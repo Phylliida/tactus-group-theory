@@ -33,3 +33,9 @@ pub mod homomorphism;
 
 #[cfg(verus_keep_ghost)]
 pub mod shortlex;
+
+#[cfg(verus_keep_ghost)]
+pub mod amalgamated_free_product;
+
+#[cfg(verus_keep_ghost)]
+pub mod normal_form_free_product;
