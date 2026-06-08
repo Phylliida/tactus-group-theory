@@ -6,3 +6,6 @@ pub mod word;
 
 #[cfg(verus_keep_ghost)]
 pub mod reduction;
+
+#[cfg(verus_keep_ghost)]
+pub mod presentation;
