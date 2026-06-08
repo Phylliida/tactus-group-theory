@@ -24,3 +24,12 @@ pub mod hnn;
 
 #[cfg(verus_keep_ghost)]
 pub mod britton;
+
+#[cfg(verus_keep_ghost)]
+pub mod free_product;
+
+#[cfg(verus_keep_ghost)]
+pub mod homomorphism;
+
+#[cfg(verus_keep_ghost)]
+pub mod shortlex;
