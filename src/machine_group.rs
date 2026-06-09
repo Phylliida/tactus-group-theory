@@ -2,6 +2,7 @@ use vstd::prelude::*;
 use crate::symbol::*;
 use crate::word::*;
 use crate::presentation::*;
+use crate::hnn::*;
 
 verus! {
 
@@ -254,6 +255,130 @@ pub proof fn lemma_quad_associations_valid(q: Quad, m: nat, k: nat)
     lemma_symbol_power_valid(Symbol::Gen(2), m, k);
     lemma_symbol_power_valid(Symbol::Gen(2), m * m, k);
     lemma_symbol_power_valid(Symbol::Gen(2), 1, k);
+}
+
+//  ============================================================
+//  B(M) as a tower of single-letter HNN steps
+//  ============================================================
+//
+//  Every stable letter associates subgroups of the ORIGINAL A, so B(M) is the
+//  iterated HNN extension  A → A∗r₀ → (A∗r₀)∗r₁ → …, one quadruple per level.
+//  Level i adds stable letter Gen(3+i) carrying quadruple i's three associations.
+
+//  B(M) restricted to the first i quadruples.
+pub open spec fn b_m_upto(mm: ModMachine, i: nat) -> Presentation
+    decreases i,
+{
+    if i == 0 {
+        base_A()
+    } else {
+        hnn_presentation(HNNData {
+            base: b_m_upto(mm, (i - 1) as nat),
+            associations: quad_associations(mm.quads[(i - 1) as int], mm.m),
+        })
+    }
+}
+
+//  The full B(M): all quadruples folded in.
+pub open spec fn b_m(mm: ModMachine) -> Presentation {
+    b_m_upto(mm, mm.quads.len())
+}
+
+//  The tower adds exactly one generator per level: |gens| = 3 + i.
+pub proof fn lemma_b_m_upto_num_generators(mm: ModMachine, i: nat)
+    ensures
+        b_m_upto(mm, i).num_generators == 3 + i,
+    decreases i,
+{
+    if i == 0 {
+    } else {
+        lemma_b_m_upto_num_generators(mm, (i - 1) as nat);
+    }
+}
+
+//  ---- Validity-preservation for a single HNN step (reusable infrastructure) ----
+
+//  One HNN relator t⁻¹·a·t·b⁻¹ is valid over the extended generator set.
+pub proof fn lemma_hnn_relator_valid(data: HNNData, j: int)
+    requires
+        hnn_data_valid(data),
+        0 <= j < data.associations.len(),
+    ensures
+        word_valid(hnn_relator(data, j), data.base.num_generators + 1),
+{
+    let ng = data.base.num_generators;
+    let (a, b) = data.associations[j];
+    let p1 = Seq::new(1, |_k: int| stable_letter_inv(data));
+    let p3 = Seq::new(1, |_k: int| stable_letter(data));
+    assert(word_valid(p1, (ng + 1) as nat)) by {
+        assert forall|q: int| 0 <= q < p1.len() implies symbol_valid(#[trigger] p1[q], (ng + 1) as nat)
+        by { assert(p1[q] == Symbol::Inv(ng)); }
+    }
+    assert(word_valid(p3, (ng + 1) as nat)) by {
+        assert forall|q: int| 0 <= q < p3.len() implies symbol_valid(#[trigger] p3[q], (ng + 1) as nat)
+        by { assert(p3[q] == Symbol::Gen(ng)); }
+    }
+    lemma_word_valid_mono(a, ng, (ng + 1) as nat);
+    lemma_inverse_word_valid(b, ng);
+    lemma_word_valid_mono(inverse_word(b), ng, (ng + 1) as nat);
+    lemma_concat_word_valid(p1, a, (ng + 1) as nat);
+    lemma_concat_word_valid(p1 + a, p3, (ng + 1) as nat);
+    lemma_concat_word_valid(p1 + a + p3, inverse_word(b), (ng + 1) as nat);
+}
+
+//  A single HNN step preserves presentation validity.
+pub proof fn lemma_hnn_presentation_valid(data: HNNData)
+    requires
+        hnn_data_valid(data),
+    ensures
+        presentation_valid(hnn_presentation(data)),
+{
+    reveal(presentation_valid);
+    let hp = hnn_presentation(data);
+    let ng = data.base.num_generators;
+    let bl = data.base.relators.len();
+    assert forall|i: int| 0 <= i < hp.relators.len()
+        implies word_valid(#[trigger] hp.relators[i], hp.num_generators)
+    by {
+        if i < bl {
+            assert(hp.relators[i] == data.base.relators[i]);
+            lemma_word_valid_mono(data.base.relators[i], ng, (ng + 1) as nat);
+        } else {
+            assert(hp.relators[i] == hnn_relator(data, i - bl));
+            lemma_hnn_relator_valid(data, i - bl);
+        }
+    }
+}
+
+//  B(M) up to level i is a valid presentation.
+pub proof fn lemma_b_m_upto_valid(mm: ModMachine, i: nat)
+    ensures
+        presentation_valid(b_m_upto(mm, i)),
+    decreases i,
+{
+    if i == 0 {
+        lemma_base_A_valid();
+    } else {
+        let prev = b_m_upto(mm, (i - 1) as nat);
+        let data = HNNData {
+            base: prev,
+            associations: quad_associations(mm.quads[(i - 1) as int], mm.m),
+        };
+        lemma_b_m_upto_valid(mm, (i - 1) as nat);
+        lemma_b_m_upto_num_generators(mm, (i - 1) as nat);
+        //  associations valid over prev.num_generators = 3 + (i-1) ≥ 3.
+        lemma_quad_associations_valid(mm.quads[(i - 1) as int], mm.m, prev.num_generators);
+        assert(hnn_data_valid(data));
+        lemma_hnn_presentation_valid(data);
+    }
+}
+
+//  The full B(M) is a valid presentation.
+pub proof fn lemma_b_m_valid(mm: ModMachine)
+    ensures
+        presentation_valid(b_m(mm)),
+{
+    lemma_b_m_upto_valid(mm, mm.quads.len());
 }
 
 } //  verus!
