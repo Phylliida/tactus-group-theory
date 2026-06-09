@@ -75,3 +75,12 @@ pub mod normal_form_afp_textbook;
 
 #[cfg(verus_keep_ghost)]
 pub mod britton_via_tower;
+
+#[cfg(verus_keep_ghost)]
+pub mod higman_operations;
+
+#[cfg(verus_keep_ghost)]
+pub mod machine_group;
+
+#[cfg(verus_keep_ghost)]
+pub mod machine_group_faithful;
