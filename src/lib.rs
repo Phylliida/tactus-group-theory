@@ -79,8 +79,10 @@ pub mod britton_via_tower;
 #[cfg(verus_keep_ghost)]
 pub mod higman_operations;
 
-#[cfg(verus_keep_ghost)]
-pub mod machine_group;
-
-#[cfg(verus_keep_ghost)]
-pub mod machine_group_faithful;
+// NOTE: machine_group / machine_group_faithful (a "modular-machine-as-group"
+// encoding) were a superseded experiment — NOT used by Britton, the Higman
+// embedding, or the live ZFC→f.p.-group pipeline (which routes through
+// lemma_ceer_embeds_in_fp_group via the two-gen/benign-relator construction in
+// verus-computability-theory). Their only downstream references were dead
+// wildcard imports. They carried 2 admit() holes; dropped here to keep this
+// crate admit-free. The verus-group-theory originals are untouched.
