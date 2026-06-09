@@ -943,11 +943,7 @@ proof fn lemma_tower_iso_per_word(
     let a_words_tower = Seq::new(afp_data.identifications.len(), |i: int| afp_data.identifications[i].0);
     let b_words_tower = Seq::new(afp_data.identifications.len(), |i: int| afp_data.identifications[i].1);
 
-    //  Element-wise: a_words_tower[i] = shift(a_words_hnn[i], k*ng) and b_words_tower[i] = b_words_hnn[i]
-    assert forall|i: int| 0 <= i < kk implies
-        afp_data.identifications[i].1 == data.associations[i].1 by {}
-    assert forall|i: int| 0 <= i < kk implies
-        #[trigger] b_words_tower[i] =~= b_words_hnn[i] by {}
+    //  Element-wise: b_words_tower =~= b_words_hnn (Lean closes Seq ext directly)
     assert(b_words_tower =~= b_words_hnn);
 
     //  Shift-embedding distributivity
@@ -975,10 +971,6 @@ proof fn lemma_tower_iso_per_word(
     //  HNN biconditional (should fire from hnn_associations_isomorphic)
     assert(equiv_in_presentation(data.base, embed_a_hnn, empty_word())
         <==> equiv_in_presentation(data.base, apply_embedding(b_words_hnn, w), empty_word()));
-
-    //  Key =~= connections
-    assert(b_words_tower =~= b_words_hnn);
-    assert(embed_b_tower =~= apply_embedding(b_words_hnn, w));
 
     //  Explicitly trigger hnn_iso biconditional
     assert(word_valid(w, kk as nat));
