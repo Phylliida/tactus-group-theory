@@ -189,4 +189,71 @@ pub open spec fn mod_machine_wf(mm: ModMachine) -> bool {
             ==> i == j)
 }
 
+//  ============================================================
+//  The HNN encoding: stable-letter associations per quadruple
+//  ============================================================
+//
+//  Each quadruple gets ONE stable letter conjugating a rank-3 subgroup of A.
+//  An association pair (P, Q) means  stable⁻¹ · P · stable = Q.
+//    R-quad (a,b,c):  t(a,b) ↦ t(c,0),   xᵐ ↦ xᵐ²,   yᵐ ↦ y
+//    L-quad (a,b,c):  t(a,b) ↦ t(0,c),   xᵐ ↦ x,      yᵐ ↦ yᵐ²
+//  The xᵐ/yᵐ relations are what telescope the residue conjugation to the FULL
+//  config (the §3 computation in the construction doc).
+
+pub open spec fn quad_associations(q: Quad, m: nat) -> Seq<(Word, Word)> {
+    match q.dir {
+        Dir::R => seq![
+            (config_word(q.a, q.b), config_word(q.c, 0)),
+            (symbol_power(Symbol::Gen(1), m), symbol_power(Symbol::Gen(1), m * m)),
+            (symbol_power(Symbol::Gen(2), m), symbol_power(Symbol::Gen(2), 1)),
+        ],
+        Dir::L => seq![
+            (config_word(q.a, q.b), config_word(0, q.c)),
+            (symbol_power(Symbol::Gen(1), m), symbol_power(Symbol::Gen(1), 1)),
+            (symbol_power(Symbol::Gen(2), m), symbol_power(Symbol::Gen(2), m * m)),
+        ],
+    }
+}
+
+//  word_valid is monotone in the generator count.
+pub proof fn lemma_word_valid_mono(w: Word, a: nat, b: nat)
+    requires
+        word_valid(w, a),
+        a <= b,
+    ensures
+        word_valid(w, b),
+{
+    assert forall|i: int| 0 <= i < w.len() implies symbol_valid(#[trigger] w[i], b)
+    by {
+        assert(symbol_valid(w[i], a));
+    }
+}
+
+//  Every association word is valid over any base with at least 3 generators
+//  (they only use t, x, y).
+pub proof fn lemma_quad_associations_valid(q: Quad, m: nat, k: nat)
+    requires
+        k >= 3,
+    ensures
+        forall|i: int| 0 <= i < quad_associations(q, m).len() ==> {
+            &&& word_valid(#[trigger] quad_associations(q, m)[i].0, k)
+            &&& word_valid(quad_associations(q, m)[i].1, k)
+        },
+{
+    //  config words: valid over 3, lift to k by monotonicity.
+    lemma_config_word_valid(q.a, q.b);
+    lemma_config_word_valid(q.c, 0);
+    lemma_config_word_valid(0, q.c);
+    lemma_word_valid_mono(config_word(q.a, q.b), 3, k);
+    lemma_word_valid_mono(config_word(q.c, 0), 3, k);
+    lemma_word_valid_mono(config_word(0, q.c), 3, k);
+    //  x/y powers: x=Gen(1), y=Gen(2) are valid over k≥3 directly.
+    lemma_symbol_power_valid(Symbol::Gen(1), m, k);
+    lemma_symbol_power_valid(Symbol::Gen(1), m * m, k);
+    lemma_symbol_power_valid(Symbol::Gen(1), 1, k);
+    lemma_symbol_power_valid(Symbol::Gen(2), m, k);
+    lemma_symbol_power_valid(Symbol::Gen(2), m * m, k);
+    lemma_symbol_power_valid(Symbol::Gen(2), 1, k);
+}
+
 } //  verus!
