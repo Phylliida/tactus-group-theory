@@ -14,11 +14,16 @@ Requires the Tactus toolchain built and Mathlib set up (see
 [`../tactus-tutorial/chapters/00-setup`](../tactus-tutorial/chapters/00-setup)). Then:
 
 ```bash
-./check.sh
+./check-modules.sh   # per-module (current default — see note below)
+./check.sh           # whole-crate (currently aborts on the runtime panic)
 ```
 
-This runs the bundled tactus `verus --lean-backend` over the whole crate. Expect
-`N verified, 0 errors`.
+`check.sh` runs `verus --lean-backend` over the whole crate. It currently **aborts** on a
+fatal Lean-backend panic while lowering the exec module `runtime`
+(see [`../BUG-vec-copy-datatype-index-lean-panic.md`](../BUG-vec-copy-datatype-index-lean-panic.md)),
+which masks every other module. Until that's fixed upstream, use `check-modules.sh`, which
+verifies each module independently with `--verify-module` (same cross-module coverage, just
+not aborted by one panic).
 
 ## Porting discipline
 
@@ -32,11 +37,22 @@ This runs the bundled tactus `verus --lean-backend` over the whole crate. Expect
 
 ## Status
 
-| Module | Source lines | Status |
-|---|---|---|
-| `symbol` | 80 | ✅ ported, verified |
-| `word` | 208 | ✅ ported, verified |
+**The general Britton's lemma is verified on the Lean backend** (`britton_via_tower`:
+194 verified, 0 errors — matching the historical Z3 count). The entire ghost/spec/proof
+mathematics of the `britton_via_tower` cone ports **verbatim** — zero changes, no compression,
+even for the 12.4k-line `normal_form_afp_textbook` (231 verified). `./check-modules.sh` reports
+**765 verified, 9 errors** across the crate; the only failures are the exec layer:
 
-Foundation (`symbol`, `word`) ports **verbatim** — the definitional lemmas close under the Lean
-default closer with no changes, and `Seq`/`=~=`/quantifier/recursion reasoning all work under
-`--lean-backend`. Next along the DAG: `reduction`, `presentation`, `free_product`, `hnn` → `britton`.
+| Module | Status |
+|---|---|
+| 24 modules (symbol … `britton_via_tower`, `normal_form_afp_textbook`, `britton`, …) | ✅ verified |
+| `todd_coxeter` | ⚠️ 15 verified, **9 errors** — exec fns use `usize::MAX`/`ArchWordBits` (documented tactus deferral) |
+| `runtime` | 💥 **PANIC** — Lean-backend bug on `Vec<CopyDatatype>` indexing ([bug report](../BUG-vec-copy-datatype-index-lean-panic.md)) |
+
+Both failing modules are the **exec/runtime layer**, off the Britton/Higman *math* path (the
+Higman modules `higman_operations`/`machine_group` don't reference them). `britton.rs` is the
+t-free base case (HNN-injectivity core), a separate partial route kept as a building block; the
+general lemma is `britton_via_tower`.
+
+Next: the **Higman rope trick** (`higman_operations`, `machine_group`), then a sibling
+`tactus-computability-theory` crate for the ZFC → CEER → finitely-presented-group construction.

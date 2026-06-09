@@ -39,3 +39,39 @@ pub mod amalgamated_free_product;
 
 #[cfg(verus_keep_ghost)]
 pub mod normal_form_free_product;
+
+#[cfg(verus_keep_ghost)]
+pub mod normal_form_amalgamated;
+
+#[cfg(verus_keep_ghost)]
+pub mod abelianization;
+
+#[cfg(verus_keep_ghost)]
+pub mod concrete;
+
+#[cfg(verus_keep_ghost)]
+pub mod britton_infra;
+
+#[cfg(verus_keep_ghost)]
+pub mod finite;
+
+#[cfg(verus_keep_ghost)]
+pub mod completeness;
+
+#[cfg(verus_keep_ghost)]
+pub mod coset_group;
+
+#[cfg(verus_keep_ghost)]
+pub mod todd_coxeter;
+
+#[cfg(verus_keep_ghost)]
+pub mod runtime;
+
+#[cfg(verus_keep_ghost)]
+pub mod tower;
+
+#[cfg(verus_keep_ghost)]
+pub mod normal_form_afp_textbook;
+
+#[cfg(verus_keep_ghost)]
+pub mod britton_via_tower;
