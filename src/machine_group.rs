@@ -2,6 +2,8 @@ use vstd::prelude::*;
 use crate::symbol::*;
 use crate::word::*;
 use crate::presentation::*;
+use crate::presentation_lemmas::*;
+use crate::reduction::*;
 use crate::hnn::*;
 
 verus! {
@@ -454,6 +456,105 @@ pub proof fn lemma_g_m_num_generators(mm: ModMachine)
         g_m(mm).num_generators == 4 + mm.quads.len(),
 {
     lemma_b_m_upto_num_generators(mm, mm.quads.len());
+}
+
+//  ============================================================
+//  Obligation C, foundation: commutativity of x and y in A
+//  ============================================================
+//
+//  In A only x,y commute (t does NOT), so this is derived from the SPECIFIC
+//  relator [x,y] = x·y·x⁻¹·y⁻¹ — not abelianization (which would make t commute
+//  too).  The keystone:  x·y ~ y·x.
+
+//  The word x·y·x⁻¹·y⁻¹·y·x freely reduces to x·y (cancel y⁻¹y then x⁻¹x).
+proof fn lemma_comm_reduces()
+    ensures
+        reduces_to(
+            seq![Symbol::Gen(1), Symbol::Gen(2), Symbol::Inv(1), Symbol::Inv(2),
+                 Symbol::Gen(2), Symbol::Gen(1)],
+            seq![Symbol::Gen(1), Symbol::Gen(2)],
+        ),
+{
+    let x = Symbol::Gen(1); let y = Symbol::Gen(2);
+    let xi = Symbol::Inv(1); let yi = Symbol::Inv(2);
+    let w0: Word = seq![x, y, xi, yi, y, x];
+    let w1: Word = seq![x, y, xi, x];
+    let w2: Word = seq![x, y];
+    //  w0 → w1 : cancel the (yi, y) pair at position 3.
+    assert(has_cancellation_at(w0, 3)) by {
+        assert(w0[3] == yi && w0[4] == y);
+        assert(is_inverse_pair(yi, y));
+    }
+    assert(reduce_at(w0, 3) =~= w1) by {
+        assert(w0.subrange(0, 3) =~= seq![x, y, xi]);
+        assert(w0.subrange(5, 6) =~= seq![x]);
+    }
+    assert(reduces_one_step(w0, w1)) by {
+        assert(has_cancellation_at(w0, 3) && w1 == reduce_at(w0, 3));
+    }
+    //  w1 → w2 : cancel the (xi, x) pair at position 2.
+    assert(has_cancellation_at(w1, 2)) by {
+        assert(w1[2] == xi && w1[3] == x);
+        assert(is_inverse_pair(xi, x));
+    }
+    assert(reduce_at(w1, 2) =~= w2) by {
+        assert(w1.subrange(0, 2) =~= seq![x, y]);
+        assert(w1.subrange(4, 4) =~= Seq::<Symbol>::empty());
+    }
+    assert(reduces_one_step(w1, w2)) by {
+        assert(has_cancellation_at(w1, 2) && w2 == reduce_at(w1, 2));
+    }
+    //  assemble the 2-step reduction.
+    assert(reduces_in_steps(w2, w2, 0));
+    assert(reduces_in_steps(w1, w2, 1)) by {
+        assert(reduces_one_step(w1, w2) && reduces_in_steps(w2, w2, 0));
+    }
+    assert(reduces_in_steps(w0, w2, 2)) by {
+        assert(reduces_one_step(w0, w1) && reduces_in_steps(w1, w2, 1));
+    }
+    assert(reduces_to(w0, w2)) by {
+        assert(reduces_in_steps(w0, w2, 2));
+    }
+}
+
+//  x·y ~ y·x in A.
+pub proof fn lemma_xy_commute_in_A()
+    ensures
+        equiv_in_presentation(
+            base_A(),
+            seq![Symbol::Gen(1), Symbol::Gen(2)],
+            seq![Symbol::Gen(2), Symbol::Gen(1)],
+        ),
+{
+    let a = base_A();
+    let x = Symbol::Gen(1); let y = Symbol::Gen(2);
+    let xi = Symbol::Inv(1); let yi = Symbol::Inv(2);
+    let xy: Word = seq![x, y];
+    let yx: Word = seq![y, x];
+    let r: Word = seq![x, y, xi, yi];
+    let r_yx: Word = seq![x, y, xi, yi, y, x];
+    assert(a.relators[0] == r);
+    //  R ~ ε   (relator is identity; w = ε).
+    lemma_conjugate_relator_is_identity(a, empty_word(), 0);
+    assert(concat(concat(empty_word(), a.relators[0]), inverse_word(empty_word())) =~= r) by {
+        assert(inverse_word(empty_word()) =~= empty_word());
+    }
+    assert(equiv_in_presentation(a, r, empty_word()));
+    //  append yx:  R·yx ~ ε·yx = yx.
+    lemma_equiv_concat_left(a, r, empty_word(), yx);
+    assert(concat(r, yx) =~= r_yx);
+    assert(concat(empty_word(), yx) =~= yx);
+    assert(equiv_in_presentation(a, r_yx, yx));
+    //  R·yx freely reduces to xy.
+    lemma_comm_reduces();
+    lemma_reduces_to_equiv(a, r_yx, xy);
+    //  xy ~ R·yx ~ yx.
+    lemma_base_A_valid();
+    assert(word_valid(r_yx, 3)) by {
+        assert forall|i: int| 0 <= i < r_yx.len() implies symbol_valid(#[trigger] r_yx[i], 3) by {}
+    }
+    lemma_equiv_symmetric(a, r_yx, xy);
+    lemma_equiv_transitive(a, xy, r_yx, yx);
 }
 
 } //  verus!
