@@ -79,6 +79,9 @@ pub mod britton_via_tower;
 #[cfg(verus_keep_ghost)]
 pub mod higman_operations;
 
+#[cfg(verus_keep_ghost)]
+pub mod tietze;
+
 // NOTE: machine_group / machine_group_faithful (a "modular-machine-as-group"
 // encoding) were a superseded experiment — NOT used by Britton, the Higman
 // embedding, or the live ZFC→f.p.-group pipeline (which routes through
