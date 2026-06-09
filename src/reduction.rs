@@ -571,24 +571,8 @@ proof fn lemma_overlapping_confluence(w: Word, w1: Word, w2: Word, i: int)
     assert(w1 =~= w2) by {
         lemma_reduce_at_len(w, i);
         lemma_reduce_at_len(w, i + 1);
-        assert(w1.len() == w2.len());
-        assert forall|k: int| 0 <= k < w1.len() implies #[trigger] w1[k] == w2[k] by {
-            lemma_reduce_at_elements(w, i);
-            lemma_reduce_at_elements(w, i + 1);
-            if k < i {
-                assert(w1[k] == w[k]);
-                assert(w2[k] == w[k]);
-            } else if k == i {
-                assert(w1[k] == w[k + 2]); //  C
-                assert(w2[k] == w[k]); //  A
-                assert(w[k] == a);
-                assert(w[k + 2] == c);
-            } else {
-                //  k > i: w1[k] == w[k+2], w2[k] == w[k+2]
-                assert(w1[k] == w[k + 2]);
-                assert(w2[k] == w[k + 2]);
-            }
-        };
+        lemma_reduce_at_elements(w, i);
+        lemma_reduce_at_elements(w, i + 1);
     };
     lemma_reduces_to_refl(w1);
 }
@@ -634,28 +618,6 @@ proof fn lemma_disjoint_confluence(w: Word, w1: Word, w2: Word, i: int, j: int)
         lemma_reduce_at_elements(w1, j - 2);
         lemma_reduce_at_len(w2, i);
         lemma_reduce_at_elements(w2, i);
-        assert(w3.len() == w2_reduced.len());
-        assert forall|k: int| 0 <= k < w3.len() implies #[trigger] w3[k] == w2_reduced[k] by {
-            if k < i {
-                //  w3[k] = w1[k] = w[k], w2_reduced[k] = w2[k] = w[k]
-                assert(w3[k] == w1[k]);
-                assert(w1[k] == w[k]);
-                assert(w2_reduced[k] == w2[k]);
-                assert(w2[k] == w[k]);
-            } else if k < j - 2 {
-                //  w3[k] = w1[k] = w[k+2], w2_reduced[k] = w2[k+2] = w[k+2]
-                assert(w3[k] == w1[k]);
-                assert(w1[k] == w[k + 2]);
-                assert(w2_reduced[k] == w2[k + 2]);
-                assert(w2[k + 2] == w[k + 2]);
-            } else {
-                //  w3[k] = w1[k+2] = w[k+4], w2_reduced[k] = w2[k+2] = w[k+4]
-                assert(w3[k] == w1[k + 2]);
-                assert(w1[k + 2] == w[k + 4]);
-                assert(w2_reduced[k] == w2[k + 2]);
-                assert(w2[k + 2] == w[k + 4]);
-            }
-        };
     };
     //  w2 →¹ w2_reduced =~= w3, so w2 →¹ w3
     assert(has_cancellation_at(w2, i) && w3 == reduce_at(w2, i)) by {
@@ -696,28 +658,6 @@ pub proof fn lemma_one_step_concat_left(w1: Word, wa: Word, w2: Word)
         lemma_reduce_at_len(w1, i);
         lemma_reduce_at_elements(cw, i);
         lemma_reduce_at_elements(w1, i);
-        let result = reduce_at(cw, i);
-        let expected = concat(reduce_at(w1, i), w2);
-        assert(result.len() == expected.len());
-        assert forall|k: int| 0 <= k < result.len() implies #[trigger] result[k] == expected[k] by {
-            if k < i {
-                assert(result[k] == cw[k]);
-                assert(cw[k] == w1[k]);
-                assert(expected[k] == reduce_at(w1, i)[k]);
-                assert(reduce_at(w1, i)[k] == w1[k]);
-            } else if k < (w1.len() - 2) as int {
-                assert(result[k] == cw[k + 2]);
-                assert(cw[k + 2] == w1[k + 2]);
-                assert(expected[k] == reduce_at(w1, i)[k]);
-                assert(reduce_at(w1, i)[k] == w1[k + 2]);
-            } else {
-                //  k >= w1.len() - 2, in the w2 part
-                assert(result[k] == cw[k + 2]);
-                let w2_idx = k - (w1.len() - 2) as int;
-                assert(cw[k + 2] == w2[w2_idx]);
-                assert(expected[k] == w2[w2_idx]);
-            }
-        };
     };
     assert(has_cancellation_at(cw, i) && concat(wa, w2) == reduce_at(cw, i));
 }
@@ -783,27 +723,6 @@ pub proof fn lemma_one_step_concat_right(w1: Word, w2: Word, wb: Word)
         lemma_reduce_at_len(w2, j);
         lemma_reduce_at_elements(cw, j + offset);
         lemma_reduce_at_elements(w2, j);
-        let result = reduce_at(cw, j + offset);
-        let expected = concat(w1, reduce_at(w2, j));
-        assert(result.len() == expected.len());
-        assert forall|k: int| 0 <= k < result.len() implies #[trigger] result[k] == expected[k] by {
-            if k < offset {
-                assert(result[k] == cw[k]);
-                assert(cw[k] == w1[k]);
-                assert(expected[k] == w1[k]);
-            } else if k < j + offset {
-                assert(result[k] == cw[k]);
-                assert(cw[k] == w2[k - offset]);
-                assert(expected[k] == reduce_at(w2, j)[k - offset]);
-                assert(reduce_at(w2, j)[k - offset] == w2[k - offset]);
-            } else {
-                //  k >= j + offset
-                assert(result[k] == cw[k + 2]);
-                assert(cw[k + 2] == w2[k + 2 - offset]);
-                assert(expected[k] == reduce_at(w2, j)[k - offset]);
-                assert(reduce_at(w2, j)[k - offset] == w2[k - offset + 2]);
-            }
-        };
     };
     assert(has_cancellation_at(cw, j + offset) && concat(w1, wb) == reduce_at(cw, j + offset));
 }
