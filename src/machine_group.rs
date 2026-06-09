@@ -381,4 +381,79 @@ pub proof fn lemma_b_m_valid(mm: ModMachine)
     lemma_b_m_upto_valid(mm, mm.quads.len());
 }
 
+//  ============================================================
+//  G(M): the finitely presented group
+//  ============================================================
+//
+//  G(M) = ⟨ B(M), k | k commutes with t, r_i, l_j ⟩ — one more HNN step on top
+//  of B(M) whose stable letter k = Gen(3+|quads|) has the IDENTITY isomorphism
+//  on the subgroup ⟨t, r_i, l_j⟩ (each generator maps to itself: k⁻¹ g k = g).
+//  The word-problem instance for a config (α,β) is the commutator [k, t(α,β)].
+
+//  k's associations: t = Gen(0) and every stable letter Gen(3+i) maps to itself.
+pub open spec fn g_m_associations(mm: ModMachine) -> Seq<(Word, Word)> {
+    seq![ (seq![Symbol::Gen(0)], seq![Symbol::Gen(0)]) ]
+    + Seq::new(mm.quads.len(), |i: int| {
+        let g = Symbol::Gen((3 + i) as nat);
+        (seq![g], seq![g])
+    })
+}
+
+//  The finitely presented group G(M).
+pub open spec fn g_m(mm: ModMachine) -> Presentation {
+    hnn_presentation(HNNData { base: b_m(mm), associations: g_m_associations(mm) })
+}
+
+//  k's association words are all single generators valid over B(M)'s 3+|quads| gens.
+pub proof fn lemma_g_m_associations_valid(mm: ModMachine)
+    ensures
+        forall|i: int| 0 <= i < g_m_associations(mm).len() ==> {
+            &&& word_valid(#[trigger] g_m_associations(mm)[i].0, (3 + mm.quads.len()) as nat)
+            &&& word_valid(g_m_associations(mm)[i].1, (3 + mm.quads.len()) as nat)
+        },
+{
+    let nq = mm.quads.len();
+    let assocs = g_m_associations(mm);
+    let k = (3 + nq) as nat;
+    assert forall|i: int| 0 <= i < assocs.len() implies {
+        &&& word_valid(#[trigger] assocs[i].0, k)
+        &&& word_valid(assocs[i].1, k)
+    } by {
+        if i == 0 {
+            let w: Word = seq![Symbol::Gen(0)];
+            assert(assocs[i].0 == w && assocs[i].1 == w);
+            assert forall|q: int| 0 <= q < w.len() implies symbol_valid(#[trigger] w[q], k)
+            by { assert(w[q] == Symbol::Gen(0)); }
+        } else {
+            let g = Symbol::Gen((3 + (i - 1)) as nat);
+            let w: Word = seq![g];
+            assert(assocs[i].0 == w && assocs[i].1 == w);
+            assert forall|q: int| 0 <= q < w.len() implies symbol_valid(#[trigger] w[q], k)
+            by { assert(w[q] == g); }
+        }
+    }
+}
+
+//  G(M) is a valid presentation. (It is finitely presented by construction:
+//  finitely many generators 3+|quads|+1 and finitely many relators.)
+pub proof fn lemma_g_m_valid(mm: ModMachine)
+    ensures
+        presentation_valid(g_m(mm)),
+{
+    lemma_b_m_valid(mm);
+    lemma_b_m_upto_num_generators(mm, mm.quads.len());
+    lemma_g_m_associations_valid(mm);
+    let data = HNNData { base: b_m(mm), associations: g_m_associations(mm) };
+    assert(hnn_data_valid(data));
+    lemma_hnn_presentation_valid(data);
+}
+
+//  G(M) has 4 + |quads| generators (t,x,y + one stable letter per quad + k).
+pub proof fn lemma_g_m_num_generators(mm: ModMachine)
+    ensures
+        g_m(mm).num_generators == 4 + mm.quads.len(),
+{
+    lemma_b_m_upto_num_generators(mm, mm.quads.len());
+}
+
 } //  verus!
