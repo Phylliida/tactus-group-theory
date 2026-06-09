@@ -99,4 +99,94 @@ pub proof fn lemma_base_A_valid()
     }
 }
 
+//  ============================================================
+//  The classic Aanderaa–Cohen modular machine (paper §1)
+//  ============================================================
+//
+//  Config (α,β) ∈ N².  Write α = u·m + a, β = v·m + b  (a,b the residues mod m).
+//  A quadruple (a,b,c,R) applies when (α mod m, β mod m) = (a,b):
+//      R:  α' = u·m² + c,  β' = v
+//      L:  α' = u,         β' = v·m² + c
+//  At most one quadruple per residue pair (a,b).  H₀(M) = { (α,β) : (α,β) →* (0,0) }.
+
+pub enum Dir { R, L }
+
+pub struct Quad {
+    pub a: nat,    //  residue of α  (0 ≤ a < m)
+    pub b: nat,    //  residue of β  (0 ≤ b < m)
+    pub c: nat,    //  0 ≤ c < m²
+    pub dir: Dir,
+}
+
+pub struct ModMachine {
+    pub m: nat,            //  modulus, > 1
+    pub n: nat,            //  0 < n < m (used for input/output)
+    pub quads: Seq<Quad>,
+}
+
+//  A quadruple matches a configuration: both residues agree.
+pub open spec fn quad_matches(q: Quad, m: nat, alpha: nat, beta: nat) -> bool {
+    alpha % m == q.a && beta % m == q.b
+}
+
+//  The configuration reached by applying one matching quadruple.
+pub open spec fn quad_step(q: Quad, m: nat, alpha: nat, beta: nat) -> (nat, nat) {
+    match q.dir {
+        Dir::R => ((alpha / m) * (m * m) + q.c, beta / m),
+        Dir::L => (alpha / m, (beta / m) * (m * m) + q.c),
+    }
+}
+
+//  (α,β) is terminal: no quadruple matches its residue pair.
+pub open spec fn mm_terminal(mm: ModMachine, alpha: nat, beta: nat) -> bool {
+    forall|i: int| 0 <= i < mm.quads.len()
+        ==> !quad_matches(#[trigger] mm.quads[i], mm.m, alpha, beta)
+}
+
+//  One-step yield (α,β) → (α',β').
+pub open spec fn mm_yields(mm: ModMachine, alpha: nat, beta: nat, alpha2: nat, beta2: nat) -> bool {
+    exists|i: int| 0 <= i < mm.quads.len()
+        && quad_matches(#[trigger] mm.quads[i], mm.m, alpha, beta)
+        && quad_step(mm.quads[i], mm.m, alpha, beta) == (alpha2, beta2)
+}
+
+//  Reachability in exactly k steps:  (a0,b0) →ᵏ (a1,b1).
+pub open spec fn mm_reaches(
+    mm: ModMachine, a0: nat, b0: nat, a1: nat, b1: nat, k: nat,
+) -> bool
+    decreases k,
+{
+    if k == 0 {
+        a0 == a1 && b0 == b1
+    } else {
+        exists|am: nat, bm: nat|
+            mm_yields(mm, a0, b0, am, bm)
+            && mm_reaches(mm, am, bm, a1, b1, (k - 1) as nat)
+    }
+}
+
+//  H₀(M): configurations that compute to the terminal origin (0,0).
+pub open spec fn mm_in_H0(mm: ModMachine, alpha: nat, beta: nat) -> bool {
+    mm_terminal(mm, 0, 0)
+    && exists|k: nat| mm_reaches(mm, alpha, beta, 0, 0, k)
+}
+
+//  Well-formedness of a quadruple w.r.t. modulus m.
+pub open spec fn quad_wf(q: Quad, m: nat) -> bool {
+    q.a < m && q.b < m && q.c < m * m
+}
+
+//  Well-formed modular machine: m>1, 0<n<m, quads wf, and deterministic
+//  (at most one quadruple per residue pair).
+pub open spec fn mod_machine_wf(mm: ModMachine) -> bool {
+    &&& mm.m > 1
+    &&& 0 < mm.n < mm.m
+    &&& (forall|i: int| 0 <= i < mm.quads.len() ==> quad_wf(#[trigger] mm.quads[i], mm.m))
+    &&& (forall|i: int, j: int|
+            0 <= i < mm.quads.len() && 0 <= j < mm.quads.len() && i != j
+            && #[trigger] mm.quads[i].a == #[trigger] mm.quads[j].a
+            && mm.quads[i].b == mm.quads[j].b
+            ==> i == j)
+}
+
 } //  verus!
