@@ -460,6 +460,112 @@ pub proof fn lemma_g_m_num_generators(mm: ModMachine)
     lemma_b_m_upto_num_generators(mm, mm.quads.len());
 }
 
+//  The stable letter k = Gen(3+|quads|), and "k commutes with w" in G(M).
+pub open spec fn k_gen(mm: ModMachine) -> Symbol {
+    Symbol::Gen((3 + mm.quads.len()) as nat)
+}
+
+pub open spec fn k_commutes(mm: ModMachine, w: Word) -> bool {
+    equiv_in_presentation(g_m(mm), seq![k_gen(mm)] + w, w + seq![k_gen(mm)])
+}
+
+//  k commutes with t (= Gen(0)), from g_m_associations[0] = (t,t).
+pub proof fn lemma_k_commutes_t(mm: ModMachine)
+    ensures
+        k_commutes(mm, seq![Symbol::Gen(0)]),
+{
+    let gdata = HNNData { base: b_m(mm), associations: g_m_associations(mm) };
+    let p = g_m(mm);
+    let kk = k_gen(mm);
+    let ki = Symbol::Inv((3 + mm.quads.len()) as nat);
+    let t: Word = seq![Symbol::Gen(0)];
+    lemma_b_m_valid(mm);
+    lemma_g_m_associations_valid(mm);
+    lemma_b_m_upto_num_generators(mm, mm.quads.len());
+    assert(hnn_data_valid(gdata));
+    lemma_g_m_valid(mm);
+    lemma_g_m_num_generators(mm);
+    assert(gdata.associations[0] == (t, t));
+    assert(stable_letter(gdata) == kk && stable_letter_inv(gdata) == ki);
+    lemma_hnn_conjugation(gdata, 0);
+    assert(Seq::new(1, |_j: int| ki) =~= seq![ki]);
+    assert(Seq::new(1, |_j: int| kk) =~= seq![kk]);
+    assert(equiv_in_presentation(p, seq![ki] + t + seq![kk], t));
+    assert(symbol_valid(kk, p.num_generators));
+    assert(word_valid(t, p.num_generators)) by {
+        assert forall|i: int| 0 <= i < t.len() implies symbol_valid(#[trigger] t[i], p.num_generators) by { }
+    }
+    lemma_commute_from_conj(p, kk, ki, t);
+}
+
+//  Commuting with k is closed under products.
+pub proof fn lemma_k_commutes_product(mm: ModMachine, x: Word, y: Word)
+    requires
+        k_commutes(mm, x),
+        k_commutes(mm, y),
+    ensures
+        k_commutes(mm, x + y),
+{
+    let p = g_m(mm);
+    let kk = k_gen(mm);
+    lemma_equiv_concat_left(p, seq![kk] + x, x + seq![kk], y);
+    lemma_equiv_concat_right(p, x, seq![kk] + y, y + seq![kk]);
+    assert((x + seq![kk]) + y == x + (seq![kk] + y));
+    lemma_equiv_transitive(p, (seq![kk] + x) + y, (x + seq![kk]) + y, x + (y + seq![kk]));
+    assert(seq![kk] + (x + y) == (seq![kk] + x) + y);
+    assert(x + (y + seq![kk]) == (x + y) + seq![kk]);
+}
+
+//  Commuting with k respects equivalence.
+pub proof fn lemma_k_commutes_respects_equiv(mm: ModMachine, x: Word, y: Word)
+    requires
+        k_commutes(mm, x),
+        equiv_in_presentation(g_m(mm), x, y),
+        word_valid(x, g_m(mm).num_generators),
+        presentation_valid(g_m(mm)),
+    ensures
+        k_commutes(mm, y),
+{
+    let p = g_m(mm);
+    let kk = k_gen(mm);
+    lemma_equiv_symmetric(p, x, y);                       //  y ~ x
+    lemma_equiv_concat_right(p, seq![kk], y, x);          //  k·y ~ k·x
+    lemma_equiv_concat_left(p, x, y, seq![kk]);           //  x·k ~ y·k
+    lemma_equiv_transitive(p, seq![kk] + y, seq![kk] + x, x + seq![kk]);
+    lemma_equiv_transitive(p, seq![kk] + y, x + seq![kk], y + seq![kk]);
+}
+
+//  k commutes with the stable letter Gen(3+qi), from g_m_associations[1+qi].
+pub proof fn lemma_k_commutes_stable(mm: ModMachine, qi: nat)
+    requires
+        qi < mm.quads.len(),
+    ensures
+        k_commutes(mm, seq![Symbol::Gen((3 + qi) as nat)]),
+{
+    let gdata = HNNData { base: b_m(mm), associations: g_m_associations(mm) };
+    let p = g_m(mm);
+    let kk = k_gen(mm);
+    let ki = Symbol::Inv((3 + mm.quads.len()) as nat);
+    let s: Word = seq![Symbol::Gen((3 + qi) as nat)];
+    lemma_b_m_valid(mm);
+    lemma_g_m_associations_valid(mm);
+    lemma_b_m_upto_num_generators(mm, mm.quads.len());
+    assert(hnn_data_valid(gdata));
+    lemma_g_m_valid(mm);
+    lemma_g_m_num_generators(mm);
+    assert(gdata.associations[(1 + qi) as int] == (s, s));
+    assert(stable_letter(gdata) == kk && stable_letter_inv(gdata) == ki);
+    lemma_hnn_conjugation(gdata, (1 + qi) as int);
+    assert(Seq::new(1, |_j: int| ki) =~= seq![ki]);
+    assert(Seq::new(1, |_j: int| kk) =~= seq![kk]);
+    assert(equiv_in_presentation(p, seq![ki] + s + seq![kk], s));
+    assert(symbol_valid(kk, p.num_generators));
+    assert(word_valid(s, p.num_generators)) by {
+        assert forall|i: int| 0 <= i < s.len() implies symbol_valid(#[trigger] s[i], p.num_generators) by { }
+    }
+    lemma_commute_from_conj(p, kk, ki, s);
+}
+
 //  ============================================================
 //  Obligation C, foundation: commutativity of x and y in A
 //  ============================================================
@@ -1390,6 +1496,53 @@ pub proof fn lemma_conj_base_inverse(
     lemma_inverse_involution(rs);
     assert(inverse_word(lhs) =~= seq![ri] + symbol_power(inverse_symbol(s), m) + seq![rs]);
     assert(inverse_word(rhs) =~= symbol_power(inverse_symbol(ssp), mp));
+}
+
+//  From the HNN relation  K⁻¹·W·K ~ W,  derive that K commutes with W:  K·W ~ W·K.
+pub proof fn lemma_commute_from_conj(p: Presentation, kk: Symbol, ki: Symbol, w: Word)
+    requires
+        is_inverse_pair(kk, ki),
+        symbol_valid(kk, p.num_generators),
+        presentation_valid(p),
+        word_valid(w, p.num_generators),
+        equiv_in_presentation(p, seq![ki] + w + seq![kk], w),
+    ensures
+        equiv_in_presentation(p, seq![kk] + w, w + seq![kk]),
+{
+    let ng = p.num_generators;
+    lemma_inverse_preserves_index(kk);
+    assert(symbol_valid(ki, ng));
+    let lhs: Word = seq![kk, ki] + w + seq![kk];
+    //  lhs reduces to  w·K  (cancel K·K⁻¹ at position 0)
+    assert(has_cancellation_at(lhs, 0)) by { assert(lhs[0] == kk && lhs[1] == ki); }
+    assert(reduce_at(lhs, 0) =~= w + seq![kk]) by {
+        assert(lhs.subrange(0, 0) =~= empty_word());
+        assert(lhs.subrange(2, lhs.len() as int) =~= w + seq![kk]);
+    }
+    assert(reduces_one_step(lhs, w + seq![kk])) by {
+        assert(has_cancellation_at(lhs, 0) && w + seq![kk] == reduce_at(lhs, 0));
+    }
+    assert(reduces_in_steps(lhs, w + seq![kk], 1)) by {
+        assert(reduces_one_step(lhs, w + seq![kk]) && reduces_in_steps(w + seq![kk], w + seq![kk], 0));
+    }
+    assert(reduces_to(lhs, w + seq![kk]));
+    lemma_reduces_to_equiv(p, lhs, w + seq![kk]);                          //  lhs ~ w·K
+    lemma_equiv_concat_right(p, seq![kk], seq![ki] + w + seq![kk], w);     //  K·(K⁻¹·w·K) ~ K·w
+    assert(seq![kk] + (seq![ki] + w + seq![kk]) == lhs);
+    //  word validity of lhs for symmetric
+    let kki: Word = seq![kk, ki];
+    let kw: Word = seq![kk];
+    assert(word_valid(kki, ng)) by {
+        assert forall|i: int| 0 <= i < kki.len() implies symbol_valid(#[trigger] kki[i], ng) by { }
+    }
+    assert(word_valid(kw, ng)) by {
+        assert forall|i: int| 0 <= i < kw.len() implies symbol_valid(#[trigger] kw[i], ng) by { }
+    }
+    lemma_concat_word_valid(kki, w, ng);
+    lemma_concat_word_valid(kki + w, kw, ng);
+    lemma_equiv_symmetric(p, lhs, w + seq![kk]);                          //  w·K ~ lhs
+    lemma_equiv_transitive(p, w + seq![kk], lhs, seq![kk] + w);           //  w·K ~ K·w
+    lemma_equiv_symmetric(p, w + seq![kk], seq![kk] + w);                 //  K·w ~ w·K
 }
 
 //  Conjugation distributes over a concatenation (insert a cancelling pair).
