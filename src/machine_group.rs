@@ -663,6 +663,101 @@ pub proof fn lemma_inverse_word_two(s1: Symbol, s2: Symbol)
     assert(seq![s2].drop_first() =~= empty_word());
 }
 
+//  ============================================================
+//  Obligation C: the config decomposition
+//    t(um+a, vm+b) ~ (yᵐ)⁻ᵛ(xᵐ)⁻ᵘ · t(a,b) · (xᵐ)ᵘ(yᵐ)ᵛ
+//  ============================================================
+
+//  The intermediate split form (config word with every power broken into its
+//  m-multiple and residue parts, residues adjacent to the centre).
+pub open spec fn w_mid_word(u: nat, a: nat, v: nat, b: nat, m: nat) -> Word {
+    symbol_power(Symbol::Inv(2), v * m) + symbol_power(Symbol::Inv(2), b)
+        + symbol_power(Symbol::Inv(1), u * m) + symbol_power(Symbol::Inv(1), a)
+        + seq![Symbol::Gen(0)]
+        + symbol_power(Symbol::Gen(1), a) + symbol_power(Symbol::Gen(1), u * m)
+        + symbol_power(Symbol::Gen(2), b) + symbol_power(Symbol::Gen(2), v * m)
+}
+
+//  The decomposition target:  (yᵐ)⁻ᵛ(xᵐ)⁻ᵘ · t(a,b) · (xᵐ)ᵘ(yᵐ)ᵛ.
+pub open spec fn config_target(u: nat, a: nat, v: nat, b: nat, m: nat) -> Word {
+    symbol_power(Symbol::Inv(2), v * m) + symbol_power(Symbol::Inv(1), u * m)
+        + config_word(a, b)
+        + symbol_power(Symbol::Gen(1), u * m) + symbol_power(Symbol::Gen(2), v * m)
+}
+
+//  Phase 1: config_word(um+a, vm+b) equals W_mid as a word (four power merges).
+pub proof fn lemma_config_eq_wmid(u: nat, a: nat, v: nat, b: nat, m: nat)
+    ensures
+        config_word((u * m + a) as nat, (v * m + b) as nat) =~= w_mid_word(u, a, v, b, m),
+{
+    let i2 = Symbol::Inv(2); let i1 = Symbol::Inv(1);
+    let g0 = Symbol::Gen(0); let g1 = Symbol::Gen(1); let g2 = Symbol::Gen(2);
+    lemma_symbol_power_merge(i2, v * m, b);   //  i2^vm · i2^b == i2^(vm+b)
+    lemma_symbol_power_merge(i1, u * m, a);   //  i1^um · i1^a == i1^(um+a)
+    lemma_symbol_power_merge(g1, a, u * m);   //  g1^a · g1^um == g1^(a+um) = g1^(um+a)
+    lemma_symbol_power_merge(g2, b, v * m);   //  g2^b · g2^vm == g2^(b+vm) = g2^(vm+b)
+    //  config_word unfolds to the merged 5-segment form; substitute each power,
+    //  then the result re-associates to W_mid.
+    let sub: Word =
+        (symbol_power(i2, v * m) + symbol_power(i2, b))
+        + (symbol_power(i1, u * m) + symbol_power(i1, a))
+        + seq![g0]
+        + (symbol_power(g1, a) + symbol_power(g1, u * m))
+        + (symbol_power(g2, b) + symbol_power(g2, v * m));
+    assert(config_word((u * m + a) as nat, (v * m + b) as nat) == sub);
+    assert(sub =~= w_mid_word(u, a, v, b, m));
+}
+
+//  Phase 2: W_mid ~ TARGET via two commutation swaps.
+//  swap1 moves i2^b past i1^um; swap2 moves g1^um past g2^b.
+pub proof fn lemma_wmid_to_target(u: nat, a: nat, v: nat, b: nat, m: nat)
+    ensures
+        equiv_in_presentation(base_A(), w_mid_word(u, a, v, b, m), config_target(u, a, v, b, m)),
+{
+    let p = base_A();
+    let i2 = Symbol::Inv(2); let i1 = Symbol::Inv(1);
+    let g0 = Symbol::Gen(0); let g1 = Symbol::Gen(1); let g2 = Symbol::Gen(2);
+    //  --- swap 1:  i2^b · i1^um  ~  i1^um · i2^b ---
+    let p1 = symbol_power(i2, v * m);
+    let m1a = symbol_power(i2, b) + symbol_power(i1, u * m);
+    let m1b = symbol_power(i1, u * m) + symbol_power(i2, b);
+    let s1 = symbol_power(i1, a) + seq![g0] + symbol_power(g1, a)
+        + symbol_power(g1, u * m) + symbol_power(g2, b) + symbol_power(g2, v * m);
+    lemma_xinv_yinv_commute_in_A();
+    lemma_power_commutes(p, i2, i1, b, u * m);              //  equiv(p, m1a, m1b)
+    lemma_equiv_concat_left(p, m1a, m1b, s1);              //  m1a·s1 ~ m1b·s1
+    lemma_equiv_concat_right(p, p1, m1a + s1, m1b + s1);   //  p1·(m1a·s1) ~ p1·(m1b·s1)
+    assert(w_mid_word(u, a, v, b, m) =~= p1 + (m1a + s1));
+    //  --- swap 2:  g1^um · g2^b  ~  g2^b · g1^um ---
+    let p2 = symbol_power(i2, v * m) + symbol_power(i1, u * m) + symbol_power(i2, b)
+        + symbol_power(i1, a) + seq![g0] + symbol_power(g1, a);
+    let m2a = symbol_power(g1, u * m) + symbol_power(g2, b);
+    let m2b = symbol_power(g2, b) + symbol_power(g1, u * m);
+    let s2 = symbol_power(g2, v * m);
+    lemma_xy_commute_in_A();
+    lemma_power_commutes(p, g1, g2, u * m, b);              //  equiv(p, m2a, m2b)
+    lemma_equiv_concat_left(p, m2a, m2b, s2);
+    lemma_equiv_concat_right(p, p2, m2a + s2, m2b + s2);    //  p2·(m2a·s2) ~ p2·(m2b·s2)
+    //  bridges: align the two swap stages and the final target
+    assert(p1 + (m1b + s1) == p2 + (m2a + s2));
+    assert(p2 + (m2b + s2) =~= config_target(u, a, v, b, m));
+    //  chain:  W_mid ~ p1·(m1b·s1) = p2·(m2a·s2) ~ p2·(m2b·s2) = TARGET
+    lemma_equiv_transitive(p, w_mid_word(u, a, v, b, m), p2 + (m2a + s2), p2 + (m2b + s2));
+}
+
+//  The full decomposition (Phase 1 ∘ Phase 2).
+pub proof fn lemma_config_decompose(u: nat, a: nat, v: nat, b: nat, m: nat)
+    ensures
+        equiv_in_presentation(
+            base_A(),
+            config_word((u * m + a) as nat, (v * m + b) as nat),
+            config_target(u, a, v, b, m),
+        ),
+{
+    lemma_config_eq_wmid(u, a, v, b, m);
+    lemma_wmid_to_target(u, a, v, b, m);
+}
+
 //  y⁻¹·x⁻¹ ~ x⁻¹·y⁻¹ in A — the inverse of the keystone (the second commutation
 //  the decomposition needs).
 pub proof fn lemma_xinv_yinv_commute_in_A()
