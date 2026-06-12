@@ -1194,6 +1194,39 @@ pub proof fn lemma_lift_to_gm(mm: ModMachine, w1: Word, w2: Word)
     lemma_base_embeds_in_hnn(data, w1, w2);
 }
 
+//  An equivalence at tower level j holds at every higher level i ≥ j.
+pub proof fn lemma_lift_bm_level(mm: ModMachine, j: nat, i: nat, w1: Word, w2: Word)
+    requires
+        equiv_in_presentation(b_m_upto(mm, j), w1, w2),
+        j <= i,
+    ensures
+        equiv_in_presentation(b_m_upto(mm, i), w1, w2),
+    decreases i,
+{
+    if i == j {
+    } else {
+        lemma_lift_bm_level(mm, j, (i - 1) as nat, w1, w2);
+        let data = HNNData {
+            base: b_m_upto(mm, (i - 1) as nat),
+            associations: quad_associations(mm.quads[(i - 1) as int], mm.m),
+        };
+        lemma_base_embeds_in_hnn(data, w1, w2);
+    }
+}
+
+//  An equivalence at tower level j holds in the full G(M).
+pub proof fn lemma_lift_level_to_gm(mm: ModMachine, j: nat, w1: Word, w2: Word)
+    requires
+        equiv_in_presentation(b_m_upto(mm, j), w1, w2),
+        j <= mm.quads.len(),
+    ensures
+        equiv_in_presentation(g_m(mm), w1, w2),
+{
+    lemma_lift_bm_level(mm, j, mm.quads.len(), w1, w2);
+    let data = HNNData { base: b_m(mm), associations: g_m_associations(mm) };
+    lemma_base_embeds_in_hnn(data, w1, w2);
+}
+
 //  ============================================================
 //  Power conjugation:  r⁻¹·sᵐⁿ·r ~ s'ᵐ'ⁿ  given the single relation r⁻¹·sᵐ·r ~ s'ᵐ'.
 //  ============================================================
