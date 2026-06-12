@@ -926,6 +926,109 @@ pub proof fn lemma_conj_config_target(u: nat, a: nat, v: nat, b: nat, c: nat, m:
     assert(recompose_target(u, v, c, m) =~= (((b1 + b2) + b3) + b4) + b5);
 }
 
+//  The single-letter HNN extension of A carrying one L-quadruple's relations.
+pub open spec fn l_step_data(a: nat, b: nat, c: nat, m: nat) -> HNNData {
+    HNNData { base: base_A(), associations: quad_associations(Quad { a, b, c, dir: Dir::L }, m) }
+}
+
+//  Conjugate the decomposed config target by the L-stable-letter.  The result is
+//  itself a config_target (with modulus 1), so the recompose reuses decomposition.
+//  L scalings:  x^m ↦ x,  y^m ↦ y²,  t(a,b) ↦ t(0,c).
+pub proof fn lemma_conj_config_target_L(u: nat, a: nat, v: nat, b: nat, c: nat, m: nat)
+    ensures
+        equiv_in_presentation(
+            hnn_presentation(l_step_data(a, b, c, m)),
+            seq![Symbol::Inv(3)] + config_target(u, a, v, b, m) + seq![Symbol::Gen(3)],
+            config_target(u, 0, (m * m * v) as nat, c, 1),
+        ),
+{
+    let q = Quad { a, b, c, dir: Dir::L };
+    let data = l_step_data(a, b, c, m);
+    let p = hnn_presentation(data);
+    let rs = Symbol::Gen(3);
+    let ri = Symbol::Inv(3);
+    let i1 = Symbol::Inv(1); let i2 = Symbol::Inv(2);
+    let g1 = Symbol::Gen(1); let g2 = Symbol::Gen(2);
+    lemma_base_A_valid();
+    lemma_quad_associations_valid(q, m, 3);
+    assert(hnn_data_valid(data));
+    lemma_hnn_presentation_valid(data);
+    assert(p.num_generators == 4);
+    let pair: Word = seq![rs, ri];
+    assert(word_valid(pair, 4)) by {
+        assert forall|i: int| 0 <= i < pair.len() implies symbol_valid(#[trigger] pair[i], 4) by { }
+    }
+    assert(is_inverse_pair(rs, ri));
+    assert(stable_letter(data) == rs && stable_letter_inv(data) == ri);
+    assert(data.associations[0] == (config_word(a, b), config_word(0, c)));
+    assert(data.associations[1] == (symbol_power(g1, m), symbol_power(g1, 1)));
+    assert(data.associations[2] == (symbol_power(g2, m), symbol_power(g2, (m * m) as nat)));
+    assert(v * m == m * v) by (nonlinear_arith);
+    assert(u * m == m * u) by (nonlinear_arith);
+    lemma_hnn_conjugation(data, 0);
+    lemma_hnn_conjugation(data, 1);
+    lemma_hnn_conjugation(data, 2);
+    assert(Seq::new(1, |_j: int| ri) =~= seq![ri]);
+    assert(Seq::new(1, |_j: int| rs) =~= seq![rs]);
+    assert(equiv_in_presentation(p, seq![ri] + config_word(a, b) + seq![rs], config_word(0, c)));
+    assert(equiv_in_presentation(p, seq![ri] + symbol_power(g1, m) + seq![rs], symbol_power(g1, 1)));
+    assert(equiv_in_presentation(p, seq![ri] + symbol_power(g2, m) + seq![rs], symbol_power(g2, (m * m) as nat)));
+    lemma_conj_word_valid(g1, m);
+    lemma_conj_word_valid(g2, m);
+    assert(word_valid(symbol_power(g1, 1), 4)) by { lemma_symbol_power_valid(g1, 1, 4); }
+    assert(word_valid(symbol_power(g2, (m * m) as nat), 4)) by { lemma_symbol_power_valid(g2, (m * m) as nat, 4); }
+    lemma_conj_base_inverse(p, rs, ri, g1, g1, m, 1);              //  conj(i1^m) ~ i1^1
+    lemma_conj_base_inverse(p, rs, ri, g2, g2, m, (m * m) as nat); //  conj(i2^m) ~ i2^m²
+    assert(inverse_symbol(g1) == i1 && inverse_symbol(g2) == i2);
+    lemma_conj_sympower(p, rs, ri, i2, i2, m, (m * m) as nat, v);  //  conj(i2^{mv}) ~ i2^{m²v}
+    lemma_conj_sympower(p, rs, ri, i1, i1, m, 1, u);              //  conj(i1^{mu}) ~ i1^u
+    lemma_conj_sympower(p, rs, ri, g1, g1, m, 1, u);             //  conj(g1^{mu}) ~ g1^u
+    lemma_conj_sympower(p, rs, ri, g2, g2, m, (m * m) as nat, v); //  conj(g2^{mv}) ~ g2^{m²v}
+    let a1 = symbol_power(i2, (v * m) as nat); let b1 = symbol_power(i2, (m * m * v) as nat);
+    let a2 = symbol_power(i1, (u * m) as nat); let b2 = symbol_power(i1, u);
+    let a3 = config_word(a, b);                let b3 = config_word(0, c);
+    let a4 = symbol_power(g1, (u * m) as nat); let b4 = symbol_power(g1, u);
+    let a5 = symbol_power(g2, (v * m) as nat); let b5 = symbol_power(g2, (m * m * v) as nat);
+    assert(equiv_in_presentation(p, seq![ri] + a1 + seq![rs], b1));
+    assert(equiv_in_presentation(p, seq![ri] + a2 + seq![rs], b2));
+    assert(equiv_in_presentation(p, seq![ri] + a3 + seq![rs], b3));
+    assert(equiv_in_presentation(p, seq![ri] + a4 + seq![rs], b4));
+    assert(equiv_in_presentation(p, seq![ri] + a5 + seq![rs], b5));
+    //  distribute (identical chain to the R case)
+    lemma_conj_distributes(p, ri, rs, a1, a2);
+    lemma_equiv_concat_left(p, seq![ri] + a1 + seq![rs], b1, seq![ri] + a2 + seq![rs]);
+    lemma_equiv_concat_right(p, b1, seq![ri] + a2 + seq![rs], b2);
+    lemma_equiv_transitive(p, seq![ri] + (a1 + a2) + seq![rs],
+        (seq![ri] + a1 + seq![rs]) + (seq![ri] + a2 + seq![rs]), b1 + (seq![ri] + a2 + seq![rs]));
+    lemma_equiv_transitive(p, seq![ri] + (a1 + a2) + seq![rs], b1 + (seq![ri] + a2 + seq![rs]), b1 + b2);
+    lemma_conj_distributes(p, ri, rs, a1 + a2, a3);
+    lemma_equiv_concat_left(p, seq![ri] + (a1 + a2) + seq![rs], b1 + b2, seq![ri] + a3 + seq![rs]);
+    lemma_equiv_concat_right(p, b1 + b2, seq![ri] + a3 + seq![rs], b3);
+    lemma_equiv_transitive(p, seq![ri] + ((a1 + a2) + a3) + seq![rs],
+        (seq![ri] + (a1 + a2) + seq![rs]) + (seq![ri] + a3 + seq![rs]),
+        (b1 + b2) + (seq![ri] + a3 + seq![rs]));
+    lemma_equiv_transitive(p, seq![ri] + ((a1 + a2) + a3) + seq![rs],
+        (b1 + b2) + (seq![ri] + a3 + seq![rs]), (b1 + b2) + b3);
+    lemma_conj_distributes(p, ri, rs, (a1 + a2) + a3, a4);
+    lemma_equiv_concat_left(p, seq![ri] + ((a1 + a2) + a3) + seq![rs], (b1 + b2) + b3, seq![ri] + a4 + seq![rs]);
+    lemma_equiv_concat_right(p, (b1 + b2) + b3, seq![ri] + a4 + seq![rs], b4);
+    lemma_equiv_transitive(p, seq![ri] + (((a1 + a2) + a3) + a4) + seq![rs],
+        (seq![ri] + ((a1 + a2) + a3) + seq![rs]) + (seq![ri] + a4 + seq![rs]),
+        ((b1 + b2) + b3) + (seq![ri] + a4 + seq![rs]));
+    lemma_equiv_transitive(p, seq![ri] + (((a1 + a2) + a3) + a4) + seq![rs],
+        ((b1 + b2) + b3) + (seq![ri] + a4 + seq![rs]), ((b1 + b2) + b3) + b4);
+    lemma_conj_distributes(p, ri, rs, ((a1 + a2) + a3) + a4, a5);
+    lemma_equiv_concat_left(p, seq![ri] + (((a1 + a2) + a3) + a4) + seq![rs], ((b1 + b2) + b3) + b4, seq![ri] + a5 + seq![rs]);
+    lemma_equiv_concat_right(p, ((b1 + b2) + b3) + b4, seq![ri] + a5 + seq![rs], b5);
+    lemma_equiv_transitive(p, seq![ri] + ((((a1 + a2) + a3) + a4) + a5) + seq![rs],
+        (seq![ri] + (((a1 + a2) + a3) + a4) + seq![rs]) + (seq![ri] + a5 + seq![rs]),
+        (((b1 + b2) + b3) + b4) + (seq![ri] + a5 + seq![rs]));
+    lemma_equiv_transitive(p, seq![ri] + ((((a1 + a2) + a3) + a4) + a5) + seq![rs],
+        (((b1 + b2) + b3) + b4) + (seq![ri] + a5 + seq![rs]), (((b1 + b2) + b3) + b4) + b5);
+    assert(config_target(u, a, v, b, m) == ((((a1 + a2) + a3) + a4) + a5));
+    assert(config_target(u, 0, (m * m * v) as nat, c, 1) =~= (((b1 + b2) + b3) + b4) + b5);
+}
+
 //  The full decomposition (Phase 1 ∘ Phase 2).
 pub proof fn lemma_config_decompose(u: nat, a: nat, v: nat, b: nat, m: nat)
     ensures
@@ -1002,6 +1105,59 @@ pub proof fn lemma_forward_step_R(u: nat, a: nat, v: nat, b: nat, c: nat, m: nat
     lemma_recompose(u, v, c, m);
     lemma_equiv_transitive(p, seq![ri] + cw + seq![rs], seq![ri] + ct + seq![rs],
         recompose_target(u, v, c, m));
+}
+
+//  The L recompose reuses the decomposition: config_target(u,0,m²v,c,1) is exactly
+//  the decomposition of config_word(u, m²v+c).
+pub proof fn lemma_recompose_L(u: nat, v: nat, c: nat, m: nat)
+    ensures
+        equiv_in_presentation(
+            base_A(),
+            config_target(u, 0, (m * m * v) as nat, c, 1),
+            config_word(u, (v * m * m + c) as nat),
+        ),
+{
+    let x = config_word((u * 1 + 0) as nat, ((m * m * v) * 1 + c) as nat);
+    let y = config_target(u, 0, (m * m * v) as nat, c, 1);
+    lemma_config_decompose(u, 0, (m * m * v) as nat, c, 1);   //  equiv(base_A, x, y)
+    lemma_base_A_valid();
+    lemma_config_word_valid((u * 1 + 0) as nat, ((m * m * v) * 1 + c) as nat);
+    lemma_equiv_symmetric(base_A(), x, y);                     //  equiv(base_A, y, x)
+    assert(m * m * v + c == v * m * m + c) by (nonlinear_arith);
+    assert(x == config_word(u, (v * m * m + c) as nat));
+}
+
+//  ============================================================
+//  THE FORWARD STEP for an L-quadruple:  l⁻¹ · t(α,β) · l ~ t(α',β')
+//  where α=um+a, β=vm+b, α'=u, β'=vm²+c.
+//  ============================================================
+pub proof fn lemma_forward_step_L(u: nat, a: nat, v: nat, b: nat, c: nat, m: nat)
+    ensures
+        equiv_in_presentation(
+            hnn_presentation(l_step_data(a, b, c, m)),
+            seq![Symbol::Inv(3)] + config_word((u * m + a) as nat, (v * m + b) as nat) + seq![Symbol::Gen(3)],
+            config_word(u, (v * m * m + c) as nat),
+        ),
+{
+    let data = l_step_data(a, b, c, m);
+    let p = hnn_presentation(data);
+    let rs = Symbol::Gen(3);
+    let ri = Symbol::Inv(3);
+    let cw = config_word((u * m + a) as nat, (v * m + b) as nat);
+    let ct = config_target(u, a, v, b, m);
+    let rt = config_target(u, 0, (m * m * v) as nat, c, 1);
+    let goal = config_word(u, (v * m * m + c) as nat);
+    lemma_config_decompose(u, a, v, b, m);
+    lemma_base_embeds_in_hnn(data, cw, ct);
+    lemma_equiv_concat_left(p, cw, ct, seq![rs]);
+    lemma_equiv_concat_right(p, seq![ri], cw + seq![rs], ct + seq![rs]);
+    assert(seq![ri] + cw + seq![rs] == seq![ri] + (cw + seq![rs]));
+    assert(seq![ri] + ct + seq![rs] == seq![ri] + (ct + seq![rs]));
+    lemma_conj_config_target_L(u, a, v, b, c, m);
+    lemma_recompose_L(u, v, c, m);
+    lemma_base_embeds_in_hnn(data, rt, goal);
+    lemma_equiv_transitive(p, seq![ri] + cw + seq![rs], seq![ri] + ct + seq![rs], rt);
+    lemma_equiv_transitive(p, seq![ri] + cw + seq![rs], rt, goal);
 }
 
 //  ============================================================
