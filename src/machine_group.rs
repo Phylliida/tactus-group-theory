@@ -5,6 +5,7 @@ use crate::presentation::*;
 use crate::presentation_lemmas::*;
 use crate::reduction::*;
 use crate::hnn::*;
+use crate::normal_form_afp_textbook::lemma_equiv_inverse;
 
 verus! {
 
@@ -650,6 +651,44 @@ pub proof fn lemma_xy_commute_in_A()
     }
     lemma_equiv_symmetric(a, r_yx, xy);
     lemma_equiv_transitive(a, xy, r_yx, yx);
+}
+
+//  inverse_word of a two-symbol word (reverses and inverts).
+pub proof fn lemma_inverse_word_two(s1: Symbol, s2: Symbol)
+    ensures
+        inverse_word(seq![s1, s2]) =~= seq![inverse_symbol(s2), inverse_symbol(s1)],
+{
+    reveal_with_fuel(inverse_word, 3);
+    assert(seq![s1, s2].drop_first() =~= seq![s2]);
+    assert(seq![s2].drop_first() =~= empty_word());
+}
+
+//  y⁻¹·x⁻¹ ~ x⁻¹·y⁻¹ in A — the inverse of the keystone (the second commutation
+//  the decomposition needs).
+pub proof fn lemma_xinv_yinv_commute_in_A()
+    ensures
+        equiv_in_presentation(
+            base_A(),
+            seq![Symbol::Inv(2), Symbol::Inv(1)],
+            seq![Symbol::Inv(1), Symbol::Inv(2)],
+        ),
+{
+    let a = base_A();
+    let xy: Word = seq![Symbol::Gen(1), Symbol::Gen(2)];
+    let yx: Word = seq![Symbol::Gen(2), Symbol::Gen(1)];
+    lemma_xy_commute_in_A();
+    lemma_base_A_valid();
+    assert(word_valid(xy, 3)) by {
+        assert forall|i: int| 0 <= i < xy.len() implies symbol_valid(#[trigger] xy[i], 3) by {}
+    }
+    assert(word_valid(yx, 3)) by {
+        assert forall|i: int| 0 <= i < yx.len() implies symbol_valid(#[trigger] yx[i], 3) by {}
+    }
+    lemma_equiv_inverse(a, xy, yx);
+    lemma_inverse_word_two(Symbol::Gen(1), Symbol::Gen(2));
+    lemma_inverse_word_two(Symbol::Gen(2), Symbol::Gen(1));
+    assert(inverse_word(xy) =~= seq![Symbol::Inv(2), Symbol::Inv(1)]);
+    assert(inverse_word(yx) =~= seq![Symbol::Inv(1), Symbol::Inv(2)]);
 }
 
 } //  verus!
