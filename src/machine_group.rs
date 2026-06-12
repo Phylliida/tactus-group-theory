@@ -654,6 +654,49 @@ pub proof fn lemma_xy_commute_in_A()
     lemma_equiv_transitive(a, xy, r_yx, yx);
 }
 
+//  inverse_word distributes (reversing) over concatenation.
+pub proof fn lemma_inverse_word_concat(a: Word, b: Word)
+    ensures
+        inverse_word(a + b) =~= inverse_word(b) + inverse_word(a),
+    decreases a.len(),
+{
+    if a.len() == 0 {
+        assert(a + b =~= b);
+        assert(inverse_word(a) =~= empty_word());
+    } else {
+        reveal_with_fuel(inverse_word, 1);
+        assert((a + b).drop_first() =~= a.drop_first() + b);
+        assert((a + b).first() == a.first());
+        lemma_inverse_word_concat(a.drop_first(), b);
+    }
+}
+
+//  inverse_word of a power inverts the symbol.
+pub proof fn lemma_inverse_word_sympower(s: Symbol, n: nat)
+    ensures
+        inverse_word(symbol_power(s, n)) =~= symbol_power(inverse_symbol(s), n),
+    decreases n,
+{
+    if n == 0 {
+        assert(symbol_power(s, 0) =~= empty_word());
+        assert(symbol_power(inverse_symbol(s), 0) =~= empty_word());
+    } else {
+        let k = (n - 1) as nat;
+        //  symbol_power(s, n) =~= seq![s] + symbol_power(s, k)
+        lemma_symbol_power_merge(s, 1, k);
+        lemma_symbol_power_one(s);
+        assert(symbol_power(s, n) =~= seq![s] + symbol_power(s, k));
+        lemma_inverse_word_concat(seq![s], symbol_power(s, k));
+        lemma_inverse_word_sympower(s, k);
+        //  inverse_word(seq![s]) =~= seq![inverse_symbol(s)]
+        reveal_with_fuel(inverse_word, 2);
+        assert(seq![s].drop_first() =~= empty_word());
+        //  refold:  sp(inv,k) + [inv] =~= sp(inv, n)
+        lemma_symbol_power_merge(inverse_symbol(s), k, 1);
+        lemma_symbol_power_one(inverse_symbol(s));
+    }
+}
+
 //  inverse_word of a two-symbol word (reverses and inverts).
 pub proof fn lemma_inverse_word_two(s1: Symbol, s2: Symbol)
     ensures
@@ -759,6 +802,38 @@ pub proof fn lemma_config_decompose(u: nat, a: nat, v: nat, b: nat, m: nat)
     lemma_wmid_to_target(u, a, v, b, m);
 }
 
+//  The conjugated form of config_target by an R-stable-letter:
+//    y⁻ᵛ · x⁻ᵘᵐ² · t(c,0) · xᵘᵐ² · yᵛ.
+pub open spec fn recompose_target(u: nat, v: nat, c: nat, m: nat) -> Word {
+    symbol_power(Symbol::Inv(2), v) + symbol_power(Symbol::Inv(1), (m * m * u) as nat)
+        + config_word(c, 0)
+        + symbol_power(Symbol::Gen(1), (m * m * u) as nat) + symbol_power(Symbol::Gen(2), v)
+}
+
+//  The recompose collapses (two x-power merges) to config_word(um²+c, v).
+pub proof fn lemma_recompose(u: nat, v: nat, c: nat, m: nat)
+    ensures
+        recompose_target(u, v, c, m) =~= config_word((u * m * m + c) as nat, v),
+{
+    let i2 = Symbol::Inv(2); let i1 = Symbol::Inv(1);
+    let g0 = Symbol::Gen(0); let g1 = Symbol::Gen(1); let g2 = Symbol::Gen(2);
+    let mmu = (m * m * u) as nat;
+    let ap = (u * m * m + c) as nat;
+    assert(m * m * u == u * m * m) by (nonlinear_arith);
+    assert(mmu + c == ap);
+    assert(c + mmu == ap);
+    lemma_symbol_power_merge(i1, mmu, c);   //  i1^mmu · i1^c =~= i1^(mmu+c) = i1^ap
+    lemma_symbol_power_merge(g1, c, mmu);   //  g1^c · g1^mmu =~= g1^(c+mmu) = g1^ap
+    //  config_word(c,0) flattens (i2^0, g2^0 empty)
+    let cw: Word = symbol_power(i1, c) + seq![g0] + symbol_power(g1, c);
+    assert(config_word(c, 0) =~= cw);
+    //  substitute, then merge, then refold into config_word(ap, v)
+    let sub: Word = symbol_power(i2, v) + symbol_power(i1, mmu)
+        + cw + symbol_power(g1, mmu) + symbol_power(g2, v);
+    assert(recompose_target(u, v, c, m) == sub);
+    assert(sub =~= config_word(ap, v));
+}
+
 //  ============================================================
 //  Tower lifting: a base_A equivalence holds in every level of B(M) and in G(M).
 //  (lemma_base_embeds_in_hnn needs no validity — the lift is purely structural.)
@@ -817,6 +892,26 @@ pub proof fn lemma_cancel_pair_equiv_empty(p: Presentation, rs: Symbol, ri: Symb
     }
     assert(reduces_to(w, empty_word()));
     lemma_reduces_to_equiv(p, w, empty_word());
+}
+
+//  Conjugation distributes over a concatenation (insert a cancelling pair).
+pub proof fn lemma_conj_distributes(p: Presentation, ri: Symbol, rs: Symbol, aw: Word, bw: Word)
+    requires
+        is_inverse_pair(rs, ri),
+        presentation_valid(p),
+        word_valid(seq![rs, ri], p.num_generators),
+    ensures
+        equiv_in_presentation(
+            p,
+            seq![ri] + (aw + bw) + seq![rs],
+            (seq![ri] + aw + seq![rs]) + (seq![ri] + bw + seq![rs]),
+        ),
+{
+    lemma_cancel_pair_equiv_empty(p, rs, ri);
+    lemma_insert_equiv_empty(p, seq![ri] + aw, seq![rs, ri], bw + seq![rs]);
+    assert((seq![ri] + aw) + (bw + seq![rs]) =~= seq![ri] + (aw + bw) + seq![rs]);
+    assert((seq![ri] + aw) + concat(seq![rs, ri], bw + seq![rs])
+        =~= (seq![ri] + aw + seq![rs]) + (seq![ri] + bw + seq![rs]));
 }
 
 //  Conjugation distributes over a power, scaling the exponent.
