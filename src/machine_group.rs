@@ -517,6 +517,101 @@ proof fn lemma_comm_reduces()
     }
 }
 
+//  ---- Power-word identities (pure Seq facts) ----
+
+//  symbol_power(s, 1) is the singleton [s].
+pub proof fn lemma_symbol_power_one(s: Symbol)
+    ensures
+        symbol_power(s, 1) =~= seq![s],
+{
+}
+
+//  Powers of the same symbol concatenate by adding exponents.
+pub proof fn lemma_symbol_power_merge(s: Symbol, a: nat, b: nat)
+    ensures
+        symbol_power(s, a) + symbol_power(s, b) =~= symbol_power(s, (a + b) as nat),
+{
+}
+
+//  A single symbol u commuting with w lifts to commuting with every power wᵠ.
+//  General over (p, u, w) so it serves all four x/y sign combinations.
+pub proof fn lemma_sym_commutes_power(p: Presentation, u: Symbol, w: Symbol, q: nat)
+    requires
+        equiv_in_presentation(p, seq![u, w], seq![w, u]),
+    ensures
+        equiv_in_presentation(p, seq![u] + symbol_power(w, q), symbol_power(w, q) + seq![u]),
+    decreases q,
+{
+    if q == 0 {
+        assert(seq![u] + symbol_power(w, 0) =~= seq![u]);
+        assert(symbol_power(w, 0) + seq![u] =~= seq![u]);
+        lemma_equiv_refl(p, seq![u]);
+    } else {
+        let k = (q - 1) as nat;
+        let wk = symbol_power(w, k);
+        let wq = symbol_power(w, q);
+        let uw: Word = seq![u, w];
+        let wu: Word = seq![w, u];
+        //  front split  wq =~= [w] + wk
+        lemma_symbol_power_merge(w, 1, k);
+        lemma_symbol_power_one(w);
+        assert(wq =~= seq![w] + wk);
+        //  IH:  [u] + wk ~ wk + [u]
+        lemma_sym_commutes_power(p, u, w, k);
+        //  step 1:  uw + wk ~ wu + wk
+        lemma_equiv_concat_left(p, uw, wu, wk);
+        //  step 2:  [w] + ([u] + wk) ~ [w] + (wk + [u])
+        lemma_equiv_concat_right(p, seq![w], seq![u] + wk, wk + seq![u]);
+        //  align endpoints by =~= and chain
+        assert(seq![u] + wq =~= concat(uw, wk));
+        assert(concat(wu, wk) =~= seq![w] + (seq![u] + wk));
+        assert(seq![w] + (wk + seq![u]) =~= wq + seq![u]);
+        assert(seq![u] + wq == concat(uw, wk));
+        lemma_equiv_transitive(p, concat(uw, wk), concat(wu, wk), wq + seq![u]);
+    }
+}
+
+//  Full power commutativity: uᵖ commutes with wᵠ given u·w ~ w·u.
+pub proof fn lemma_power_commutes(p: Presentation, u: Symbol, w: Symbol, pp: nat, qq: nat)
+    requires
+        equiv_in_presentation(p, seq![u, w], seq![w, u]),
+    ensures
+        equiv_in_presentation(
+            p,
+            symbol_power(u, pp) + symbol_power(w, qq),
+            symbol_power(w, qq) + symbol_power(u, pp),
+        ),
+    decreases pp,
+{
+    let wqq = symbol_power(w, qq);
+    if pp == 0 {
+        assert(symbol_power(u, 0) + wqq =~= wqq);
+        assert(wqq + symbol_power(u, 0) =~= wqq);
+        lemma_equiv_refl(p, wqq);
+    } else {
+        let j = (pp - 1) as nat;
+        let uj = symbol_power(u, j);
+        let upp = symbol_power(u, pp);
+        lemma_symbol_power_merge(u, 1, j);
+        lemma_symbol_power_one(u);
+        assert(upp =~= seq![u] + uj);
+        //  IH:  uⱼ·wqq ~ wqq·uⱼ
+        lemma_power_commutes(p, u, w, j, qq);
+        //  equiv1:  [u]·(uⱼ·wqq) ~ [u]·(wqq·uⱼ)
+        lemma_equiv_concat_right(p, seq![u], uj + wqq, wqq + uj);
+        //  [u]·wqq ~ wqq·[u]
+        lemma_sym_commutes_power(p, u, w, qq);
+        //  equiv2:  ([u]·wqq)·uⱼ ~ (wqq·[u])·uⱼ
+        lemma_equiv_concat_left(p, seq![u] + wqq, wqq + seq![u], uj);
+        //  bridge equiv1.RHS == equiv2.LHS, then chain
+        assert(seq![u] + (wqq + uj) == (seq![u] + wqq) + uj);
+        lemma_equiv_transitive(p, seq![u] + (uj + wqq), seq![u] + (wqq + uj), (wqq + seq![u]) + uj);
+        //  align endpoints A == equiv1.LHS,  equiv2.RHS == F
+        assert(upp + wqq == seq![u] + (uj + wqq));
+        assert((wqq + seq![u]) + uj == wqq + upp);
+    }
+}
+
 //  x·y ~ y·x in A.
 pub proof fn lemma_xy_commute_in_A()
     ensures
