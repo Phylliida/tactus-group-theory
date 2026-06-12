@@ -794,53 +794,59 @@ pub open spec fn r_step_data(a: nat, b: nat, c: nat, m: nat) -> HNNData {
     HNNData { base: base_A(), associations: quad_associations(Quad { a, b, c, dir: Dir::R }, m) }
 }
 
-//  Validity of a conjugated power over the r-step's 4 generators.
-pub proof fn lemma_conj_word_valid(s: Symbol, n: nat)
+//  Validity of a conjugated power [Inv(ng)]·sᵏ·[Gen(ng)] over ng+1 generators.
+pub proof fn lemma_conj_word_valid(s: Symbol, k: nat, ng: nat)
     requires
-        symbol_valid(s, 4),
+        symbol_valid(s, ng),
     ensures
-        word_valid(seq![Symbol::Inv(3)] + symbol_power(s, n) + seq![Symbol::Gen(3)], 4),
+        word_valid(seq![Symbol::Inv(ng)] + symbol_power(s, k) + seq![Symbol::Gen(ng)], (ng + 1) as nat),
 {
-    let ri: Word = seq![Symbol::Inv(3)];
-    let rsw: Word = seq![Symbol::Gen(3)];
-    assert(word_valid(ri, 4)) by {
-        assert forall|i: int| 0 <= i < ri.len() implies symbol_valid(#[trigger] ri[i], 4)
-        by { assert(ri[i] == Symbol::Inv(3)); }
+    let ri: Word = seq![Symbol::Inv(ng)];
+    let rsw: Word = seq![Symbol::Gen(ng)];
+    assert(symbol_valid(s, (ng + 1) as nat));
+    assert(word_valid(ri, (ng + 1) as nat)) by {
+        assert forall|i: int| 0 <= i < ri.len() implies symbol_valid(#[trigger] ri[i], (ng + 1) as nat)
+        by { assert(ri[i] == Symbol::Inv(ng)); }
     }
-    assert(word_valid(rsw, 4)) by {
-        assert forall|i: int| 0 <= i < rsw.len() implies symbol_valid(#[trigger] rsw[i], 4)
-        by { assert(rsw[i] == Symbol::Gen(3)); }
+    assert(word_valid(rsw, (ng + 1) as nat)) by {
+        assert forall|i: int| 0 <= i < rsw.len() implies symbol_valid(#[trigger] rsw[i], (ng + 1) as nat)
+        by { assert(rsw[i] == Symbol::Gen(ng)); }
     }
-    lemma_symbol_power_valid(s, n, 4);
-    lemma_concat_word_valid(ri, symbol_power(s, n), 4);
-    lemma_concat_word_valid(ri + symbol_power(s, n), rsw, 4);
+    lemma_symbol_power_valid(s, k, (ng + 1) as nat);
+    lemma_concat_word_valid(ri, symbol_power(s, k), (ng + 1) as nat);
+    lemma_concat_word_valid(ri + symbol_power(s, k), rsw, (ng + 1) as nat);
 }
 
 //  Conjugate the decomposed config target by the R-stable-letter, term by term.
-pub proof fn lemma_conj_config_target(u: nat, a: nat, v: nat, b: nat, c: nat, m: nat)
+//  Generic over any base presentation p_base (so it works at every tower level).
+pub proof fn lemma_conj_config_target(p_base: Presentation, n: nat, u: nat, a: nat, v: nat, b: nat, c: nat, m: nat)
+    requires
+        presentation_valid(p_base),
+        p_base.num_generators == n,
+        n >= 3,
     ensures
         equiv_in_presentation(
-            hnn_presentation(r_step_data(a, b, c, m)),
-            seq![Symbol::Inv(3)] + config_target(u, a, v, b, m) + seq![Symbol::Gen(3)],
+            hnn_presentation(HNNData { base: p_base, associations: quad_associations(Quad { a, b, c, dir: Dir::R }, m) }),
+            seq![Symbol::Inv(n)] + config_target(u, a, v, b, m) + seq![Symbol::Gen(n)],
             recompose_target(u, v, c, m),
         ),
 {
     let q = Quad { a, b, c, dir: Dir::R };
-    let data = r_step_data(a, b, c, m);
+    let data = HNNData { base: p_base, associations: quad_associations(q, m) };
     let p = hnn_presentation(data);
-    let rs = Symbol::Gen(3);
-    let ri = Symbol::Inv(3);
+    let rs = Symbol::Gen(n);
+    let ri = Symbol::Inv(n);
     let i1 = Symbol::Inv(1); let i2 = Symbol::Inv(2);
     let g1 = Symbol::Gen(1); let g2 = Symbol::Gen(2);
     //  --- validity & structure ---
-    lemma_base_A_valid();
-    lemma_quad_associations_valid(q, m, 3);
+    lemma_quad_associations_valid(q, m, n);
     assert(hnn_data_valid(data));
     lemma_hnn_presentation_valid(data);
-    assert(p.num_generators == 4);
+    assert(p.num_generators == n + 1);
+    assert(symbol_valid(g1, n) && symbol_valid(g2, n));
     let pair: Word = seq![rs, ri];
-    assert(word_valid(pair, 4)) by {
-        assert forall|i: int| 0 <= i < pair.len() implies symbol_valid(#[trigger] pair[i], 4)
+    assert(word_valid(pair, (n + 1) as nat)) by {
+        assert forall|i: int| 0 <= i < pair.len() implies symbol_valid(#[trigger] pair[i], (n + 1) as nat)
         by { }
     }
     assert(is_inverse_pair(rs, ri));
@@ -861,10 +867,10 @@ pub proof fn lemma_conj_config_target(u: nat, a: nat, v: nat, b: nat, c: nat, m:
     assert(equiv_in_presentation(p, seq![ri] + symbol_power(g1, m) + seq![rs], symbol_power(g1, (m * m) as nat)));
     assert(equiv_in_presentation(p, seq![ri] + symbol_power(g2, m) + seq![rs], symbol_power(g2, 1)));
     //  --- inverse base relations for i1, i2 ---
-    lemma_conj_word_valid(g1, m);
-    lemma_conj_word_valid(g2, m);
-    assert(word_valid(symbol_power(g1, (m * m) as nat), 4)) by { lemma_symbol_power_valid(g1, (m * m) as nat, 4); }
-    assert(word_valid(symbol_power(g2, 1), 4)) by { lemma_symbol_power_valid(g2, 1, 4); }
+    lemma_conj_word_valid(g1, m, n);
+    lemma_conj_word_valid(g2, m, n);
+    assert(word_valid(symbol_power(g1, (m * m) as nat), (n + 1) as nat)) by { lemma_symbol_power_valid(g1, (m * m) as nat, (n + 1) as nat); }
+    assert(word_valid(symbol_power(g2, 1), (n + 1) as nat)) by { lemma_symbol_power_valid(g2, 1, (n + 1) as nat); }
     lemma_conj_base_inverse(p, rs, ri, g1, g1, m, (m * m) as nat);  //  conj(i1^m) ~ i1^m²
     lemma_conj_base_inverse(p, rs, ri, g2, g2, m, 1);              //  conj(i2^m) ~ i2^1
     assert(inverse_symbol(g1) == i1 && inverse_symbol(g2) == i2);
@@ -934,29 +940,33 @@ pub open spec fn l_step_data(a: nat, b: nat, c: nat, m: nat) -> HNNData {
 //  Conjugate the decomposed config target by the L-stable-letter.  The result is
 //  itself a config_target (with modulus 1), so the recompose reuses decomposition.
 //  L scalings:  x^m ↦ x,  y^m ↦ y²,  t(a,b) ↦ t(0,c).
-pub proof fn lemma_conj_config_target_L(u: nat, a: nat, v: nat, b: nat, c: nat, m: nat)
+pub proof fn lemma_conj_config_target_L(p_base: Presentation, n: nat, u: nat, a: nat, v: nat, b: nat, c: nat, m: nat)
+    requires
+        presentation_valid(p_base),
+        p_base.num_generators == n,
+        n >= 3,
     ensures
         equiv_in_presentation(
-            hnn_presentation(l_step_data(a, b, c, m)),
-            seq![Symbol::Inv(3)] + config_target(u, a, v, b, m) + seq![Symbol::Gen(3)],
+            hnn_presentation(HNNData { base: p_base, associations: quad_associations(Quad { a, b, c, dir: Dir::L }, m) }),
+            seq![Symbol::Inv(n)] + config_target(u, a, v, b, m) + seq![Symbol::Gen(n)],
             config_target(u, 0, (m * m * v) as nat, c, 1),
         ),
 {
     let q = Quad { a, b, c, dir: Dir::L };
-    let data = l_step_data(a, b, c, m);
+    let data = HNNData { base: p_base, associations: quad_associations(q, m) };
     let p = hnn_presentation(data);
-    let rs = Symbol::Gen(3);
-    let ri = Symbol::Inv(3);
+    let rs = Symbol::Gen(n);
+    let ri = Symbol::Inv(n);
     let i1 = Symbol::Inv(1); let i2 = Symbol::Inv(2);
     let g1 = Symbol::Gen(1); let g2 = Symbol::Gen(2);
-    lemma_base_A_valid();
-    lemma_quad_associations_valid(q, m, 3);
+    lemma_quad_associations_valid(q, m, n);
     assert(hnn_data_valid(data));
     lemma_hnn_presentation_valid(data);
-    assert(p.num_generators == 4);
+    assert(p.num_generators == n + 1);
+    assert(symbol_valid(g1, n) && symbol_valid(g2, n));
     let pair: Word = seq![rs, ri];
-    assert(word_valid(pair, 4)) by {
-        assert forall|i: int| 0 <= i < pair.len() implies symbol_valid(#[trigger] pair[i], 4) by { }
+    assert(word_valid(pair, (n + 1) as nat)) by {
+        assert forall|i: int| 0 <= i < pair.len() implies symbol_valid(#[trigger] pair[i], (n + 1) as nat) by { }
     }
     assert(is_inverse_pair(rs, ri));
     assert(stable_letter(data) == rs && stable_letter_inv(data) == ri);
@@ -973,10 +983,10 @@ pub proof fn lemma_conj_config_target_L(u: nat, a: nat, v: nat, b: nat, c: nat, 
     assert(equiv_in_presentation(p, seq![ri] + config_word(a, b) + seq![rs], config_word(0, c)));
     assert(equiv_in_presentation(p, seq![ri] + symbol_power(g1, m) + seq![rs], symbol_power(g1, 1)));
     assert(equiv_in_presentation(p, seq![ri] + symbol_power(g2, m) + seq![rs], symbol_power(g2, (m * m) as nat)));
-    lemma_conj_word_valid(g1, m);
-    lemma_conj_word_valid(g2, m);
-    assert(word_valid(symbol_power(g1, 1), 4)) by { lemma_symbol_power_valid(g1, 1, 4); }
-    assert(word_valid(symbol_power(g2, (m * m) as nat), 4)) by { lemma_symbol_power_valid(g2, (m * m) as nat, 4); }
+    lemma_conj_word_valid(g1, m, n);
+    lemma_conj_word_valid(g2, m, n);
+    assert(word_valid(symbol_power(g1, 1), (n + 1) as nat)) by { lemma_symbol_power_valid(g1, 1, (n + 1) as nat); }
+    assert(word_valid(symbol_power(g2, (m * m) as nat), (n + 1) as nat)) by { lemma_symbol_power_valid(g2, (m * m) as nat, (n + 1) as nat); }
     lemma_conj_base_inverse(p, rs, ri, g1, g1, m, 1);              //  conj(i1^m) ~ i1^1
     lemma_conj_base_inverse(p, rs, ri, g2, g2, m, (m * m) as nat); //  conj(i2^m) ~ i2^m²
     assert(inverse_symbol(g1) == i1 && inverse_symbol(g2) == i2);
@@ -1101,7 +1111,8 @@ pub proof fn lemma_forward_step_R(u: nat, a: nat, v: nat, b: nat, c: nat, m: nat
     assert(seq![ri] + cw + seq![rs] == seq![ri] + (cw + seq![rs]));
     assert(seq![ri] + ct + seq![rs] == seq![ri] + (ct + seq![rs]));
     //  conjugate the decomposed target, then recompose
-    lemma_conj_config_target(u, a, v, b, c, m);
+    lemma_base_A_valid();
+    lemma_conj_config_target(base_A(), 3, u, a, v, b, c, m);
     lemma_recompose(u, v, c, m);
     lemma_equiv_transitive(p, seq![ri] + cw + seq![rs], seq![ri] + ct + seq![rs],
         recompose_target(u, v, c, m));
@@ -1153,7 +1164,8 @@ pub proof fn lemma_forward_step_L(u: nat, a: nat, v: nat, b: nat, c: nat, m: nat
     lemma_equiv_concat_right(p, seq![ri], cw + seq![rs], ct + seq![rs]);
     assert(seq![ri] + cw + seq![rs] == seq![ri] + (cw + seq![rs]));
     assert(seq![ri] + ct + seq![rs] == seq![ri] + (ct + seq![rs]));
-    lemma_conj_config_target_L(u, a, v, b, c, m);
+    lemma_base_A_valid();
+    lemma_conj_config_target_L(base_A(), 3, u, a, v, b, c, m);
     lemma_recompose_L(u, v, c, m);
     lemma_base_embeds_in_hnn(data, rt, goal);
     lemma_equiv_transitive(p, seq![ri] + cw + seq![rs], seq![ri] + ct + seq![rs], rt);
@@ -1212,6 +1224,100 @@ pub proof fn lemma_lift_bm_level(mm: ModMachine, j: nat, i: nat, w1: Word, w2: W
         };
         lemma_base_embeds_in_hnn(data, w1, w2);
     }
+}
+
+//  The R forward step at tower level qi (stable letter Gen(3+qi)), living in
+//  b_m_upto(mm, qi+1).  This is the form Theorem 1 needs.
+pub proof fn lemma_forward_step_R_tower(mm: ModMachine, qi: nat, u: nat, v: nat)
+    requires
+        qi < mm.quads.len(),
+        mm.quads[qi as int].dir == Dir::R,
+    ensures
+        equiv_in_presentation(
+            b_m_upto(mm, (qi + 1) as nat),
+            seq![Symbol::Inv((3 + qi) as nat)]
+                + config_word((u * mm.m + mm.quads[qi as int].a) as nat, (v * mm.m + mm.quads[qi as int].b) as nat)
+                + seq![Symbol::Gen((3 + qi) as nat)],
+            config_word((u * mm.m * mm.m + mm.quads[qi as int].c) as nat, v),
+        ),
+{
+    let q = mm.quads[qi as int];
+    let m = mm.m;
+    let n = (3 + qi) as nat;
+    let base = b_m_upto(mm, qi);
+    let rs = Symbol::Gen(n);
+    let ri = Symbol::Inv(n);
+    let cw = config_word((u * m + q.a) as nat, (v * m + q.b) as nat);
+    let ct = config_target(u, q.a, v, q.b, m);
+    lemma_b_m_upto_valid(mm, qi);
+    lemma_b_m_upto_num_generators(mm, qi);
+    assert(base.num_generators == n);
+    assert(q == Quad { a: q.a, b: q.b, c: q.c, dir: Dir::R });
+    let data = HNNData { base, associations: quad_associations(q, m) };
+    let p = hnn_presentation(data);
+    assert(p == b_m_upto(mm, (qi + 1) as nat));
+    assert(data == HNNData { base, associations: quad_associations(Quad { a: q.a, b: q.b, c: q.c, dir: Dir::R }, m) });
+    //  decomposition (base_A), lifted to base, then into p
+    lemma_config_decompose(u, q.a, v, q.b, m);
+    lemma_lift_to_bm(mm, qi, cw, ct);
+    lemma_base_embeds_in_hnn(data, cw, ct);
+    //  wrap in r⁻¹ … r
+    lemma_equiv_concat_left(p, cw, ct, seq![rs]);
+    lemma_equiv_concat_right(p, seq![ri], cw + seq![rs], ct + seq![rs]);
+    assert(seq![ri] + cw + seq![rs] == seq![ri] + (cw + seq![rs]));
+    assert(seq![ri] + ct + seq![rs] == seq![ri] + (ct + seq![rs]));
+    //  conjugate (generic, at base) + recompose
+    lemma_conj_config_target(base, n, u, q.a, v, q.b, q.c, m);
+    lemma_recompose(u, v, q.c, m);
+    lemma_equiv_transitive(p, seq![ri] + cw + seq![rs], seq![ri] + ct + seq![rs],
+        recompose_target(u, v, q.c, m));
+}
+
+//  The L forward step at tower level qi, living in b_m_upto(mm, qi+1).
+pub proof fn lemma_forward_step_L_tower(mm: ModMachine, qi: nat, u: nat, v: nat)
+    requires
+        qi < mm.quads.len(),
+        mm.quads[qi as int].dir == Dir::L,
+    ensures
+        equiv_in_presentation(
+            b_m_upto(mm, (qi + 1) as nat),
+            seq![Symbol::Inv((3 + qi) as nat)]
+                + config_word((u * mm.m + mm.quads[qi as int].a) as nat, (v * mm.m + mm.quads[qi as int].b) as nat)
+                + seq![Symbol::Gen((3 + qi) as nat)],
+            config_word(u, (v * mm.m * mm.m + mm.quads[qi as int].c) as nat),
+        ),
+{
+    let q = mm.quads[qi as int];
+    let m = mm.m;
+    let n = (3 + qi) as nat;
+    let base = b_m_upto(mm, qi);
+    let rs = Symbol::Gen(n);
+    let ri = Symbol::Inv(n);
+    let cw = config_word((u * m + q.a) as nat, (v * m + q.b) as nat);
+    let ct = config_target(u, q.a, v, q.b, m);
+    let rt = config_target(u, 0, (m * m * v) as nat, q.c, 1);
+    let goal = config_word(u, (v * m * m + q.c) as nat);
+    lemma_b_m_upto_valid(mm, qi);
+    lemma_b_m_upto_num_generators(mm, qi);
+    assert(base.num_generators == n);
+    assert(q == Quad { a: q.a, b: q.b, c: q.c, dir: Dir::L });
+    let data = HNNData { base, associations: quad_associations(q, m) };
+    let p = hnn_presentation(data);
+    assert(p == b_m_upto(mm, (qi + 1) as nat));
+    assert(data == HNNData { base, associations: quad_associations(Quad { a: q.a, b: q.b, c: q.c, dir: Dir::L }, m) });
+    lemma_config_decompose(u, q.a, v, q.b, m);
+    lemma_lift_to_bm(mm, qi, cw, ct);
+    lemma_base_embeds_in_hnn(data, cw, ct);
+    lemma_equiv_concat_left(p, cw, ct, seq![rs]);
+    lemma_equiv_concat_right(p, seq![ri], cw + seq![rs], ct + seq![rs]);
+    assert(seq![ri] + cw + seq![rs] == seq![ri] + (cw + seq![rs]));
+    assert(seq![ri] + ct + seq![rs] == seq![ri] + (ct + seq![rs]));
+    lemma_conj_config_target_L(base, n, u, q.a, v, q.b, q.c, m);
+    lemma_recompose_L(u, v, q.c, m);
+    lemma_lift_to_bm(mm, qi, rt, goal);
+    lemma_base_embeds_in_hnn(data, rt, goal);
+    lemma_equiv_transitive(p, seq![ri] + cw + seq![rs], seq![ri] + ct + seq![rs], rt);
+    lemma_equiv_transitive(p, seq![ri] + cw + seq![rs], rt, goal);
 }
 
 //  An equivalence at tower level j holds in the full G(M).
