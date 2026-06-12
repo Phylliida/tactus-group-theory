@@ -1761,4 +1761,152 @@ pub proof fn lemma_xinv_yinv_commute_in_A()
     assert(inverse_word(yx) =~= seq![Symbol::Inv(1), Symbol::Inv(2)]);
 }
 
+//  ============================================================
+//  ⟸ direction of Theorem 1 — THE CAPSTONE INDUCTION
+//  ============================================================
+//
+//  If the machine drives (α,β) to the terminal origin (0,0) in k steps, then the
+//  stable letter k commutes with the configuration word t(α,β).  Each machine step
+//  becomes a forward-step conjugation, solved for t(α,β) as a product of three
+//  k-commuting pieces: the stable letter rᵢ/lⱼ, the inductive hypothesis on the
+//  next configuration, and the stable letter's inverse.
+
+//  Euclidean reconstruction for nat:  x = (x/m)·m + x mod m.
+//  On the Lean backend nat is `Nat`, so we discharge with the core `Nat` lemmas:
+//  `Nat.div_add_mod` (m·(x/m) + x%m = x) and `Nat.mul_comm`, then omega.
+pub proof fn lemma_div_mod_id(x: nat, m: nat)
+    requires
+        m > 0,
+    ensures
+        x == (x / m) * m + x % m
+by {
+    have h1 := Nat.div_add_mod x m
+    have h2 := Nat.mul_comm (x / m) m
+    omega
+}
+
+//  config_word(0,0) is just the bare generator t = Gen(0).
+pub proof fn lemma_config_word_zero()
+    ensures
+        config_word(0, 0) =~= seq![Symbol::Gen(0)],
+{
+    assert(symbol_power(Symbol::Inv(2), 0) =~= empty_word());
+    assert(symbol_power(Symbol::Inv(1), 0) =~= empty_word());
+    assert(symbol_power(Symbol::Gen(1), 0) =~= empty_word());
+    assert(symbol_power(Symbol::Gen(2), 0) =~= empty_word());
+}
+
+pub proof fn lemma_reaches_implies_k_commutes(mm: ModMachine, alpha: nat, beta: nat, k: nat)
+    requires
+        mod_machine_wf(mm),
+        mm_reaches(mm, alpha, beta, 0, 0, k),
+    ensures
+        k_commutes(mm, config_word(alpha, beta)),
+    decreases k,
+{
+    let p = g_m(mm);
+    let m = mm.m;
+    lemma_g_m_valid(mm);
+    lemma_g_m_num_generators(mm);
+    let ng = p.num_generators;          //  == 4 + |quads|
+    if k == 0 {
+        assert(alpha == 0 && beta == 0);
+        lemma_config_word_zero();
+        assert(config_word(alpha, beta) == seq![Symbol::Gen(0)]);
+        lemma_k_commutes_t(mm);
+    } else {
+        //  unfold mm_reaches: ∃ am,bm. yields(α,β,am,bm) ∧ reaches(am,bm,0,0,k-1)
+        reveal_with_fuel(mm_reaches, 1);
+        let ambm: (nat, nat) = choose|am: nat, bm: nat| #![auto]
+            mm_yields(mm, alpha, beta, am, bm)
+            && mm_reaches(mm, am, bm, 0, 0, (k - 1) as nat);
+        let am = ambm.0;
+        let bm = ambm.1;
+        assert(mm_yields(mm, alpha, beta, am, bm)
+            && mm_reaches(mm, am, bm, 0, 0, (k - 1) as nat));
+        //  the matching quadruple
+        let qi = choose|qi: int| 0 <= qi < mm.quads.len()
+            && quad_matches(mm.quads[qi], m, alpha, beta)
+            && quad_step(mm.quads[qi], m, alpha, beta) == (am, bm);
+        assert(0 <= qi < mm.quads.len()
+            && quad_matches(mm.quads[qi], m, alpha, beta)
+            && quad_step(mm.quads[qi], m, alpha, beta) == (am, bm));
+        let q = mm.quads[qi];
+        let qn = qi as nat;
+        assert(mm.quads[qn as int] == q);
+        let u = alpha / m;
+        let v = beta / m;
+        //  div-mod + residue match  ⟹  α = u·m + a, β = v·m + b
+        assert(m > 0);
+        lemma_div_mod_id(alpha, m);
+        lemma_div_mod_id(beta, m);
+        assert(alpha % m == q.a && beta % m == q.b);
+        assert(alpha == u * m + q.a);
+        assert(beta == v * m + q.b);
+        //  inductive hypothesis on the next configuration
+        lemma_reaches_implies_k_commutes(mm, am, bm, (k - 1) as nat);
+        //  RHS pieces and their k-commutation
+        let rs: Word = seq![Symbol::Gen((3 + qn) as nat)];
+        let ri: Word = seq![Symbol::Inv((3 + qn) as nat)];
+        let cwn = config_word(am, bm);
+        let cwab = config_word(alpha, beta);
+        let rhs: Word = rs + cwn + ri;
+        lemma_k_commutes_stable(mm, qn);
+        lemma_k_commutes_stable_inv(mm, qn);
+        lemma_k_commutes_product(mm, rs, cwn);
+        lemma_k_commutes_product(mm, rs + cwn, ri);
+        //  validity of t(α,β), t(am,bm), and rhs over ng generators
+        lemma_config_word_valid(alpha, beta);
+        lemma_word_valid_mono(cwab, 3, ng);
+        lemma_config_word_valid(am, bm);
+        lemma_word_valid_mono(cwn, 3, ng);
+        assert(3 + qn < ng);
+        assert(symbol_valid(Symbol::Gen((3 + qn) as nat), ng));
+        assert(symbol_valid(Symbol::Inv((3 + qn) as nat), ng));
+        assert(word_valid(rs, ng)) by {
+            assert forall|i: int| 0 <= i < rs.len() implies symbol_valid(#[trigger] rs[i], ng) by { }
+        }
+        assert(word_valid(ri, ng)) by {
+            assert forall|i: int| 0 <= i < ri.len() implies symbol_valid(#[trigger] ri[i], ng) by { }
+        }
+        lemma_concat_word_valid(rs, cwn, ng);
+        lemma_concat_word_valid(rs + cwn, ri, ng);
+        //  the forward step gives  rᵢ⁻¹ · t(α,β) · rᵢ ~ t(am,bm)  in b_m_upto(qi+1);
+        //  lift to G(M), conj-solve, and read off k-commutation.
+        let lhs_conj: Word = ri + cwab + rs;
+        assert(is_inverse_pair(Symbol::Gen((3 + qn) as nat), Symbol::Inv((3 + qn) as nat)));
+        match q.dir {
+            Dir::R => {
+                assert((u * m + q.a) as nat == alpha && (v * m + q.b) as nat == beta);
+                //  quad_step (R) gives the next configuration
+                assert(am == (alpha / m) * (m * m) + q.c && bm == beta / m);
+                assert(u * (m * m) == u * m * m) by (nonlinear_arith);
+                assert(am == u * m * m + q.c);
+                assert(bm == v);
+                assert(config_word((u * m + q.a) as nat, (v * m + q.b) as nat) == cwab);
+                assert(config_word((u * m * m + q.c) as nat, v) == cwn);
+                lemma_forward_step_R_tower(mm, qn, u, v);
+                assert(equiv_in_presentation(b_m_upto(mm, (qn + 1) as nat), lhs_conj, cwn));
+            }
+            Dir::L => {
+                assert((u * m + q.a) as nat == alpha && (v * m + q.b) as nat == beta);
+                //  quad_step (L) gives the next configuration
+                assert(am == alpha / m && bm == (beta / m) * (m * m) + q.c);
+                assert(v * (m * m) == v * m * m) by (nonlinear_arith);
+                assert(am == u);
+                assert(bm == v * m * m + q.c);
+                assert(config_word((u * m + q.a) as nat, (v * m + q.b) as nat) == cwab);
+                assert(config_word(u, (v * m * m + q.c) as nat) == cwn);
+                lemma_forward_step_L_tower(mm, qn, u, v);
+                assert(equiv_in_presentation(b_m_upto(mm, (qn + 1) as nat), lhs_conj, cwn));
+            }
+        }
+        lemma_lift_level_to_gm(mm, (qn + 1) as nat, lhs_conj, cwn);
+        lemma_conj_solve(p, Symbol::Gen((3 + qn) as nat), Symbol::Inv((3 + qn) as nat), cwab, cwn);
+        assert(equiv_in_presentation(p, cwab, rhs));
+        lemma_equiv_symmetric(p, cwab, rhs);
+        lemma_k_commutes_respects_equiv(mm, rhs, cwab);
+    }
+}
+
 } //  verus!
