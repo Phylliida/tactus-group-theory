@@ -7,6 +7,7 @@ use crate::reduction::*;
 use crate::hnn::*;
 use crate::normal_form_afp_textbook::lemma_equiv_inverse;
 use crate::britton_via_tower::lemma_insert_equiv_empty;
+use crate::britton_via_tower::lemma_delete_equiv_empty;
 
 verus! {
 
@@ -498,6 +499,60 @@ pub proof fn lemma_k_commutes_t(mm: ModMachine)
     lemma_commute_from_conj(p, kk, ki, t);
 }
 
+//  k commutes with Inv(3+qi) (invert the stable conjugation relation).
+pub proof fn lemma_k_commutes_stable_inv(mm: ModMachine, qi: nat)
+    requires
+        qi < mm.quads.len(),
+    ensures
+        k_commutes(mm, seq![Symbol::Inv((3 + qi) as nat)]),
+{
+    let gdata = HNNData { base: b_m(mm), associations: g_m_associations(mm) };
+    let p = g_m(mm);
+    let kk = k_gen(mm);
+    let ki = Symbol::Inv((3 + mm.quads.len()) as nat);
+    let g = Symbol::Gen((3 + qi) as nat);
+    let gi = Symbol::Inv((3 + qi) as nat);
+    let s: Word = seq![g];
+    let sgi: Word = seq![gi];
+    let kiw: Word = seq![ki];
+    let kkw: Word = seq![kk];
+    lemma_b_m_valid(mm);
+    lemma_g_m_associations_valid(mm);
+    lemma_b_m_upto_num_generators(mm, mm.quads.len());
+    assert(hnn_data_valid(gdata));
+    lemma_g_m_valid(mm);
+    lemma_g_m_num_generators(mm);
+    let ng = p.num_generators;
+    assert(gdata.associations[(1 + qi) as int] == (s, s));
+    assert(stable_letter(gdata) == kk && stable_letter_inv(gdata) == ki);
+    lemma_hnn_conjugation(gdata, (1 + qi) as int);
+    assert(Seq::new(1, |_j: int| ki) =~= seq![ki]);
+    assert(Seq::new(1, |_j: int| kk) =~= seq![kk]);
+    let conj_g: Word = kiw + s + kkw;
+    assert(equiv_in_presentation(p, conj_g, s));
+    //  validity
+    assert(symbol_valid(kk, ng) && symbol_valid(g, ng) && symbol_valid(gi, ng));
+    assert(word_valid(s, ng)) by { assert forall|i: int| 0 <= i < s.len() implies symbol_valid(#[trigger] s[i], ng) by { } }
+    assert(word_valid(sgi, ng)) by { assert forall|i: int| 0 <= i < sgi.len() implies symbol_valid(#[trigger] sgi[i], ng) by { } }
+    assert(word_valid(kiw, ng)) by { assert forall|i: int| 0 <= i < kiw.len() implies symbol_valid(#[trigger] kiw[i], ng) by { } }
+    assert(word_valid(kkw, ng)) by { assert forall|i: int| 0 <= i < kkw.len() implies symbol_valid(#[trigger] kkw[i], ng) by { } }
+    lemma_concat_word_valid(kiw, s, ng);
+    lemma_concat_word_valid(kiw + s, kkw, ng);
+    //  invert the relation
+    lemma_equiv_inverse(p, conj_g, s);
+    let conj_gi: Word = kiw + sgi + kkw;
+    lemma_inverse_word_concat(kiw + s, kkw);
+    lemma_inverse_word_concat(kiw, s);
+    lemma_inverse_word_one(kk);
+    lemma_inverse_word_one(ki);
+    lemma_inverse_word_one(g);
+    assert(inverse_symbol(kk) == ki && inverse_symbol(ki) == kk && inverse_symbol(g) == gi);
+    assert(inverse_word(conj_g) =~= conj_gi);
+    assert(inverse_word(s) =~= sgi);
+    assert(equiv_in_presentation(p, conj_gi, sgi));
+    lemma_commute_from_conj(p, kk, ki, sgi);
+}
+
 //  Commuting with k is closed under products.
 pub proof fn lemma_k_commutes_product(mm: ModMachine, x: Word, y: Word)
     requires
@@ -801,6 +856,15 @@ pub proof fn lemma_inverse_word_sympower(s: Symbol, n: nat)
         lemma_symbol_power_merge(inverse_symbol(s), k, 1);
         lemma_symbol_power_one(inverse_symbol(s));
     }
+}
+
+//  inverse_word of a singleton.
+pub proof fn lemma_inverse_word_one(s: Symbol)
+    ensures
+        inverse_word(seq![s]) =~= seq![inverse_symbol(s)],
+{
+    reveal_with_fuel(inverse_word, 2);
+    assert(seq![s].drop_first() =~= empty_word());
 }
 
 //  inverse_word of a two-symbol word (reverses and inverts).
@@ -1543,6 +1607,46 @@ pub proof fn lemma_commute_from_conj(p: Presentation, kk: Symbol, ki: Symbol, w:
     lemma_equiv_symmetric(p, lhs, w + seq![kk]);                          //  w·K ~ lhs
     lemma_equiv_transitive(p, w + seq![kk], lhs, seq![kk] + w);           //  w·K ~ K·w
     lemma_equiv_symmetric(p, w + seq![kk], seq![kk] + w);                 //  K·w ~ w·K
+}
+
+//  From  s⁻¹·W·s ~ V,  solve for W:  W ~ s·V·s⁻¹.
+pub proof fn lemma_conj_solve(p: Presentation, s: Symbol, si: Symbol, w: Word, vv: Word)
+    requires
+        is_inverse_pair(s, si),
+        symbol_valid(s, p.num_generators),
+        presentation_valid(p),
+        word_valid(w, p.num_generators),
+        equiv_in_presentation(p, seq![si] + w + seq![s], vv),
+    ensures
+        equiv_in_presentation(p, w, seq![s] + vv + seq![si]),
+{
+    let ng = p.num_generators;
+    lemma_inverse_preserves_index(s);
+    assert(symbol_valid(si, ng));
+    //  wrap the hypothesis in s · … · s⁻¹
+    lemma_equiv_concat_left(p, seq![si] + w + seq![s], vv, seq![si]);
+    lemma_equiv_concat_right(p, seq![s], (seq![si] + w + seq![s]) + seq![si], vv + seq![si]);
+    let big: Word = seq![s, si] + w + seq![s, si];
+    assert(seq![s] + ((seq![si] + w + seq![s]) + seq![si]) =~= big);
+    assert(seq![s] + (vv + seq![si]) == seq![s] + vv + seq![si]);
+    //  big collapses to w (delete the two cancelling pairs)
+    lemma_cancel_pair_equiv_empty(p, s, si);
+    lemma_delete_equiv_empty(p, empty_word(), seq![s, si], w + seq![s, si]);
+    lemma_delete_equiv_empty(p, w, seq![s, si], empty_word());
+    assert(concat(empty_word(), concat(seq![s, si], w + seq![s, si])) =~= big);
+    assert(concat(empty_word(), w + seq![s, si]) =~= w + seq![s, si]);
+    assert(concat(w, concat(seq![s, si], empty_word())) =~= w + seq![s, si]);
+    assert(concat(w, empty_word()) =~= w);
+    lemma_equiv_transitive(p, big, w + seq![s, si], w);
+    //  word validity of big for symmetric
+    let ssi: Word = seq![s, si];
+    assert(word_valid(ssi, ng)) by {
+        assert forall|i: int| 0 <= i < ssi.len() implies symbol_valid(#[trigger] ssi[i], ng) by { }
+    }
+    lemma_concat_word_valid(ssi, w, ng);
+    lemma_concat_word_valid(ssi + w, ssi, ng);
+    lemma_equiv_symmetric(p, big, w);
+    lemma_equiv_transitive(p, w, big, seq![s] + vv + seq![si]);
 }
 
 //  Conjugation distributes over a concatenation (insert a cancelling pair).
