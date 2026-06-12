@@ -6,6 +6,7 @@ use crate::presentation_lemmas::*;
 use crate::reduction::*;
 use crate::hnn::*;
 use crate::normal_form_afp_textbook::lemma_equiv_inverse;
+use crate::britton_via_tower::lemma_insert_equiv_empty;
 
 verus! {
 
@@ -756,6 +757,130 @@ pub proof fn lemma_config_decompose(u: nat, a: nat, v: nat, b: nat, m: nat)
 {
     lemma_config_eq_wmid(u, a, v, b, m);
     lemma_wmid_to_target(u, a, v, b, m);
+}
+
+//  ============================================================
+//  Tower lifting: a base_A equivalence holds in every level of B(M) and in G(M).
+//  (lemma_base_embeds_in_hnn needs no validity — the lift is purely structural.)
+//  ============================================================
+
+pub proof fn lemma_lift_to_bm(mm: ModMachine, i: nat, w1: Word, w2: Word)
+    requires
+        equiv_in_presentation(base_A(), w1, w2),
+    ensures
+        equiv_in_presentation(b_m_upto(mm, i), w1, w2),
+    decreases i,
+{
+    if i == 0 {
+    } else {
+        lemma_lift_to_bm(mm, (i - 1) as nat, w1, w2);
+        let data = HNNData {
+            base: b_m_upto(mm, (i - 1) as nat),
+            associations: quad_associations(mm.quads[(i - 1) as int], mm.m),
+        };
+        lemma_base_embeds_in_hnn(data, w1, w2);
+    }
+}
+
+pub proof fn lemma_lift_to_gm(mm: ModMachine, w1: Word, w2: Word)
+    requires
+        equiv_in_presentation(base_A(), w1, w2),
+    ensures
+        equiv_in_presentation(g_m(mm), w1, w2),
+{
+    lemma_lift_to_bm(mm, mm.quads.len(), w1, w2);
+    let data = HNNData { base: b_m(mm), associations: g_m_associations(mm) };
+    lemma_base_embeds_in_hnn(data, w1, w2);
+}
+
+//  ============================================================
+//  Power conjugation:  r⁻¹·sᵐⁿ·r ~ s'ᵐ'ⁿ  given the single relation r⁻¹·sᵐ·r ~ s'ᵐ'.
+//  ============================================================
+
+//  A cancelling pair is trivial.
+pub proof fn lemma_cancel_pair_equiv_empty(p: Presentation, rs: Symbol, ri: Symbol)
+    requires
+        is_inverse_pair(rs, ri),
+    ensures
+        equiv_in_presentation(p, seq![rs, ri], empty_word()),
+{
+    let w: Word = seq![rs, ri];
+    assert(has_cancellation_at(w, 0)) by {
+        assert(w[0] == rs && w[1] == ri);
+    }
+    assert(reduce_at(w, 0) =~= empty_word());
+    assert(reduces_one_step(w, empty_word())) by {
+        assert(has_cancellation_at(w, 0) && empty_word() == reduce_at(w, 0));
+    }
+    assert(reduces_in_steps(w, empty_word(), 1)) by {
+        assert(reduces_one_step(w, empty_word()) && reduces_in_steps(empty_word(), empty_word(), 0));
+    }
+    assert(reduces_to(w, empty_word()));
+    lemma_reduces_to_equiv(p, w, empty_word());
+}
+
+//  Conjugation distributes over a power, scaling the exponent.
+pub proof fn lemma_conj_sympower(
+    p: Presentation, rs: Symbol, ri: Symbol, s: Symbol, ssp: Symbol,
+    m: nat, mp: nat, n: nat,
+)
+    requires
+        is_inverse_pair(rs, ri),
+        presentation_valid(p),
+        word_valid(seq![rs, ri], p.num_generators),
+        equiv_in_presentation(p, seq![ri] + symbol_power(s, m) + seq![rs], symbol_power(ssp, mp)),
+    ensures
+        equiv_in_presentation(
+            p,
+            seq![ri] + symbol_power(s, (m * n) as nat) + seq![rs],
+            symbol_power(ssp, (mp * n) as nat),
+        ),
+    decreases n,
+{
+    if n == 0 {
+        lemma_inverse_pair_symmetric(rs, ri);
+        lemma_cancel_pair_equiv_empty(p, ri, rs);
+        assert(seq![ri] + symbol_power(s, (m * 0) as nat) + seq![rs] =~= seq![ri, rs]);
+        assert(symbol_power(ssp, (mp * 0) as nat) =~= empty_word());
+    } else {
+        let k = (n - 1) as nat;
+        let f1: Word = seq![ri] + symbol_power(s, m) + seq![rs];
+        let f2: Word = seq![ri] + symbol_power(s, (m * k) as nat) + seq![rs];
+        let lhs0: Word = seq![ri] + symbol_power(s, m) + symbol_power(s, (m * k) as nat) + seq![rs];
+        //  exponent arithmetic (nonlinear: m·n = m·(k+1) = m + m·k)
+        assert(n == k + 1);
+        assert(m * n == m + m * k) by (nonlinear_arith)
+            requires n == k + 1;
+        assert(mp * n == mp + mp * k) by (nonlinear_arith)
+            requires n == k + 1;
+        //  goal-LHS =~= lhs0   (merge sᵐ·sᵐᵏ = sᵐ⁽ᵏ⁺¹⁾)
+        lemma_symbol_power_merge(s, m, m * k);
+        assert(seq![ri] + symbol_power(s, (m * n) as nat) + seq![rs] =~= lhs0);
+        //  insert the cancelling pair rs·ri between sᵐ and sᵐᵏ
+        lemma_cancel_pair_equiv_empty(p, rs, ri);
+        lemma_insert_equiv_empty(
+            p,
+            seq![ri] + symbol_power(s, m),
+            seq![rs, ri],
+            symbol_power(s, (m * k) as nat) + seq![rs],
+        );
+        assert((seq![ri] + symbol_power(s, m)) + (symbol_power(s, (m * k) as nat) + seq![rs]) =~= lhs0);
+        assert((seq![ri] + symbol_power(s, m))
+            + concat(seq![rs, ri], symbol_power(s, (m * k) as nat) + seq![rs]) =~= f1 + f2);
+        //  equiv(p, lhs0, f1 + f2)
+        //  hyp gives f1 ~ s'ᵐ'; IH gives f2 ~ s'ᵐ'ᵏ
+        lemma_conj_sympower(p, rs, ri, s, ssp, m, mp, k);
+        lemma_equiv_concat_left(p, f1, symbol_power(ssp, mp), f2);
+        lemma_equiv_concat_right(p, symbol_power(ssp, mp), f2, symbol_power(ssp, (mp * k) as nat));
+        //  merge s'ᵐ'·s'ᵐ'ᵏ = s'ᵐ'⁽ᵏ⁺¹⁾
+        lemma_symbol_power_merge(ssp, mp, mp * k);
+        assert(symbol_power(ssp, mp) + symbol_power(ssp, (mp * k) as nat)
+            =~= symbol_power(ssp, (mp * n) as nat));
+        //  chain:  lhs0 ~ f1+f2 ~ s'ᵐ'·f2 ~ s'ᵐ'·s'ᵐ'ᵏ
+        lemma_equiv_transitive(p, lhs0, f1 + f2, symbol_power(ssp, mp) + f2);
+        lemma_equiv_transitive(p, lhs0, symbol_power(ssp, mp) + f2,
+            symbol_power(ssp, mp) + symbol_power(ssp, (mp * k) as nat));
+    }
 }
 
 //  y⁻¹·x⁻¹ ~ x⁻¹·y⁻¹ in A — the inverse of the keystone (the second commutation
