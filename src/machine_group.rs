@@ -2005,4 +2005,111 @@ pub proof fn lemma_commutator_stable_at_ends(
     }
 }
 
+//  ============================================================
+//  E1 — property (III) for the k-extension:
+//        k commutes with t(α,β)  ⟹  t(α,β) ∈ ⟨t, rᵢ, lⱼ⟩.
+//  ============================================================
+//
+//  k_commutes gives [k]·t(α,β) ≡ t(α,β)·[k], so the commutator
+//  C = [k]·t(α,β)·[k⁻¹]·t(α,β)⁻¹ ≡ ε.  C carries the stable letter k, so by
+//  britton_lemma_full it has a pinch.  t(α,β) has no k, so the pinch is forced
+//  to the two ends (0, 1+|t(α,β)|) — the t·g·t⁻¹ case — whose middle is exactly
+//  t(α,β), landing it in the associated subgroup ⟨t, rᵢ, lⱼ⟩.
+pub proof fn lemma_k_commutes_implies_subgroup(mm: ModMachine, alpha: nat, beta: nat)
+    requires
+        k_commutes(mm, config_word(alpha, beta)),
+    ensures
+        in_generated_subgroup(b_m(mm), g_subgens(mm), config_word(alpha, beta)),
+{
+    let w = config_word(alpha, beta);
+    let nq = mm.quads.len();
+    let ngb = (3 + nq) as nat;
+    let kk = Symbol::Gen(ngb);
+    let ki = Symbol::Inv(ngb);
+    let kw: Word = seq![kk];
+    let kiw: Word = seq![ki];
+    let gdata = HNNData { base: b_m(mm), associations: g_m_associations(mm) };
+    let p = g_m(mm);
+    let l = w.len() as int;
+
+    //  --- validity / structure setup ---
+    lemma_b_m_valid(mm);
+    lemma_g_m_associations_valid(mm);
+    lemma_b_m_upto_num_generators(mm, nq);
+    assert(b_m(mm).num_generators == ngb);
+    assert(hnn_data_valid(gdata));
+    lemma_g_m_associations_isomorphic(mm);
+    lemma_g_m_valid(mm);
+    lemma_g_m_num_generators(mm);
+    let ng = p.num_generators;
+    assert(k_gen(mm) == kk);
+
+    //  --- the commutator cc ≡ ε ---
+    let u: Word = kw + w;
+    let v: Word = w + kw;
+    assert(equiv_in_presentation(p, u, v));
+    lemma_inverse_word_concat(w, kw);
+    lemma_inverse_word_one(kk);
+    assert(inverse_symbol(kk) == ki);
+    assert(inverse_word(v) =~= kiw + inverse_word(w));
+    let cc: Word = kw + w + kiw + inverse_word(w);
+    assert(u + inverse_word(v) =~= cc);
+    lemma_word_inverse_right(p, v);
+    lemma_equiv_concat_left(p, u, v, inverse_word(v));
+    lemma_equiv_transitive(p, u + inverse_word(v), v + inverse_word(v), empty_word());
+    assert(equiv_in_presentation(p, cc, empty_word()));
+
+    //  --- word validity of cc ---
+    lemma_config_word_valid(alpha, beta);
+    lemma_word_valid_mono(w, 3, ng);
+    crate::word::lemma_inverse_word_valid(w, ng);
+    assert(symbol_valid(kk, ng) && symbol_valid(ki, ng));
+    assert(word_valid(kw, ng)) by {
+        assert forall|i: int| 0 <= i < kw.len() implies symbol_valid(#[trigger] kw[i], ng) by { }
+    }
+    assert(word_valid(kiw, ng)) by {
+        assert forall|i: int| 0 <= i < kiw.len() implies symbol_valid(#[trigger] kiw[i], ng) by { }
+    }
+    lemma_concat_word_valid(kw, w, ng);
+    lemma_concat_word_valid(kw + w, kiw, ng);
+    lemma_concat_word_valid(kw + w + kiw, inverse_word(w), ng);
+
+    //  --- has_stable_letter(gdata, cc) ---
+    assert(cc[0] == kk);
+    assert(is_stable(gdata, kk));
+    assert(has_stable_letter(gdata, cc)) by {
+        assert(0 <= 0 < cc.len() && is_stable(gdata, cc[0]));
+    }
+
+    //  --- britton: cc has a pinch ---
+    britton_lemma_full(gdata, cc);
+    assert(has_pinch(gdata, cc));
+
+    //  --- w and w⁻¹ carry no stable letters (valid over 3 ≤ ngb) ---
+    lemma_no_stable_of_valid(gdata, w, 3);
+    crate::word::lemma_inverse_word_valid(w, 3);
+    lemma_no_stable_of_valid(gdata, inverse_word(w), 3);
+
+    //  --- extract the pinch and force it to the ends (0, 1+l) ---
+    let pij: (int, int) = choose|i: int, j: int| has_pinch_at(gdata, cc, i, j);
+    let pi = pij.0;
+    let pj = pij.1;
+    assert(has_pinch_at(gdata, cc, pi, pj));
+    assert(has_adjacent_opposite_at(gdata, cc, pi, pj));
+    assert(is_stable(gdata, cc[pi]) && is_stable(gdata, cc[pj]) && 0 <= pi < pj < cc.len());
+    lemma_commutator_stable_at_ends(gdata, kk, ki, w, pi);
+    lemma_commutator_stable_at_ends(gdata, kk, ki, w, pj);
+    assert(pi == 0 && pj == 1 + l);
+
+    //  --- read off membership (the t·g·t⁻¹ disjunct) ---
+    assert(cc[pi] == Symbol::Gen(gdata.base.num_generators));
+    assert(cc[pj] == Symbol::Inv(gdata.base.num_generators));
+    let base_word = cc.subrange(pi + 1, pj);
+    let bgens = Seq::new(gdata.associations.len(), |i: int| gdata.associations[i].1);
+    assert(in_generated_subgroup(gdata.base, bgens, base_word));
+    assert(base_word =~= w);
+    assert(bgens =~= g_subgens(mm));
+    assert(in_generated_subgroup(b_m(mm), g_subgens(mm), w));
+}
+
 } //  verus!
