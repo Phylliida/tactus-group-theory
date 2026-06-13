@@ -2228,4 +2228,157 @@ pub proof fn lemma_in_T_product(mm: ModMachine, w1: Word, w2: Word)
     assert(all_h0_factors(mm, f));
 }
 
+//  ============================================================
+//  E2 base camp — T(M) is closed under inverse (subgroup property 2/2)
+//  ============================================================
+
+//  is_h0_factor is closed under inverse_word:  ±t(a,b) ↦ ∓t(a,b).
+pub proof fn lemma_is_h0_factor_inverse(mm: ModMachine, f: Word)
+    requires
+        is_h0_factor(mm, f),
+    ensures
+        is_h0_factor(mm, inverse_word(f)),
+{
+    let ab = choose|a: nat, b: nat| #![trigger config_word(a, b)]
+        mm_in_H0(mm, a, b) && (f == config_word(a, b) || f == inverse_word(config_word(a, b)));
+    let a = ab.0;
+    let b = ab.1;
+    assert(mm_in_H0(mm, a, b)
+        && (f == config_word(a, b) || f == inverse_word(config_word(a, b))));
+    if f != config_word(a, b) {
+        crate::word::lemma_inverse_involution(config_word(a, b));   //  inverse_word(inverse_word(cw)) =~= cw
+    }
+    assert(is_h0_factor(mm, inverse_word(f))) by {
+        assert(mm_in_H0(mm, a, b)
+            && (inverse_word(f) == config_word(a, b)
+                || inverse_word(f) == inverse_word(config_word(a, b))));
+    }
+}
+
+//  The inverse factorization: reverse the list and invert each factor
+//  (so that  inverse_word(g₀·g₁·…·gₙ) = gₙ⁻¹·…·g₀⁻¹).
+pub open spec fn inv_rev_factors(factors: Seq<Word>) -> Seq<Word>
+    decreases factors.len(),
+{
+    if factors.len() == 0 {
+        Seq::<Word>::empty()
+    } else {
+        inv_rev_factors(factors.drop_first()) + seq![inverse_word(factors.first())]
+    }
+}
+
+//  concat_all of the inverse factorization is the inverse of the product.
+pub proof fn lemma_concat_all_inverse(factors: Seq<Word>)
+    ensures
+        inverse_word(concat_all(factors)) =~= concat_all(inv_rev_factors(factors)),
+    decreases factors.len(),
+{
+    reveal_with_fuel(concat_all, 2);
+    reveal_with_fuel(inv_rev_factors, 2);
+    if factors.len() == 0 {
+        lemma_concat_all_empty();
+        assert(concat_all(factors) =~= empty_word());
+        assert(inverse_word(empty_word()) =~= empty_word());
+    } else {
+        let first = factors.first();
+        let rest = factors.drop_first();
+        lemma_inverse_word_concat(first, concat_all(rest));
+        lemma_concat_all_inverse(rest);
+        lemma_concat_all_distributes(inv_rev_factors(rest), seq![inverse_word(first)]);
+        lemma_concat_all_singleton(inverse_word(first));
+    }
+}
+
+//  all_h0_factors is preserved by the inverse factorization.
+pub proof fn lemma_all_h0_factors_inv_rev(mm: ModMachine, factors: Seq<Word>)
+    requires
+        all_h0_factors(mm, factors),
+    ensures
+        all_h0_factors(mm, inv_rev_factors(factors)),
+    decreases factors.len(),
+{
+    reveal_with_fuel(inv_rev_factors, 2);
+    if factors.len() == 0 {
+    } else {
+        let first = factors.first();
+        let rest = factors.drop_first();
+        assert(factors[0] == first);
+        assert(is_h0_factor(mm, first));
+        assert forall|i: int| 0 <= i < rest.len()
+            implies is_h0_factor(mm, #[trigger] rest[i]) by {
+            assert(rest[i] == factors[i + 1]);
+        }
+        lemma_all_h0_factors_inv_rev(mm, rest);
+        lemma_is_h0_factor_inverse(mm, first);
+        let inv1: Seq<Word> = seq![inverse_word(first)];
+        assert(all_h0_factors(mm, inv1)) by {
+            assert(inv1[0] == inverse_word(first));
+        }
+        lemma_all_h0_factors_concat(mm, inv_rev_factors(rest), inv1);
+    }
+}
+
+//  Each H₀ factor is a valid word over A's 3 generators.
+pub proof fn lemma_h0_factor_valid(mm: ModMachine, f: Word)
+    requires
+        is_h0_factor(mm, f),
+    ensures
+        word_valid(f, 3),
+{
+    let ab = choose|a: nat, b: nat| #![trigger config_word(a, b)]
+        mm_in_H0(mm, a, b) && (f == config_word(a, b) || f == inverse_word(config_word(a, b)));
+    lemma_config_word_valid(ab.0, ab.1);
+    if f != config_word(ab.0, ab.1) {
+        crate::word::lemma_inverse_word_valid(config_word(ab.0, ab.1), 3);
+    }
+}
+
+//  A finite product of H₀ factors is valid over A's 3 generators.
+pub proof fn lemma_concat_all_h0_valid(mm: ModMachine, factors: Seq<Word>)
+    requires
+        all_h0_factors(mm, factors),
+    ensures
+        word_valid(concat_all(factors), 3),
+    decreases factors.len(),
+{
+    reveal_with_fuel(concat_all, 2);
+    if factors.len() == 0 {
+        lemma_concat_all_empty();
+    } else {
+        let first = factors.first();
+        let rest = factors.drop_first();
+        assert(factors[0] == first);
+        assert(is_h0_factor(mm, first));
+        lemma_h0_factor_valid(mm, first);
+        assert forall|i: int| 0 <= i < rest.len()
+            implies is_h0_factor(mm, #[trigger] rest[i]) by {
+            assert(rest[i] == factors[i + 1]);
+        }
+        lemma_concat_all_h0_valid(mm, rest);
+        lemma_concat_word_valid(first, concat_all(rest), 3);
+    }
+}
+
+//  T(M) is closed under inverse:  w ∈ T(M) ⟹ w⁻¹ ∈ T(M).
+pub proof fn lemma_in_T_inverse(mm: ModMachine, w: Word)
+    requires
+        in_T(mm, w),
+        word_valid(w, 3),
+    ensures
+        in_T(mm, inverse_word(w)),
+{
+    let factors = choose|f: Seq<Word>|
+        #[trigger] all_h0_factors(mm, f) && equiv_in_presentation(base_A(), concat_all(f), w);
+    let g = inv_rev_factors(factors);
+    lemma_all_h0_factors_inv_rev(mm, factors);
+    lemma_concat_all_inverse(factors);
+    //  concat_all(g) =~= inverse_word(concat_all(factors)) ≡ inverse_word(w)
+    lemma_base_A_valid();
+    lemma_concat_all_h0_valid(mm, factors);
+    lemma_equiv_inverse(base_A(), concat_all(factors), w);
+    assert(concat_all(g) =~= inverse_word(concat_all(factors)));
+    assert(equiv_in_presentation(base_A(), concat_all(g), inverse_word(w)));
+    assert(all_h0_factors(mm, g));
+}
+
 } //  verus!
