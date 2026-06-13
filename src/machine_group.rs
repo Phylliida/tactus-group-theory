@@ -8,6 +8,9 @@ use crate::hnn::*;
 use crate::normal_form_afp_textbook::lemma_equiv_inverse;
 use crate::britton_via_tower::lemma_insert_equiv_empty;
 use crate::britton_via_tower::lemma_delete_equiv_empty;
+use crate::britton_via_tower::{britton_lemma_full, has_pinch, has_pinch_at,
+    has_adjacent_opposite_at, is_stable, has_stable_letter};
+use crate::benign::in_generated_subgroup;
 
 verus! {
 
@@ -1940,6 +1943,66 @@ pub proof fn lemma_g_m_associations_isomorphic(mm: ModMachine)
         }
     }
     assert(a_words =~= b_words);
+}
+
+//  The generators of the k-extension's associated subgroup ⟨t, rᵢ, lⱼ⟩
+//  (= the b_gens / a_gens of g_m's identity-iso associations).
+pub open spec fn g_subgens(mm: ModMachine) -> Seq<Word> {
+    Seq::new(g_m_associations(mm).len(), |i: int| g_m_associations(mm)[i].1)
+}
+
+//  A word valid over n ≤ base.num_generators contains no stable letter
+//  (stable letters live at index exactly base.num_generators).
+pub proof fn lemma_no_stable_of_valid(data: HNNData, x: Word, n: nat)
+    requires
+        word_valid(x, n),
+        n <= data.base.num_generators,
+    ensures
+        forall|pp: int| 0 <= pp < x.len() ==> !is_stable(data, #[trigger] x[pp]),
+{
+    let ng = data.base.num_generators;
+    assert forall|pp: int| 0 <= pp < x.len() implies !is_stable(data, x[pp]) by {
+        assert(symbol_valid(x[pp], n));
+        assert(generator_index(x[pp]) < n);
+        assert(generator_index(Symbol::Gen(ng)) == ng);
+        assert(generator_index(Symbol::Inv(ng)) == ng);
+    }
+}
+
+//  The commutator word [k]·w·[k⁻¹]·w⁻¹ has stable letters ONLY at its two ends
+//  (position 0 = k, position 1+|w| = k⁻¹), provided w and w⁻¹ have none.
+pub proof fn lemma_commutator_stable_at_ends(
+    data: HNNData, kk: Symbol, ki: Symbol, w: Word, pp: int,
+)
+    requires
+        kk == Symbol::Gen(data.base.num_generators),
+        ki == Symbol::Inv(data.base.num_generators),
+        forall|q: int| 0 <= q < w.len() ==> !is_stable(data, #[trigger] w[q]),
+        forall|q: int| 0 <= q < inverse_word(w).len() ==> !is_stable(data, #[trigger] inverse_word(w)[q]),
+        0 <= pp < (seq![kk] + w + seq![ki] + inverse_word(w)).len(),
+        is_stable(data, (seq![kk] + w + seq![ki] + inverse_word(w))[pp]),
+    ensures
+        pp == 0 || pp == 1 + w.len(),
+{
+    let iw = inverse_word(w);
+    let c: Word = seq![kk] + w + seq![ki] + iw;
+    let l = w.len() as int;
+    //  c = (((seq![kk] + w) + seq![ki]) + iw)
+    let c3: Word = seq![kk] + w + seq![ki];     //  length 2 + l
+    assert(c3.len() == 2 + l);
+    if pp == 0 {
+    } else if pp < 1 + l {
+        //  middle of w: c[pp] == w[pp-1]
+        assert(c[pp] == c3[pp]);
+        assert(c3[pp] == (seq![kk] + w)[pp]);
+        assert((seq![kk] + w)[pp] == w[pp - 1]);
+        assert(!is_stable(data, w[pp - 1]));
+    } else if pp == 1 + l {
+    } else {
+        //  tail of w⁻¹: c[pp] == iw[pp - (2 + l)]
+        assert(c[pp] == iw[pp - (2 + l)]);
+        assert(!is_stable(data, iw[pp - (2 + l)]));
+    }
 }
 
 } //  verus!
