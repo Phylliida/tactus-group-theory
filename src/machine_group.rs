@@ -10,7 +10,7 @@ use crate::britton_via_tower::lemma_insert_equiv_empty;
 use crate::britton_via_tower::lemma_delete_equiv_empty;
 use crate::britton_via_tower::{britton_lemma_full, has_pinch, has_pinch_at,
     has_adjacent_opposite_at, is_stable, has_stable_letter};
-use crate::benign::in_generated_subgroup;
+use crate::benign::{in_generated_subgroup, concat_all, lemma_concat_all_singleton};
 
 verus! {
 
@@ -2110,6 +2110,56 @@ pub proof fn lemma_k_commutes_implies_subgroup(mm: ModMachine, alpha: nat, beta:
     assert(base_word =~= w);
     assert(bgens =~= g_subgens(mm));
     assert(in_generated_subgroup(b_m(mm), g_subgens(mm), w));
+}
+
+//  ============================================================
+//  E2 base camp — T(M)-membership as a finite-factorization predicate.
+//  ============================================================
+//
+//  T(M) = ⟨ t(α',β') : (α',β') ∈ H₀(M) ⟩ is INFINITELY generated, so we can't
+//  use `in_generated_subgroup` with a finite `Seq` of generators.  Instead:
+//  `in_T(mm, w)` holds iff w is a finite product of signed H₀ config words,
+//  equivalent in A.  The factorization is finite even though the basis isn't.
+
+//  A single factor is ±t(α',β') for some H₀ configuration.
+pub open spec fn is_h0_factor(mm: ModMachine, f: Word) -> bool {
+    exists|a: nat, b: nat| #![trigger config_word(a, b)]
+        mm_in_H0(mm, a, b) && (f == config_word(a, b) || f == inverse_word(config_word(a, b)))
+}
+
+pub open spec fn all_h0_factors(mm: ModMachine, factors: Seq<Word>) -> bool {
+    forall|i: int| 0 <= i < factors.len() ==> is_h0_factor(mm, #[trigger] factors[i])
+}
+
+//  w ∈ T(M): a finite product of signed H₀ config words, ≡ w in A.
+pub open spec fn in_T(mm: ModMachine, w: Word) -> bool {
+    exists|factors: Seq<Word>|
+        #[trigger] all_h0_factors(mm, factors)
+        && equiv_in_presentation(base_A(), concat_all(factors), w)
+}
+
+//  Each H₀ configuration word lies in T(M) (the length-1 factorization).
+pub proof fn lemma_h0_config_in_T(mm: ModMachine, a: nat, b: nat)
+    requires
+        mm_in_H0(mm, a, b),
+    ensures
+        in_T(mm, config_word(a, b)),
+{
+    let f = config_word(a, b);
+    let factors: Seq<Word> = seq![f];
+    lemma_base_A_valid();
+    lemma_config_word_valid(a, b);
+    lemma_concat_all_singleton(f);
+    assert(concat_all(factors) =~= f);
+    lemma_equiv_refl(base_A(), f);
+    assert(all_h0_factors(mm, factors)) by {
+        assert(factors[0] == f);
+        assert(is_h0_factor(mm, f)) by {
+            assert(mm_in_H0(mm, a, b) && (f == config_word(a, b)));
+        }
+    }
+    assert(equiv_in_presentation(base_A(), concat_all(factors), f));
+    assert(in_T(mm, f));
 }
 
 } //  verus!
