@@ -10,7 +10,7 @@ use crate::britton_via_tower::lemma_insert_equiv_empty;
 use crate::britton_via_tower::lemma_delete_equiv_empty;
 use crate::britton_via_tower::{britton_lemma_full, has_pinch, has_pinch_at,
     has_adjacent_opposite_at, is_stable, has_stable_letter};
-use crate::benign::{in_generated_subgroup, concat_all, lemma_concat_all_singleton};
+use crate::benign::{in_generated_subgroup, concat_all, lemma_concat_all_singleton, lemma_concat_all_empty};
 
 verus! {
 
@@ -2160,6 +2160,72 @@ pub proof fn lemma_h0_config_in_T(mm: ModMachine, a: nat, b: nat)
     }
     assert(equiv_in_presentation(base_A(), concat_all(factors), f));
     assert(in_T(mm, f));
+}
+
+//  ============================================================
+//  E2 base camp — T(M) is closed under product (subgroup property 1/2)
+//  ============================================================
+
+//  concat_all distributes over list concatenation.
+pub proof fn lemma_concat_all_distributes(f1: Seq<Word>, f2: Seq<Word>)
+    ensures
+        concat_all(f1 + f2) =~= concat(concat_all(f1), concat_all(f2)),
+    decreases f1.len(),
+{
+    reveal_with_fuel(concat_all, 2);
+    if f1.len() == 0 {
+        lemma_concat_all_empty();
+        assert(f1 + f2 =~= f2);
+        assert(concat_all(f1) =~= empty_word());
+        assert(concat(empty_word(), concat_all(f2)) =~= concat_all(f2));
+    } else {
+        let rest = f1.drop_first();
+        assert((f1 + f2).first() == f1.first());
+        assert((f1 + f2).drop_first() =~= rest + f2);
+        lemma_concat_all_distributes(rest, f2);
+        assert(concat_all(f1) =~= concat(f1.first(), concat_all(rest)));
+        assert(concat_all(f1 + f2) =~= concat(f1.first(), concat_all(rest + f2)));
+    }
+}
+
+//  all_h0_factors is preserved by list concatenation.
+pub proof fn lemma_all_h0_factors_concat(mm: ModMachine, f1: Seq<Word>, f2: Seq<Word>)
+    requires
+        all_h0_factors(mm, f1),
+        all_h0_factors(mm, f2),
+    ensures
+        all_h0_factors(mm, f1 + f2),
+{
+    assert forall|i: int| 0 <= i < (f1 + f2).len()
+        implies is_h0_factor(mm, #[trigger] (f1 + f2)[i]) by {
+        if i < f1.len() {
+            assert((f1 + f2)[i] == f1[i]);
+        } else {
+            assert((f1 + f2)[i] == f2[i - f1.len()]);
+        }
+    }
+}
+
+//  T(M) is closed under the group product:  w1, w2 ∈ T(M) ⟹ w1·w2 ∈ T(M).
+pub proof fn lemma_in_T_product(mm: ModMachine, w1: Word, w2: Word)
+    requires
+        in_T(mm, w1),
+        in_T(mm, w2),
+    ensures
+        in_T(mm, w1 + w2),
+{
+    let f1 = choose|f: Seq<Word>|
+        #[trigger] all_h0_factors(mm, f) && equiv_in_presentation(base_A(), concat_all(f), w1);
+    let f2 = choose|f: Seq<Word>|
+        #[trigger] all_h0_factors(mm, f) && equiv_in_presentation(base_A(), concat_all(f), w2);
+    let f = f1 + f2;
+    lemma_all_h0_factors_concat(mm, f1, f2);
+    lemma_concat_all_distributes(f1, f2);
+    lemma_equiv_concat(base_A(), concat_all(f1), w1, concat_all(f2), w2);
+    //  concat_all(f) =~= concat(concat_all(f1), concat_all(f2)) ≡ w1·w2
+    assert(concat_all(f) =~= concat(concat_all(f1), concat_all(f2)));
+    assert(equiv_in_presentation(base_A(), concat_all(f), w1 + w2));
+    assert(all_h0_factors(mm, f));
 }
 
 } //  verus!
