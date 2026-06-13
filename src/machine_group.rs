@@ -1909,4 +1909,37 @@ pub proof fn lemma_reaches_implies_k_commutes(mm: ModMachine, alpha: nat, beta: 
     }
 }
 
+//  ============================================================
+//  Obligation E (faithfulness, the crux) — E1a: the k-extension's
+//  associated subgroups form an isomorphic pair (identity iso).
+//  ============================================================
+//
+//  g_m is HNN(B(M), k) with EVERY association of the form (s, s) — the identity
+//  isomorphism on ⟨t, rᵢ, lⱼ⟩.  So `hnn_associations_isomorphic` is reflexive:
+//  a_words == b_words, hence apply_embedding agrees, hence the ⟺ is trivial.
+//  Needed to invoke britton_lemma_full on the k-extension.
+pub proof fn lemma_g_m_associations_isomorphic(mm: ModMachine)
+    ensures
+        hnn_associations_isomorphic(HNNData { base: b_m(mm), associations: g_m_associations(mm) }),
+{
+    let gdata = HNNData { base: b_m(mm), associations: g_m_associations(mm) };
+    let k = gdata.associations.len();
+    let a_words = Seq::new(k, |i: int| gdata.associations[i].0);
+    let b_words = Seq::new(k, |i: int| gdata.associations[i].1);
+    //  every association is (s, s), so the two image lists coincide;
+    //  with a_words == b_words the ⟺ in hnn_associations_isomorphic is reflexive.
+    assert forall|i: int| 0 <= i < k implies
+        gdata.associations[i].0 == gdata.associations[i].1
+    by {
+        if i == 0 {
+        } else {
+            assert(gdata.associations[i] == {
+                let g = Symbol::Gen((3 + (i - 1)) as nat);
+                (seq![g], seq![g])
+            });
+        }
+    }
+    assert(a_words =~= b_words);
+}
+
 } //  verus!
