@@ -5,6 +5,9 @@ use crate::presentation::*;
 use crate::presentation_lemmas::*;
 use crate::reduction::*;
 use crate::hnn::*;
+use crate::benign::{apply_embedding, apply_embedding_symbol,
+    lemma_apply_embedding_concat, lemma_apply_embedding_symbol_inverse,
+    lemma_apply_embedding_inverse, lemma_apply_embedding_valid};
 use crate::normal_form_afp_textbook::lemma_equiv_inverse;
 use crate::britton_via_tower::lemma_insert_equiv_empty;
 use crate::britton_via_tower::lemma_delete_equiv_empty;
@@ -2890,6 +2893,64 @@ pub proof fn lemma_x_pow_y_pow_trivial(p: nat, q: nat)
     assert(gexp(2, w) == q);
     lemma_equiv_in_A_preserves_gexp(2, w, empty_word());
     assert(gexp(2, empty_word()) == 0);
+}
+
+//  ============================================================
+//  Property (iii), brick 1: apply_embedding respects image equivalence
+//  ============================================================
+//
+//  Substituting equivalent image words gives equivalent results.  This is the
+//  workhorse that lets us replace the quad's a_words by any words equivalent to
+//  them (e.g. conjugated/scaled forms) when proving the association isomorphism.
+
+pub proof fn lemma_apply_embedding_respects_image_equiv(
+    p: Presentation, images: Seq<Word>, images2: Seq<Word>, w: Word, k: nat,
+)
+    requires
+        images.len() == k,
+        images2.len() == k,
+        word_valid(w, k),
+        presentation_valid(p),
+        forall|i: int| 0 <= i < k ==> word_valid(#[trigger] images[i], p.num_generators),
+        forall|i: int| 0 <= i < k ==> word_valid(#[trigger] images2[i], p.num_generators),
+        forall|i: int| 0 <= i < k ==> equiv_in_presentation(p, #[trigger] images[i], images2[i]),
+    ensures
+        equiv_in_presentation(p, apply_embedding(images, w), apply_embedding(images2, w)),
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        assert(apply_embedding(images, w) =~= empty_word());
+        assert(apply_embedding(images2, w) =~= empty_word());
+        lemma_equiv_refl(p, apply_embedding(images, w));
+    } else {
+        let s = w.first();
+        let rest = w.drop_first();
+        assert(symbol_valid(s, k)) by { assert(w[0] == s); }
+        let head = apply_embedding_symbol(images, s);
+        let head2 = apply_embedding_symbol(images2, s);
+        //  head ≡ head2
+        match s {
+            Symbol::Gen(i) => {
+                assert(head == images[i as int] && head2 == images2[i as int]);
+                assert(0 <= i < k);
+                assert(equiv_in_presentation(p, images[i as int], images2[i as int]));
+            },
+            Symbol::Inv(i) => {
+                assert(head == inverse_word(images[i as int]) && head2 == inverse_word(images2[i as int]));
+                assert(0 <= i < k);
+                lemma_equiv_inverse(p, images[i as int], images2[i as int]);
+            },
+        }
+        assert(equiv_in_presentation(p, head, head2));
+        lemma_apply_embedding_respects_image_equiv(p, images, images2, rest, k);
+        let tail = apply_embedding(images, rest);
+        let tail2 = apply_embedding(images2, rest);
+        assert(apply_embedding(images, w) == concat(head, tail));
+        assert(apply_embedding(images2, w) == concat(head2, tail2));
+        lemma_equiv_concat_left(p, head, head2, tail);
+        lemma_equiv_concat_right(p, head2, tail, tail2);
+        lemma_equiv_transitive(p, concat(head, tail), concat(head2, tail), concat(head2, tail2));
+    }
 }
 
 } //  verus!
