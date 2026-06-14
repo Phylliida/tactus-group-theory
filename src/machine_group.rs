@@ -2582,4 +2582,117 @@ pub proof fn lemma_base_A_is_free_product()
     assert(fp == base_A());
 }
 
+//  ============================================================
+//  Exponent-sum invariant — the bedrock of free-factor triviality
+//  ============================================================
+//
+//  gexp(i, w) = net exponent of generator i in w  (+1 per Gen(i), −1 per Inv(i)).
+//  It is preserved by `equiv` whenever every relator has gexp 0 (proved by
+//  induction on the derivation), so it DETECTS non-triviality.  Consequence:
+//  t = Gen(0) has infinite order in A — tⁿ ≢ ε — the floor under property (i).
+
+pub open spec fn sym_exp(i: nat, s: Symbol) -> int {
+    if s == Symbol::Gen(i) { 1 } else if s == Symbol::Inv(i) { -1 } else { 0 }
+}
+
+pub open spec fn gexp(i: nat, w: Word) -> int
+    decreases w.len(),
+{
+    if w.len() == 0 { 0 } else { sym_exp(i, w[0]) + gexp(i, w.drop_first()) }
+}
+
+pub proof fn lemma_gexp_singleton(i: nat, s: Symbol)
+    ensures
+        gexp(i, seq![s]) == sym_exp(i, s),
+{
+    let w: Word = seq![s];
+    assert(w.len() == 1);
+    assert(w[0] == s);
+    assert(w.drop_first() =~= empty_word());
+    assert(gexp(i, w) == sym_exp(i, w[0]) + gexp(i, w.drop_first()));
+}
+
+pub proof fn lemma_gexp_concat(i: nat, a: Word, b: Word)
+    ensures
+        gexp(i, a + b) == gexp(i, a) + gexp(i, b),
+    decreases a.len(),
+{
+    if a.len() == 0 {
+        assert(a + b =~= b);
+    } else {
+        assert((a + b)[0] == a[0]);
+        assert((a + b).drop_first() =~= a.drop_first() + b);
+        lemma_gexp_concat(i, a.drop_first(), b);
+    }
+}
+
+//  Inverting a symbol negates its exponent contribution.
+pub proof fn lemma_sym_exp_inverse(i: nat, s: Symbol)
+    ensures
+        sym_exp(i, inverse_symbol(s)) == -sym_exp(i, s),
+{
+}
+
+pub proof fn lemma_gexp_inverse(i: nat, w: Word)
+    ensures
+        gexp(i, inverse_word(w)) == -gexp(i, w),
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        assert(inverse_word(w) =~= empty_word());
+    } else {
+        lemma_gexp_inverse(i, w.drop_first());
+        let tail = Seq::new(1, |_j: int| inverse_symbol(w.first()));
+        lemma_gexp_concat(i, inverse_word(w.drop_first()), tail);
+        assert(tail =~= seq![inverse_symbol(w.first())]);
+        lemma_gexp_singleton(i, inverse_symbol(w.first()));
+        lemma_sym_exp_inverse(i, w.first());
+        assert(w[0] == w.first());
+    }
+}
+
+//  A cancelling pair contributes nothing.
+pub proof fn lemma_gexp_pair(i: nat, s: Symbol)
+    ensures
+        gexp(i, seq![s, inverse_symbol(s)]) == 0,
+{
+    let w: Word = seq![s, inverse_symbol(s)];
+    assert(w[0] == s);
+    assert(w.drop_first() =~= seq![inverse_symbol(s)]);
+    lemma_gexp_singleton(i, inverse_symbol(s));
+    lemma_sym_exp_inverse(i, s);
+}
+
+//  gexp splits across any subrange boundary.
+pub proof fn lemma_gexp_split(i: nat, w: Word, k: int)
+    requires
+        0 <= k <= w.len(),
+    ensures
+        gexp(i, w) == gexp(i, w.subrange(0, k)) + gexp(i, w.subrange(k, w.len() as int)),
+{
+    assert(w =~= w.subrange(0, k) + w.subrange(k, w.len() as int));
+    lemma_gexp_concat(i, w.subrange(0, k), w.subrange(k, w.len() as int));
+}
+
+//  A constant power scales the exponent.
+pub proof fn lemma_gexp_symbol_power(i: nat, s: Symbol, n: nat)
+    ensures
+        gexp(i, symbol_power(s, n)) == n * sym_exp(i, s),
+    decreases n,
+{
+    if n == 0 {
+        assert(symbol_power(s, 0) =~= empty_word());
+    } else {
+        let np = (n - 1) as nat;
+        let e = sym_exp(i, s);
+        assert(symbol_power(s, n).len() == n);
+        assert(symbol_power(s, n)[0] == s);
+        assert(symbol_power(s, n).drop_first() =~= symbol_power(s, np));
+        assert(gexp(i, symbol_power(s, n)) == e + gexp(i, symbol_power(s, n).drop_first()));
+        lemma_gexp_symbol_power(i, s, np);
+        assert(n == np + 1);
+        assert((np + 1) * e == e + np * e) by (nonlinear_arith);
+    }
+}
+
 } //  verus!
