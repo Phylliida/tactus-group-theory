@@ -3074,4 +3074,42 @@ pub proof fn lemma_conj_trivial_iff(p: Presentation, g: Word, ww: Word)
     }
 }
 
+//  ============================================================
+//  Property (iii), A2a foundations: apply_embedding as a homomorphism
+//  ============================================================
+//
+//  Toward "apply_embedding sends source-equivalences to target-equivalences"
+//  (the embedding is a homomorphism from the source group when the images
+//  satisfy the source relations).  These two stones handle the free-reduction
+//  and relator-inverse moves; the full per-step + derivation induction is next.
+
+//  The image of a cancelling pair is trivial:  emb([s, s⁻¹]) ≡ ε.
+pub proof fn lemma_emb_inverse_pair_trivial(p: Presentation, images: Seq<Word>, s: Symbol)
+    ensures
+        equiv_in_presentation(p, apply_embedding(images, seq![s, inverse_symbol(s)]), empty_word()),
+{
+    reveal_with_fuel(apply_embedding, 3);
+    let s2 = inverse_symbol(s);
+    let m_sym = apply_embedding_symbol(images, s);
+    lemma_apply_embedding_symbol_inverse(images, s);   //  emb_sym(s2) =~= inverse_word(m_sym)
+    assert(seq![s, s2].drop_first() =~= seq![s2]);
+    assert(seq![s2].drop_first() =~= empty_word());
+    assert(apply_embedding(images, seq![s, s2]) =~= m_sym + inverse_word(m_sym));
+    lemma_word_inverse_right(p, m_sym);                //  m + m⁻¹ ≡ ε
+}
+
+//  If emb(r) ≡ ε then emb(r⁻¹) ≡ ε.
+pub proof fn lemma_emb_inverse_word_trivial(p: Presentation, images: Seq<Word>, r: Word)
+    requires
+        equiv_in_presentation(p, apply_embedding(images, r), empty_word()),
+        presentation_valid(p),
+        word_valid(apply_embedding(images, r), p.num_generators),
+    ensures
+        equiv_in_presentation(p, apply_embedding(images, inverse_word(r)), empty_word()),
+{
+    lemma_apply_embedding_inverse(images, r);   //  emb(inverse_word(r)) =~= inverse_word(emb(r))
+    lemma_equiv_inverse(p, apply_embedding(images, r), empty_word());
+    assert(inverse_word(empty_word()) =~= empty_word());
+}
+
 } //  verus!
