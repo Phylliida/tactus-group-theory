@@ -2695,4 +2695,139 @@ pub proof fn lemma_gexp_symbol_power(i: nat, s: Symbol, n: nat)
     }
 }
 
+//  One derivation step preserves gexp, provided every relator has gexp 0.
+pub proof fn lemma_apply_step_preserves_gexp(
+    p: Presentation, w: Word, w2: Word, step: DerivationStep, i: nat,
+)
+    requires
+        apply_step(p, w, step) == Some(w2),
+        forall|j: int| 0 <= j < p.relators.len() ==> gexp(i, #[trigger] p.relators[j]) == 0,
+    ensures
+        gexp(i, w2) == gexp(i, w),
+{
+    match step {
+        DerivationStep::FreeReduce { position } => {
+            let pos = position;
+            assert(has_cancellation_at(w, pos));
+            assert(w2 == w.subrange(0, pos) + w.subrange(pos + 2, w.len() as int));
+            assert(w[pos + 1] == inverse_symbol(w[pos]));
+            lemma_gexp_split(i, w, pos);
+            let tail = w.subrange(pos, w.len() as int);
+            lemma_gexp_split(i, tail, 2);
+            assert(tail.subrange(0, 2) =~= seq![w[pos], inverse_symbol(w[pos])]);
+            lemma_gexp_pair(i, w[pos]);
+            assert(tail.subrange(2, tail.len() as int) =~= w.subrange(pos + 2, w.len() as int));
+            lemma_gexp_concat(i, w.subrange(0, pos), w.subrange(pos + 2, w.len() as int));
+        },
+        DerivationStep::FreeExpand { position, symbol } => {
+            let pair = Seq::new(1, |_k: int| symbol) + Seq::new(1, |_k: int| inverse_symbol(symbol));
+            assert(w2 == w.subrange(0, position) + pair + w.subrange(position, w.len() as int));
+            assert(pair =~= seq![symbol, inverse_symbol(symbol)]);
+            lemma_gexp_pair(i, symbol);
+            lemma_gexp_concat(i, w.subrange(0, position) + pair, w.subrange(position, w.len() as int));
+            lemma_gexp_concat(i, w.subrange(0, position), pair);
+            lemma_gexp_split(i, w, position);
+        },
+        DerivationStep::RelatorInsert { position, relator_index, inverted } => {
+            let r = get_relator(p, relator_index, inverted);
+            assert(w2 == w.subrange(0, position) + r + w.subrange(position, w.len() as int));
+            assert(gexp(i, p.relators[relator_index as int]) == 0);
+            if inverted {
+                lemma_gexp_inverse(i, p.relators[relator_index as int]);
+            }
+            assert(gexp(i, r) == 0);
+            lemma_gexp_concat(i, w.subrange(0, position) + r, w.subrange(position, w.len() as int));
+            lemma_gexp_concat(i, w.subrange(0, position), r);
+            lemma_gexp_split(i, w, position);
+        },
+        DerivationStep::RelatorDelete { position, relator_index, inverted } => {
+            let r = get_relator(p, relator_index, inverted);
+            let rlen = r.len() as int;
+            assert(w.subrange(position, position + rlen) == r);
+            assert(w2 == w.subrange(0, position) + w.subrange(position + rlen, w.len() as int));
+            assert(gexp(i, p.relators[relator_index as int]) == 0);
+            if inverted {
+                lemma_gexp_inverse(i, p.relators[relator_index as int]);
+            }
+            assert(gexp(i, r) == 0);
+            lemma_gexp_split(i, w, position);
+            let tail = w.subrange(position, w.len() as int);
+            lemma_gexp_split(i, tail, rlen);
+            assert(tail.subrange(0, rlen) =~= r);
+            assert(tail.subrange(rlen, tail.len() as int) =~= w.subrange(position + rlen, w.len() as int));
+            lemma_gexp_concat(i, w.subrange(0, position), w.subrange(position + rlen, w.len() as int));
+        },
+    }
+}
+
+//  A whole derivation preserves gexp (relators all gexp 0).
+pub proof fn lemma_derivation_preserves_gexp(
+    p: Presentation, steps: Seq<DerivationStep>, start: Word, end: Word, i: nat,
+)
+    requires
+        derivation_produces(p, steps, start) == Some(end),
+        forall|j: int| 0 <= j < p.relators.len() ==> gexp(i, #[trigger] p.relators[j]) == 0,
+    ensures
+        gexp(i, end) == gexp(i, start),
+    decreases steps.len(),
+{
+    if steps.len() == 0 {
+        assert(start == end);
+    } else {
+        let first = steps.first();
+        match apply_step(p, start, first) {
+            Some(next) => {
+                lemma_apply_step_preserves_gexp(p, start, next, first, i);
+                lemma_derivation_preserves_gexp(p, steps.drop_first(), next, end, i);
+            },
+            None => {
+                assert(false);
+            },
+        }
+    }
+}
+
+//  Equivalence preserves gexp (relators all gexp 0).
+pub proof fn lemma_equiv_preserves_gexp(p: Presentation, w1: Word, w2: Word, i: nat)
+    requires
+        equiv_in_presentation(p, w1, w2),
+        forall|j: int| 0 <= j < p.relators.len() ==> gexp(i, #[trigger] p.relators[j]) == 0,
+    ensures
+        gexp(i, w1) == gexp(i, w2),
+{
+    let d = choose|d: Derivation| derivation_valid(p, d, w1, w2);
+    lemma_derivation_preserves_gexp(p, d.steps, w1, w2, i);
+}
+
+//  Every relator of A has zero exponent in every generator.
+pub proof fn lemma_base_A_relators_gexp_zero(i: nat)
+    ensures
+        forall|j: int| 0 <= j < base_A().relators.len()
+            ==> gexp(i, #[trigger] base_A().relators[j]) == 0,
+{
+    reveal_with_fuel(gexp, 5);
+    assert(base_A().relators.len() == 1);
+    let r = base_A().relators[0];
+    assert(r == seq![Symbol::Gen(1), Symbol::Gen(2), Symbol::Inv(1), Symbol::Inv(2)]);
+    assert(gexp(i, r) == sym_exp(i, Symbol::Gen(1)) + sym_exp(i, Symbol::Gen(2))
+        + sym_exp(i, Symbol::Inv(1)) + sym_exp(i, Symbol::Inv(2)));
+}
+
+//  ★ t = Gen(0) has infinite order in A:  tⁿ ≢ ε for n ≥ 1.  (Property (i)'s floor.)
+pub proof fn lemma_t_power_nontrivial(n: nat)
+    requires
+        n >= 1,
+    ensures
+        !equiv_in_presentation(base_A(), symbol_power(Symbol::Gen(0), n), empty_word()),
+{
+    if equiv_in_presentation(base_A(), symbol_power(Symbol::Gen(0), n), empty_word()) {
+        lemma_base_A_relators_gexp_zero(0);
+        lemma_equiv_preserves_gexp(base_A(), symbol_power(Symbol::Gen(0), n), empty_word(), 0);
+        lemma_gexp_symbol_power(0, Symbol::Gen(0), n);
+        assert(sym_exp(0, Symbol::Gen(0)) == 1);
+        assert(gexp(0, empty_word()) == 0);
+        assert(false);
+    }
+}
+
 } //  verus!
