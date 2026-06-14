@@ -2499,4 +2499,25 @@ pub proof fn lemma_in_gen_implies_in_T_stable(mm: ModMachine, w: Word)
     assert(in_T_stable(mm, w));
 }
 
+//  ============================================================
+//  E2.C.1 — base case of the property-II induction.
+//  ============================================================
+//
+//  When a ⟨T(M), rᵢ, lⱼ⟩-factorization has been pinched down to NO stable
+//  factors — i.e. every factor is an H₀ config word — the product is already an
+//  element of T(M).  (The factorization itself witnesses in_T, by reflexivity.)
+
+pub proof fn lemma_all_h0_in_T(mm: ModMachine, factors: Seq<Word>)
+    requires
+        all_h0_factors(mm, factors),
+    ensures
+        in_T(mm, concat_all(factors)),
+{
+    lemma_base_A_valid();
+    lemma_concat_all_h0_valid(mm, factors);
+    lemma_equiv_refl(base_A(), concat_all(factors));
+    assert(all_h0_factors(mm, factors)
+        && equiv_in_presentation(base_A(), concat_all(factors), concat_all(factors)));
+}
+
 } //  verus!
