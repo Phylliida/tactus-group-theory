@@ -2953,4 +2953,83 @@ pub proof fn lemma_apply_embedding_respects_image_equiv(
     }
 }
 
+//  ============================================================
+//  Property (iii), brick 2: conjugation telescopes through embedding
+//  ============================================================
+
+//  Conjugate every image word by g:  imagesᵢ ↦ g⁻¹ · imagesᵢ · g.
+pub open spec fn conj_images(g: Word, images: Seq<Word>) -> Seq<Word> {
+    Seq::new(images.len(), |i: int| inverse_word(g) + images[i] + g)
+}
+
+//  Substituting one symbol through conj_images = g⁻¹ · (image of s) · g.
+pub proof fn lemma_apply_embedding_symbol_conj(g: Word, images: Seq<Word>, s: Symbol)
+    requires
+        generator_index(s) < images.len(),
+    ensures
+        apply_embedding_symbol(conj_images(g, images), s)
+            =~= inverse_word(g) + apply_embedding_symbol(images, s) + g,
+{
+    let ci = conj_images(g, images);
+    match s {
+        Symbol::Gen(i) => {
+            assert(ci[i as int] == inverse_word(g) + images[i as int] + g);
+        },
+        Symbol::Inv(i) => {
+            assert(ci[i as int] == inverse_word(g) + images[i as int] + g);
+            lemma_inverse_word_concat(inverse_word(g) + images[i as int], g);
+            lemma_inverse_word_concat(inverse_word(g), images[i as int]);
+            crate::word::lemma_inverse_involution(g);
+        },
+    }
+}
+
+//  emb(conj_images(g, images), w)  ≡  g⁻¹ · emb(images, w) · g.
+pub proof fn lemma_emb_conj_telescope(
+    p: Presentation, g: Word, images: Seq<Word>, w: Word, k: nat,
+)
+    requires
+        images.len() == k,
+        word_valid(w, k),
+        presentation_valid(p),
+        word_valid(g, p.num_generators),
+    ensures
+        equiv_in_presentation(p, apply_embedding(conj_images(g, images), w),
+            inverse_word(g) + apply_embedding(images, w) + g),
+    decreases w.len(),
+{
+    let ci = conj_images(g, images);
+    let ig = inverse_word(g);
+    if w.len() == 0 {
+        assert(apply_embedding(ci, w) =~= empty_word());
+        assert(apply_embedding(images, w) =~= empty_word());
+        lemma_inverse_word_valid(g, p.num_generators);
+        lemma_concat_word_valid(ig, g, p.num_generators);
+        lemma_word_inverse_left(p, g);                                   //  ig + g ≡ ε
+        lemma_equiv_symmetric(p, ig + g, empty_word());                 //  ε ≡ ig + g
+        assert(ig + apply_embedding(images, w) + g =~= ig + g);
+    } else {
+        let s = w.first();
+        let rest = w.drop_first();
+        assert(symbol_valid(s, k)) by { assert(w[0] == s); }
+        let m_sym = apply_embedding_symbol(images, s);
+        let r = apply_embedding(images, rest);
+        let mc = apply_embedding_symbol(ci, s);
+        lemma_apply_embedding_symbol_conj(g, images, s);                //  mc =~= ig + m_sym + g
+        lemma_emb_conj_telescope(p, g, images, rest, k);               //  emb(ci,rest) ≡ ig + r + g
+        assert(apply_embedding(ci, w) == concat(mc, apply_embedding(ci, rest)));
+        assert(mc == ig + m_sym + g);
+        let big = concat(ig + m_sym + g, ig + r + g);
+        //  emb(ci,w) ≡ big   (congruence on the tail with the IH)
+        lemma_equiv_concat_right(p, mc, apply_embedding(ci, rest), ig + r + g);
+        assert(concat(mc, ig + r + g) == big);
+        //  big = (ig+m) (g+ig) (r+g);  delete the middle g+ig ≡ ε
+        assert(big =~= (ig + m_sym) + ((g + ig) + (r + g)));
+        lemma_word_inverse_right(p, g);                                 //  g + ig ≡ ε
+        lemma_delete_equiv_empty(p, ig + m_sym, g + ig, r + g);
+        assert((ig + m_sym) + (r + g) =~= ig + apply_embedding(images, w) + g);
+        lemma_equiv_transitive(p, apply_embedding(ci, w), big, (ig + m_sym) + (r + g));
+    }
+}
+
 } //  verus!
