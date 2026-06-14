@@ -2830,4 +2830,66 @@ pub proof fn lemma_t_power_nontrivial(n: nat)
     }
 }
 
+//  ============================================================
+//  The ℤ² right factor: x and y are independent in A
+//  ============================================================
+
+//  Equivalence in A preserves every generator's exponent (A's only relator
+//  [x,y] has zero exponent in every generator).
+pub proof fn lemma_equiv_in_A_preserves_gexp(i: nat, w1: Word, w2: Word)
+    requires
+        equiv_in_presentation(base_A(), w1, w2),
+    ensures
+        gexp(i, w1) == gexp(i, w2),
+{
+    lemma_base_A_relators_gexp_zero(i);
+    lemma_equiv_preserves_gexp(base_A(), w1, w2, i);
+}
+
+//  Every generator has infinite order in A:  Gen(g)ⁿ ≢ ε for n ≥ 1.
+//  (t = Gen(0), x = Gen(1), y = Gen(2) are all special cases.)
+pub proof fn lemma_gen_power_nontrivial(g: nat, n: nat)
+    requires
+        n >= 1,
+    ensures
+        !equiv_in_presentation(base_A(), symbol_power(Symbol::Gen(g), n), empty_word()),
+{
+    if equiv_in_presentation(base_A(), symbol_power(Symbol::Gen(g), n), empty_word()) {
+        lemma_equiv_in_A_preserves_gexp(g, symbol_power(Symbol::Gen(g), n), empty_word());
+        lemma_gexp_symbol_power(g, Symbol::Gen(g), n);
+        assert(sym_exp(g, Symbol::Gen(g)) == 1);
+        assert(gexp(g, empty_word()) == 0);
+        assert(false);
+    }
+}
+
+//  x = Gen(1) and y = Gen(2) are independent:  xᵖ·yᵠ ≡ ε  ⟹  p = q = 0.
+pub proof fn lemma_x_pow_y_pow_trivial(p: nat, q: nat)
+    requires
+        equiv_in_presentation(base_A(),
+            symbol_power(Symbol::Gen(1), p) + symbol_power(Symbol::Gen(2), q), empty_word()),
+    ensures
+        p == 0 && q == 0,
+{
+    let xp = symbol_power(Symbol::Gen(1), p);
+    let yq = symbol_power(Symbol::Gen(2), q);
+    let w = xp + yq;
+    //  x-exponent reads off p
+    lemma_gexp_concat(1, xp, yq);
+    lemma_gexp_symbol_power(1, Symbol::Gen(1), p);
+    lemma_gexp_symbol_power(1, Symbol::Gen(2), q);
+    assert(sym_exp(1, Symbol::Gen(1)) == 1 && sym_exp(1, Symbol::Gen(2)) == 0);
+    assert(gexp(1, w) == p);
+    lemma_equiv_in_A_preserves_gexp(1, w, empty_word());
+    assert(gexp(1, empty_word()) == 0);
+    //  y-exponent reads off q
+    lemma_gexp_concat(2, xp, yq);
+    lemma_gexp_symbol_power(2, Symbol::Gen(1), p);
+    lemma_gexp_symbol_power(2, Symbol::Gen(2), q);
+    assert(sym_exp(2, Symbol::Gen(1)) == 0 && sym_exp(2, Symbol::Gen(2)) == 1);
+    assert(gexp(2, w) == q);
+    lemma_equiv_in_A_preserves_gexp(2, w, empty_word());
+    assert(gexp(2, empty_word()) == 0);
+}
+
 } //  verus!
