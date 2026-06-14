@@ -3032,4 +3032,46 @@ pub proof fn lemma_emb_conj_telescope(
     }
 }
 
+//  Conjugation preserves triviality:  g⁻¹·W·g ≡ ε  ⟺  W ≡ ε.
+pub proof fn lemma_conj_trivial_iff(p: Presentation, g: Word, ww: Word)
+    requires
+        presentation_valid(p),
+        word_valid(g, p.num_generators),
+    ensures
+        equiv_in_presentation(p, inverse_word(g) + ww + g, empty_word())
+        <==> equiv_in_presentation(p, ww, empty_word()),
+{
+    let ig = inverse_word(g);
+    lemma_inverse_word_valid(g, p.num_generators);
+    lemma_concat_word_valid(g, ig, p.num_generators);
+    //  ⟸ : W ≡ ε  ⟹  ig·W·g ≡ ε   (delete W, then ig·g ≡ ε)
+    if equiv_in_presentation(p, ww, empty_word()) {
+        lemma_delete_equiv_empty(p, ig, ww, g);
+        lemma_word_inverse_left(p, g);
+        assert(concat(ig, concat(ww, g)) =~= ig + ww + g);
+        assert(concat(ig, g) =~= ig + g);
+        lemma_equiv_transitive(p, ig + ww + g, ig + g, empty_word());
+    }
+    //  ⟹ : ig·W·g ≡ ε  ⟹  W ≡ ε
+    if equiv_in_presentation(p, ig + ww + g, empty_word()) {
+        lemma_word_inverse_right(p, g);                                 //  g·ig ≡ ε
+        //  build  W ≡ (g·ig)·W·(g·ig)  by inserting g·ig ≡ ε at both ends
+        lemma_insert_equiv_empty(p, empty_word(), g + ig, ww);
+        lemma_insert_equiv_empty(p, g + ig + ww, g + ig, empty_word());
+        assert(concat(empty_word(), ww) =~= ww);
+        assert(concat(empty_word(), concat(g + ig, ww)) =~= (g + ig) + ww);
+        assert(concat(g + ig + ww, empty_word()) =~= (g + ig) + ww);
+        assert(concat(g + ig + ww, concat(g + ig, empty_word())) =~= (g + ig) + ww + (g + ig));
+        let big_x = (g + ig) + ww + (g + ig);
+        lemma_equiv_transitive(p, ww, (g + ig) + ww, big_x);
+        //  big_x  =~=  g·(ig·W·g)·ig  ≡  g·ig  ≡  ε
+        assert(big_x =~= concat(g, concat(ig + ww + g, ig)));
+        lemma_delete_equiv_empty(p, g, ig + ww + g, ig);               //  g·(igWg)·ig ≡ g·ig
+        assert(concat(g, ig) =~= g + ig);
+        assert(equiv_in_presentation(p, big_x, g + ig));
+        lemma_equiv_transitive(p, ww, big_x, g + ig);
+        lemma_equiv_transitive(p, ww, g + ig, empty_word());
+    }
+}
+
 } //  verus!
