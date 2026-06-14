@@ -11,6 +11,7 @@ use crate::britton_via_tower::lemma_delete_equiv_empty;
 use crate::britton_via_tower::{britton_lemma_full, has_pinch, has_pinch_at,
     has_adjacent_opposite_at, is_stable, has_stable_letter};
 use crate::benign::{in_generated_subgroup, concat_all, lemma_concat_all_singleton, lemma_concat_all_empty, is_generator_or_inverse, factors_from_generators};
+use crate::free_product::{free_product, shift_relators, shift_word, shift_symbol};
 
 verus! {
 
@@ -2518,6 +2519,67 @@ pub proof fn lemma_all_h0_in_T(mm: ModMachine, factors: Seq<Word>)
     lemma_equiv_refl(base_A(), concat_all(factors));
     assert(all_h0_factors(mm, factors)
         && equiv_in_presentation(base_A(), concat_all(factors), concat_all(factors)));
+}
+
+//  ============================================================
+//  Free-product structure of A — the foundation for properties (i)–(iii)
+//  ============================================================
+//
+//  A = ⟨t, x, y | xy=yx⟩ is LITERALLY the free product ⟨t⟩ * ⟨x,y|xy=yx⟩:
+//  generator t = Gen(0) is the left factor, x=Gen(1),y=Gen(2) the right.  This
+//  opens the verified free-product toolbox (injective_left/right, reflects_*) on
+//  A, which is exactly what the faithfulness crux (the quad-level HNN isomorphism,
+//  paper property (iii)) is built from.
+
+//  Left factor ⟨t⟩ (free, one generator).
+pub open spec fn pres_t() -> Presentation {
+    Presentation { num_generators: 1, relators: Seq::empty() }
+}
+
+//  Right factor ⟨x, y | xy = yx⟩.
+pub open spec fn pres_xy() -> Presentation {
+    Presentation {
+        num_generators: 2,
+        relators: seq![ seq![Symbol::Gen(0), Symbol::Gen(1), Symbol::Inv(0), Symbol::Inv(1)] ],
+    }
+}
+
+pub proof fn lemma_pres_t_valid()
+    ensures
+        presentation_valid(pres_t()),
+{
+    reveal(presentation_valid);
+}
+
+pub proof fn lemma_pres_xy_valid()
+    ensures
+        presentation_valid(pres_xy()),
+{
+    reveal(presentation_valid);
+    let p = pres_xy();
+    assert forall|i: int| 0 <= i < p.relators.len()
+        implies word_valid(#[trigger] p.relators[i], p.num_generators)
+    by {
+        assert(p.relators[i] == seq![Symbol::Gen(0), Symbol::Gen(1), Symbol::Inv(0), Symbol::Inv(1)]);
+    }
+}
+
+//  A is the free product ⟨t⟩ * ⟨x,y|xy=yx⟩, on the nose.
+pub proof fn lemma_base_A_is_free_product()
+    ensures
+        base_A() == free_product(pres_t(), pres_xy()),
+{
+    let fp = free_product(pres_t(), pres_xy());
+    let rxy: Word = seq![Symbol::Gen(0), Symbol::Gen(1), Symbol::Inv(0), Symbol::Inv(1)];
+    let rA: Word = seq![Symbol::Gen(1), Symbol::Gen(2), Symbol::Inv(1), Symbol::Inv(2)];
+    assert(shift_word(rxy, 1) =~= rA);
+    assert(pres_xy().relators.len() == 1 && pres_xy().relators[0] == rxy);
+    assert(shift_relators(pres_xy().relators, 1) =~= seq![rA]);
+    assert(Seq::<Word>::empty() + shift_relators(pres_xy().relators, 1)
+        =~= shift_relators(pres_xy().relators, 1));
+    assert(fp.relators =~= base_A().relators);
+    assert(fp.num_generators == base_A().num_generators);
+    assert(fp == base_A());
 }
 
 } //  verus!
