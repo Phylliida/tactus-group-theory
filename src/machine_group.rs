@@ -4982,6 +4982,126 @@ pub proof fn lemma_psi_A_emb_symbol_stable_count(p: nat, q: nat, s: Symbol)
     }
 }
 
+//  ============================================================
+//  χₓ : the signed x-exponent-sum  (the ⟨x⟩-membership detector)
+//  ============================================================
+//
+//  The engine of the y-pinch middle-correspondence: a y-pinch's middle must lie
+//  in ⟨x⟩, and χₓ reads that off.  χₓ is a ℤ-homomorphism (additive over concat),
+//  it scales by p under ψ_F (x↦xᵖ), and — the hard step, next — it is ≡-invariant
+//  on the free group F, so ψ_F(u) ≡ xⁿ forces n = p·χₓ(u), handing us the witness.
+
+pub open spec fn x_exp_sum(w: Word) -> int
+    decreases w.len()
+{
+    if w.len() == 0 {
+        0int
+    } else {
+        (if w.first() == Symbol::Gen(1) { 1int }
+         else if w.first() == Symbol::Inv(1) { -1int }
+         else { 0int })
+        + x_exp_sum(w.drop_first())
+    }
+}
+
+//  χₓ is additive over concatenation.
+pub proof fn lemma_x_exp_sum_concat(w1: Word, w2: Word)
+    ensures
+        x_exp_sum(w1 + w2) == x_exp_sum(w1) + x_exp_sum(w2),
+    decreases w1.len(),
+{
+    if w1.len() == 0 {
+        assert(w1 + w2 =~= w2);
+    } else {
+        assert((w1 + w2).first() == w1.first());
+        assert((w1 + w2).drop_first() =~= w1.drop_first() + w2);
+        lemma_x_exp_sum_concat(w1.drop_first(), w2);
+    }
+}
+
+//  χₓ of a constant power.
+pub proof fn lemma_x_exp_sum_symbol_power(s: Symbol, n: nat)
+    ensures
+        x_exp_sum(symbol_power(s, n))
+            == (if s == Symbol::Gen(1) { n as int }
+                else if s == Symbol::Inv(1) { -(n as int) }
+                else { 0int }),
+    decreases n,
+{
+    if n == 0 {
+        assert(symbol_power(s, n) =~= Seq::<Symbol>::empty());
+    } else {
+        assert(symbol_power(s, n).first() == s);
+        assert(symbol_power(s, n).drop_first() =~= symbol_power(s, (n - 1) as nat));
+        lemma_x_exp_sum_symbol_power(s, (n - 1) as nat);
+    }
+}
+
+//  ψ_F scales χₓ by p  (x↦xᵖ multiplies the x-count, t↦t contributes none).
+pub proof fn lemma_x_exp_sum_psi_F(p: nat, u: Word)
+    requires
+        word_valid(u, 2),
+    ensures
+        x_exp_sum(apply_embedding(psi_F_images(p), u)) == p * x_exp_sum(u),
+    decreases u.len(),
+{
+    let imgs = psi_F_images(p);
+    reveal_with_fuel(apply_embedding, 2);
+    reveal_with_fuel(inverse_word, 2);
+    if u.len() == 0 {
+        assert(apply_embedding(imgs, u) =~= Seq::<Symbol>::empty());
+    } else {
+        let c = u.first();
+        let rest = u.drop_first();
+        assert(u =~= seq![c] + rest);
+        assert(word_valid(rest, 2)) by {
+            assert forall|k: int| 0 <= k < rest.len() implies symbol_valid(#[trigger] rest[k], 2)
+            by { assert(rest[k] == u[k + 1]); }
+        }
+        lemma_apply_embedding_concat(imgs, seq![c], rest);
+        assert(apply_embedding(imgs, u)
+            =~= apply_embedding(imgs, seq![c]) + apply_embedding(imgs, rest));
+        lemma_x_exp_sum_concat(apply_embedding(imgs, seq![c]), apply_embedding(imgs, rest));
+        lemma_x_exp_sum_psi_F(p, rest);
+        //  per-symbol: χₓ(ψ_F([c])) == p · χₓ([c])
+        reveal_with_fuel(x_exp_sum, 2);
+        assert(apply_embedding(imgs, seq![c]) =~= apply_embedding_symbol(imgs, c));
+        assert(imgs[0] =~= seq![Symbol::Gen(0)]);
+        assert(imgs[1] =~= symbol_power(Symbol::Gen(1), p));
+        if c == Symbol::Gen(1) {
+            assert(apply_embedding_symbol(imgs, c) =~= symbol_power(Symbol::Gen(1), p));
+            lemma_x_exp_sum_symbol_power(Symbol::Gen(1), p);
+            assert(x_exp_sum(apply_embedding(imgs, seq![c])) == p);
+            assert(x_exp_sum(seq![c]) == 1);
+            assert(x_exp_sum(apply_embedding(imgs, seq![c])) == p * x_exp_sum(seq![c]));
+        } else if c == Symbol::Inv(1) {
+            lemma_inverse_word_sympower(Symbol::Gen(1), p);
+            assert(apply_embedding_symbol(imgs, c) =~= symbol_power(Symbol::Inv(1), p));
+            lemma_x_exp_sum_symbol_power(Symbol::Inv(1), p);
+            assert(x_exp_sum(apply_embedding(imgs, seq![c])) == -(p as int));
+            assert(x_exp_sum(seq![c]) == -1);
+            assert(p * (-1int) == -(p as int)) by (nonlinear_arith);
+            assert(x_exp_sum(apply_embedding(imgs, seq![c])) == p * x_exp_sum(seq![c]));
+        } else if c == Symbol::Gen(0) {
+            assert(apply_embedding_symbol(imgs, c) =~= seq![Symbol::Gen(0)]);
+            assert(x_exp_sum(apply_embedding(imgs, seq![c])) == 0);
+            assert(x_exp_sum(seq![c]) == 0);
+            assert(x_exp_sum(apply_embedding(imgs, seq![c])) == p * x_exp_sum(seq![c]));
+        } else {
+            assert(c == Symbol::Inv(0));
+            assert(apply_embedding_symbol(imgs, c) =~= seq![Symbol::Inv(0)]);
+            assert(x_exp_sum(apply_embedding(imgs, seq![c])) == 0);
+            assert(x_exp_sum(seq![c]) == 0);
+            assert(x_exp_sum(apply_embedding(imgs, seq![c])) == p * x_exp_sum(seq![c]));
+        }
+        assert(x_exp_sum(seq![c] + rest) == x_exp_sum(seq![c]) + x_exp_sum(rest)) by {
+            lemma_x_exp_sum_concat(seq![c], rest);
+        }
+        assert(p * (x_exp_sum(seq![c]) + x_exp_sum(rest))
+            == p * x_exp_sum(seq![c]) + p * x_exp_sum(rest)) by (nonlinear_arith);
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
