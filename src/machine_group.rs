@@ -4920,4 +4920,110 @@ pub proof fn lemma_pinch_out(w: Word, i: int, j: int)
         =~= concat(w.subrange(0, i), w.subrange(j + 1, w.len() as int)));
 }
 
+//  ============================================================
+//  Step 2 foundation: ψ (t↦t, x↦xᵖ, y↦yᵠ) scales the y-stable-count by q.
+//  ============================================================
+//
+//  Over a_as_hnn the stable letter is y = Gen(2); t and x are base symbols.
+//  So each y/y⁻¹ in w expands to a length-q run of stable letters, and t,x
+//  contribute none — the count multiplies by q.
+
+//  Per-symbol y-contribution under ψ.
+pub proof fn lemma_psi_A_emb_symbol_stable_count(p: nat, q: nat, s: Symbol)
+    requires
+        symbol_valid(s, 3),
+    ensures
+        stable_count(a_as_hnn(), apply_embedding(psi_images(p, q), seq![s]))
+            == (if is_stable(a_as_hnn(), s) { q } else { 0nat }),
+{
+    let data = a_as_hnn();
+    let imgs = psi_images(p, q);
+    reveal_with_fuel(apply_embedding, 2);
+    reveal_with_fuel(inverse_word, 2);
+    reveal_with_fuel(stable_count, 2);
+    assert(data.base.num_generators == 2);
+    assert(apply_embedding(imgs, seq![s]) =~= apply_embedding_symbol(imgs, s));
+    assert(imgs[0] =~= seq![Symbol::Gen(0)]);
+    assert(imgs[1] =~= symbol_power(Symbol::Gen(1), p));
+    assert(imgs[2] =~= symbol_power(Symbol::Gen(2), q));
+    match s {
+        Symbol::Gen(i) => {
+            if i == 0 {
+                assert(apply_embedding_symbol(imgs, s) =~= seq![Symbol::Gen(0)]);
+                assert(!is_stable(data, s));
+            } else if i == 1 {
+                lemma_stable_count_symbol_power(data, Symbol::Gen(1), p);
+                assert(apply_embedding_symbol(imgs, s) =~= symbol_power(Symbol::Gen(1), p));
+                assert(!is_stable(data, s));
+            } else {
+                assert(i == 2);
+                lemma_stable_count_symbol_power(data, Symbol::Gen(2), q);
+                assert(apply_embedding_symbol(imgs, s) =~= symbol_power(Symbol::Gen(2), q));
+                assert(is_stable(data, s));
+            }
+        }
+        Symbol::Inv(i) => {
+            if i == 0 {
+                assert(apply_embedding_symbol(imgs, s) =~= seq![Symbol::Inv(0)]);
+                assert(!is_stable(data, s));
+            } else if i == 1 {
+                lemma_inverse_word_sympower(Symbol::Gen(1), p);
+                assert(apply_embedding_symbol(imgs, s) =~= symbol_power(Symbol::Inv(1), p));
+                lemma_stable_count_symbol_power(data, Symbol::Inv(1), p);
+                assert(!is_stable(data, s));
+            } else {
+                assert(i == 2);
+                lemma_inverse_word_sympower(Symbol::Gen(2), q);
+                assert(apply_embedding_symbol(imgs, s) =~= symbol_power(Symbol::Inv(2), q));
+                lemma_stable_count_symbol_power(data, Symbol::Inv(2), q);
+                assert(is_stable(data, s));
+            }
+        }
+    }
+}
+
+//  ψ multiplies the y-stable-count by q.
+pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
+    requires
+        word_valid(w, 3),
+    ensures
+        stable_count(a_as_hnn(), apply_embedding(psi_images(p, q), w))
+            == q * stable_count(a_as_hnn(), w),
+    decreases w.len(),
+{
+    let data = a_as_hnn();
+    let imgs = psi_images(p, q);
+    if w.len() == 0 {
+        assert(apply_embedding(imgs, w) =~= Seq::<Symbol>::empty());
+    } else {
+        let last = w.last();
+        let pre = w.drop_last();
+        assert(w =~= pre + seq![last]);
+        assert(word_valid(pre, 3)) by {
+            assert forall|k: int| 0 <= k < pre.len() implies symbol_valid(#[trigger] pre[k], 3)
+            by { assert(pre[k] == w[k]); }
+        }
+        assert(symbol_valid(last, 3));
+        lemma_apply_embedding_concat(imgs, pre, seq![last]);
+        assert(apply_embedding(imgs, w)
+            =~= apply_embedding(imgs, pre) + apply_embedding(imgs, seq![last]));
+        lemma_stable_count_concat(data,
+            apply_embedding(imgs, pre), apply_embedding(imgs, seq![last]));
+        lemma_psi_A_emb_symbol_stable_count(p, q, last);
+        lemma_psi_A_stable_count_scales(p, q, pre);
+        let inc: nat = if is_stable(data, last) { 1nat } else { 0nat };
+        assert(stable_count(data, w) == stable_count(data, pre) + inc) by {
+            reveal_with_fuel(stable_count, 2);
+        }
+        assert(stable_count(data, apply_embedding(imgs, seq![last])) == q * inc) by {
+            if is_stable(data, last) { } else { }
+        }
+        assert(q * (stable_count(data, pre) + inc)
+            == q * stable_count(data, pre) + q * inc) by (nonlinear_arith);
+        assert(stable_count(data, apply_embedding(imgs, w))
+            == q * stable_count(data, pre) + q * inc);
+        assert(stable_count(data, apply_embedding(imgs, w)) == q * stable_count(data, w));
+    }
+}
+
 } //  verus!
