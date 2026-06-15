@@ -5405,6 +5405,61 @@ pub proof fn lemma_x_factors_to_pow(factors: Seq<Word>)
     }
 }
 
+//  concat_all of x-factors is a valid word over ⟨t,x⟩ (each factor is x^±1).
+pub proof fn lemma_x_factors_concat_valid(factors: Seq<Word>)
+    requires
+        factors_from_generators(seq![seq![Symbol::Gen(1)]], factors),
+    ensures
+        word_valid(concat_all(factors), 2),
+    decreases factors.len(),
+{
+    reveal_with_fuel(concat_all, 1);
+    reveal_with_fuel(inverse_word, 2);
+    let g = seq![seq![Symbol::Gen(1)]];
+    if factors.len() == 0 {
+        assert(concat_all(factors) =~= Seq::<Symbol>::empty());
+    } else {
+        let f = factors.first();
+        let rest = factors.drop_first();
+        assert(factors_from_generators(g, rest)) by {
+            assert forall|k: int| 0 <= k < rest.len()
+                implies is_generator_or_inverse(g, #[trigger] rest[k])
+            by { assert(rest[k] == factors[k + 1]); }
+        }
+        lemma_x_factors_concat_valid(rest);
+        assert(is_generator_or_inverse(g, f)) by { assert(f == factors[0]); }
+        assert(inverse_word(seq![Symbol::Gen(1)]) =~= seq![Symbol::Inv(1)]);
+        assert(word_valid(f, 2)) by {
+            assert forall|k: int| 0 <= k < f.len() implies symbol_valid(#[trigger] f[k], 2) by { }
+        }
+        assert(concat_all(factors) =~= f + concat_all(rest));
+        lemma_concat_word_valid(f, concat_all(rest), 2);
+    }
+}
+
+//  (A): an element of ⟨x⟩ is ≡ to x raised to its x-exponent-sum.
+pub proof fn lemma_x_subgroup_is_pow(v: Word)
+    requires
+        in_generated_subgroup(pres_tx(), seq![seq![Symbol::Gen(1)]], v),
+    ensures
+        equiv_in_presentation(pres_tx(), v, x_pow(x_exp_sum(v))),
+{
+    let g = seq![seq![Symbol::Gen(1)]];
+    let factors = choose|factors: Seq<Word>|
+        factors_from_generators(g, factors)
+        && equiv_in_presentation(pres_tx(), concat_all(factors), v);
+    assert(factors_from_generators(g, factors)
+        && equiv_in_presentation(pres_tx(), concat_all(factors), v));
+    let cf = concat_all(factors);
+    lemma_x_factors_to_pow(factors);                       //  cf ~ x_pow(χₓ(cf))
+    lemma_x_exp_sum_equiv_invariant(cf, v);                //  χₓ(cf) == χₓ(v)
+    assert(x_pow(x_exp_sum(cf)) == x_pow(x_exp_sum(v)));
+    lemma_x_factors_concat_valid(factors);                 //  word_valid(cf, 2)
+    assert(presentation_valid(pres_tx())) by { reveal(presentation_valid); }
+    lemma_equiv_symmetric(pres_tx(), cf, v);               //  v ~ cf
+    lemma_equiv_transitive(pres_tx(), v, cf, x_pow(x_exp_sum(v)));
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
