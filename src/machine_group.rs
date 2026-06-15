@@ -5220,6 +5220,87 @@ pub proof fn lemma_x_exp_sum_equiv_invariant(w1: Word, w2: Word)
     lemma_x_exp_sum_derivation_invariant(pres_tx(), d.steps, w1, w2);
 }
 
+//  ============================================================
+//  x^k (signed) and the cancelling free reductions
+//  ============================================================
+
+//  x^k as a word:  k≥0 ↦ xᵏ,  k<0 ↦ (x⁻¹)^(−k).
+pub open spec fn x_pow(k: int) -> Word {
+    if k >= 0 {
+        symbol_power(Symbol::Gen(1), k as nat)
+    } else {
+        symbol_power(Symbol::Inv(1), (-k) as nat)
+    }
+}
+
+//  χₓ(x^k) == k.
+pub proof fn lemma_x_exp_sum_x_pow(k: int)
+    ensures
+        x_exp_sum(x_pow(k)) == k,
+{
+    if k >= 0 {
+        lemma_x_exp_sum_symbol_power(Symbol::Gen(1), k as nat);
+    } else {
+        lemma_x_exp_sum_symbol_power(Symbol::Inv(1), (-k) as nat);
+    }
+}
+
+//  x · x⁻ᵏ  freely reduces to  x⁻⁽ᵏ⁻¹⁾.
+pub proof fn lemma_x_cancel_gen(k: nat)
+    requires
+        k >= 1,
+    ensures
+        equiv_in_presentation(pres_tx(),
+            seq![Symbol::Gen(1)] + symbol_power(Symbol::Inv(1), k),
+            symbol_power(Symbol::Inv(1), (k - 1) as nat)),
+{
+    let target = symbol_power(Symbol::Inv(1), (k - 1) as nat);
+    let w: Word = seq![Symbol::Gen(1)] + symbol_power(Symbol::Inv(1), k);
+    assert(symbol_power(Symbol::Inv(1), k)
+        =~= seq![Symbol::Inv(1)] + target);
+    assert(w =~= seq![Symbol::Gen(1), Symbol::Inv(1)] + target);
+    assert(w[0] == Symbol::Gen(1) && w[1] == Symbol::Inv(1));
+    assert(is_inverse_pair(Symbol::Gen(1), Symbol::Inv(1)));
+    assert(has_cancellation_at(w, 0));
+    assert(reduce_at(w, 0) =~= target);
+    assert(reduces_one_step(w, target)) by {
+        assert(has_cancellation_at(w, 0) && target == reduce_at(w, 0));
+    }
+    assert(reduces_in_steps(w, target, 1)) by {
+        assert(reduces_one_step(w, target) && reduces_in_steps(target, target, 0));
+    }
+    assert(reduces_to(w, target));
+    lemma_reduces_to_equiv(pres_tx(), w, target);
+}
+
+//  x⁻¹ · xᵏ  freely reduces to  x^(k−1).
+pub proof fn lemma_x_cancel_inv(k: nat)
+    requires
+        k >= 1,
+    ensures
+        equiv_in_presentation(pres_tx(),
+            seq![Symbol::Inv(1)] + symbol_power(Symbol::Gen(1), k),
+            symbol_power(Symbol::Gen(1), (k - 1) as nat)),
+{
+    let target = symbol_power(Symbol::Gen(1), (k - 1) as nat);
+    let w: Word = seq![Symbol::Inv(1)] + symbol_power(Symbol::Gen(1), k);
+    assert(symbol_power(Symbol::Gen(1), k)
+        =~= seq![Symbol::Gen(1)] + target);
+    assert(w =~= seq![Symbol::Inv(1), Symbol::Gen(1)] + target);
+    assert(w[0] == Symbol::Inv(1) && w[1] == Symbol::Gen(1));
+    assert(is_inverse_pair(Symbol::Inv(1), Symbol::Gen(1)));
+    assert(has_cancellation_at(w, 0));
+    assert(reduce_at(w, 0) =~= target);
+    assert(reduces_one_step(w, target)) by {
+        assert(has_cancellation_at(w, 0) && target == reduce_at(w, 0));
+    }
+    assert(reduces_in_steps(w, target, 1)) by {
+        assert(reduces_one_step(w, target) && reduces_in_steps(target, target, 0));
+    }
+    assert(reduces_to(w, target));
+    lemma_reduces_to_equiv(pres_tx(), w, target);
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
