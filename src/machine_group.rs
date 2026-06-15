@@ -5301,6 +5301,56 @@ pub proof fn lemma_x_cancel_inv(k: nat)
     lemma_reduces_to_equiv(pres_tx(), w, target);
 }
 
+//  Prepending x shifts the exponent up by one:  x · xᵐ ~ x^(m+1).
+pub proof fn lemma_x_pow_prepend_gen(m: int)
+    ensures
+        equiv_in_presentation(pres_tx(), seq![Symbol::Gen(1)] + x_pow(m), x_pow(m + 1)),
+{
+    let lhs: Word = seq![Symbol::Gen(1)] + x_pow(m);
+    if m >= 0 {
+        lemma_symbol_power_merge(Symbol::Gen(1), 1, m as nat);
+        assert(seq![Symbol::Gen(1)] =~= symbol_power(Symbol::Gen(1), 1));
+        assert(lhs =~= symbol_power(Symbol::Gen(1), (1 + m) as nat));
+        assert(x_pow(m + 1) =~= symbol_power(Symbol::Gen(1), (1 + m) as nat));
+        assert(lhs =~= x_pow(m + 1));
+        lemma_equiv_refl(pres_tx(), x_pow(m + 1));
+    } else {
+        let kk: nat = (-m) as nat;
+        assert(x_pow(m) =~= symbol_power(Symbol::Inv(1), kk));
+        assert(lhs =~= seq![Symbol::Gen(1)] + symbol_power(Symbol::Inv(1), kk));
+        lemma_x_cancel_gen(kk);
+        if m + 1 >= 0 {
+            assert(kk == 1);
+            assert(symbol_power(Symbol::Inv(1), (kk - 1) as nat) =~= x_pow(m + 1));
+        } else {
+            assert(symbol_power(Symbol::Inv(1), (kk - 1) as nat) =~= x_pow(m + 1));
+        }
+    }
+}
+
+//  Prepending x⁻¹ shifts the exponent down by one:  x⁻¹ · xᵐ ~ x^(m−1).
+pub proof fn lemma_x_pow_prepend_inv(m: int)
+    ensures
+        equiv_in_presentation(pres_tx(), seq![Symbol::Inv(1)] + x_pow(m), x_pow(m - 1)),
+{
+    let lhs: Word = seq![Symbol::Inv(1)] + x_pow(m);
+    if m > 0 {
+        assert(x_pow(m) =~= symbol_power(Symbol::Gen(1), m as nat));
+        assert(lhs =~= seq![Symbol::Inv(1)] + symbol_power(Symbol::Gen(1), m as nat));
+        lemma_x_cancel_inv(m as nat);
+        assert(symbol_power(Symbol::Gen(1), (m as nat - 1) as nat) =~= x_pow(m - 1));
+    } else {
+        let kk: nat = (-m) as nat;
+        assert(x_pow(m) =~= symbol_power(Symbol::Inv(1), kk));
+        lemma_symbol_power_merge(Symbol::Inv(1), 1, kk);
+        assert(seq![Symbol::Inv(1)] =~= symbol_power(Symbol::Inv(1), 1));
+        assert(lhs =~= symbol_power(Symbol::Inv(1), (1 + kk) as nat));
+        assert(x_pow(m - 1) =~= symbol_power(Symbol::Inv(1), (1 + kk) as nat));
+        assert(lhs =~= x_pow(m - 1));
+        lemma_equiv_refl(pres_tx(), x_pow(m - 1));
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
