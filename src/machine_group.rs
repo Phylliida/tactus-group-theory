@@ -3496,4 +3496,92 @@ pub proof fn lemma_commute_ysym_past_xpow(s: Symbol, a: int)
     }
 }
 
+//  A word using only x,y (and inverses).
+pub open spec fn is_xy_word(w: Word) -> bool {
+    forall|i: int| 0 <= i < w.len()
+        ==> (generator_index(#[trigger] w[i]) == 1 || generator_index(w[i]) == 2)
+}
+
+//  THE ABELIAN SORT: any {x,y}-word ~ its normal form  x^{net-x} · y^{net-y}.
+pub proof fn lemma_z_word_sorts(w: Word)
+    requires
+        is_xy_word(w),
+    ensures
+        equiv_in_presentation(base_A(), w,
+            signed_power(1, gexp(1, w)) + signed_power(2, gexp(2, w))),
+    decreases w.len(),
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    let target = signed_power(1, gexp(1, w)) + signed_power(2, gexp(2, w));
+    if w.len() == 0 {
+        assert(gexp(1, w) == 0);
+        assert(gexp(2, w) == 0);
+        assert(signed_power(1, 0) =~= empty_word());
+        assert(signed_power(2, 0) =~= empty_word());
+        assert(target =~= w);
+        lemma_equiv_refl(a, w);
+    } else {
+        let s = w[0];
+        let rest = w.drop_first();
+        assert(w =~= seq![s] + rest);
+        assert(is_xy_word(rest)) by {
+            assert forall|i: int| 0 <= i < rest.len()
+                implies (generator_index(#[trigger] rest[i]) == 1 || generator_index(rest[i]) == 2)
+            by { assert(rest[i] == w[i + 1]); }
+        }
+        lemma_z_word_sorts(rest);                 //  IH
+        let aA = gexp(1, rest);
+        let bB = gexp(2, rest);
+        let sp1 = signed_power(1, aA);
+        let sp2 = signed_power(2, bB);
+        assert(gexp(1, w) == sym_exp(1, s) + aA);
+        assert(gexp(2, w) == sym_exp(2, s) + bB);
+        assert(generator_index(s) == 1 || generator_index(s) == 2);
+        //  w ~ [s] + (sp1 + sp2)
+        lemma_equiv_concat_right(a, seq![s], rest, sp1 + sp2);
+        if generator_index(s) == 1 {
+            //  x-case: merge [s] into sp1 (gexp(2,w) unchanged)
+            assert(sym_exp(2, s) == 0);
+            assert(gexp(2, w) == bB);
+            let sp1n = signed_power(1, gexp(1, w));
+            assert(seq![s] + (sp1 + sp2) =~= (seq![s] + sp1) + sp2);
+            if s == Symbol::Gen(1) {
+                lemma_prepend_gen_signed(a, 1, aA);
+                assert(gexp(1, w) == aA + 1);
+            } else {
+                assert(s == Symbol::Inv(1));
+                lemma_prepend_inv_signed(a, 1, aA);
+                assert(gexp(1, w) == aA - 1);
+            }
+            assert(equiv_in_presentation(a, seq![s] + sp1, sp1n));
+            lemma_equiv_concat_left(a, seq![s] + sp1, sp1n, sp2);
+            assert(target =~= sp1n + sp2);
+            lemma_equiv_transitive(a, w, (seq![s] + sp1) + sp2, sp1n + sp2);
+        } else {
+            //  y-case: commute [s] past sp1, then merge into sp2 (gexp(1,w) unchanged)
+            assert(sym_exp(1, s) == 0);
+            assert(gexp(1, w) == aA);
+            assert(s == Symbol::Gen(2) || s == Symbol::Inv(2));
+            let sp2n = signed_power(2, gexp(2, w));
+            lemma_commute_ysym_past_xpow(s, aA);          //  [s]+sp1 ~ sp1+[s]
+            if s == Symbol::Gen(2) {
+                lemma_prepend_gen_signed(a, 2, bB);
+                assert(gexp(2, w) == bB + 1);
+            } else {
+                lemma_prepend_inv_signed(a, 2, bB);
+                assert(gexp(2, w) == bB - 1);
+            }
+            assert(equiv_in_presentation(a, seq![s] + sp2, sp2n));
+            assert(seq![s] + (sp1 + sp2) =~= (seq![s] + sp1) + sp2);
+            lemma_equiv_concat_left(a, seq![s] + sp1, sp1 + seq![s], sp2);
+            assert((sp1 + seq![s]) + sp2 =~= sp1 + (seq![s] + sp2));
+            lemma_equiv_concat_right(a, sp1, seq![s] + sp2, sp2n);
+            assert(target =~= sp1 + sp2n);
+            lemma_equiv_transitive(a, w, (seq![s] + sp1) + sp2, (sp1 + seq![s]) + sp2);
+            lemma_equiv_transitive(a, w, (sp1 + seq![s]) + sp2, sp1 + sp2n);
+        }
+    }
+}
+
 } //  verus!
