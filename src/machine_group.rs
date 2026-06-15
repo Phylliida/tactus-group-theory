@@ -17,6 +17,11 @@ use crate::benign::{in_generated_subgroup, concat_all, lemma_concat_all_singleto
 use crate::free_product::{free_product, shift_relators, shift_word, shift_symbol};
 use crate::quotient::add_relator;
 use crate::tietze::lemma_add_derivable_relator_reverse;
+use crate::britton_via_tower::{derivation_min_adj_level, derivation_max_step_level,
+    derivation_levels_ok, step_level_ok, step_position, step_is_hnn_relator, net_level,
+    lemma_hnn_derivation_to_tower_equiv, lemma_translate_base_word_at, lemma_translate_empty,
+    lemma_copy_s_embeds, lemma_tower_textbook_chain_from_hnn_iso, translate_word_at};
+use crate::tower::tower_presentation;
 
 verus! {
 
@@ -4035,6 +4040,124 @@ pub proof fn lemma_psi_respects_relator(p: nat, q: nat)
     assert(concat(yq, yinv) =~= yq + yinv);
     lemma_equiv_transitive(a, yq + ((xp + xinv) + yinv), yq + yinv, empty_word());
     lemma_equiv_transitive(a, (xp + yq) + suf, (yq + xp) + suf, empty_word());
+}
+
+//  ============================================================
+//  Single-HNN base faithfulness (property I) — built by generalizing
+//  britton_via_tower::britton_lemma to a free base_level = -min_adj, so a
+//  derivation that dips below the base is shifted up into the tower; we land
+//  via lemma_copy_s_embeds (copy s) instead of the copy-0 embedding.
+//  ============================================================
+
+//  The min adjusted level is ≤ 0 (the recursion bottoms out at 0 and takes mins).
+proof fn lemma_min_adj_nonpos(data: HNNData, steps: Seq<DerivationStep>, start: Word)
+    ensures
+        derivation_min_adj_level(data, steps, start) <= 0,
+    decreases steps.len(),
+{
+    if steps.len() == 0 {
+    } else {
+        match apply_step(hnn_presentation(data), start, steps.first()) {
+            Some(next) => { lemma_min_adj_nonpos(data, steps.drop_first(), next); },
+            None => {},
+        }
+    }
+}
+
+//  The max step level is ≥ 0 (bottoms at 0 and takes maxes).
+proof fn lemma_max_step_nonneg(data: HNNData, steps: Seq<DerivationStep>, start: Word)
+    ensures
+        derivation_max_step_level(data, steps, start) >= 0,
+    decreases steps.len(),
+{
+    if steps.len() == 0 {
+    } else {
+        match apply_step(hnn_presentation(data), start, steps.first()) {
+            Some(next) => { lemma_max_step_nonneg(data, steps.drop_first(), next); },
+            None => {},
+        }
+    }
+}
+
+//  Replication of the (private) britton_via_tower bounds helper: a high-enough
+//  tower with a base_level above the dip makes every step's level legal.
+proof fn lemma_levels_ok_from_bounds(
+    data: HNNData, m: nat, base_level: int, steps: Seq<DerivationStep>, start: Word,
+)
+    requires
+        derivation_produces(hnn_presentation(data), steps, start) is Some,
+        base_level >= -derivation_min_adj_level(data, steps, start),
+        m as int >= derivation_max_step_level(data, steps, start) + base_level,
+    ensures
+        derivation_levels_ok(data, m, base_level, steps, start),
+    decreases steps.len(),
+{
+    if steps.len() == 0 {
+    } else {
+        let hp = hnn_presentation(data);
+        let step = steps.first();
+        let next = apply_step(hp, start, step).unwrap();
+        let pos = step_position(step);
+        let level = net_level(data, start.subrange(0, pos));
+        let adj = if step_is_hnn_relator(data, step) { level - 1 } else { level };
+        let rest_min = derivation_min_adj_level(data, steps.drop_first(), next);
+        let rest_max = derivation_max_step_level(data, steps.drop_first(), next);
+        assert(adj >= derivation_min_adj_level(data, steps, start));
+        assert(level <= derivation_max_step_level(data, steps, start));
+        assert(rest_min >= derivation_min_adj_level(data, steps, start)) by {
+            if adj < rest_min {} else {}
+        }
+        assert(rest_max <= derivation_max_step_level(data, steps, start)) by {
+            if level > rest_max {} else {}
+        }
+        lemma_levels_ok_from_bounds(data, m, base_level, steps.drop_first(), next);
+    }
+}
+
+//  Property I: a base word trivial in the HNN extension is trivial in the base.
+pub proof fn lemma_single_hnn_base_faithful(data: HNNData, w: Word)
+    requires
+        hnn_data_valid(data),
+        hnn_associations_isomorphic(data),
+        word_valid(w, data.base.num_generators),
+        equiv_in_presentation(hnn_presentation(data), w, empty_word()),
+    ensures
+        equiv_in_presentation(data.base, w, empty_word()),
+{
+    let hp = hnn_presentation(data);
+    let ng = data.base.num_generators;
+    let d: Derivation = choose|d: Derivation| derivation_valid(hp, d, w, empty_word());
+    assert(derivation_valid(hp, d, w, empty_word()));
+    let steps = d.steps;
+    assert(derivation_produces(hp, steps, w) == Some(empty_word()));
+    //  level bounds
+    lemma_min_adj_nonpos(data, steps, w);
+    lemma_max_step_nonneg(data, steps, w);
+    let min_adj = derivation_min_adj_level(data, steps, w);
+    let max_lvl = derivation_max_step_level(data, steps, w);
+    let base_level: int = -min_adj;
+    assert(base_level >= 0);
+    let m: nat = (max_lvl + base_level) as nat;
+    assert(max_lvl + base_level >= 0);
+    assert(m as int == max_lvl + base_level);
+    //  w valid over the (larger) HNN presentation
+    assert(ng <= hp.num_generators);
+    lemma_word_valid_mono(w, ng, hp.num_generators);
+    //  discharge the level fit, the textbook chain, and lift the derivation to the tower
+    lemma_levels_ok_from_bounds(data, m, base_level, steps, w);
+    lemma_tower_textbook_chain_from_hnn_iso(data, m);
+    lemma_hnn_derivation_to_tower_equiv(data, m, base_level, steps, w, empty_word());
+    //  translate(w, base_level) = shift_word(w, base_level·ng); translate(ε) = ε
+    lemma_translate_base_word_at(data, w, base_level as nat);
+    lemma_translate_empty(data);
+    assert((base_level as nat) as int == base_level);
+    assert(translate_word_at(data, w, base_level) =~= shift_word(w, (base_level as nat) * ng));
+    assert(translate_word_at(data, empty_word(), base_level) =~= empty_word());
+    //  equiv(tower(m), shift_word(w, base_level·ng), ε); descend via the copy-s embedding
+    assert(equiv_in_presentation(tower_presentation(data, m),
+        shift_word(w, (base_level as nat) * ng), empty_word()));
+    assert((base_level as nat) <= m);
+    lemma_copy_s_embeds(data, m, base_level as nat, w);
 }
 
 } //  verus!
