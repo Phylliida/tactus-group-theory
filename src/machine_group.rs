@@ -4220,6 +4220,48 @@ pub proof fn lemma_f_base_faithful(w: Word)
     lemma_single_hnn_base_faithful(f_as_hnn(), w);
 }
 
+//  A word over only t = Gen(0) / t⁻¹ = Inv(0).
+pub open spec fn is_t_word(w: Word) -> bool {
+    forall|i: int| 0 <= i < w.len()
+        ==> (#[trigger] w[i] == Symbol::Gen(0) || w[i] == Symbol::Inv(0))
+}
+
+//  ψ fixes t-words pointwise (t ↦ t, and t-words use no x or y) — the base case
+//  of the ψ-injectivity peel and the (trivial) middle-correspondence at the
+//  F-level, where pinch middles lie in the trivial ⟨t⟩ associated subgroup.
+pub proof fn lemma_psi_fixes_t_word(p: nat, q: nat, w: Word)
+    requires
+        is_t_word(w),
+    ensures
+        apply_embedding(psi_images(p, q), w) =~= w,
+    decreases w.len(),
+{
+    let imgs = psi_images(p, q);
+    if w.len() == 0 {
+    } else {
+        let s = w.first();
+        assert(s == w[0]);
+        assert(s == Symbol::Gen(0) || s == Symbol::Inv(0));
+        assert(is_t_word(w.drop_first())) by {
+            assert forall|i: int| 0 <= i < w.drop_first().len() implies
+                (#[trigger] w.drop_first()[i] == Symbol::Gen(0) || w.drop_first()[i] == Symbol::Inv(0))
+            by { assert(w.drop_first()[i] == w[i + 1]); }
+        }
+        lemma_psi_fixes_t_word(p, q, w.drop_first());
+        reveal_with_fuel(inverse_word, 2);
+        reveal_with_fuel(apply_embedding, 2);
+        assert(imgs[0] =~= seq![Symbol::Gen(0)]);
+        assert(apply_embedding_symbol(imgs, s) =~= seq![s]) by {
+            if s == Symbol::Inv(0) {
+                assert(inverse_word(imgs[0]) =~= seq![Symbol::Inv(0)]);
+            }
+        }
+        assert(apply_embedding(imgs, w)
+            =~= concat(seq![s], apply_embedding(imgs, w.drop_first())));
+        assert(w =~= seq![s] + w.drop_first());
+    }
+}
+
 //  Contrapositive of Britton's lemma: a Britton-reduced word (no pinch) that
 //  still contains a stable letter is NONTRIVIAL.  The engine of the
 //  ψ-injectivity peel — a scaled word that stays reduced cannot vanish.
