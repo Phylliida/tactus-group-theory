@@ -22,7 +22,8 @@ use crate::britton_via_tower::{derivation_min_adj_level, derivation_max_step_lev
     lemma_hnn_derivation_to_tower_equiv, lemma_translate_base_word_at, lemma_translate_empty,
     lemma_copy_s_embeds, lemma_tower_textbook_chain_from_hnn_iso, translate_word_at};
 use crate::britton_via_tower::{textbook_act_hnn, lemma_no_pinch_action_nontrivial,
-    lemma_derivation_preserves_syls, stable_count, lemma_stable_count_concat};
+    lemma_derivation_preserves_syls, stable_count, lemma_stable_count_concat,
+    lemma_stable_count_no_stable, lemma_has_stable_implies_count};
 use crate::normal_form_afp_textbook::Syllable;
 use crate::tower::tower_presentation;
 
@@ -1776,6 +1777,168 @@ pub proof fn lemma_xinv_yinv_commute_in_A()
     lemma_inverse_word_two(Symbol::Gen(2), Symbol::Gen(1));
     assert(inverse_word(xy) =~= seq![Symbol::Inv(2), Symbol::Inv(1)]);
     assert(inverse_word(yx) =~= seq![Symbol::Inv(1), Symbol::Inv(2)]);
+}
+
+//  ============================================================
+//  ψ_F-injectivity supporting lemmas (F-level / 2-image)
+//  ============================================================
+
+//  ψ_F fixes t-words pointwise (the base case of the injectivity peel).
+pub proof fn lemma_psi_F_fixes_t_word(p: nat, w: Word)
+    requires
+        is_t_word(w),
+    ensures
+        apply_embedding(psi_F_images(p), w) =~= w,
+    decreases w.len(),
+{
+    let imgs = psi_F_images(p);
+    reveal_with_fuel(apply_embedding, 2);
+    reveal_with_fuel(inverse_word, 2);
+    if w.len() == 0 {
+    } else {
+        let s = w.first();
+        assert(s == w[0]);
+        assert(s == Symbol::Gen(0) || s == Symbol::Inv(0));
+        assert(is_t_word(w.drop_first())) by {
+            assert forall|i: int| 0 <= i < w.drop_first().len()
+                implies (#[trigger] w.drop_first()[i] == Symbol::Gen(0)
+                    || w.drop_first()[i] == Symbol::Inv(0))
+            by { assert(w.drop_first()[i] == w[i + 1]); }
+        }
+        lemma_psi_F_fixes_t_word(p, w.drop_first());
+        assert(imgs[0] =~= seq![Symbol::Gen(0)]);
+        if s == Symbol::Gen(0) {
+            assert(apply_embedding_symbol(imgs, s) =~= seq![Symbol::Gen(0)]);
+        } else {
+            assert(apply_embedding_symbol(imgs, s) =~= seq![Symbol::Inv(0)]);
+        }
+        assert(apply_embedding_symbol(imgs, s) =~= seq![s]);
+        assert(apply_embedding(imgs, w) =~= seq![s] + apply_embedding(imgs, w.drop_first()));
+        assert(w =~= seq![s] + w.drop_first());
+    }
+}
+
+//  A positive stable count means there really is a stable letter somewhere.
+pub proof fn lemma_stable_count_pos_has_stable(data: HNNData, w: Word)
+    requires
+        stable_count(data, w) >= 1,
+    ensures
+        has_stable_letter(data, w),
+{
+    if !has_stable_letter(data, w) {
+        assert(forall|k: int| 0 <= k < w.len() ==> !is_stable(data, #[trigger] w[k]));
+        lemma_stable_count_no_stable(data, w);
+    }
+}
+
+//  A valid F-word with no stable letters is a pure t-word.
+pub proof fn lemma_stable_count_zero_is_t_word(w: Word)
+    requires
+        word_valid(w, 2),
+        stable_count(f_as_hnn(), w) == 0,
+    ensures
+        is_t_word(w),
+{
+    let data = f_as_hnn();
+    assert(data.base.num_generators == 1);
+    assert(!has_stable_letter(data, w)) by {
+        if has_stable_letter(data, w) { lemma_has_stable_implies_count(data, w); }
+    }
+    assert forall|i: int| 0 <= i < w.len()
+        implies (#[trigger] w[i] == Symbol::Gen(0) || w[i] == Symbol::Inv(0))
+    by {
+        assert(!is_stable(data, w[i]));
+        assert(symbol_valid(w[i], 2));
+    }
+}
+
+//  ============================================================
+//  ★ ψ_F IS INJECTIVE ON F ★  (the pieces assembled)
+//  ============================================================
+//
+//  If the p-scaled word ψ_F(w) (t↦t, x↦xᵖ) is trivial in F = ⟨t,x⟩, so is w.
+//  Length-induction: a t-word is fixed by ψ_F (base); otherwise ψ_F(w) keeps a
+//  stable letter, so (trivial ⟹ Britton-reducible) it has a pinch, which (Corr)
+//  pushes back to a pinch in w, which (Q) cancels to a strictly shorter w′ with
+//  w ≡ w′ and ψ_F(w′) ≡ ε — then the induction closes.
+pub proof fn lemma_psi_F_injective(p: nat, w: Word)
+    requires
+        word_valid(w, 2),
+        p >= 1,
+        equiv_in_presentation(pres_tx(), apply_embedding(psi_F_images(p), w), empty_word()),
+    ensures
+        equiv_in_presentation(pres_tx(), w, empty_word()),
+    decreases w.len(),
+{
+    let data = f_as_hnn();
+    let imgs = psi_F_images(p);
+    let pw = apply_embedding(imgs, w);
+    lemma_f_as_hnn_presentation();
+    assert(pres_tx().num_generators == 2);
+    assert(presentation_valid(pres_tx())) by { reveal(presentation_valid); }
+    //  the two images are valid over 2 generators (they use only t, x)
+    assert(imgs[0] =~= seq![Symbol::Gen(0)]);
+    assert(imgs[1] =~= symbol_power(Symbol::Gen(1), p));
+    assert forall|k: int| 0 <= k < imgs.len() implies word_valid(#[trigger] imgs[k], 2) by {
+        if k == 0 {
+            assert forall|m: int| 0 <= m < imgs[0].len() implies symbol_valid(#[trigger] imgs[0][m], 2)
+            by { assert(imgs[0][m] == Symbol::Gen(0)); }
+        } else {
+            lemma_symbol_power_valid(Symbol::Gen(1), p, 2);
+        }
+    }
+    if stable_count(data, w) == 0 {
+        //  base case: w is a t-word, fixed by ψ_F
+        lemma_stable_count_zero_is_t_word(w);
+        lemma_psi_F_fixes_t_word(p, w);
+        assert(pw =~= w);
+    } else {
+        //  step: ψ_F(w) has a stable letter, hence (being trivial) a pinch
+        lemma_psi_F_stable_count_scales(p, w);
+        assert(stable_count(data, w) >= 1);
+        assert(p * stable_count(data, w) >= 1) by (nonlinear_arith)
+            requires p >= 1, stable_count(data, w) >= 1;
+        assert(stable_count(data, pw) >= 1);
+        lemma_stable_count_pos_has_stable(data, pw);
+        lemma_apply_embedding_valid(imgs, w, 2);
+        lemma_f_as_hnn_valid();
+        lemma_f_as_hnn_isomorphic();
+        if !has_pinch(data, pw) {
+            lemma_no_pinch_stable_nontrivial(data, pw);
+        }
+        assert(has_pinch(data, pw));
+        //  (Corr): the pinch descends to w
+        lemma_psi_F_pinch_descends(p, w);
+        let ij: (int, int) = choose|i: int, j: int| has_pinch_at(data, w, i, j);
+        let i = ij.0;
+        let j = ij.1;
+        assert(has_pinch_at(data, w, i, j));
+        assert(has_adjacent_opposite_at(data, w, i, j));
+        let wshort: Word = w.subrange(0, i) + w.subrange(j + 1, w.len() as int);
+        //  (Q): pinch-out
+        lemma_pinch_out(w, i, j);
+        //  wshort is shorter and still valid
+        assert(wshort.len() < w.len());
+        assert(word_valid(w.subrange(0, i), 2)) by {
+            assert forall|k: int| 0 <= k < w.subrange(0, i).len()
+                implies symbol_valid(#[trigger] w.subrange(0, i)[k], 2)
+            by { assert(w.subrange(0, i)[k] == w[k]); }
+        }
+        assert(word_valid(w.subrange(j + 1, w.len() as int), 2)) by {
+            assert forall|k: int| 0 <= k < w.subrange(j + 1, w.len() as int).len()
+                implies symbol_valid(#[trigger] w.subrange(j + 1, w.len() as int)[k], 2)
+            by { assert(w.subrange(j + 1, w.len() as int)[k] == w[k + j + 1]); }
+        }
+        lemma_concat_word_valid(w.subrange(0, i), w.subrange(j + 1, w.len() as int), 2);
+        //  ψ_F respects ≡, then transport triviality to ψ_F(wshort)
+        let pws = apply_embedding(imgs, wshort);
+        lemma_emb_respects_source_equiv(pres_tx(), pres_tx(), imgs, w, wshort);
+        lemma_equiv_symmetric(pres_tx(), pw, pws);
+        lemma_equiv_transitive(pres_tx(), pws, pw, empty_word());
+        //  inductive hypothesis on the shorter word, then close
+        lemma_psi_F_injective(p, wshort);
+        lemma_equiv_transitive(pres_tx(), w, wshort, empty_word());
+    }
 }
 
 //  ============================================================

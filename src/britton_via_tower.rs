@@ -4879,7 +4879,7 @@ pub proof fn lemma_stable_count_concat(data: HNNData, a: Word, b: Word)
 }
 
 ///  A word with no stable letters has stable_count 0.
-proof fn lemma_stable_count_no_stable(data: HNNData, w: Word)
+pub proof fn lemma_stable_count_no_stable(data: HNNData, w: Word)
     requires forall|k: int| 0 <= k < w.len()
         ==> !is_stable(data, #[trigger] w[k]),
     ensures stable_count(data, w) == 0,
@@ -7785,7 +7785,7 @@ proof fn lemma_hnn_relator_inverse_preserves(
 //  ---- Tier 3: Assembly — the final Miller argument ----
 
 /// has_stable_letter implies stable_count ≥ 1.
-proof fn lemma_has_stable_implies_count(data: HNNData, w: Word)
+pub proof fn lemma_has_stable_implies_count(data: HNNData, w: Word)
     requires
         has_stable_letter(data, w),
     ensures
