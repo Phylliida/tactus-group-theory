@@ -3979,4 +3979,62 @@ pub proof fn lemma_a_hnn_to_base_A(w1: Word, w2: Word)
     lemma_add_derivable_relator_reverse(a, rh, w1, w2);
 }
 
+//  ============================================================
+//  ψ_{p,q} : A → A,  t↦t, x↦xᵖ, y↦yᵠ  is a WELL-DEFINED endomorphism
+//  (the scaling map of property (iii); injectivity for p,q≥1 is the A2b crux).
+//  ============================================================
+
+//  The substitution images of ψ_{p,q}:  Gen0↦t, Gen1↦xᵖ, Gen2↦yᵠ.
+pub open spec fn psi_images(p: nat, q: nat) -> Seq<Word> {
+    seq![ seq![Symbol::Gen(0)], symbol_power(Symbol::Gen(1), p), symbol_power(Symbol::Gen(2), q) ]
+}
+
+//  ψ respects A's relator: ψ(xyx⁻¹y⁻¹) = xᵖyᵠx⁻ᵖy⁻ᵠ ≡ ε (the powers commute).
+//  This makes ψ a homomorphism A→A (usable with lemma_emb_respects_source_equiv),
+//  giving the easy direction emb(images,w)≡ε ⟸ w≡ε of the L2 isomorphism.
+pub proof fn lemma_psi_respects_relator(p: nat, q: nat)
+    ensures
+        equiv_in_presentation(base_A(),
+            apply_embedding(psi_images(p, q), base_A().relators[0]), empty_word()),
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    let imgs = psi_images(p, q);
+    let xp = symbol_power(Symbol::Gen(1), p);
+    let yq = symbol_power(Symbol::Gen(2), q);
+    let xinv = symbol_power(Symbol::Inv(1), p);
+    let yinv = symbol_power(Symbol::Inv(2), q);
+    assert(a.relators[0] == seq![Symbol::Gen(1), Symbol::Gen(2), Symbol::Inv(1), Symbol::Inv(2)]);
+    assert(imgs[1] == xp && imgs[2] == yq);
+    lemma_inverse_word_sympower(Symbol::Gen(1), p);
+    lemma_inverse_word_sympower(Symbol::Gen(2), q);
+    assert(inverse_word(xp) =~= xinv);
+    assert(inverse_word(yq) =~= yinv);
+    //  ψ(R_A) = xᵖ · yᵠ · x⁻ᵖ · y⁻ᵠ
+    let psra = apply_embedding(imgs, a.relators[0]);
+    assert(psra =~= xp + yq + xinv + yinv) by {
+        reveal_with_fuel(apply_embedding, 5);
+    }
+    //  the cancellation chain
+    lemma_xy_commute_in_A();
+    lemma_power_commutes(a, Symbol::Gen(1), Symbol::Gen(2), p, q);   //  xᵖyᵠ ~ yᵠxᵖ
+    let suf: Word = xinv + yinv;
+    lemma_equiv_concat_left(a, xp + yq, yq + xp, suf);              //  (xᵖyᵠ)·suf ~ (yᵠxᵖ)·suf
+    lemma_word_inverse_right(a, xp);
+    assert(equiv_in_presentation(a, xp + xinv, empty_word())) by {
+        assert(concat(xp, inverse_word(xp)) =~= xp + xinv);
+    }
+    lemma_delete_equiv_empty(a, yq, xp + xinv, yinv);              //  yᵠ(xᵖx⁻ᵖ)y⁻ᵠ ~ yᵠy⁻ᵠ
+    lemma_word_inverse_right(a, yq);
+    assert(equiv_in_presentation(a, yq + yinv, empty_word())) by {
+        assert(concat(yq, inverse_word(yq)) =~= yq + yinv);
+    }
+    //  assemble: psra == (xᵖyᵠ)suf ~ (yᵠxᵖ)suf == yᵠ(xᵖx⁻ᵖ)y⁻ᵠ ~ yᵠy⁻ᵠ ~ ε
+    assert((xp + yq) + suf =~= psra);
+    assert((yq + xp) + suf =~= yq + ((xp + xinv) + yinv));
+    assert(concat(yq, yinv) =~= yq + yinv);
+    lemma_equiv_transitive(a, yq + ((xp + xinv) + yinv), yq + yinv, empty_word());
+    lemma_equiv_transitive(a, (xp + yq) + suf, (yq + xp) + suf, empty_word());
+}
+
 } //  verus!
