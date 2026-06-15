@@ -3287,4 +3287,82 @@ pub proof fn lemma_emb_respects_source_equiv(
     lemma_equiv_symmetric(tgt, apply_embedding(images, w2), apply_embedding(images, w1));
 }
 
+//  ============================================================
+//  Property (iii), A2a(b): the abelian normal form (sorting)
+//  ============================================================
+//
+//  A signed power  x^a  (a ∈ ℤ):  Gen(i)ᵃ for a≥0, Inv(i)^|a| for a<0.
+
+pub open spec fn signed_power(i: nat, a: int) -> Word {
+    if a >= 0 {
+        symbol_power(Symbol::Gen(i), a as nat)
+    } else {
+        symbol_power(Symbol::Inv(i), (-a) as nat)
+    }
+}
+
+//  The exponent of a signed power: a in its own generator, 0 in others.
+pub proof fn lemma_gexp_signed_power(i: nat, j: nat, a: int)
+    ensures
+        i == j ==> gexp(j, signed_power(i, a)) == a,
+        i != j ==> gexp(j, signed_power(i, a)) == 0,
+{
+    if a >= 0 {
+        lemma_gexp_symbol_power(j, Symbol::Gen(i), a as nat);
+        assert(i == j ==> sym_exp(j, Symbol::Gen(i)) == 1);
+        assert(i != j ==> sym_exp(j, Symbol::Gen(i)) == 0);
+    } else {
+        lemma_gexp_symbol_power(j, Symbol::Inv(i), (-a) as nat);
+        assert(i == j ==> sym_exp(j, Symbol::Inv(i)) == -1);
+        assert(i != j ==> sym_exp(j, Symbol::Inv(i)) == 0);
+        assert(i == j ==> (-a) * (-1) == a) by (nonlinear_arith);
+    }
+}
+
+//  Prepending Gen(i) to x^a gives x^{a+1}  (free reduction when a < 0).
+pub proof fn lemma_prepend_gen_signed(p: Presentation, i: nat, a: int)
+    ensures
+        equiv_in_presentation(p, seq![Symbol::Gen(i)] + signed_power(i, a), signed_power(i, a + 1)),
+{
+    if a >= 0 {
+        assert(seq![Symbol::Gen(i)] + signed_power(i, a) =~= signed_power(i, a + 1));
+        lemma_equiv_refl(p, signed_power(i, a + 1));
+    } else {
+        let n = (-a) as nat;   //  ≥ 1
+        let inv: Word = seq![Symbol::Gen(i), Symbol::Inv(i)];
+        assert(seq![Symbol::Gen(i)] + signed_power(i, a)
+            =~= inv + symbol_power(Symbol::Inv(i), (n - 1) as nat));
+        lemma_cancel_pair_equiv_empty(p, Symbol::Gen(i), Symbol::Inv(i));
+        lemma_delete_equiv_empty(p, empty_word(), inv, symbol_power(Symbol::Inv(i), (n - 1) as nat));
+        assert(concat(empty_word(), concat(inv, symbol_power(Symbol::Inv(i), (n - 1) as nat)))
+            =~= inv + symbol_power(Symbol::Inv(i), (n - 1) as nat));
+        assert(concat(empty_word(), symbol_power(Symbol::Inv(i), (n - 1) as nat))
+            =~= symbol_power(Symbol::Inv(i), (n - 1) as nat));
+        assert(signed_power(i, a + 1) =~= symbol_power(Symbol::Inv(i), (n - 1) as nat));
+    }
+}
+
+//  Prepending Inv(i) to x^a gives x^{a-1}.
+pub proof fn lemma_prepend_inv_signed(p: Presentation, i: nat, a: int)
+    ensures
+        equiv_in_presentation(p, seq![Symbol::Inv(i)] + signed_power(i, a), signed_power(i, a - 1)),
+{
+    if a <= 0 {
+        assert(seq![Symbol::Inv(i)] + signed_power(i, a) =~= signed_power(i, a - 1));
+        lemma_equiv_refl(p, signed_power(i, a - 1));
+    } else {
+        let n = a as nat;   //  ≥ 1
+        let inv: Word = seq![Symbol::Inv(i), Symbol::Gen(i)];
+        assert(seq![Symbol::Inv(i)] + signed_power(i, a)
+            =~= inv + symbol_power(Symbol::Gen(i), (n - 1) as nat));
+        lemma_cancel_pair_equiv_empty(p, Symbol::Inv(i), Symbol::Gen(i));
+        lemma_delete_equiv_empty(p, empty_word(), inv, symbol_power(Symbol::Gen(i), (n - 1) as nat));
+        assert(concat(empty_word(), concat(inv, symbol_power(Symbol::Gen(i), (n - 1) as nat)))
+            =~= inv + symbol_power(Symbol::Gen(i), (n - 1) as nat));
+        assert(concat(empty_word(), symbol_power(Symbol::Gen(i), (n - 1) as nat))
+            =~= symbol_power(Symbol::Gen(i), (n - 1) as nat));
+        assert(signed_power(i, a - 1) =~= symbol_power(Symbol::Gen(i), (n - 1) as nat));
+    }
+}
+
 } //  verus!
