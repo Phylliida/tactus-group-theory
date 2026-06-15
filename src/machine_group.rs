@@ -5351,6 +5351,60 @@ pub proof fn lemma_x_pow_prepend_inv(m: int)
     }
 }
 
+//  A product of x's and x⁻¹'s reduces to x raised to its net exponent.
+pub proof fn lemma_x_factors_to_pow(factors: Seq<Word>)
+    requires
+        factors_from_generators(seq![seq![Symbol::Gen(1)]], factors),
+    ensures
+        equiv_in_presentation(pres_tx(),
+            concat_all(factors), x_pow(x_exp_sum(concat_all(factors)))),
+    decreases factors.len(),
+{
+    reveal_with_fuel(concat_all, 1);
+    reveal_with_fuel(x_exp_sum, 2);
+    reveal_with_fuel(inverse_word, 2);
+    let g = seq![seq![Symbol::Gen(1)]];
+    if factors.len() == 0 {
+        assert(concat_all(factors) =~= Seq::<Symbol>::empty());
+        assert(x_exp_sum(concat_all(factors)) == 0);
+        assert(x_pow(0) =~= Seq::<Symbol>::empty());
+        lemma_equiv_refl(pres_tx(), concat_all(factors));
+    } else {
+        let f = factors.first();
+        let rest = factors.drop_first();
+        let cr = concat_all(rest);
+        assert(concat_all(factors) =~= f + cr);
+        assert(factors_from_generators(g, rest)) by {
+            assert forall|k: int| 0 <= k < rest.len()
+                implies is_generator_or_inverse(g, #[trigger] rest[k])
+            by { assert(rest[k] == factors[k + 1]); }
+        }
+        lemma_x_factors_to_pow(rest);
+        let m = x_exp_sum(cr);
+        assert(is_generator_or_inverse(g, f)) by { assert(f == factors[0]); }
+        assert(inverse_word(seq![Symbol::Gen(1)]) =~= seq![Symbol::Inv(1)]);
+        lemma_x_exp_sum_concat(f, cr);
+        if f == seq![Symbol::Gen(1)] {
+            assert(x_exp_sum(f) == 1);
+            assert(x_exp_sum(concat_all(factors)) == m + 1);
+            lemma_equiv_concat_right(pres_tx(), seq![Symbol::Gen(1)], cr, x_pow(m));
+            lemma_x_pow_prepend_gen(m);
+            lemma_equiv_transitive(pres_tx(),
+                f + cr, seq![Symbol::Gen(1)] + x_pow(m), x_pow(m + 1));
+            assert(x_pow(m + 1) =~= x_pow(x_exp_sum(concat_all(factors))));
+        } else {
+            assert(f == seq![Symbol::Inv(1)]);
+            assert(x_exp_sum(f) == -1);
+            assert(x_exp_sum(concat_all(factors)) == m - 1);
+            lemma_equiv_concat_right(pres_tx(), seq![Symbol::Inv(1)], cr, x_pow(m));
+            lemma_x_pow_prepend_inv(m);
+            lemma_equiv_transitive(pres_tx(),
+                f + cr, seq![Symbol::Inv(1)] + x_pow(m), x_pow(m - 1));
+            assert(x_pow(m - 1) =~= x_pow(x_exp_sum(concat_all(factors))));
+        }
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
