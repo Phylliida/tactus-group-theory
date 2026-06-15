@@ -3742,4 +3742,72 @@ pub proof fn lemma_mu_injective(images: Seq<Word>, p: nat, q: nat, w: Word)
     lemma_xy_word_zero_exp_trivial(w);
 }
 
+//  ============================================================
+//  A2b via Britton: A viewed as an HNN extension
+//  ============================================================
+//
+//  A = ⟨t,x,y | xy=yx⟩ is an HNN extension of the free group F = ⟨t,x⟩ with
+//  stable letter y and associated subgroup ⟨x⟩ under the IDENTITY iso
+//  (y⁻¹·x·y = x).  So the proven britton_lemma_full applies to A, and its
+//  isomorphism precondition is trivial (identity, as at the k-level in brick 22).
+//  hnn_presentation(a_as_hnn) = ⟨t,x,y | y⁻¹xyx⁻¹⟩ — Tietze-equivalent to base_A
+//  (bridge: the two single relators are mutually derivable).
+
+//  The free group ⟨t, x⟩ (the HNN base).
+pub open spec fn pres_tx() -> Presentation {
+    Presentation { num_generators: 2, relators: Seq::empty() }
+}
+
+//  A as an HNN extension: base ⟨t,x⟩, stable letter y=Gen(2), ⟨x⟩ identity iso.
+pub open spec fn a_as_hnn() -> HNNData {
+    HNNData {
+        base: pres_tx(),
+        associations: seq![ (seq![Symbol::Gen(1)], seq![Symbol::Gen(1)]) ],
+    }
+}
+
+pub proof fn lemma_a_as_hnn_valid()
+    ensures
+        hnn_data_valid(a_as_hnn()),
+{
+    reveal(presentation_valid);
+    let data = a_as_hnn();
+    assert(data.base.relators.len() == 0);
+    let w: Word = seq![Symbol::Gen(1)];
+    assert(word_valid(w, 2)) by {
+        assert forall|j: int| 0 <= j < w.len() implies symbol_valid(#[trigger] w[j], 2) by {}
+    }
+    assert forall|i: int| 0 <= i < data.associations.len() implies {
+        &&& word_valid(#[trigger] data.associations[i].0, data.base.num_generators)
+        &&& word_valid(data.associations[i].1, data.base.num_generators)
+    } by {
+        assert(data.associations[i] == (w, w));
+    }
+}
+
+//  The iso condition is trivial: the association is the identity on ⟨x⟩.
+pub proof fn lemma_a_as_hnn_isomorphic()
+    ensures
+        hnn_associations_isomorphic(a_as_hnn()),
+{
+    let data = a_as_hnn();
+    let k = data.associations.len();
+    let a_words = Seq::new(k, |i: int| data.associations[i].0);
+    let b_words = Seq::new(k, |i: int| data.associations[i].1);
+    assert forall|i: int| 0 <= i < k implies
+        data.associations[i].0 == data.associations[i].1
+    by {
+        assert(data.associations[0] == (seq![Symbol::Gen(1)], seq![Symbol::Gen(1)]));
+    }
+    assert(a_words =~= b_words);
+}
+
+//  The HNN presentation of A has 3 generators and the single relator y⁻¹xyx⁻¹.
+pub proof fn lemma_a_as_hnn_presentation()
+    ensures
+        hnn_presentation(a_as_hnn()).num_generators == 3,
+{
+    lemma_a_as_hnn_valid();
+}
+
 } //  verus!
