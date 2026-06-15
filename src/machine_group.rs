@@ -3584,4 +3584,162 @@ pub proof fn lemma_z_word_sorts(w: Word)
     }
 }
 
+//  ============================================================
+//  A2a(c): the abelian word problem ⟹ μ (x↦xᵖ, y↦yᵠ) injective
+//  ============================================================
+
+//  Zero net exponents ⟹ the {x,y}-word is trivial (immediate from the sort).
+pub proof fn lemma_xy_word_zero_exp_trivial(w: Word)
+    requires
+        is_xy_word(w),
+        gexp(1, w) == 0,
+        gexp(2, w) == 0,
+    ensures
+        equiv_in_presentation(base_A(), w, empty_word()),
+{
+    let a = base_A();
+    lemma_z_word_sorts(w);
+    assert(signed_power(1, 0) =~= empty_word());
+    assert(signed_power(2, 0) =~= empty_word());
+    assert(signed_power(1, gexp(1, w)) + signed_power(2, gexp(2, w)) =~= empty_word());
+}
+
+//  gexp₁ of a scaled embedding scales by p.
+pub proof fn lemma_gexp1_scaled_embedding(images: Seq<Word>, p: nat, q: nat, w: Word)
+    requires
+        images.len() >= 3,
+        images[1] == symbol_power(Symbol::Gen(1), p),
+        images[2] == symbol_power(Symbol::Gen(2), q),
+        is_xy_word(w),
+    ensures
+        gexp(1, apply_embedding(images, w)) == (p as int) * gexp(1, w),
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        assert(apply_embedding(images, w) =~= empty_word());
+    } else {
+        let s = w.first();
+        let rest = w.drop_first();
+        assert(is_xy_word(rest)) by {
+            assert forall|j: int| 0 <= j < rest.len()
+                implies (generator_index(#[trigger] rest[j]) == 1 || generator_index(rest[j]) == 2)
+            by { assert(rest[j] == w[j + 1]); }
+        }
+        lemma_gexp1_scaled_embedding(images, p, q, rest);
+        let es = apply_embedding_symbol(images, s);
+        assert(apply_embedding(images, w) =~= concat(es, apply_embedding(images, rest)));
+        lemma_gexp_concat(1, es, apply_embedding(images, rest));
+        assert(generator_index(s) == 1 || generator_index(s) == 2);
+        assert(gexp(1, es) == (p as int) * sym_exp(1, s)) by {
+            if s == Symbol::Gen(1) {
+                lemma_gexp_symbol_power(1, Symbol::Gen(1), p);
+            } else if s == Symbol::Inv(1) {
+                lemma_gexp_symbol_power(1, Symbol::Gen(1), p);
+                lemma_gexp_inverse(1, symbol_power(Symbol::Gen(1), p));
+                assert((p as int) * sym_exp(1, Symbol::Inv(1)) == -(p as int)) by (nonlinear_arith);
+                assert(-((p as int) * sym_exp(1, Symbol::Gen(1))) == -(p as int)) by (nonlinear_arith);
+            } else if s == Symbol::Gen(2) {
+                lemma_gexp_symbol_power(1, Symbol::Gen(2), q);
+                assert(sym_exp(1, Symbol::Gen(2)) == 0);
+                assert((q as int) * 0 == 0) by (nonlinear_arith);
+                assert((p as int) * 0 == 0) by (nonlinear_arith);
+            } else {
+                assert(s == Symbol::Inv(2));
+                lemma_gexp_symbol_power(1, Symbol::Gen(2), q);
+                lemma_gexp_inverse(1, symbol_power(Symbol::Gen(2), q));
+                assert(sym_exp(1, Symbol::Gen(2)) == 0);
+                assert(sym_exp(1, Symbol::Inv(2)) == 0);
+                assert((q as int) * 0 == 0) by (nonlinear_arith);
+                assert((p as int) * 0 == 0) by (nonlinear_arith);
+            }
+        }
+        assert(gexp(1, w) == sym_exp(1, s) + gexp(1, rest));
+        assert((p as int) * sym_exp(1, s) + (p as int) * gexp(1, rest)
+            == (p as int) * (sym_exp(1, s) + gexp(1, rest))) by (nonlinear_arith);
+    }
+}
+
+//  gexp₂ of a scaled embedding scales by q.
+pub proof fn lemma_gexp2_scaled_embedding(images: Seq<Word>, p: nat, q: nat, w: Word)
+    requires
+        images.len() >= 3,
+        images[1] == symbol_power(Symbol::Gen(1), p),
+        images[2] == symbol_power(Symbol::Gen(2), q),
+        is_xy_word(w),
+    ensures
+        gexp(2, apply_embedding(images, w)) == (q as int) * gexp(2, w),
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        assert(apply_embedding(images, w) =~= empty_word());
+    } else {
+        let s = w.first();
+        let rest = w.drop_first();
+        assert(is_xy_word(rest)) by {
+            assert forall|j: int| 0 <= j < rest.len()
+                implies (generator_index(#[trigger] rest[j]) == 1 || generator_index(rest[j]) == 2)
+            by { assert(rest[j] == w[j + 1]); }
+        }
+        lemma_gexp2_scaled_embedding(images, p, q, rest);
+        let es = apply_embedding_symbol(images, s);
+        assert(apply_embedding(images, w) =~= concat(es, apply_embedding(images, rest)));
+        lemma_gexp_concat(2, es, apply_embedding(images, rest));
+        assert(generator_index(s) == 1 || generator_index(s) == 2);
+        assert(gexp(2, es) == (q as int) * sym_exp(2, s)) by {
+            if s == Symbol::Gen(2) {
+                lemma_gexp_symbol_power(2, Symbol::Gen(2), q);
+            } else if s == Symbol::Inv(2) {
+                lemma_gexp_symbol_power(2, Symbol::Gen(2), q);
+                lemma_gexp_inverse(2, symbol_power(Symbol::Gen(2), q));
+                assert((q as int) * sym_exp(2, Symbol::Inv(2)) == -(q as int)) by (nonlinear_arith);
+                assert(-((q as int) * sym_exp(2, Symbol::Gen(2))) == -(q as int)) by (nonlinear_arith);
+            } else if s == Symbol::Gen(1) {
+                lemma_gexp_symbol_power(2, Symbol::Gen(1), p);
+                assert(sym_exp(2, Symbol::Gen(1)) == 0);
+                assert((p as int) * 0 == 0) by (nonlinear_arith);
+                assert((q as int) * 0 == 0) by (nonlinear_arith);
+            } else {
+                assert(s == Symbol::Inv(1));
+                lemma_gexp_symbol_power(2, Symbol::Gen(1), p);
+                lemma_gexp_inverse(2, symbol_power(Symbol::Gen(1), p));
+                assert(sym_exp(2, Symbol::Gen(1)) == 0);
+                assert(sym_exp(2, Symbol::Inv(1)) == 0);
+                assert((p as int) * 0 == 0) by (nonlinear_arith);
+                assert((q as int) * 0 == 0) by (nonlinear_arith);
+            }
+        }
+        assert(gexp(2, w) == sym_exp(2, s) + gexp(2, rest));
+        assert((q as int) * sym_exp(2, s) + (q as int) * gexp(2, rest)
+            == (q as int) * (sym_exp(2, s) + gexp(2, rest))) by (nonlinear_arith);
+    }
+}
+
+//  μ injective: a scaled {x,y}-word trivial ⟹ the original is trivial.
+pub proof fn lemma_mu_injective(images: Seq<Word>, p: nat, q: nat, w: Word)
+    requires
+        images.len() >= 3,
+        images[1] == symbol_power(Symbol::Gen(1), p),
+        images[2] == symbol_power(Symbol::Gen(2), q),
+        p >= 1,
+        q >= 1,
+        is_xy_word(w),
+        equiv_in_presentation(base_A(), apply_embedding(images, w), empty_word()),
+    ensures
+        equiv_in_presentation(base_A(), w, empty_word()),
+{
+    let emb = apply_embedding(images, w);
+    lemma_gexp1_scaled_embedding(images, p, q, w);
+    lemma_gexp2_scaled_embedding(images, p, q, w);
+    lemma_equiv_in_A_preserves_gexp(1, emb, empty_word());
+    lemma_equiv_in_A_preserves_gexp(2, emb, empty_word());
+    assert(gexp(1, empty_word()) == 0);
+    assert(gexp(2, empty_word()) == 0);
+    //  p·gexp(1,w) == 0  and  p ≥ 1  ⟹  gexp(1,w) == 0
+    assert(gexp(1, w) == 0) by (nonlinear_arith)
+        requires (p as int) * gexp(1, w) == 0, p >= 1;
+    assert(gexp(2, w) == 0) by (nonlinear_arith)
+        requires (q as int) * gexp(2, w) == 0, q >= 1;
+    lemma_xy_word_zero_exp_trivial(w);
+}
+
 } //  verus!
