@@ -22,7 +22,7 @@ use crate::britton_via_tower::{derivation_min_adj_level, derivation_max_step_lev
     lemma_hnn_derivation_to_tower_equiv, lemma_translate_base_word_at, lemma_translate_empty,
     lemma_copy_s_embeds, lemma_tower_textbook_chain_from_hnn_iso, translate_word_at};
 use crate::britton_via_tower::{textbook_act_hnn, lemma_no_pinch_action_nontrivial,
-    lemma_derivation_preserves_syls};
+    lemma_derivation_preserves_syls, stable_count, lemma_stable_count_concat};
 use crate::normal_form_afp_textbook::Syllable;
 use crate::tower::tower_presentation;
 
@@ -4342,6 +4342,123 @@ pub proof fn lemma_in_empty_subgroup_trivial(p: Presentation, w: Word)
     }
     assert(concat_all(factors) =~= empty_word());
     lemma_equiv_symmetric(p, concat_all(factors), w);
+}
+
+//  ============================================================
+//  (Corr) foundation: ψ_F scales the stable-letter count by p.
+//  ============================================================
+//
+//  The F-level scaling ψ_F: t ↦ t, x ↦ xᵖ  (images over F's two generators).
+pub open spec fn psi_F_images(p: nat) -> Seq<Word> {
+    seq![ seq![Symbol::Gen(0)], symbol_power(Symbol::Gen(1), p) ]
+}
+
+//  stable_count of a constant power: n if the symbol is stable, else 0.
+pub proof fn lemma_stable_count_symbol_power(data: HNNData, s: Symbol, n: nat)
+    ensures
+        stable_count(data, symbol_power(s, n)) == (if is_stable(data, s) { n } else { 0nat }),
+    decreases n,
+{
+    if n == 0 {
+        assert(symbol_power(s, n) =~= Seq::<Symbol>::empty());
+    } else {
+        assert(symbol_power(s, n).last() == s);
+        assert(symbol_power(s, n).drop_last() =~= symbol_power(s, (n - 1) as nat));
+        lemma_stable_count_symbol_power(data, s, (n - 1) as nat);
+    }
+}
+
+//  ψ_F applied to a single symbol contributes p stable letters iff the symbol
+//  was an x/x⁻¹ (stable), else 0.
+pub proof fn lemma_psi_F_emb_symbol_stable_count(p: nat, s: Symbol)
+    requires
+        symbol_valid(s, 2),
+    ensures
+        stable_count(f_as_hnn(),
+            apply_embedding(psi_F_images(p), seq![s]))
+            == (if is_stable(f_as_hnn(), s) { p } else { 0nat }),
+{
+    let data = f_as_hnn();
+    let imgs = psi_F_images(p);
+    reveal_with_fuel(apply_embedding, 2);
+    reveal_with_fuel(inverse_word, 2);
+    reveal_with_fuel(stable_count, 2);
+    assert(data.base.num_generators == 1);
+    assert(apply_embedding(imgs, seq![s]) =~= apply_embedding_symbol(imgs, s));
+    assert(imgs[0] =~= seq![Symbol::Gen(0)]);
+    assert(imgs[1] =~= symbol_power(Symbol::Gen(1), p));
+    //  symbol_valid(s, 2) ⟹ generator_index(s) ∈ {0, 1}
+    match s {
+        Symbol::Gen(i) => {
+            if i == 0 {
+                assert(apply_embedding_symbol(imgs, s) =~= seq![Symbol::Gen(0)]);
+                assert(!is_stable(data, s));
+            } else {
+                assert(i == 1);
+                lemma_stable_count_symbol_power(data, Symbol::Gen(1), p);
+                assert(apply_embedding_symbol(imgs, s) =~= symbol_power(Symbol::Gen(1), p));
+                assert(is_stable(data, s));
+            }
+        }
+        Symbol::Inv(i) => {
+            if i == 0 {
+                assert(apply_embedding_symbol(imgs, s) =~= seq![Symbol::Inv(0)]);
+                assert(!is_stable(data, s));
+            } else {
+                assert(i == 1);
+                lemma_inverse_word_sympower(Symbol::Gen(1), p);
+                assert(apply_embedding_symbol(imgs, s) =~= symbol_power(Symbol::Inv(1), p));
+                lemma_stable_count_symbol_power(data, Symbol::Inv(1), p);
+                assert(is_stable(data, s));
+            }
+        }
+    }
+}
+
+//  ψ_F multiplies the stable-letter count by p — so w has an x iff ψ_F(w) does.
+pub proof fn lemma_psi_F_stable_count_scales(p: nat, w: Word)
+    requires
+        word_valid(w, 2),
+    ensures
+        stable_count(f_as_hnn(), apply_embedding(psi_F_images(p), w))
+            == p * stable_count(f_as_hnn(), w),
+    decreases w.len(),
+{
+    let data = f_as_hnn();
+    let imgs = psi_F_images(p);
+    if w.len() == 0 {
+        assert(apply_embedding(imgs, w) =~= Seq::<Symbol>::empty());
+    } else {
+        let last = w.last();
+        let pre = w.drop_last();
+        assert(w =~= pre + seq![last]);
+        assert(word_valid(pre, 2)) by {
+            assert forall|k: int| 0 <= k < pre.len() implies symbol_valid(#[trigger] pre[k], 2)
+            by { assert(pre[k] == w[k]); }
+        }
+        assert(symbol_valid(last, 2));
+        lemma_apply_embedding_concat(imgs, pre, seq![last]);
+        assert(apply_embedding(imgs, w)
+            =~= apply_embedding(imgs, pre) + apply_embedding(imgs, seq![last]));
+        lemma_stable_count_concat(data,
+            apply_embedding(imgs, pre), apply_embedding(imgs, seq![last]));
+        lemma_psi_F_emb_symbol_stable_count(p, last);
+        lemma_psi_F_stable_count_scales(p, pre);
+        //  extract the if-else value so nonlinear_arith stays linear in `inc`
+        let inc: nat = if is_stable(data, last) { 1nat } else { 0nat };
+        assert(stable_count(data, w) == stable_count(data, pre) + inc) by {
+            reveal_with_fuel(stable_count, 2);
+        }
+        assert(stable_count(data, apply_embedding(imgs, seq![last])) == p * inc) by {
+            if is_stable(data, last) { } else { }
+        }
+        assert(p * (stable_count(data, pre) + inc)
+            == p * stable_count(data, pre) + p * inc) by (nonlinear_arith);
+        //  assemble: stable_count(ψ_F(w)) = p·stable_count(pre) + p·inc = p·stable_count(w)
+        assert(stable_count(data, apply_embedding(imgs, w))
+            == p * stable_count(data, pre) + p * inc);
+        assert(stable_count(data, apply_embedding(imgs, w)) == p * stable_count(data, w));
+    }
 }
 
 //  ============================================================
