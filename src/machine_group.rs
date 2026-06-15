@@ -4324,4 +4324,68 @@ pub proof fn lemma_reduced_stable_implies_syls_nonempty(data: HNNData, w: Word)
     lemma_no_pinch_action_nontrivial(data, w);
 }
 
+//  In the trivial subgroup (no generators), only the identity lives.
+pub proof fn lemma_in_empty_subgroup_trivial(p: Presentation, w: Word)
+    requires
+        presentation_valid(p),
+        in_generated_subgroup(p, Seq::<Word>::empty(), w),
+    ensures
+        equiv_in_presentation(p, w, empty_word()),
+{
+    let factors = choose|factors: Seq<Word>|
+        #[trigger] factors_from_generators(Seq::<Word>::empty(), factors)
+        && equiv_in_presentation(p, concat_all(factors), w);
+    assert(factors.len() == 0) by {
+        if factors.len() > 0 {
+            assert(is_generator_or_inverse(Seq::<Word>::empty(), factors[0]));
+        }
+    }
+    assert(concat_all(factors) =~= empty_word());
+    lemma_equiv_symmetric(p, concat_all(factors), w);
+}
+
+//  ============================================================
+//  (Q) Pinch-out at the F-level: deleting a pinch shrinks the word.
+//  ============================================================
+//
+//  A pinch  x^ε · u · x^{-ε}  (u in the trivial ⟨t⟩ subgroup, hence ≡ε) equals
+//  the empty word, so w ≡ w with positions i..j removed — strictly shorter.
+//  The reduction engine of the ψ-injectivity induction (on word length).
+pub proof fn lemma_pinch_out(w: Word, i: int, j: int)
+    requires
+        word_valid(w, 2),
+        has_pinch_at(f_as_hnn(), w, i, j),
+    ensures
+        equiv_in_presentation(pres_tx(),
+            w, w.subrange(0, i) + w.subrange(j + 1, w.len() as int)),
+{
+    let data = f_as_hnn();
+    let u = w.subrange(i + 1, j);
+    let mid = w.subrange(i, j + 1);
+    let si = w[i];
+    let sj = w[j];
+    lemma_pres_t_valid();
+    lemma_f_as_hnn_presentation();   //  hnn_presentation(f_as_hnn) == pres_tx
+    //  both associated-subgroup generator lists are empty
+    assert(Seq::new(0, |k: int| data.associations[k].0) =~= Seq::<Word>::empty());
+    assert(Seq::new(0, |k: int| data.associations[k].1) =~= Seq::<Word>::empty());
+    //  the pinch middle lies in the trivial ⟨t⟩ subgroup ⟹ u ≡ ε
+    assert(in_generated_subgroup(pres_t(), Seq::<Word>::empty(), u));
+    assert(is_inverse_pair(si, sj));
+    lemma_in_empty_subgroup_trivial(pres_t(), u);
+    lemma_base_embeds_in_hnn(data, u, empty_word());     //  u ≡ ε in pres_tx
+    //  mid = [si] · (u · [sj]) ≡ [si] · [sj] ≡ ε  (right-assoc matches delete's output)
+    assert(mid =~= concat(seq![si], concat(u, seq![sj])));
+    lemma_delete_equiv_empty(pres_tx(), seq![si], u, seq![sj]);
+    assert(concat(seq![si], seq![sj]) =~= seq![si, sj]);
+    lemma_cancel_pair_equiv_empty(pres_tx(), si, sj);
+    lemma_equiv_transitive(pres_tx(), mid, concat(seq![si], seq![sj]), empty_word());
+    //  w = w[0..i] · (mid · w[j+1..])  ⟹  w ≡ w[0..i] · w[j+1..]
+    assert(w =~= concat(w.subrange(0, i), concat(mid, w.subrange(j + 1, w.len() as int))));
+    lemma_delete_equiv_empty(pres_tx(),
+        w.subrange(0, i), mid, w.subrange(j + 1, w.len() as int));
+    assert(w.subrange(0, i) + w.subrange(j + 1, w.len() as int)
+        =~= concat(w.subrange(0, i), w.subrange(j + 1, w.len() as int)));
+}
+
 } //  verus!
