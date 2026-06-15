@@ -4462,6 +4462,62 @@ pub proof fn lemma_psi_F_stable_count_scales(p: nat, w: Word)
 }
 
 //  ============================================================
+//  (Corr) core support: prepending a symbol preserves a pinch.
+//  ============================================================
+//
+//  A pinch at (i,j) in w is still a pinch at (i+1,j+1) in [s]·w: the prepended
+//  symbol sits at position 0, strictly before both endpoints, so it disturbs
+//  neither the adjacency/opposition nor the (unchanged) middle.
+pub proof fn lemma_prepend_preserves_pinch(data: HNNData, s: Symbol, w: Word)
+    requires
+        has_pinch(data, w),
+    ensures
+        has_pinch(data, seq![s] + w),
+{
+    let w2: Word = seq![s] + w;
+    let ij: (int, int) = choose|i: int, j: int| has_pinch_at(data, w, i, j);
+    let i = ij.0;
+    let j = ij.1;
+    assert(has_pinch_at(data, w, i, j));
+    //  index shift: w2[k+1] == w[k]
+    assert(forall|k: int| 0 <= k < w.len() ==> #[trigger] w2[k + 1] == w[k]);
+    //  middle is preserved verbatim
+    assert(w2.subrange(i + 2, j + 1) =~= w.subrange(i + 1, j));
+    //  no stable letter strictly between the shifted endpoints
+    assert forall|k: int| (i + 1) < k < (j + 1) implies !is_stable(data, #[trigger] w2[k]) by {
+        assert(w2[k] == w[k - 1]);
+    }
+    assert(has_pinch_at(data, w2, i + 1, j + 1));
+    assert(has_pinch(data, w2)) by {
+        assert(has_pinch_at(data, w2, i + 1, j + 1));
+    }
+}
+
+//  A pinch whose left endpoint lies past a prefix descends to the suffix.
+pub proof fn lemma_strip_prefix_preserves_pinch(data: HNNData, pre: Word, suf: Word, i: int, j: int)
+    requires
+        has_pinch_at(data, pre + suf, i, j),
+        pre.len() <= i,
+    ensures
+        has_pinch(data, suf),
+{
+    let w2: Word = pre + suf;
+    let pl = pre.len() as int;
+    let i2 = i - pl;
+    let j2 = j - pl;
+    //  index shift on the suffix side
+    assert(forall|k: int| pl <= k < w2.len() ==> #[trigger] w2[k] == suf[k - pl]);
+    assert(suf.subrange(i2 + 1, j2) =~= w2.subrange(i + 1, j));
+    assert forall|k: int| i2 < k < j2 implies !is_stable(data, #[trigger] suf[k]) by {
+        assert(suf[k] == w2[k + pl]);
+    }
+    assert(has_pinch_at(data, suf, i2, j2));
+    assert(has_pinch(data, suf)) by {
+        assert(has_pinch_at(data, suf, i2, j2));
+    }
+}
+
+//  ============================================================
 //  (Q) Pinch-out at the F-level: deleting a pinch shrinks the word.
 //  ============================================================
 //
