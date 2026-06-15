@@ -21,6 +21,9 @@ use crate::britton_via_tower::{derivation_min_adj_level, derivation_max_step_lev
     derivation_levels_ok, step_level_ok, step_position, step_is_hnn_relator, net_level,
     lemma_hnn_derivation_to_tower_equiv, lemma_translate_base_word_at, lemma_translate_empty,
     lemma_copy_s_embeds, lemma_tower_textbook_chain_from_hnn_iso, translate_word_at};
+use crate::britton_via_tower::{textbook_act_hnn, lemma_no_pinch_action_nontrivial,
+    lemma_derivation_preserves_syls};
+use crate::normal_form_afp_textbook::Syllable;
 use crate::tower::tower_presentation;
 
 verus! {
@@ -4279,6 +4282,46 @@ pub proof fn lemma_no_pinch_stable_nontrivial(data: HNNData, w: Word)
         britton_lemma_full(data, w);
         assert(has_pinch(data, w));   //  contradicts !has_pinch
     }
+}
+
+//  ============================================================
+//  Britton normal-form syllable interface (for the ψ-injectivity peel)
+//  ============================================================
+//
+//  textbook_act_hnn(data, w, ε, []).1 is the Britton normal-form syllable list.
+//  It is an ≡-invariant; the peel reasons about its length (= stable_count for a
+//  reduced word), which ψ scales but never zeroes.
+
+pub open spec fn act_syls(data: HNNData, w: Word) -> Seq<Syllable> {
+    textbook_act_hnn(data, w, empty_word(), Seq::<Syllable>::empty()).1
+}
+
+//  A word trivial in the HNN extension has NO normal-form syllables.
+pub proof fn lemma_trivial_implies_syls_empty(data: HNNData, w: Word)
+    requires
+        hnn_data_valid(data),
+        hnn_associations_isomorphic(data),
+        word_valid(w, hnn_presentation(data).num_generators),
+        equiv_in_presentation(hnn_presentation(data), w, empty_word()),
+    ensures
+        act_syls(data, w) =~= Seq::<Syllable>::empty(),
+{
+    let d = choose|d: Derivation| derivation_valid(hnn_presentation(data), d, w, empty_word());
+    lemma_derivation_preserves_syls(data, d.steps, w);
+}
+
+//  A Britton-reduced word (no pinch) that still has a stable letter has ≥1
+//  normal-form syllable — hence (with the previous lemma) is nontrivial.
+pub proof fn lemma_reduced_stable_implies_syls_nonempty(data: HNNData, w: Word)
+    requires
+        hnn_data_valid(data),
+        word_valid(w, hnn_presentation(data).num_generators),
+        has_stable_letter(data, w),
+        !has_pinch(data, w),
+    ensures
+        act_syls(data, w).len() >= 1,
+{
+    lemma_no_pinch_action_nontrivial(data, w);
 }
 
 } //  verus!
