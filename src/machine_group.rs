@@ -4493,6 +4493,89 @@ pub proof fn lemma_prepend_preserves_pinch(data: HNNData, s: Symbol, w: Word)
     }
 }
 
+//  First-stable correspondence: if the first stable letter of ψ_F(w) is at
+//  position l (everything before it non-stable), then w has its first stable
+//  letter at the SAME index l, with the same letter, and the prefixes agree.
+//  (Leading t-symbols expand 1:1, so the index is preserved; the first x's run
+//  starts exactly at l and its first letter is the x itself.)
+pub proof fn lemma_psi_F_spanning(p: nat, w: Word, l: int)
+    requires
+        word_valid(w, 2),
+        p >= 1,
+        0 <= l < apply_embedding(psi_F_images(p), w).len(),
+        is_stable(f_as_hnn(), apply_embedding(psi_F_images(p), w)[l]),
+        forall|k: int| 0 <= k < l
+            ==> !is_stable(f_as_hnn(), #[trigger] apply_embedding(psi_F_images(p), w)[k]),
+    ensures
+        l < w.len(),
+        is_stable(f_as_hnn(), w[l]),
+        w[l] == apply_embedding(psi_F_images(p), w)[l],
+        w.subrange(0, l) =~= apply_embedding(psi_F_images(p), w).subrange(0, l),
+        forall|k: int| 0 <= k < l ==> !is_stable(f_as_hnn(), #[trigger] w[k]),
+    decreases w.len(),
+{
+    let data = f_as_hnn();
+    let imgs = psi_F_images(p);
+    let pw = apply_embedding(imgs, w);
+    reveal_with_fuel(apply_embedding, 2);
+    reveal_with_fuel(inverse_word, 2);
+    assert(data.base.num_generators == 1);
+    assert(w.len() > 0) by {
+        if w.len() == 0 { assert(apply_embedding(imgs, w) =~= Seq::<Symbol>::empty()); }
+    }
+    let c = w[0];
+    let w2 = w.drop_first();
+    assert(w =~= seq![c] + w2);
+    assert(word_valid(w2, 2)) by {
+        assert forall|k: int| 0 <= k < w2.len() implies symbol_valid(#[trigger] w2[k], 2)
+        by { assert(w2[k] == w[k + 1]); }
+    }
+    lemma_apply_embedding_concat(imgs, seq![c], w2);
+    let ec = apply_embedding(imgs, seq![c]);
+    let pw2 = apply_embedding(imgs, w2);
+    assert(pw =~= ec + pw2);
+    assert(ec =~= apply_embedding_symbol(imgs, c));
+    assert(imgs[0] =~= seq![Symbol::Gen(0)]);
+    assert(imgs[1] =~= symbol_power(Symbol::Gen(1), p));
+    if is_stable(data, c) {
+        //  c is x/x⁻¹: ec is the length-p run, ec[0] = c is stable, so l must be 0
+        assert(c == Symbol::Gen(1) || c == Symbol::Inv(1));
+        if c == Symbol::Gen(1) {
+            assert(ec =~= symbol_power(Symbol::Gen(1), p));
+        } else {
+            lemma_inverse_word_sympower(Symbol::Gen(1), p);
+            assert(ec =~= symbol_power(Symbol::Inv(1), p));
+        }
+        assert(ec =~= symbol_power(c, p));
+        assert(ec.len() == p);
+        assert(ec[0] == c);
+        assert(pw[0] == c);
+        assert(l == 0);
+        assert(w.subrange(0, 0) =~= pw.subrange(0, 0));
+    } else {
+        //  c is t/t⁻¹: ec = [c] (length 1, non-stable); peel it and recurse
+        assert(ec =~= seq![c]);
+        assert(ec.len() == 1);
+        assert(pw[0] == c);
+        assert(!is_stable(data, pw[0]));
+        assert(l >= 1);
+        assert(forall|m: int| 1 <= m < pw.len() ==> #[trigger] pw[m] == pw2[m - 1]);
+        assert(is_stable(data, pw2[l - 1]));
+        assert forall|k: int| 0 <= k < l - 1 implies !is_stable(data, #[trigger] pw2[k]) by {
+            assert(pw2[k] == pw[k + 1]);
+        }
+        lemma_psi_F_spanning(p, w2, l - 1);
+        //  reassemble for w
+        assert(w[l] == w2[l - 1]);
+        assert(w.subrange(0, l) =~= seq![c] + w2.subrange(0, l - 1));
+        assert(pw.subrange(0, l) =~= seq![c] + pw2.subrange(0, l - 1));
+        assert(w.subrange(0, l) =~= pw.subrange(0, l));
+        assert forall|k: int| 0 <= k < l implies !is_stable(data, #[trigger] w[k]) by {
+            if k != 0 { assert(w[k] == w2[k - 1]); }
+        }
+    }
+}
+
 //  A pinch whose left endpoint lies past a prefix descends to the suffix.
 pub proof fn lemma_strip_prefix_preserves_pinch(data: HNNData, pre: Word, suf: Word, i: int, j: int)
     requires
