@@ -3365,4 +3365,135 @@ pub proof fn lemma_prepend_inv_signed(p: Presentation, i: nat, a: int)
     }
 }
 
+//  ============================================================
+//  The four x/y commuting variants (all from A's [x,y] relator),
+//  then: a y-symbol commutes past xᵃ (signed).
+//  ============================================================
+
+//  y·x ~ x·y  (symmetric of lemma_xy_commute_in_A).
+pub proof fn lemma_comm_y_x()
+    ensures
+        equiv_in_presentation(base_A(), seq![Symbol::Gen(2), Symbol::Gen(1)],
+            seq![Symbol::Gen(1), Symbol::Gen(2)]),
+{
+    let a = base_A();
+    let xy: Word = seq![Symbol::Gen(1), Symbol::Gen(2)];
+    let yx: Word = seq![Symbol::Gen(2), Symbol::Gen(1)];
+    lemma_base_A_valid();
+    lemma_xy_commute_in_A();
+    assert(word_valid(xy, 3)) by {
+        assert forall|i: int| 0 <= i < xy.len() implies symbol_valid(#[trigger] xy[i], 3) by {}
+    }
+    lemma_equiv_symmetric(a, xy, yx);
+}
+
+//  y·x⁻¹ ~ x⁻¹·y  (the mixed variant, via two free cancellations from y·x ~ x·y).
+pub proof fn lemma_comm_y_xinv()
+    ensures
+        equiv_in_presentation(base_A(), seq![Symbol::Gen(2), Symbol::Inv(1)],
+            seq![Symbol::Inv(1), Symbol::Gen(2)]),
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    let x = Symbol::Gen(1); let y = Symbol::Gen(2); let xi = Symbol::Inv(1);
+    let yx: Word = seq![y, x];
+    let xy: Word = seq![x, y];
+    let xip: Word = seq![xi];
+    let yw: Word = seq![y];
+    let xix: Word = seq![xi, x];
+    let xxi: Word = seq![x, xi];
+    let xiyx: Word = seq![xi, y, x];
+    let xixy: Word = seq![xi, x, y];
+    let xiy: Word = seq![xi, y];
+    let yxi: Word = seq![y, xi];
+    let xiyxxi: Word = seq![xi, y, x, xi];
+    //  Fact A:  y·x ~ x·y
+    lemma_comm_y_x();
+    //  1. prepend x⁻¹:  [xi,y,x] ~ [xi,x,y]
+    lemma_equiv_concat_right(a, xip, yx, xy);
+    assert(xip + yx =~= xiyx);
+    assert(xip + xy =~= xixy);
+    //  2. [xi,x,y] ~ [y]   (cancel xi·x)
+    lemma_cancel_pair_equiv_empty(a, xi, x);
+    lemma_delete_equiv_empty(a, empty_word(), xix, yw);
+    assert(concat(xix, yw) =~= xixy);
+    assert(concat(empty_word(), xixy) =~= xixy);
+    assert(concat(empty_word(), yw) =~= yw);
+    //  3. xiyx ~ xixy ~ y
+    lemma_equiv_transitive(a, xiyx, xixy, yw);
+    //  4. append x⁻¹:  [xi,y,x,xi] ~ [y,xi]
+    lemma_equiv_concat_left(a, xiyx, yw, xip);
+    assert(xiyx + xip =~= xiyxxi);
+    assert(yw + xip =~= yxi);
+    //  5. [xi,y,x,xi] ~ [xi,y]   (cancel x·xi)
+    lemma_cancel_pair_equiv_empty(a, x, xi);
+    lemma_delete_equiv_empty(a, xiy, xxi, empty_word());
+    assert(concat(xxi, empty_word()) =~= xxi);
+    assert(concat(xiy, xxi) =~= xiyxxi);
+    assert(concat(xiy, empty_word()) =~= xiy);
+    //  6. symmetric of 4 + transitivity:  [y,xi] ~ [xi,y,x,xi] ~ [xi,y]
+    assert(word_valid(xiyxxi, 3)) by {
+        assert forall|i: int| 0 <= i < xiyxxi.len() implies symbol_valid(#[trigger] xiyxxi[i], 3) by {}
+    }
+    lemma_equiv_symmetric(a, xiyxxi, yxi);
+    lemma_equiv_transitive(a, yxi, xiyxxi, xiy);
+}
+
+//  y⁻¹·x ~ x·y⁻¹  (inverse of the mixed variant).
+pub proof fn lemma_comm_yinv_x()
+    ensures
+        equiv_in_presentation(base_A(), seq![Symbol::Inv(2), Symbol::Gen(1)],
+            seq![Symbol::Gen(1), Symbol::Inv(2)]),
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    let yxi: Word = seq![Symbol::Gen(2), Symbol::Inv(1)];
+    let xiy: Word = seq![Symbol::Inv(1), Symbol::Gen(2)];
+    let giv: Word = seq![Symbol::Gen(1), Symbol::Inv(2)];
+    let ivg: Word = seq![Symbol::Inv(2), Symbol::Gen(1)];
+    lemma_comm_y_xinv();   //  equiv(a, yxi, xiy)
+    assert(word_valid(yxi, 3)) by {
+        assert forall|i: int| 0 <= i < yxi.len() implies symbol_valid(#[trigger] yxi[i], 3) by {}
+    }
+    assert(word_valid(xiy, 3)) by {
+        assert forall|i: int| 0 <= i < xiy.len() implies symbol_valid(#[trigger] xiy[i], 3) by {}
+    }
+    lemma_equiv_inverse(a, yxi, xiy);
+    lemma_inverse_word_two(Symbol::Gen(2), Symbol::Inv(1));   //  inv(yxi) =~= giv
+    lemma_inverse_word_two(Symbol::Inv(1), Symbol::Gen(2));   //  inv(xiy) =~= ivg
+    assert(inverse_word(yxi) =~= giv);
+    assert(inverse_word(xiy) =~= ivg);
+    assert(word_valid(giv, 3)) by {
+        assert forall|i: int| 0 <= i < giv.len() implies symbol_valid(#[trigger] giv[i], 3) by {}
+    }
+    lemma_equiv_symmetric(a, giv, ivg);
+}
+
+//  A y-symbol (Gen(2) or Inv(2)) commutes past  xᵃ = signed_power(1, a).
+pub proof fn lemma_commute_ysym_past_xpow(s: Symbol, a: int)
+    requires
+        s == Symbol::Gen(2) || s == Symbol::Inv(2),
+    ensures
+        equiv_in_presentation(base_A(), seq![s] + signed_power(1, a), signed_power(1, a) + seq![s]),
+{
+    let aa = base_A();
+    if a >= 0 {
+        assert(signed_power(1, a) == symbol_power(Symbol::Gen(1), a as nat));
+        if s == Symbol::Gen(2) {
+            lemma_comm_y_x();
+        } else {
+            lemma_comm_yinv_x();
+        }
+        lemma_sym_commutes_power(aa, s, Symbol::Gen(1), a as nat);
+    } else {
+        assert(signed_power(1, a) == symbol_power(Symbol::Inv(1), (-a) as nat));
+        if s == Symbol::Gen(2) {
+            lemma_comm_y_xinv();
+        } else {
+            lemma_xinv_yinv_commute_in_A();
+        }
+        lemma_sym_commutes_power(aa, s, Symbol::Inv(1), (-a) as nat);
+    }
+}
+
 } //  verus!
