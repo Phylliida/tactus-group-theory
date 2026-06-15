@@ -15,6 +15,8 @@ use crate::britton_via_tower::{britton_lemma_full, has_pinch, has_pinch_at,
     has_adjacent_opposite_at, is_stable, has_stable_letter};
 use crate::benign::{in_generated_subgroup, concat_all, lemma_concat_all_singleton, lemma_concat_all_empty, is_generator_or_inverse, factors_from_generators};
 use crate::free_product::{free_product, shift_relators, shift_word, shift_symbol};
+use crate::quotient::add_relator;
+use crate::tietze::lemma_add_derivable_relator_reverse;
 
 verus! {
 
@@ -3806,8 +3808,175 @@ pub proof fn lemma_a_as_hnn_isomorphic()
 pub proof fn lemma_a_as_hnn_presentation()
     ensures
         hnn_presentation(a_as_hnn()).num_generators == 3,
+        hnn_presentation(a_as_hnn()).relators.len() == 1,
+        hnn_presentation(a_as_hnn()).relators[0]
+            =~= seq![Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(2), Symbol::Inv(1)],
 {
     lemma_a_as_hnn_valid();
+    let data = a_as_hnn();
+    assert(data.base.relators.len() == 0);
+    assert(hnn_relators(data).len() == 1);
+    assert(hnn_presentation(data).relators[0] == hnn_relator(data, 0));
+    assert(Seq::new(1, |_j: int| Symbol::Inv(2)) =~= seq![Symbol::Inv(2)]);
+    assert(Seq::new(1, |_j: int| Symbol::Gen(2)) =~= seq![Symbol::Gen(2)]);
+    assert(inverse_word(seq![Symbol::Gen(1)]) =~= seq![Symbol::Inv(1)]) by {
+        reveal_with_fuel(inverse_word, 2);
+    }
+}
+
+//  ============================================================
+//  Tietze bridge:  equiv in base_A  ⟺  equiv in the HNN presentation of A.
+//  The two single relators xyx⁻¹y⁻¹ and y⁻¹xyx⁻¹ are conjugate, hence mutually
+//  derivable, so the two presentations have identical equivalence.
+//  ============================================================
+
+//  R_H = y⁻¹xyx⁻¹ is trivial in base_A (a conjugate of base_A's relator xyx⁻¹y⁻¹).
+pub proof fn lemma_rh_trivial_in_base_A()
+    ensures
+        equiv_in_presentation(base_A(),
+            seq![Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(2), Symbol::Inv(1)], empty_word()),
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    let ra: Word = seq![Symbol::Gen(1), Symbol::Gen(2), Symbol::Inv(1), Symbol::Inv(2)];
+    let rh: Word = seq![Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(2), Symbol::Inv(1)];
+    let conj: Word = seq![Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(2), Symbol::Inv(1),
+        Symbol::Inv(2), Symbol::Gen(2)];
+    assert(a.relators[0] == ra);
+    lemma_conjugate_relator_is_identity(a, seq![Symbol::Inv(2)], 0);
+    assert(inverse_word(seq![Symbol::Inv(2)]) =~= seq![Symbol::Gen(2)]) by {
+        reveal_with_fuel(inverse_word, 2);
+    }
+    assert(concat(concat(seq![Symbol::Inv(2)], a.relators[0]), inverse_word(seq![Symbol::Inv(2)]))
+        =~= conj);
+    assert(equiv_in_presentation(a, conj, empty_word()));
+    //  conj freely reduces to rh: cancel the Inv2·Gen2 pair at positions 4,5.
+    assert(has_cancellation_at(conj, 4)) by {
+        assert(conj[4] == Symbol::Inv(2) && conj[5] == Symbol::Gen(2));
+    }
+    assert(reduce_at(conj, 4) =~= rh);
+    assert(reduces_one_step(conj, rh)) by {
+        assert(has_cancellation_at(conj, 4) && rh == reduce_at(conj, 4));
+    }
+    assert(reduces_in_steps(conj, rh, 1)) by {
+        assert(reduces_one_step(conj, rh) && reduces_in_steps(rh, rh, 0));
+    }
+    assert(reduces_to(conj, rh));
+    lemma_reduces_to_equiv(a, conj, rh);
+    assert(word_valid(conj, 3)) by {
+        assert forall|i: int| 0 <= i < conj.len() implies symbol_valid(#[trigger] conj[i], 3) by {}
+    }
+    lemma_equiv_symmetric(a, conj, rh);
+    lemma_equiv_transitive(a, rh, conj, empty_word());
+}
+
+//  R_A = xyx⁻¹y⁻¹ is trivial in A's HNN presentation (a conjugate of y⁻¹xyx⁻¹).
+pub proof fn lemma_ra_trivial_in_a_hnn()
+    ensures
+        equiv_in_presentation(hnn_presentation(a_as_hnn()),
+            seq![Symbol::Gen(1), Symbol::Gen(2), Symbol::Inv(1), Symbol::Inv(2)], empty_word()),
+{
+    let data = a_as_hnn();
+    let p = hnn_presentation(data);
+    lemma_a_as_hnn_valid();
+    lemma_hnn_presentation_valid(data);
+    lemma_a_as_hnn_presentation();
+    let ra: Word = seq![Symbol::Gen(1), Symbol::Gen(2), Symbol::Inv(1), Symbol::Inv(2)];
+    let rh: Word = seq![Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(2), Symbol::Inv(1)];
+    let conj: Word = seq![Symbol::Gen(2), Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(2),
+        Symbol::Inv(1), Symbol::Inv(2)];
+    assert(p.relators[0] =~= rh);
+    lemma_conjugate_relator_is_identity(p, seq![Symbol::Gen(2)], 0);
+    assert(inverse_word(seq![Symbol::Gen(2)]) =~= seq![Symbol::Inv(2)]) by {
+        reveal_with_fuel(inverse_word, 2);
+    }
+    assert(concat(concat(seq![Symbol::Gen(2)], p.relators[0]), inverse_word(seq![Symbol::Gen(2)]))
+        =~= conj);
+    assert(equiv_in_presentation(p, conj, empty_word()));
+    //  conj freely reduces to ra: cancel the Gen2·Inv2 pair at positions 0,1.
+    assert(has_cancellation_at(conj, 0)) by {
+        assert(conj[0] == Symbol::Gen(2) && conj[1] == Symbol::Inv(2));
+    }
+    assert(reduce_at(conj, 0) =~= ra);
+    assert(reduces_one_step(conj, ra)) by {
+        assert(has_cancellation_at(conj, 0) && ra == reduce_at(conj, 0));
+    }
+    assert(reduces_in_steps(conj, ra, 1)) by {
+        assert(reduces_one_step(conj, ra) && reduces_in_steps(ra, ra, 0));
+    }
+    assert(reduces_to(conj, ra));
+    lemma_reduces_to_equiv(p, conj, ra);
+    assert(word_valid(conj, 3)) by {
+        assert forall|i: int| 0 <= i < conj.len() implies symbol_valid(#[trigger] conj[i], 3) by {}
+    }
+    lemma_equiv_symmetric(p, conj, ra);
+    lemma_equiv_transitive(p, ra, conj, empty_word());
+}
+
+//  Transport: equiv in base_A ⟹ equiv in A's HNN presentation.
+pub proof fn lemma_base_A_to_a_hnn(w1: Word, w2: Word)
+    requires
+        equiv_in_presentation(base_A(), w1, w2),
+        word_valid(w1, 3),
+    ensures
+        equiv_in_presentation(hnn_presentation(a_as_hnn()), w1, w2),
+{
+    let a = base_A();
+    let p = hnn_presentation(a_as_hnn());
+    lemma_base_A_valid();
+    lemma_a_as_hnn_valid();
+    lemma_hnn_presentation_valid(a_as_hnn());
+    lemma_a_as_hnn_presentation();
+    let ra: Word = seq![Symbol::Gen(1), Symbol::Gen(2), Symbol::Inv(1), Symbol::Inv(2)];
+    let p_ha = add_relator(p, ra);
+    //  p_ha = ⟨3 | [rh, ra]⟩ includes base_A's relator ra at index 1.
+    assert(p_ha.relators.len() == 2);
+    assert(p_ha.relators[1] == ra);
+    assert(a.relators[0] == ra);
+    assert(relators_included(a, p_ha)) by {
+        assert forall|i: int| 0 <= i < a.relators.len() implies
+            exists|j: int| 0 <= j < p_ha.relators.len() && p_ha.relators[j] == #[trigger] a.relators[i]
+        by { assert(p_ha.relators[1] == a.relators[0]); }
+    }
+    lemma_relator_inclusion_preserves_equiv(a, p_ha, w1, w2);
+    lemma_ra_trivial_in_a_hnn();
+    assert(word_valid(ra, 3)) by {
+        assert forall|i: int| 0 <= i < ra.len() implies symbol_valid(#[trigger] ra[i], 3) by {}
+    }
+    lemma_add_derivable_relator_reverse(p, ra, w1, w2);
+}
+
+//  Transport: equiv in A's HNN presentation ⟹ equiv in base_A.
+pub proof fn lemma_a_hnn_to_base_A(w1: Word, w2: Word)
+    requires
+        equiv_in_presentation(hnn_presentation(a_as_hnn()), w1, w2),
+        word_valid(w1, 3),
+    ensures
+        equiv_in_presentation(base_A(), w1, w2),
+{
+    let a = base_A();
+    let p = hnn_presentation(a_as_hnn());
+    lemma_base_A_valid();
+    lemma_a_as_hnn_valid();
+    lemma_hnn_presentation_valid(a_as_hnn());
+    lemma_a_as_hnn_presentation();
+    let rh: Word = seq![Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(2), Symbol::Inv(1)];
+    let p_ah = add_relator(a, rh);
+    //  p_ah = ⟨3 | [ra, rh]⟩ includes the HNN relator rh at index 1.
+    assert(p_ah.relators.len() == 2);
+    assert(p_ah.relators[1] == rh);
+    assert(p.relators[0] =~= rh);
+    assert(relators_included(p, p_ah)) by {
+        assert forall|i: int| 0 <= i < p.relators.len() implies
+            exists|j: int| 0 <= j < p_ah.relators.len() && p_ah.relators[j] == #[trigger] p.relators[i]
+        by { assert(p_ah.relators[1] == p.relators[0]); }
+    }
+    lemma_relator_inclusion_preserves_equiv(p, p_ah, w1, w2);
+    lemma_rh_trivial_in_base_A();
+    assert(word_valid(rh, 3)) by {
+        assert forall|i: int| 0 <= i < rh.len() implies symbol_valid(#[trigger] rh[i], 3) by {}
+    }
+    lemma_add_derivable_relator_reverse(a, rh, w1, w2);
 }
 
 } //  verus!
