@@ -3112,4 +3112,179 @@ pub proof fn lemma_emb_inverse_word_trivial(p: Presentation, images: Seq<Word>, 
     assert(inverse_word(empty_word()) =~= empty_word());
 }
 
+//  One derivation step in the source maps to an equivalence in the target —
+//  provided the images satisfy the source relators.
+pub proof fn lemma_emb_step_respects(
+    src: Presentation, tgt: Presentation, images: Seq<Word>,
+    w: Word, w2: Word, step: DerivationStep,
+)
+    requires
+        apply_step(src, w, step) == Some(w2),
+        src.num_generators == images.len(),
+        word_valid(w, src.num_generators),
+        presentation_valid(src),
+        presentation_valid(tgt),
+        forall|i: int| 0 <= i < images.len() ==> word_valid(#[trigger] images[i], tgt.num_generators),
+        forall|j: int| 0 <= j < src.relators.len()
+            ==> equiv_in_presentation(tgt, apply_embedding(images, #[trigger] src.relators[j]), empty_word()),
+    ensures
+        equiv_in_presentation(tgt, apply_embedding(images, w2), apply_embedding(images, w)),
+{
+    let k = images.len();
+    reveal(presentation_valid);
+    match step {
+        DerivationStep::FreeExpand { position, symbol } => {
+            let pair = Seq::new(1, |_i: int| symbol) + Seq::new(1, |_i: int| inverse_symbol(symbol));
+            let pre = w.subrange(0, position);
+            let suf = w.subrange(position, w.len() as int);
+            assert(w2 == pre + pair + suf);
+            assert(w =~= pre + suf);
+            assert(pair =~= seq![symbol, inverse_symbol(symbol)]);
+            lemma_emb_inverse_pair_trivial(tgt, images, symbol);
+            let ep = apply_embedding(images, pre);
+            let ec = apply_embedding(images, pair);
+            let es = apply_embedding(images, suf);
+            lemma_apply_embedding_concat(images, pre + pair, suf);
+            lemma_apply_embedding_concat(images, pre, pair);
+            lemma_apply_embedding_concat(images, pre, suf);
+            assert(apply_embedding(images, w2) =~= concat(ep, concat(ec, es)));
+            assert(apply_embedding(images, w) =~= concat(ep, es));
+            lemma_delete_equiv_empty(tgt, ep, ec, es);
+        },
+        DerivationStep::FreeReduce { position } => {
+            let pre = w.subrange(0, position);
+            let suf = w.subrange(position + 2, w.len() as int);
+            let pair = w.subrange(position, position + 2);
+            assert(has_cancellation_at(w, position));
+            assert(w[position + 1] == inverse_symbol(w[position]));
+            assert(pair =~= seq![w[position], inverse_symbol(w[position])]);
+            assert(w =~= pre + pair + suf);
+            assert(w2 == pre + suf);
+            assert(word_valid(pair, k));
+            lemma_emb_inverse_pair_trivial(tgt, images, w[position]);
+            lemma_apply_embedding_valid(images, pair, tgt.num_generators);
+            let ep = apply_embedding(images, pre);
+            let ec = apply_embedding(images, pair);
+            let es = apply_embedding(images, suf);
+            lemma_apply_embedding_concat(images, pre + pair, suf);
+            lemma_apply_embedding_concat(images, pre, pair);
+            lemma_apply_embedding_concat(images, pre, suf);
+            assert(apply_embedding(images, w) =~= concat(ep, concat(ec, es)));
+            assert(apply_embedding(images, w2) =~= concat(ep, es));
+            lemma_insert_equiv_empty(tgt, ep, ec, es);
+        },
+        DerivationStep::RelatorInsert { position, relator_index, inverted } => {
+            let r = get_relator(src, relator_index, inverted);
+            let pre = w.subrange(0, position);
+            let suf = w.subrange(position, w.len() as int);
+            assert(w2 == pre + r + suf);
+            assert(w =~= pre + suf);
+            assert(word_valid(src.relators[relator_index as int], src.num_generators));
+            if inverted {
+                lemma_apply_embedding_valid(images, src.relators[relator_index as int], tgt.num_generators);
+                lemma_emb_inverse_word_trivial(tgt, images, src.relators[relator_index as int]);
+            }
+            assert(equiv_in_presentation(tgt, apply_embedding(images, r), empty_word()));
+            let ep = apply_embedding(images, pre);
+            let ec = apply_embedding(images, r);
+            let es = apply_embedding(images, suf);
+            lemma_apply_embedding_concat(images, pre + r, suf);
+            lemma_apply_embedding_concat(images, pre, r);
+            lemma_apply_embedding_concat(images, pre, suf);
+            assert(apply_embedding(images, w2) =~= concat(ep, concat(ec, es)));
+            assert(apply_embedding(images, w) =~= concat(ep, es));
+            lemma_delete_equiv_empty(tgt, ep, ec, es);
+        },
+        DerivationStep::RelatorDelete { position, relator_index, inverted } => {
+            let r = get_relator(src, relator_index, inverted);
+            let rlen = r.len() as int;
+            let pre = w.subrange(0, position);
+            let suf = w.subrange(position + rlen, w.len() as int);
+            assert(w.subrange(position, position + rlen) == r);
+            assert(w =~= pre + r + suf);
+            assert(w2 == pre + suf);
+            assert(word_valid(src.relators[relator_index as int], src.num_generators));
+            if inverted {
+                lemma_inverse_word_valid(src.relators[relator_index as int], src.num_generators);
+                lemma_apply_embedding_valid(images, src.relators[relator_index as int], tgt.num_generators);
+                lemma_emb_inverse_word_trivial(tgt, images, src.relators[relator_index as int]);
+            }
+            assert(equiv_in_presentation(tgt, apply_embedding(images, r), empty_word()));
+            assert(word_valid(r, k));
+            lemma_apply_embedding_valid(images, r, tgt.num_generators);
+            let ep = apply_embedding(images, pre);
+            let ec = apply_embedding(images, r);
+            let es = apply_embedding(images, suf);
+            lemma_apply_embedding_concat(images, pre + r, suf);
+            lemma_apply_embedding_concat(images, pre, r);
+            lemma_apply_embedding_concat(images, pre, suf);
+            assert(apply_embedding(images, w) =~= concat(ep, concat(ec, es)));
+            assert(apply_embedding(images, w2) =~= concat(ep, es));
+            lemma_insert_equiv_empty(tgt, ep, ec, es);
+        },
+    }
+}
+
+//  A whole source derivation maps to a target equivalence.
+pub proof fn lemma_emb_derivation_respects(
+    src: Presentation, tgt: Presentation, images: Seq<Word>,
+    steps: Seq<DerivationStep>, start: Word, end: Word,
+)
+    requires
+        derivation_produces(src, steps, start) == Some(end),
+        src.num_generators == images.len(),
+        word_valid(start, src.num_generators),
+        presentation_valid(src),
+        presentation_valid(tgt),
+        forall|i: int| 0 <= i < images.len() ==> word_valid(#[trigger] images[i], tgt.num_generators),
+        forall|j: int| 0 <= j < src.relators.len()
+            ==> equiv_in_presentation(tgt, apply_embedding(images, #[trigger] src.relators[j]), empty_word()),
+    ensures
+        equiv_in_presentation(tgt, apply_embedding(images, end), apply_embedding(images, start)),
+    decreases steps.len(),
+{
+    if steps.len() == 0 {
+        assert(start == end);
+        lemma_equiv_refl(tgt, apply_embedding(images, start));
+    } else {
+        let first = steps.first();
+        match apply_step(src, start, first) {
+            Some(next) => {
+                lemma_emb_step_respects(src, tgt, images, start, next, first);
+                lemma_step_preserves_word_valid_pres(src, start, first, next);
+                lemma_emb_derivation_respects(src, tgt, images, steps.drop_first(), next, end);
+                lemma_equiv_transitive(tgt, apply_embedding(images, end),
+                    apply_embedding(images, next), apply_embedding(images, start));
+            },
+            None => {
+                assert(false);
+            },
+        }
+    }
+}
+
+//  ★ apply_embedding is a HOMOMORPHISM from the source group: source-equivalences
+//  map to target-equivalences, provided the images satisfy the source relators.
+pub proof fn lemma_emb_respects_source_equiv(
+    src: Presentation, tgt: Presentation, images: Seq<Word>, w1: Word, w2: Word,
+)
+    requires
+        equiv_in_presentation(src, w1, w2),
+        src.num_generators == images.len(),
+        word_valid(w1, src.num_generators),
+        word_valid(w2, src.num_generators),
+        presentation_valid(src),
+        presentation_valid(tgt),
+        forall|i: int| 0 <= i < images.len() ==> word_valid(#[trigger] images[i], tgt.num_generators),
+        forall|j: int| 0 <= j < src.relators.len()
+            ==> equiv_in_presentation(tgt, apply_embedding(images, #[trigger] src.relators[j]), empty_word()),
+    ensures
+        equiv_in_presentation(tgt, apply_embedding(images, w1), apply_embedding(images, w2)),
+{
+    let d = choose|d: Derivation| derivation_valid(src, d, w1, w2);
+    lemma_emb_derivation_respects(src, tgt, images, d.steps, w1, w2);
+    lemma_apply_embedding_valid(images, w2, tgt.num_generators);
+    lemma_equiv_symmetric(tgt, apply_embedding(images, w2), apply_embedding(images, w1));
+}
+
 } //  verus!
