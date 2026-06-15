@@ -4220,4 +4220,23 @@ pub proof fn lemma_f_base_faithful(w: Word)
     lemma_single_hnn_base_faithful(f_as_hnn(), w);
 }
 
+//  Contrapositive of Britton's lemma: a Britton-reduced word (no pinch) that
+//  still contains a stable letter is NONTRIVIAL.  The engine of the
+//  ψ-injectivity peel — a scaled word that stays reduced cannot vanish.
+pub proof fn lemma_no_pinch_stable_nontrivial(data: HNNData, w: Word)
+    requires
+        hnn_data_valid(data),
+        hnn_associations_isomorphic(data),
+        word_valid(w, hnn_presentation(data).num_generators),
+        has_stable_letter(data, w),
+        !has_pinch(data, w),
+    ensures
+        !equiv_in_presentation(hnn_presentation(data), w, empty_word()),
+{
+    if equiv_in_presentation(hnn_presentation(data), w, empty_word()) {
+        britton_lemma_full(data, w);
+        assert(has_pinch(data, w));   //  contradicts !has_pinch
+    }
+}
+
 } //  verus!
