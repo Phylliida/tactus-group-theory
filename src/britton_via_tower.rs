@@ -4855,7 +4855,7 @@ proof fn lemma_no_stable_after_lsp(data: HNNData, w: Word, pos: int)
 }
 
 ///  stable_count distributes over concat.
-proof fn lemma_stable_count_concat(data: HNNData, a: Word, b: Word)
+pub proof fn lemma_stable_count_concat(data: HNNData, a: Word, b: Word)
     ensures stable_count(data, concat(a, b))
         == stable_count(data, a) + stable_count(data, b),
     decreases b.len(),
