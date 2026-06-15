@@ -7808,7 +7808,7 @@ proof fn lemma_has_stable_implies_count(data: HNNData, w: Word)
 }
 
 /// Lemma 3c: No pinch + stable letters → action gives ≥ 1 syllable.
-proof fn lemma_no_pinch_action_nontrivial(data: HNNData, w: Word)
+pub proof fn lemma_no_pinch_action_nontrivial(data: HNNData, w: Word)
     requires
         hnn_data_valid(data),
         word_valid(w, hnn_presentation(data).num_generators),
@@ -8633,7 +8633,7 @@ proof fn lemma_single_step_preserves_syls(
 /// Derivation induction: if derivation from w to ε, then act(w, ε, []).1 is empty.
 /// This is Miller's "θ⋆ψ is well-defined": equivalent words give the same action.
 /// Induction on derivation length.
-proof fn lemma_derivation_preserves_syls(
+pub proof fn lemma_derivation_preserves_syls(
     data: HNNData,
     steps: Seq<DerivationStep>,
     w: Word,
