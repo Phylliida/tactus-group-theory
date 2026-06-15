@@ -5102,6 +5102,124 @@ pub proof fn lemma_x_exp_sum_psi_F(p: nat, u: Word)
     }
 }
 
+//  ============================================================
+//  χₓ is ≡-invariant on the free group F = ⟨t,x⟩  (the hard nut)
+//  ============================================================
+//
+//  F = pres_tx() has NO relators, so every derivation step is a free reduction or
+//  expansion — inserting/deleting an inverse pair, which is χₓ-neutral.  (The two
+//  Relator steps return None when there are no relators, so they never occur in a
+//  valid derivation.)  Hence χₓ is constant along any derivation, i.e. ≡-invariant.
+
+//  An inverse pair contributes 0 to χₓ.
+pub proof fn lemma_x_exp_sum_inverse_pair(s1: Symbol, s2: Symbol)
+    requires
+        is_inverse_pair(s1, s2),
+    ensures
+        x_exp_sum(seq![s1, s2]) == 0,
+{
+    reveal_with_fuel(x_exp_sum, 3);
+    assert(seq![s1, s2].drop_first() =~= seq![s2]);
+    assert(seq![s2].drop_first() =~= Seq::<Symbol>::empty());
+    assert(s2 == inverse_symbol(s1));
+    //  case on s1: in every case x_val(s1) + x_val(s2) = 0
+    match s1 {
+        Symbol::Gen(i) => { assert(s2 == Symbol::Inv(i)); }
+        Symbol::Inv(i) => { assert(s2 == Symbol::Gen(i)); }
+    }
+}
+
+//  A single valid derivation step preserves χₓ (no relators ⟹ only free moves).
+pub proof fn lemma_x_exp_sum_step_invariant(
+    p: Presentation, w: Word, step: DerivationStep, w2: Word,
+)
+    requires
+        p.relators.len() == 0,
+        apply_step(p, w, step) == Some(w2),
+    ensures
+        x_exp_sum(w2) == x_exp_sum(w),
+{
+    match step {
+        DerivationStep::FreeReduce { position } => {
+            let i = position;
+            assert(has_cancellation_at(w, i));
+            assert(w2 == reduce_at(w, i));
+            let a = w.subrange(0, i);
+            let mid = w.subrange(i, i + 2);
+            let b = w.subrange(i + 2, w.len() as int);
+            assert(w =~= a + mid + b);
+            assert(w2 =~= a + b);
+            assert(mid =~= seq![w[i], w[i + 1]]);
+            assert(is_inverse_pair(w[i], w[i + 1]));
+            lemma_x_exp_sum_inverse_pair(w[i], w[i + 1]);
+            lemma_x_exp_sum_concat(a + mid, b);
+            lemma_x_exp_sum_concat(a, mid);
+            lemma_x_exp_sum_concat(a, b);
+        }
+        DerivationStep::FreeExpand { position, symbol } => {
+            let i = position;
+            let pair: Word =
+                Seq::new(1, |_j: int| symbol) + Seq::new(1, |_j: int| inverse_symbol(symbol));
+            let a = w.subrange(0, i);
+            let b = w.subrange(i, w.len() as int);
+            assert(w2 =~= a + pair + b);
+            assert(w =~= a + b);
+            assert(pair =~= seq![symbol, inverse_symbol(symbol)]);
+            assert(is_inverse_pair(symbol, inverse_symbol(symbol)));
+            lemma_x_exp_sum_inverse_pair(symbol, inverse_symbol(symbol));
+            lemma_x_exp_sum_concat(a + pair, b);
+            lemma_x_exp_sum_concat(a, pair);
+            lemma_x_exp_sum_concat(a, b);
+        }
+        DerivationStep::RelatorInsert { position, relator_index, inverted } => {
+            assert(!(0 <= relator_index < p.relators.len()));
+            assert(apply_step(p, w, step) is None);
+        }
+        DerivationStep::RelatorDelete { position, relator_index, inverted } => {
+            assert(!(0 <= relator_index < p.relators.len()));
+            assert(apply_step(p, w, step) is None);
+        }
+    }
+}
+
+//  A full derivation preserves χₓ.
+pub proof fn lemma_x_exp_sum_derivation_invariant(
+    p: Presentation, steps: Seq<DerivationStep>, start: Word, end: Word,
+)
+    requires
+        p.relators.len() == 0,
+        derivation_produces(p, steps, start) == Some(end),
+    ensures
+        x_exp_sum(start) == x_exp_sum(end),
+    decreases steps.len(),
+{
+    if steps.len() == 0 {
+        assert(start == end);
+    } else {
+        match apply_step(p, start, steps.first()) {
+            Some(w_next) => {
+                lemma_x_exp_sum_step_invariant(p, start, steps.first(), w_next);
+                lemma_x_exp_sum_derivation_invariant(p, steps.drop_first(), w_next, end);
+            }
+            None => {
+                assert(false);
+            }
+        }
+    }
+}
+
+//  χₓ is ≡-invariant on F.
+pub proof fn lemma_x_exp_sum_equiv_invariant(w1: Word, w2: Word)
+    requires
+        equiv_in_presentation(pres_tx(), w1, w2),
+    ensures
+        x_exp_sum(w1) == x_exp_sum(w2),
+{
+    let d = choose|d: Derivation| derivation_valid(pres_tx(), d, w1, w2);
+    assert(derivation_valid(pres_tx(), d, w1, w2));
+    lemma_x_exp_sum_derivation_invariant(pres_tx(), d.steps, w1, w2);
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
