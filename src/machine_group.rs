@@ -4160,4 +4160,64 @@ pub proof fn lemma_single_hnn_base_faithful(data: HNNData, w: Word)
     lemma_copy_s_embeds(data, m, base_level as nat, w);
 }
 
+//  ============================================================
+//  F = ⟨t,x⟩ as an HNN extension of ⟨t⟩ (stable letter x, trivial associated
+//  subgroup / empty associations) — the lower level of the double-HNN peel.
+//  ============================================================
+
+pub open spec fn f_as_hnn() -> HNNData {
+    HNNData { base: pres_t(), associations: Seq::empty() }
+}
+
+pub proof fn lemma_f_as_hnn_valid()
+    ensures
+        hnn_data_valid(f_as_hnn()),
+{
+    lemma_pres_t_valid();
+}
+
+pub proof fn lemma_f_as_hnn_isomorphic()
+    ensures
+        hnn_associations_isomorphic(f_as_hnn()),
+{
+    //  empty associations: a_words == b_words == [], so the iff is reflexive.
+    let data = f_as_hnn();
+    let a_words = Seq::new(0nat as int as nat, |i: int| data.associations[i].0);
+    assert forall|w: Word| word_valid(w, 0nat) implies (
+        equiv_in_presentation(data.base,
+            apply_embedding(Seq::new(0, |i: int| data.associations[i].0), w), empty_word())
+        <==>
+        equiv_in_presentation(data.base,
+            apply_embedding(Seq::new(0, |i: int| data.associations[i].1), w), empty_word())
+    ) by {
+        assert(Seq::new(0, |i: int| data.associations[i].0)
+            =~= Seq::new(0, |i: int| data.associations[i].1));
+    }
+}
+
+//  The HNN presentation of f_as_hnn is exactly the free group ⟨t,x⟩ = pres_tx.
+pub proof fn lemma_f_as_hnn_presentation()
+    ensures
+        hnn_presentation(f_as_hnn()) == pres_tx(),
+{
+    let data = f_as_hnn();
+    assert(hnn_relators(data).len() == 0);
+    assert(hnn_presentation(data).relators =~= pres_tx().relators);
+    assert(hnn_presentation(data).num_generators == 2);
+}
+
+//  Base faithfulness F → ⟨t⟩: a t-word trivial in F = ⟨t,x⟩ is trivial in ⟨t⟩.
+pub proof fn lemma_f_base_faithful(w: Word)
+    requires
+        word_valid(w, 1),
+        equiv_in_presentation(pres_tx(), w, empty_word()),
+    ensures
+        equiv_in_presentation(pres_t(), w, empty_word()),
+{
+    lemma_f_as_hnn_valid();
+    lemma_f_as_hnn_isomorphic();
+    lemma_f_as_hnn_presentation();
+    lemma_single_hnn_base_faithful(f_as_hnn(), w);
+}
+
 } //  verus!
