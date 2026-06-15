@@ -4601,6 +4601,119 @@ pub proof fn lemma_strip_prefix_preserves_pinch(data: HNNData, pre: Word, suf: W
 }
 
 //  ============================================================
+//  (Corr) CORE: a pinch in ψ_F(w) descends to a pinch in w.
+//  ============================================================
+//
+//  Structural induction on w. With w = c·w', ψ_F(w) = E(c)·ψ_F(w'):
+//   • a pinch lying entirely past E(c) descends (strip-prefix), recurses (IH),
+//     and re-prepends c;
+//   • the spanning case (c an x, left endpoint at the run's last position p-1,
+//     right endpoint the first stable of ψ_F(w')) reconstructs a pinch at (0, l+1)
+//     of w via the first-stable correspondence — the run forces no new pinch.
+pub proof fn lemma_psi_F_pinch_descends(p: nat, w: Word)
+    requires
+        word_valid(w, 2),
+        p >= 1,
+        has_pinch(f_as_hnn(), apply_embedding(psi_F_images(p), w)),
+    ensures
+        has_pinch(f_as_hnn(), w),
+    decreases w.len(),
+{
+    let data = f_as_hnn();
+    let imgs = psi_F_images(p);
+    let pw = apply_embedding(imgs, w);
+    reveal_with_fuel(apply_embedding, 2);
+    reveal_with_fuel(inverse_word, 2);
+    assert(data.base.num_generators == 1);
+    let ij: (int, int) = choose|i: int, j: int| has_pinch_at(data, pw, i, j);
+    let i = ij.0;
+    let j = ij.1;
+    assert(has_pinch_at(data, pw, i, j));
+    assert(has_adjacent_opposite_at(data, pw, i, j));
+    assert(w.len() > 0) by {
+        if w.len() == 0 { assert(pw =~= Seq::<Symbol>::empty()); }
+    }
+    let c = w[0];
+    let w2 = w.drop_first();
+    assert(w =~= seq![c] + w2);
+    assert(word_valid(w2, 2)) by {
+        assert forall|k: int| 0 <= k < w2.len() implies symbol_valid(#[trigger] w2[k], 2)
+        by { assert(w2[k] == w[k + 1]); }
+    }
+    lemma_apply_embedding_concat(imgs, seq![c], w2);
+    let ec = apply_embedding(imgs, seq![c]);
+    let pw2 = apply_embedding(imgs, w2);
+    assert(pw =~= ec + pw2);
+    assert(ec =~= apply_embedding_symbol(imgs, c));
+    assert(imgs[0] =~= seq![Symbol::Gen(0)]);
+    assert(imgs[1] =~= symbol_power(Symbol::Gen(1), p));
+    if is_stable(data, c) {
+        assert(c == Symbol::Gen(1) || c == Symbol::Inv(1));
+        if c == Symbol::Gen(1) {
+            assert(ec =~= symbol_power(Symbol::Gen(1), p));
+        } else {
+            lemma_inverse_word_sympower(Symbol::Gen(1), p);
+            assert(ec =~= symbol_power(Symbol::Inv(1), p));
+        }
+        assert(ec =~= symbol_power(c, p));
+        assert(ec.len() == p);
+        assert(forall|m: int| 0 <= m < p ==> #[trigger] ec[m] == c);
+        if i >= p as int {
+            //  pinch entirely past the run: strip, recurse, re-prepend
+            lemma_strip_prefix_preserves_pinch(data, ec, pw2, i, j);
+            lemma_psi_F_pinch_descends(p, w2);
+            lemma_prepend_preserves_pinch(data, c, w2);
+        } else {
+            //  spanning case
+            assert(forall|m: int| 0 <= m < p ==> #[trigger] pw[m] == c) by {
+                assert forall|m: int| 0 <= m < p implies pw[m] == c
+                by { assert(pw[m] == ec[m]); }
+            }
+            //  j >= p, else both endpoints sit in the run and would be equal
+            assert(j >= p as int) by {
+                if j < p as int { assert(pw[j] == c && pw[i] == c); }
+            }
+            //  i = p-1, else a run position i+1 (<p<=j) is a stable letter between i and j
+            assert(i == p - 1) by {
+                if i < p - 1 { assert(pw[i + 1] == c && i < i + 1 < j); }
+            }
+            let ll = j - (p as int);
+            assert(forall|m: int| 0 <= m < pw2.len() ==> #[trigger] pw[m + p] == pw2[m]);
+            assert(0 <= ll < pw2.len());
+            assert(is_stable(data, pw2[ll]));
+            assert forall|k: int| 0 <= k < ll implies !is_stable(data, #[trigger] pw2[k]) by {
+                assert(pw2[k] == pw[k + p]);
+            }
+            lemma_psi_F_spanning(p, w2, ll);
+            //  reconstruct the pinch at (0, ll+1) of w
+            assert(w[ll + 1] == w2[ll]);
+            assert(w.subrange(1, ll + 1) =~= w2.subrange(0, ll));
+            assert(pw.subrange(i + 1, j) =~= pw2.subrange(0, ll));
+            assert(w.subrange(1, ll + 1) =~= pw.subrange(i + 1, j));
+            assert(pw[i] == c && pw[j] == pw2[ll]);
+            assert(c != w2[ll]);
+            assert forall|k: int| 0 < k < ll + 1 implies !is_stable(data, #[trigger] w[k]) by {
+                assert(w[k] == w2[k - 1]);
+            }
+            assert(has_pinch_at(data, w, 0, ll + 1));
+            assert(has_pinch(data, w)) by {
+                assert(has_pinch_at(data, w, 0, ll + 1));
+            }
+        }
+    } else {
+        //  c non-stable: pw[0] = c can't be a (stable) pinch endpoint, so i >= 1
+        assert(ec =~= seq![c]);
+        assert(ec.len() == 1);
+        assert(pw[0] == c) by { assert(pw[0] == ec[0]); }
+        assert(is_stable(data, pw[i]));
+        assert(i >= 1);
+        lemma_strip_prefix_preserves_pinch(data, ec, pw2, i, j);
+        lemma_psi_F_pinch_descends(p, w2);
+        lemma_prepend_preserves_pinch(data, c, w2);
+    }
+}
+
+//  ============================================================
 //  (Q) Pinch-out at the F-level: deleting a pinch shrinks the word.
 //  ============================================================
 //
