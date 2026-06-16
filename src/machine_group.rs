@@ -6035,6 +6035,29 @@ pub proof fn lemma_psi_A_pinch_descends(p: nat, q: nat, w: Word)
     }
 }
 
+//  ============================================================
+//  Step 2 (Q) + assembly:  pinch-out and ψ_A injectivity
+//  ============================================================
+
+//  Base faithfulness for A:  an F-word (over t,x) trivial in A is trivial in F.
+//  The injectivity base case (no y) lands here.
+pub proof fn lemma_a_base_faithful(w: Word)
+    requires
+        word_valid(w, 2),
+        equiv_in_presentation(base_A(), w, empty_word()),
+    ensures
+        equiv_in_presentation(pres_tx(), w, empty_word()),
+{
+    lemma_a_as_hnn_valid();
+    lemma_a_as_hnn_isomorphic();
+    assert(word_valid(w, 3)) by {
+        assert forall|k: int| 0 <= k < w.len() implies symbol_valid(#[trigger] w[k], 3)
+        by { assert(symbol_valid(w[k], 2)); }
+    }
+    lemma_base_A_to_a_hnn(w, empty_word());
+    lemma_single_hnn_base_faithful(a_as_hnn(), w);
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
