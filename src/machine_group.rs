@@ -5699,6 +5699,50 @@ pub proof fn lemma_psi_F_in_x_subgroup(p: nat, u: Word)
     lemma_in_subgroup_respects_equiv(pt, g, xk, u);
 }
 
+//  ============================================================
+//  Step 2 (Corr): y-spanning + y-pinch descent
+//  ============================================================
+
+//  On an F-word (t's and x's only, no y), ψ_A agrees with ψ_F — both send t↦t,
+//  x↦xᵖ, and the only difference (y↦yᵠ) never fires.  Lets the pinch-middle (an
+//  F-word) be fed to lemma_psi_F_in_x_subgroup.
+pub proof fn lemma_psi_A_eq_psi_F_on_fword(p: nat, q: nat, w: Word)
+    requires
+        word_valid(w, 2),
+    ensures
+        apply_embedding(psi_images(p, q), w) =~= apply_embedding(psi_F_images(p), w),
+    decreases w.len(),
+{
+    let ia = psi_images(p, q);
+    let iff = psi_F_images(p);
+    reveal_with_fuel(apply_embedding, 2);
+    reveal_with_fuel(inverse_word, 2);
+    if w.len() == 0 {
+        assert(apply_embedding(ia, w) =~= Seq::<Symbol>::empty());
+        assert(apply_embedding(iff, w) =~= Seq::<Symbol>::empty());
+    } else {
+        let c = w.first();
+        let rest = w.drop_first();
+        assert(w =~= seq![c] + rest);
+        assert(word_valid(rest, 2)) by {
+            assert forall|k: int| 0 <= k < rest.len() implies symbol_valid(#[trigger] rest[k], 2)
+            by { assert(rest[k] == w[k + 1]); }
+        }
+        lemma_apply_embedding_concat(ia, seq![c], rest);
+        lemma_apply_embedding_concat(iff, seq![c], rest);
+        lemma_psi_A_eq_psi_F_on_fword(p, q, rest);
+        assert(symbol_valid(c, 2));
+        assert(apply_embedding(ia, seq![c]) =~= apply_embedding_symbol(ia, c));
+        assert(apply_embedding(iff, seq![c]) =~= apply_embedding_symbol(iff, c));
+        assert(apply_embedding_symbol(ia, c) =~= apply_embedding_symbol(iff, c)) by {
+            match c {
+                Symbol::Gen(i) => { assert(ia[i as int] =~= iff[i as int]); }
+                Symbol::Inv(i) => { assert(ia[i as int] =~= iff[i as int]); }
+            }
+        }
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
