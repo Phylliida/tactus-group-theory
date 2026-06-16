@@ -6159,6 +6159,222 @@ pub proof fn lemma_a_base_faithful(w: Word)
     lemma_single_hnn_base_faithful(a_as_hnn(), w);
 }
 
+//  (Q) at the A-level:  deleting a y-pinch (y·u·y⁻¹ with u∈⟨x⟩) removes the two y's,
+//  keeping the (commuting) middle.  w ≡ w with positions i, j deleted.
+pub proof fn lemma_pinch_out_A(w: Word, i: int, j: int)
+    requires
+        word_valid(w, 3),
+        has_pinch_at(a_as_hnn(), w, i, j),
+    ensures
+        equiv_in_presentation(base_A(),
+            w, w.subrange(0, i) + w.subrange(i + 1, j) + w.subrange(j + 1, w.len() as int)),
+{
+    let data = a_as_hnn();
+    let a = base_A();
+    lemma_base_A_valid();
+    assert(presentation_valid(a)) by { reveal(presentation_valid); }
+    assert(data.base.num_generators == 2);
+    assert(has_adjacent_opposite_at(data, w, i, j));
+    assert(0 <= i < j < w.len());
+    let si = w[i];
+    let sj = w[j];
+    let u = w.subrange(i + 1, j);
+    assert(is_stable(data, si) && is_stable(data, sj) && si != sj);
+    assert(word_valid(u, 3)) by {
+        assert forall|k: int| 0 <= k < u.len() implies symbol_valid(#[trigger] u[k], 3)
+        by { assert(u[k] == w[i + 1 + k]); }
+    }
+    let agens = Seq::new(data.associations.len(), |k: int| data.associations[k].0);
+    let bgens = Seq::new(data.associations.len(), |k: int| data.associations[k].1);
+    assert(agens =~= seq![seq![Symbol::Gen(1)]]);
+    assert(bgens =~= seq![seq![Symbol::Gen(1)]]);
+    //  extract u ∈ ⟨x⟩ and the inverse-pair endpoints
+    assert(is_inverse_pair(si, sj) && in_generated_subgroup(pres_tx(), seq![seq![Symbol::Gen(1)]], u)) by {
+        if si == Symbol::Gen(2) {
+            assert(sj == Symbol::Inv(2));
+            assert(in_generated_subgroup(pres_tx(), bgens, u));
+        } else {
+            assert(si == Symbol::Inv(2) && sj == Symbol::Gen(2));
+            assert(in_generated_subgroup(pres_tx(), agens, u));
+        }
+    }
+    let k = x_exp_sum(u);
+    let xk = x_pow(k);
+    lemma_x_pow_valid(k);
+    assert(word_valid(xk, 3)) by {
+        assert forall|m: int| 0 <= m < xk.len() implies symbol_valid(#[trigger] xk[m], 3)
+        by { assert(symbol_valid(xk[m], 2)); }
+    }
+    //  u ≡_A xk
+    lemma_x_subgroup_is_pow(u);
+    lemma_base_embeds_in_hnn(data, u, xk);
+    lemma_a_hnn_to_base_A(u, xk);
+    assert(equiv_in_presentation(a, u, xk));
+    lemma_equiv_symmetric(a, u, xk);
+    //  conjugation:  [si]+xk+[sj] ≡ xk
+    lemma_x_pow_commutes_stable(k, si);                 //  xk+[si] ≡ [si]+xk
+    lemma_equiv_symmetric(a, xk + seq![si], seq![si] + xk);
+    lemma_equiv_concat_left(a, seq![si] + xk, xk + seq![si], seq![sj]);
+    assert((seq![si] + xk) + seq![sj] =~= seq![si] + xk + seq![sj]);
+    assert((xk + seq![si]) + seq![sj] =~= xk + seq![si, sj]);
+    lemma_cancel_pair_equiv_empty(a, si, sj);
+    lemma_equiv_concat_right(a, xk, seq![si, sj], empty_word());
+    assert(xk + empty_word() =~= xk);
+    lemma_equiv_transitive(a, seq![si] + xk + seq![sj], xk + seq![si, sj], xk);
+    //  mid = [si]+u+[sj] ≡ [si]+xk+[sj] ≡ xk ≡ u
+    let mid = w.subrange(i, j + 1);
+    assert(mid =~= seq![si] + u + seq![sj]);
+    lemma_equiv_concat_right(a, seq![si], u, xk);
+    lemma_equiv_concat_left(a, seq![si] + u, seq![si] + xk, seq![sj]);
+    assert((seq![si] + u) + seq![sj] =~= seq![si] + u + seq![sj]);
+    assert((seq![si] + xk) + seq![sj] =~= seq![si] + xk + seq![sj]);
+    lemma_equiv_transitive(a, seq![si] + u + seq![sj], seq![si] + xk + seq![sj], xk);
+    lemma_equiv_transitive(a, seq![si] + u + seq![sj], xk, u);
+    assert(equiv_in_presentation(a, mid, u));
+    //  w = w[0..i] + mid + w[j+1..] ≡ w[0..i] + u + w[j+1..]
+    let pre = w.subrange(0, i);
+    let post = w.subrange(j + 1, w.len() as int);
+    assert(w =~= pre + mid + post);
+    lemma_equiv_concat_right(a, pre, mid, u);
+    lemma_equiv_concat_left(a, pre + mid, pre + u, post);
+    assert((pre + mid) + post =~= pre + mid + post);
+    assert((pre + u) + post =~= pre + u + post);
+    assert(pre + u + post =~= pre + w.subrange(i + 1, j) + post);
+}
+
+//  No y (stable_count 0) ⟹ every symbol is non-stable.
+pub proof fn lemma_stable_count_zero_no_stable(data: HNNData, w: Word)
+    requires
+        stable_count(data, w) == 0,
+    ensures
+        forall|k: int| 0 <= k < w.len() ==> !is_stable(data, #[trigger] w[k]),
+    decreases w.len(),
+{
+    reveal_with_fuel(stable_count, 2);
+    if w.len() == 0 {
+    } else {
+        let pre = w.drop_last();
+        lemma_stable_count_zero_no_stable(data, pre);
+        assert(forall|k: int| 0 <= k < pre.len() ==> pre[k] == w[k]);
+        assert(!is_stable(data, w[w.len() - 1]));
+    }
+}
+
+//  THE STEP-2 CAPSTONE:  ψ_A is injective on A.
+//  equiv_in_presentation(base_A, ψ_A(w), ε)  ⟹  equiv_in_presentation(base_A, w, ε).
+pub proof fn lemma_psi_A_injective(p: nat, q: nat, w: Word)
+    requires
+        word_valid(w, 3),
+        p >= 1,
+        q >= 1,
+        equiv_in_presentation(base_A(), apply_embedding(psi_images(p, q), w), empty_word()),
+    ensures
+        equiv_in_presentation(base_A(), w, empty_word()),
+    decreases w.len(),
+{
+    let data = a_as_hnn();
+    let a = base_A();
+    let imgs = psi_images(p, q);
+    let pw = apply_embedding(imgs, w);
+    lemma_a_as_hnn_valid();
+    lemma_a_as_hnn_isomorphic();
+    lemma_a_as_hnn_presentation();
+    lemma_base_A_valid();
+    assert(presentation_valid(a)) by { reveal(presentation_valid); }
+    assert(data.base.num_generators == 2);
+    assert(imgs[0] =~= seq![Symbol::Gen(0)]);
+    assert(imgs[1] =~= symbol_power(Symbol::Gen(1), p));
+    assert(imgs[2] =~= symbol_power(Symbol::Gen(2), q));
+    assert forall|kk: int| 0 <= kk < imgs.len() implies word_valid(#[trigger] imgs[kk], 3) by {
+        if kk == 0 {
+            assert forall|m: int| 0 <= m < imgs[0].len() implies symbol_valid(#[trigger] imgs[0][m], 3)
+            by { assert(imgs[0][m] == Symbol::Gen(0)); }
+        } else if kk == 1 {
+            lemma_symbol_power_valid(Symbol::Gen(1), p, 3);
+        } else {
+            lemma_symbol_power_valid(Symbol::Gen(2), q, 3);
+        }
+    }
+    if stable_count(data, w) == 0 {
+        //  base case: no y ⟹ w is an F-word, ψ_A(w) = ψ_F(w)
+        lemma_stable_count_zero_no_stable(data, w);
+        assert(word_valid(w, 2)) by {
+            assert forall|k: int| 0 <= k < w.len() implies symbol_valid(#[trigger] w[k], 2) by {
+                assert(!is_stable(data, w[k]));
+                assert(symbol_valid(w[k], 3));
+            }
+        }
+        lemma_psi_A_eq_psi_F_on_fword(p, q, w);
+        let pwf = apply_embedding(psi_F_images(p), w);
+        assert(equiv_in_presentation(a, pwf, empty_word()));
+        assert forall|kk: int| 0 <= kk < psi_F_images(p).len()
+            implies word_valid(#[trigger] psi_F_images(p)[kk], 2) by {
+            if kk == 0 {
+                assert forall|m: int| 0 <= m < psi_F_images(p)[0].len()
+                    implies symbol_valid(#[trigger] psi_F_images(p)[0][m], 2)
+                by { assert(psi_F_images(p)[0][m] == Symbol::Gen(0)); }
+            } else {
+                lemma_symbol_power_valid(Symbol::Gen(1), p, 2);
+            }
+        }
+        lemma_apply_embedding_valid(psi_F_images(p), w, 2);
+        lemma_a_base_faithful(pwf);
+        lemma_psi_F_injective(p, w);
+        lemma_base_embeds_in_hnn(data, w, empty_word());
+        lemma_a_hnn_to_base_A(w, empty_word());
+    } else {
+        //  step case: ψ_A(w) has a y, hence a pinch
+        lemma_psi_A_stable_count_scales(p, q, w);
+        assert(stable_count(data, w) >= 1);
+        assert(q * stable_count(data, w) >= 1) by (nonlinear_arith)
+            requires q >= 1, stable_count(data, w) >= 1;
+        assert(stable_count(data, pw) >= 1);
+        lemma_apply_embedding_valid(imgs, w, 3);
+        lemma_stable_count_pos_has_stable(data, pw);
+        lemma_base_A_to_a_hnn(pw, empty_word());
+        if !has_pinch(data, pw) {
+            lemma_no_pinch_stable_nontrivial(data, pw);
+        }
+        assert(has_pinch(data, pw));
+        lemma_psi_A_pinch_descends(p, q, w);
+        let ij: (int, int) = choose|i: int, j: int| has_pinch_at(data, w, i, j);
+        let i = ij.0;
+        let j = ij.1;
+        assert(has_pinch_at(data, w, i, j));
+        assert(has_adjacent_opposite_at(data, w, i, j));
+        let wshort: Word =
+            w.subrange(0, i) + w.subrange(i + 1, j) + w.subrange(j + 1, w.len() as int);
+        lemma_pinch_out_A(w, i, j);
+        assert(wshort.len() < w.len());
+        assert(word_valid(w.subrange(0, i), 3)) by {
+            assert forall|k: int| 0 <= k < w.subrange(0, i).len()
+                implies symbol_valid(#[trigger] w.subrange(0, i)[k], 3)
+            by { assert(w.subrange(0, i)[k] == w[k]); }
+        }
+        assert(word_valid(w.subrange(i + 1, j), 3)) by {
+            assert forall|k: int| 0 <= k < w.subrange(i + 1, j).len()
+                implies symbol_valid(#[trigger] w.subrange(i + 1, j)[k], 3)
+            by { assert(w.subrange(i + 1, j)[k] == w[k + i + 1]); }
+        }
+        assert(word_valid(w.subrange(j + 1, w.len() as int), 3)) by {
+            assert forall|k: int| 0 <= k < w.subrange(j + 1, w.len() as int).len()
+                implies symbol_valid(#[trigger] w.subrange(j + 1, w.len() as int)[k], 3)
+            by { assert(w.subrange(j + 1, w.len() as int)[k] == w[k + j + 1]); }
+        }
+        lemma_concat_word_valid(w.subrange(0, i), w.subrange(i + 1, j), 3);
+        lemma_concat_word_valid(w.subrange(0, i) + w.subrange(i + 1, j),
+            w.subrange(j + 1, w.len() as int), 3);
+        //  ψ_A respects ≡ over base_A (ψ kills the relator)
+        lemma_psi_respects_relator(p, q);
+        let pws = apply_embedding(imgs, wshort);
+        lemma_emb_respects_source_equiv(a, a, imgs, w, wshort);
+        lemma_equiv_symmetric(a, pw, pws);
+        lemma_equiv_transitive(a, pws, pw, empty_word());
+        lemma_psi_A_injective(p, q, wshort);
+        lemma_equiv_transitive(a, w, wshort, empty_word());
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
