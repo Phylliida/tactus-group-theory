@@ -5743,6 +5743,147 @@ pub proof fn lemma_psi_A_eq_psi_F_on_fword(p: nat, q: nat, w: Word)
     }
 }
 
+//  Index of the first stable (y) symbol of w, or w.len() if none.
+pub open spec fn first_stable_idx(data: HNNData, w: Word) -> int
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        0
+    } else if is_stable(data, w[0]) {
+        0
+    } else {
+        1 + first_stable_idx(data, w.drop_first())
+    }
+}
+
+pub proof fn lemma_first_stable_idx_nonneg(data: HNNData, w: Word)
+    ensures
+        first_stable_idx(data, w) >= 0,
+    decreases w.len(),
+{
+    reveal_with_fuel(first_stable_idx, 1);
+    if w.len() == 0 {
+    } else if is_stable(data, w[0]) {
+    } else {
+        lemma_first_stable_idx_nonneg(data, w.drop_first());
+    }
+}
+
+//  First-y correspondence over a_as_hnn.  Unlike ψ_F (where the only non-stable
+//  symbol t expands 1:1, preserving the index), here x also expands (to xᵖ), so the
+//  first-y index in ψ_A(w) is the ψ_A-image-length of w's pre-y prefix, not the
+//  prefix length.  The output is driven by first_stable_idx(w); the pre-y prefix of
+//  ψ_A(w) is exactly ψ_A of w's pre-y prefix.
+pub proof fn lemma_psi_A_spanning(p: nat, q: nat, w: Word, l: int)
+    requires
+        word_valid(w, 3),
+        p >= 1,
+        q >= 1,
+        0 <= l < apply_embedding(psi_images(p, q), w).len(),
+        is_stable(a_as_hnn(), apply_embedding(psi_images(p, q), w)[l]),
+        forall|k: int| 0 <= k < l
+            ==> !is_stable(a_as_hnn(), #[trigger] apply_embedding(psi_images(p, q), w)[k]),
+    ensures
+        first_stable_idx(a_as_hnn(), w) < w.len(),
+        is_stable(a_as_hnn(), w[first_stable_idx(a_as_hnn(), w)]),
+        w[first_stable_idx(a_as_hnn(), w)] == apply_embedding(psi_images(p, q), w)[l],
+        apply_embedding(psi_images(p, q), w).subrange(0, l)
+            =~= apply_embedding(psi_images(p, q),
+                w.subrange(0, first_stable_idx(a_as_hnn(), w))),
+        forall|k: int| 0 <= k < first_stable_idx(a_as_hnn(), w)
+            ==> !is_stable(a_as_hnn(), #[trigger] w[k]),
+    decreases w.len(),
+{
+    let data = a_as_hnn();
+    let imgs = psi_images(p, q);
+    let pw = apply_embedding(imgs, w);
+    reveal_with_fuel(apply_embedding, 2);
+    reveal_with_fuel(inverse_word, 2);
+    reveal_with_fuel(first_stable_idx, 2);
+    assert(data.base.num_generators == 2);
+    assert(w.len() > 0) by {
+        if w.len() == 0 { assert(pw =~= Seq::<Symbol>::empty()); }
+    }
+    let c = w[0];
+    let w2 = w.drop_first();
+    assert(w =~= seq![c] + w2);
+    assert(word_valid(w2, 3)) by {
+        assert forall|k: int| 0 <= k < w2.len() implies symbol_valid(#[trigger] w2[k], 3)
+        by { assert(w2[k] == w[k + 1]); }
+    }
+    lemma_apply_embedding_concat(imgs, seq![c], w2);
+    let ec = apply_embedding(imgs, seq![c]);
+    let pw2 = apply_embedding(imgs, w2);
+    assert(pw =~= ec + pw2);
+    assert(ec =~= apply_embedding_symbol(imgs, c));
+    assert(imgs[0] =~= seq![Symbol::Gen(0)]);
+    assert(imgs[1] =~= symbol_power(Symbol::Gen(1), p));
+    assert(imgs[2] =~= symbol_power(Symbol::Gen(2), q));
+    if is_stable(data, c) {
+        //  c is y: pw[0] = c is stable, so l = 0 and first_stable_idx(w) = 0
+        assert(c == Symbol::Gen(2) || c == Symbol::Inv(2));
+        if c == Symbol::Gen(2) {
+            assert(ec =~= symbol_power(Symbol::Gen(2), q));
+        } else {
+            lemma_inverse_word_sympower(Symbol::Gen(2), q);
+            assert(ec =~= symbol_power(Symbol::Inv(2), q));
+        }
+        assert(ec[0] == c);
+        assert(pw[0] == c) by { assert(pw[0] == ec[0]); }
+        assert(l == 0) by { if l > 0 { assert(!is_stable(data, pw[0])); } }
+        assert(first_stable_idx(data, w) == 0);
+        assert(w.subrange(0, 0) =~= Seq::<Symbol>::empty());
+        assert(pw.subrange(0, 0) =~= Seq::<Symbol>::empty());
+    } else {
+        //  c non-stable (t or x):  ec = c^elen (elen = 1 or p), all non-stable
+        assert(c == Symbol::Gen(0) || c == Symbol::Inv(0)
+            || c == Symbol::Gen(1) || c == Symbol::Inv(1));
+        let elen: int = if c == Symbol::Gen(1) || c == Symbol::Inv(1) { p as int } else { 1int };
+        if c == Symbol::Gen(0) {
+            assert(ec =~= symbol_power(Symbol::Gen(0), 1));
+        } else if c == Symbol::Inv(0) {
+            assert(ec =~= symbol_power(Symbol::Inv(0), 1));
+        } else if c == Symbol::Gen(1) {
+            assert(ec =~= symbol_power(Symbol::Gen(1), p));
+        } else {
+            lemma_inverse_word_sympower(Symbol::Gen(1), p);
+            assert(ec =~= symbol_power(Symbol::Inv(1), p));
+        }
+        assert(ec =~= symbol_power(c, elen as nat));
+        assert(ec.len() == elen && elen >= 1);
+        assert(forall|m: int| 0 <= m < elen ==> #[trigger] ec[m] == c);
+        assert(forall|m: int| 0 <= m < elen ==> !is_stable(data, #[trigger] ec[m]));
+        //  pw[0..elen) = ec all non-stable ⟹ l ≥ elen
+        assert(forall|m: int| 0 <= m < elen ==> #[trigger] pw[m] == ec[m]);
+        assert(l >= elen) by { if l < elen { assert(pw[l] == ec[l]); } }
+        let l2 = l - elen;
+        assert(forall|m: int| 0 <= m < pw2.len() ==> #[trigger] pw[m + elen] == pw2[m]);
+        assert(0 <= l2 < pw2.len());
+        assert(is_stable(data, pw2[l2])) by { assert(pw2[l2] == pw[l2 + elen]); }
+        assert forall|k: int| 0 <= k < l2 implies !is_stable(data, #[trigger] pw2[k]) by {
+            assert(pw2[k] == pw[k + elen]);
+        }
+        lemma_psi_A_spanning(p, q, w2, l2);
+        let lp2 = first_stable_idx(data, w2);
+        lemma_first_stable_idx_nonneg(data, w2);
+        assert(0 <= lp2 < w2.len());
+        assert(w =~= seq![c] + w2);
+        assert(forall|m: int| 0 <= m < w2.len() ==> #[trigger] w[m + 1] == w2[m]);
+        assert(first_stable_idx(data, w) == 1 + lp2);
+        assert(w[lp2 + 1] == w2[lp2]);
+        assert(w[1 + lp2] == w2[lp2]);
+        assert(pw2[l2] == pw[l]);
+        assert(w.subrange(0, 1 + lp2) =~= seq![c] + w2.subrange(0, lp2));
+        lemma_apply_embedding_concat(imgs, seq![c], w2.subrange(0, lp2));
+        assert(apply_embedding(imgs, w.subrange(0, 1 + lp2))
+            =~= ec + apply_embedding(imgs, w2.subrange(0, lp2)));
+        assert(pw.subrange(0, l) =~= ec + pw2.subrange(0, l2));
+        assert forall|k: int| 0 <= k < 1 + lp2 implies !is_stable(data, #[trigger] w[k]) by {
+            if k != 0 { assert(w[k] == w2[k - 1]); }
+        }
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
