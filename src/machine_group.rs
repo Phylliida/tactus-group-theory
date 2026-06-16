@@ -6039,6 +6039,107 @@ pub proof fn lemma_psi_A_pinch_descends(p: nat, q: nat, w: Word)
 //  Step 2 (Q) + assembly:  pinch-out and ψ_A injectivity
 //  ============================================================
 
+//  x⁻¹ commutes with y in A:  [x⁻¹, y] ≡ [y, x⁻¹]  (derived from xy≡yx via xyx⁻¹≡y).
+pub proof fn lemma_xinv_y_commute_in_A()
+    ensures
+        equiv_in_presentation(base_A(),
+            seq![Symbol::Inv(1), Symbol::Gen(2)], seq![Symbol::Gen(2), Symbol::Inv(1)]),
+{
+    let a = base_A();
+    let x = Symbol::Gen(1);
+    let y = Symbol::Gen(2);
+    let xi = Symbol::Inv(1);
+    lemma_base_A_valid();
+    lemma_xy_commute_in_A();
+    lemma_equiv_concat_left(a, seq![x, y], seq![y, x], seq![xi]);
+    assert(seq![x, y] + seq![xi] =~= seq![x, y, xi]);
+    assert(seq![y, x] + seq![xi] =~= seq![y, x, xi]);
+    lemma_cancel_pair_equiv_empty(a, x, xi);
+    assert(seq![y, x, xi] =~= seq![y] + seq![x, xi]);
+    lemma_equiv_concat_right(a, seq![y], seq![x, xi], empty_word());
+    assert(seq![y] + empty_word() =~= seq![y]);
+    lemma_equiv_transitive(a, seq![x, y, xi], seq![y, x, xi], seq![y]);
+    assert(seq![x] + seq![y] + seq![xi] =~= seq![x, y, xi]);
+    assert(presentation_valid(a)) by { reveal(presentation_valid); }
+    lemma_commute_from_conj(a, xi, x, seq![y]);
+    assert(seq![xi] + seq![y] =~= seq![xi, y]);
+    assert(seq![y] + seq![xi] =~= seq![y, xi]);
+}
+
+//  x commutes with y⁻¹ in A:  [x, y⁻¹] ≡ [y⁻¹, x]  (derived from xy≡yx via yxy⁻¹≡x).
+pub proof fn lemma_x_yinv_commute_in_A()
+    ensures
+        equiv_in_presentation(base_A(),
+            seq![Symbol::Gen(1), Symbol::Inv(2)], seq![Symbol::Inv(2), Symbol::Gen(1)]),
+{
+    let a = base_A();
+    let x = Symbol::Gen(1);
+    let y = Symbol::Gen(2);
+    let yi = Symbol::Inv(2);
+    lemma_base_A_valid();
+    lemma_xy_commute_in_A();
+    lemma_equiv_symmetric(a, seq![x, y], seq![y, x]);
+    lemma_equiv_concat_left(a, seq![y, x], seq![x, y], seq![yi]);
+    assert(seq![y, x] + seq![yi] =~= seq![y, x, yi]);
+    assert(seq![x, y] + seq![yi] =~= seq![x, y, yi]);
+    lemma_cancel_pair_equiv_empty(a, y, yi);
+    assert(seq![x, y, yi] =~= seq![x] + seq![y, yi]);
+    lemma_equiv_concat_right(a, seq![x], seq![y, yi], empty_word());
+    assert(seq![x] + empty_word() =~= seq![x]);
+    lemma_equiv_transitive(a, seq![y, x, yi], seq![x, y, yi], seq![x]);
+    assert(seq![y] + seq![x] + seq![yi] =~= seq![y, x, yi]);
+    assert(presentation_valid(a)) by { reveal(presentation_valid); }
+    lemma_commute_from_conj(a, yi, y, seq![x]);
+    assert(seq![yi] + seq![x] =~= seq![yi, x]);
+    assert(seq![x] + seq![yi] =~= seq![x, yi]);
+    lemma_equiv_symmetric(a, seq![yi, x], seq![x, yi]);
+}
+
+//  x^k commutes with a stable letter y / y⁻¹ in A.
+pub proof fn lemma_x_pow_commutes_stable(k: int, si: Symbol)
+    requires
+        si == Symbol::Gen(2) || si == Symbol::Inv(2),
+    ensures
+        equiv_in_presentation(base_A(), x_pow(k) + seq![si], seq![si] + x_pow(k)),
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    assert(presentation_valid(a)) by { reveal(presentation_valid); }
+    assert(symbol_power(si, 1) =~= seq![si]);
+    if k >= 0 {
+        let n = k as nat;
+        assert(x_pow(k) =~= symbol_power(Symbol::Gen(1), n));
+        if si == Symbol::Gen(2) {
+            lemma_xy_commute_in_A();
+            lemma_power_commutes(a, Symbol::Gen(1), Symbol::Gen(2), n, 1);
+        } else {
+            lemma_x_yinv_commute_in_A();
+            lemma_power_commutes(a, Symbol::Gen(1), Symbol::Inv(2), n, 1);
+        }
+        assert(x_pow(k) + seq![si] =~= symbol_power(Symbol::Gen(1), n) + symbol_power(si, 1));
+        assert(seq![si] + x_pow(k) =~= symbol_power(si, 1) + symbol_power(Symbol::Gen(1), n));
+    } else {
+        let n = (-k) as nat;
+        assert(x_pow(k) =~= symbol_power(Symbol::Inv(1), n));
+        if si == Symbol::Gen(2) {
+            lemma_xinv_y_commute_in_A();
+            lemma_power_commutes(a, Symbol::Inv(1), Symbol::Gen(2), n, 1);
+        } else {
+            lemma_xinv_yinv_commute_in_A();
+            let wv: Word = seq![Symbol::Inv(2), Symbol::Inv(1)];
+            assert(word_valid(wv, 3)) by {
+                assert forall|m: int| 0 <= m < wv.len()
+                    implies symbol_valid(#[trigger] wv[m], 3) by {}
+            }
+            lemma_equiv_symmetric(a, seq![Symbol::Inv(2), Symbol::Inv(1)],
+                seq![Symbol::Inv(1), Symbol::Inv(2)]);
+            lemma_power_commutes(a, Symbol::Inv(1), Symbol::Inv(2), n, 1);
+        }
+        assert(x_pow(k) + seq![si] =~= symbol_power(Symbol::Inv(1), n) + symbol_power(si, 1));
+        assert(seq![si] + x_pow(k) =~= symbol_power(si, 1) + symbol_power(Symbol::Inv(1), n));
+    }
+}
+
 //  Base faithfulness for A:  an F-word (over t,x) trivial in A is trivial in F.
 //  The injectivity base case (no y) lands here.
 pub proof fn lemma_a_base_faithful(w: Word)
