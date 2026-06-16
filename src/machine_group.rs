@@ -5460,6 +5460,93 @@ pub proof fn lemma_x_subgroup_is_pow(v: Word)
     lemma_equiv_transitive(pres_tx(), v, cf, x_pow(x_exp_sum(v)));
 }
 
+//  ============================================================
+//  (B) the middle-correspondence:  ψ_F(u) ∈ ⟨x⟩  ⟹  u ∈ ⟨x⟩
+//  ============================================================
+
+//  ψ_F sends xⁿ to x^(pn).
+pub proof fn lemma_psi_F_emb_genpow(p: nat, n: nat)
+    ensures
+        apply_embedding(psi_F_images(p), symbol_power(Symbol::Gen(1), n))
+            =~= symbol_power(Symbol::Gen(1), p * n),
+    decreases n,
+{
+    let imgs = psi_F_images(p);
+    reveal_with_fuel(apply_embedding, 2);
+    if n == 0 {
+        assert(symbol_power(Symbol::Gen(1), n) =~= Seq::<Symbol>::empty());
+        assert(apply_embedding(imgs, symbol_power(Symbol::Gen(1), n)) =~= Seq::<Symbol>::empty());
+        assert(symbol_power(Symbol::Gen(1), p * n) =~= Seq::<Symbol>::empty());
+    } else {
+        let n1: nat = (n - 1) as nat;
+        let tail = symbol_power(Symbol::Gen(1), n1);
+        assert(n == n1 + 1);
+        assert(symbol_power(Symbol::Gen(1), n) =~= seq![Symbol::Gen(1)] + tail);
+        lemma_apply_embedding_concat(imgs, seq![Symbol::Gen(1)], tail);
+        assert(apply_embedding(imgs, seq![Symbol::Gen(1)]) =~= symbol_power(Symbol::Gen(1), p));
+        lemma_psi_F_emb_genpow(p, n1);
+        lemma_symbol_power_merge(Symbol::Gen(1), p, p * n1);
+        assert(p + p * n1 == p * n) by (nonlinear_arith)
+            requires n == n1 + 1;
+    }
+}
+
+//  ψ_F sends x⁻ⁿ to x^(−pn).
+pub proof fn lemma_psi_F_emb_invpow(p: nat, n: nat)
+    ensures
+        apply_embedding(psi_F_images(p), symbol_power(Symbol::Inv(1), n))
+            =~= symbol_power(Symbol::Inv(1), p * n),
+    decreases n,
+{
+    let imgs = psi_F_images(p);
+    reveal_with_fuel(apply_embedding, 2);
+    reveal_with_fuel(inverse_word, 2);
+    if n == 0 {
+        assert(symbol_power(Symbol::Inv(1), n) =~= Seq::<Symbol>::empty());
+        assert(apply_embedding(imgs, symbol_power(Symbol::Inv(1), n)) =~= Seq::<Symbol>::empty());
+        assert(symbol_power(Symbol::Inv(1), p * n) =~= Seq::<Symbol>::empty());
+    } else {
+        let n1: nat = (n - 1) as nat;
+        let tail = symbol_power(Symbol::Inv(1), n1);
+        assert(n == n1 + 1);
+        assert(symbol_power(Symbol::Inv(1), n) =~= seq![Symbol::Inv(1)] + tail);
+        lemma_apply_embedding_concat(imgs, seq![Symbol::Inv(1)], tail);
+        lemma_inverse_word_sympower(Symbol::Gen(1), p);
+        assert(apply_embedding(imgs, seq![Symbol::Inv(1)]) =~= symbol_power(Symbol::Inv(1), p));
+        lemma_psi_F_emb_invpow(p, n1);
+        lemma_symbol_power_merge(Symbol::Inv(1), p, p * n1);
+        assert(p + p * n1 == p * n) by (nonlinear_arith)
+            requires n == n1 + 1;
+    }
+}
+
+//  ψ_F sends x^k to x^(pk)  (signed).
+pub proof fn lemma_psi_F_x_pow(p: nat, k: int)
+    ensures
+        apply_embedding(psi_F_images(p), x_pow(k)) =~= x_pow(p * k),
+{
+    if k >= 0 {
+        let kn: nat = k as nat;
+        assert(k == kn);
+        lemma_psi_F_emb_genpow(p, kn);
+        assert(p * k == p * kn) by (nonlinear_arith) requires k == kn;
+        assert(p * k >= 0) by (nonlinear_arith) requires k >= 0;
+        assert((p * k) as nat == p * kn);
+        assert(x_pow(k) =~= symbol_power(Symbol::Gen(1), kn));
+        assert(x_pow(p * k) =~= symbol_power(Symbol::Gen(1), p * kn));
+    } else {
+        let kn: nat = (-k) as nat;
+        assert(-k == kn);
+        lemma_psi_F_emb_invpow(p, kn);
+        assert(p * (-k) == p * kn) by (nonlinear_arith) requires -k == kn;
+        assert(p * k == -(p * kn)) by (nonlinear_arith) requires -k == kn;
+        assert(p * k <= 0) by (nonlinear_arith) requires k <= 0;
+        assert((-(p * k)) as nat == p * kn);
+        assert(x_pow(k) =~= symbol_power(Symbol::Inv(1), kn));
+        assert(x_pow(p * k) =~= symbol_power(Symbol::Inv(1), p * kn));
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
