@@ -5634,6 +5634,71 @@ pub proof fn lemma_x_pow_in_subgroup(k: int)
     }
 }
 
+//  THE MIDDLE-CORRESPONDENCE:  ψ_F(u) ∈ ⟨x⟩  ⟹  u ∈ ⟨x⟩.
+pub proof fn lemma_psi_F_in_x_subgroup(p: nat, u: Word)
+    requires
+        word_valid(u, 2),
+        p >= 1,
+        in_generated_subgroup(pres_tx(), seq![seq![Symbol::Gen(1)]],
+            apply_embedding(psi_F_images(p), u)),
+    ensures
+        in_generated_subgroup(pres_tx(), seq![seq![Symbol::Gen(1)]], u),
+{
+    let pt = pres_tx();
+    let g = seq![seq![Symbol::Gen(1)]];
+    let imgs = psi_F_images(p);
+    let pu = apply_embedding(imgs, u);
+    let kk = x_exp_sum(u);
+    let xk = x_pow(kk);
+    let xpk = x_pow(p * kk);
+    assert(presentation_valid(pt)) by { reveal(presentation_valid); }
+
+    //  (A) + scaling:  pu ~ x^(p·k)
+    lemma_x_subgroup_is_pow(pu);
+    lemma_x_exp_sum_psi_F(p, u);
+    assert(x_pow(x_exp_sum(pu)) =~= xpk);
+    assert(equiv_in_presentation(pt, pu, xpk));
+    lemma_psi_F_x_pow(p, kk);                     //  ψ_F(xk) =~= xpk
+
+    //  validities
+    lemma_x_pow_valid(kk);
+    lemma_x_pow_valid(p * kk);
+    lemma_inverse_word_valid(xk, 2);
+    let w: Word = u + inverse_word(xk);
+    lemma_concat_word_valid(u, inverse_word(xk), 2);
+
+    //  ψ_F(w) =~= pu + inverse_word(xpk)  ~  xpk + inverse_word(xpk)  ~  ε
+    lemma_apply_embedding_concat(imgs, u, inverse_word(xk));
+    lemma_apply_embedding_inverse(imgs, xk);
+    assert(apply_embedding(imgs, w) =~= pu + inverse_word(xpk));
+    lemma_equiv_concat_left(pt, pu, xpk, inverse_word(xpk));
+    lemma_word_inverse_right(pt, xpk);
+    lemma_equiv_transitive(pt,
+        pu + inverse_word(xpk), xpk + inverse_word(xpk), empty_word());
+    assert(equiv_in_presentation(pt, apply_embedding(imgs, w), empty_word()));
+
+    //  injectivity:  w ~ ε
+    lemma_psi_F_injective(p, w);
+
+    //  u ~ xk:  u ~ u+(inv(xk)+xk) = w+xk ~ ε+xk = xk
+    lemma_word_inverse_left(pt, xk);
+    lemma_equiv_concat_right(pt, u, inverse_word(xk) + xk, empty_word());
+    assert(u + empty_word() =~= u);
+    assert(u + (inverse_word(xk) + xk) =~= w + xk);
+    assert(equiv_in_presentation(pt, w + xk, u));
+    lemma_equiv_concat_left(pt, w, empty_word(), xk);
+    assert(empty_word() + xk =~= xk);
+    lemma_concat_word_valid(inverse_word(xk), xk, 2);
+    lemma_concat_word_valid(w, xk, 2);
+    lemma_equiv_symmetric(pt, w + xk, u);
+    lemma_equiv_transitive(pt, u, w + xk, xk);
+
+    //  membership transport
+    lemma_x_pow_in_subgroup(kk);
+    lemma_equiv_symmetric(pt, u, xk);
+    lemma_in_subgroup_respects_equiv(pt, g, xk, u);
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
