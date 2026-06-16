@@ -5547,6 +5547,93 @@ pub proof fn lemma_psi_F_x_pow(p: nat, k: int)
     }
 }
 
+//  concat_all of n copies of [s] is sⁿ.
+pub proof fn lemma_concat_all_const(s: Symbol, n: nat)
+    ensures
+        concat_all(Seq::new(n, |_j: int| seq![s])) =~= symbol_power(s, n),
+    decreases n,
+{
+    reveal_with_fuel(concat_all, 1);
+    if n == 0 {
+        assert(Seq::new(n, |_j: int| seq![s]) =~= Seq::<Word>::empty());
+        assert(symbol_power(s, n) =~= Seq::<Symbol>::empty());
+    } else {
+        let full = Seq::new(n, |_j: int| seq![s]);
+        let tail = Seq::new((n - 1) as nat, |_j: int| seq![s]);
+        assert(full.first() =~= seq![s]);
+        assert(full.drop_first() =~= tail);
+        lemma_concat_all_const(s, (n - 1) as nat);
+        assert(symbol_power(s, n) =~= seq![s] + symbol_power(s, (n - 1) as nat));
+    }
+}
+
+//  x^k is a valid word over ⟨t,x⟩.
+pub proof fn lemma_x_pow_valid(k: int)
+    ensures
+        word_valid(x_pow(k), 2),
+{
+    if k >= 0 {
+        lemma_symbol_power_valid(Symbol::Gen(1), k as nat, 2);
+    } else {
+        lemma_symbol_power_valid(Symbol::Inv(1), (-k) as nat, 2);
+    }
+}
+
+//  Subgroup membership is preserved when the target moves to an equivalent word.
+pub proof fn lemma_in_subgroup_respects_equiv(p: Presentation, gens: Seq<Word>, v: Word, u: Word)
+    requires
+        in_generated_subgroup(p, gens, v),
+        equiv_in_presentation(p, v, u),
+    ensures
+        in_generated_subgroup(p, gens, u),
+{
+    let factors = choose|factors: Seq<Word>|
+        factors_from_generators(gens, factors)
+        && equiv_in_presentation(p, concat_all(factors), v);
+    assert(factors_from_generators(gens, factors)
+        && equiv_in_presentation(p, concat_all(factors), v));
+    lemma_equiv_transitive(p, concat_all(factors), v, u);
+    assert(in_generated_subgroup(p, gens, u)) by {
+        assert(factors_from_generators(gens, factors)
+            && equiv_in_presentation(p, concat_all(factors), u));
+    }
+}
+
+//  x^k lies in ⟨x⟩.
+pub proof fn lemma_x_pow_in_subgroup(k: int)
+    ensures
+        in_generated_subgroup(pres_tx(), seq![seq![Symbol::Gen(1)]], x_pow(k)),
+{
+    let g = seq![seq![Symbol::Gen(1)]];
+    reveal_with_fuel(inverse_word, 2);
+    assert(inverse_word(seq![Symbol::Gen(1)]) =~= seq![Symbol::Inv(1)]);
+    let sym = if k >= 0 { Symbol::Gen(1) } else { Symbol::Inv(1) };
+    let cnt: nat = if k >= 0 { k as nat } else { (-k) as nat };
+    let factors = Seq::new(cnt, |_j: int| seq![sym]);
+    lemma_concat_all_const(sym, cnt);
+    assert(concat_all(factors) =~= x_pow(k));
+    assert(factors_from_generators(g, factors)) by {
+        assert forall|j: int| 0 <= j < factors.len()
+            implies is_generator_or_inverse(g, #[trigger] factors[j])
+        by {
+            assert(factors[j] == seq![sym]);
+            assert(g[0] == seq![Symbol::Gen(1)]);
+            if k >= 0 {
+                assert(factors[j] == g[0]);
+            } else {
+                assert(factors[j] == inverse_word(g[0]));
+            }
+            assert(0 <= 0 < g.len()
+                && (factors[j] == g[0] || factors[j] == inverse_word(g[0])));
+        }
+    }
+    lemma_equiv_refl(pres_tx(), x_pow(k));
+    assert(in_generated_subgroup(pres_tx(), g, x_pow(k))) by {
+        assert(factors_from_generators(g, factors)
+            && equiv_in_presentation(pres_tx(), concat_all(factors), x_pow(k)));
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
