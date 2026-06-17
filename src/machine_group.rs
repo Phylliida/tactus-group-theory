@@ -6375,6 +6375,106 @@ pub proof fn lemma_psi_A_injective(p: nat, q: nat, w: Word)
     }
 }
 
+//  ============================================================
+//  Property (iii): the quad associations are isomorphic
+//  ============================================================
+//
+//  The rᵢ/lⱼ conjugation t(a,b)↦t(c,0), xᵐ↦xᵐ², yᵐ↦y must be an isomorphism of
+//  the associated subgroups for the HNN extension to be valid (Britton).  Route:
+//  t(a,b) = (xᵃyᵇ)⁻¹·t·(xᵃyᵇ), and xᵃyᵇ commutes with xᵐ,yᵐ, so the a-side word
+//  emb([t(a,b),xᵐ,yᵐ],w) is a conjugate of the scaling ψ_{m,m}(w); it is trivial
+//  iff ψ_{m,m}(w) is iff w is (ψ_A injectivity).  Same for the b-side via ψ_{m²,1}.
+
+//  Conjugation by a commuting element is trivial:  a·b ≡ b·a  ⟹  a⁻¹·b·a ≡ b.
+pub proof fn lemma_conj_of_commuting(p: Presentation, aw: Word, bw: Word)
+    requires
+        presentation_valid(p),
+        word_valid(aw, p.num_generators),
+        word_valid(bw, p.num_generators),
+        equiv_in_presentation(p, aw + bw, bw + aw),
+    ensures
+        equiv_in_presentation(p, inverse_word(aw) + bw + aw, bw),
+{
+    let ng = p.num_generators;
+    let ia = inverse_word(aw);
+    lemma_inverse_word_valid(aw, ng);
+    //  bw·aw ≡ aw·bw  (symmetric of the hypothesis)
+    lemma_concat_word_valid(aw, bw, ng);
+    lemma_equiv_symmetric(p, aw + bw, bw + aw);
+    //  ia·(bw·aw) ≡ ia·(aw·bw)
+    lemma_equiv_concat_right(p, ia, bw + aw, aw + bw);
+    assert(ia + bw + aw =~= ia + (bw + aw));
+    assert(ia + (aw + bw) =~= (ia + aw) + bw);
+    //  (ia·aw)·bw ≡ ε·bw ≡ bw
+    lemma_word_inverse_left(p, aw);                     //  ia + aw ≡ ε
+    lemma_equiv_concat_left(p, ia + aw, empty_word(), bw);
+    assert(empty_word() + bw =~= bw);
+    //  chain:  ia·bw·aw ≡ ia·(aw·bw) ≡ bw
+    lemma_equiv_transitive(p, ia + bw + aw, ia + (aw + bw), bw);
+}
+
+//  xᵃyᵇ commutes with xᵐ in A.
+pub proof fn lemma_xayb_commutes_xpow(a: nat, b: nat, m: nat)
+    ensures
+        equiv_in_presentation(base_A(),
+            (symbol_power(Symbol::Gen(1), a) + symbol_power(Symbol::Gen(2), b))
+                + symbol_power(Symbol::Gen(1), m),
+            symbol_power(Symbol::Gen(1), m)
+                + (symbol_power(Symbol::Gen(1), a) + symbol_power(Symbol::Gen(2), b))),
+{
+    let aa = base_A();
+    lemma_base_A_valid();
+    assert(presentation_valid(aa)) by { reveal(presentation_valid); }
+    let xa = symbol_power(Symbol::Gen(1), a);
+    let yb = symbol_power(Symbol::Gen(2), b);
+    let xm = symbol_power(Symbol::Gen(1), m);
+    //  yᵇ·xᵐ ~ xᵐ·yᵇ
+    lemma_xy_commute_in_A();
+    let xy: Word = seq![Symbol::Gen(1), Symbol::Gen(2)];
+    assert(word_valid(xy, 3)) by {
+        assert forall|k: int| 0 <= k < xy.len() implies symbol_valid(#[trigger] xy[k], 3) by { }
+    }
+    lemma_equiv_symmetric(aa, xy, seq![Symbol::Gen(2), Symbol::Gen(1)]);
+    lemma_power_commutes(aa, Symbol::Gen(2), Symbol::Gen(1), b, m);
+    //  xᵃ·(yᵇ·xᵐ) ~ xᵃ·(xᵐ·yᵇ)
+    lemma_equiv_concat_right(aa, xa, yb + xm, xm + yb);
+    //  xᵃ·xᵐ =~= xᵐ·xᵃ
+    lemma_symbol_power_merge(Symbol::Gen(1), a, m);
+    lemma_symbol_power_merge(Symbol::Gen(1), m, a);
+    assert(xa + xm =~= xm + xa);
+    //  assemble  (xa+yb)+xm =~= xa+(yb+xm) ~ xa+(xm+yb) =~= (xm+xa)+yb =~= xm+(xa+yb)
+    assert((xa + yb) + xm =~= xa + (yb + xm));
+    assert(xa + (xm + yb) =~= xm + (xa + yb));
+}
+
+//  xᵃyᵇ commutes with yᵐ in A.
+pub proof fn lemma_xayb_commutes_ypow(a: nat, b: nat, m: nat)
+    ensures
+        equiv_in_presentation(base_A(),
+            (symbol_power(Symbol::Gen(1), a) + symbol_power(Symbol::Gen(2), b))
+                + symbol_power(Symbol::Gen(2), m),
+            symbol_power(Symbol::Gen(2), m)
+                + (symbol_power(Symbol::Gen(1), a) + symbol_power(Symbol::Gen(2), b))),
+{
+    let aa = base_A();
+    lemma_base_A_valid();
+    assert(presentation_valid(aa)) by { reveal(presentation_valid); }
+    let xa = symbol_power(Symbol::Gen(1), a);
+    let yb = symbol_power(Symbol::Gen(2), b);
+    let ym = symbol_power(Symbol::Gen(2), m);
+    //  xᵃ·yᵐ ~ yᵐ·xᵃ
+    lemma_xy_commute_in_A();
+    lemma_power_commutes(aa, Symbol::Gen(1), Symbol::Gen(2), a, m);
+    //  yᵇ·yᵐ =~= yᵐ·yᵇ
+    lemma_symbol_power_merge(Symbol::Gen(2), b, m);
+    lemma_symbol_power_merge(Symbol::Gen(2), m, b);
+    assert(yb + ym =~= ym + yb);
+    //  (xa+yb)+ym =~= xa+(yb+ym) =~= xa+(ym+yb) =~= (xa+ym)+yb ~ (ym+xa)+yb =~= ym+(xa+yb)
+    assert((xa + yb) + ym =~= (xa + ym) + yb);
+    lemma_equiv_concat_left(aa, xa + ym, ym + xa, yb);
+    assert((ym + xa) + yb =~= ym + (xa + yb));
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
