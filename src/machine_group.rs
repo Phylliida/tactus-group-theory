@@ -6755,6 +6755,76 @@ pub proof fn lemma_b_m_upto_faithful(mm: ModMachine, i: nat, w: Word)
     }
 }
 
+//  The qi-th B(M) tower step's associations are isomorphic (exposed as a
+//  standalone fact for Britton, via the now-proven tower base-faithfulness).
+pub proof fn lemma_b_m_step_isomorphic(mm: ModMachine, qi: nat)
+    requires
+        mod_machine_wf(mm),
+        qi < mm.quads.len(),
+    ensures
+        hnn_associations_isomorphic(HNNData {
+            base: b_m_upto(mm, qi),
+            associations: quad_associations(mm.quads[qi as int], mm.m),
+        }),
+{
+    let q = mm.quads[qi as int];
+    let m = mm.m;
+    let base = b_m_upto(mm, qi);
+    let assoc = quad_associations(q, m);
+    let step = HNNData { base, associations: assoc };
+    lemma_b_m_upto_valid(mm, qi);
+    lemma_b_m_upto_num_generators(mm, qi);
+    let k = assoc.len();
+    assert(k == 3);
+    let a_words = Seq::new(k, |idx: int| assoc[idx].0);
+    let b_words = Seq::new(k, |idx: int| assoc[idx].1);
+    assert(a_words =~= seq![config_word(q.a, q.b), symbol_power(Symbol::Gen(1), m),
+        symbol_power(Symbol::Gen(2), m)]);
+    assert forall|ww: Word| word_valid(ww, k as nat) implies (
+        equiv_in_presentation(base, apply_embedding(a_words, ww), empty_word())
+        <==> equiv_in_presentation(base, apply_embedding(b_words, ww), empty_word())
+    ) by {
+        assert(m >= 1);
+        assert(m * m >= 1) by (nonlinear_arith) requires m >= 1;
+        lemma_quad_associations_valid(q, m, 3);
+        lemma_apply_embedding_valid(a_words, ww, 3);
+        lemma_apply_embedding_valid(b_words, ww, 3);
+        let ea = apply_embedding(a_words, ww);
+        let eb = apply_embedding(b_words, ww);
+        lemma_conj_scaling_trivial_iff(q.a, q.b, m, m, ww);
+        assert(apply_embedding(seq![config_word(q.a, q.b), symbol_power(Symbol::Gen(1), m),
+            symbol_power(Symbol::Gen(2), m)], ww) =~= ea);
+        if equiv_in_presentation(base, ea, empty_word()) {
+            lemma_b_m_upto_faithful(mm, qi, ea);
+        }
+        if equiv_in_presentation(base_A(), ea, empty_word()) {
+            lemma_lift_bm_level(mm, 0, qi, ea, empty_word());
+        }
+        match q.dir {
+            Dir::R => {
+                assert(b_words =~= seq![config_word(q.c, 0), symbol_power(Symbol::Gen(1), m * m),
+                    symbol_power(Symbol::Gen(2), 1)]);
+                lemma_conj_scaling_trivial_iff(q.c, 0, m * m, 1, ww);
+                assert(apply_embedding(seq![config_word(q.c, 0), symbol_power(Symbol::Gen(1), m * m),
+                    symbol_power(Symbol::Gen(2), 1)], ww) =~= eb);
+            }
+            Dir::L => {
+                assert(b_words =~= seq![config_word(0, q.c), symbol_power(Symbol::Gen(1), 1),
+                    symbol_power(Symbol::Gen(2), m * m)]);
+                lemma_conj_scaling_trivial_iff(0, q.c, 1, m * m, ww);
+                assert(apply_embedding(seq![config_word(0, q.c), symbol_power(Symbol::Gen(1), 1),
+                    symbol_power(Symbol::Gen(2), m * m)], ww) =~= eb);
+            }
+        }
+        if equiv_in_presentation(base, eb, empty_word()) {
+            lemma_b_m_upto_faithful(mm, qi, eb);
+        }
+        if equiv_in_presentation(base_A(), eb, empty_word()) {
+            lemma_lift_bm_level(mm, 0, qi, eb, empty_word());
+        }
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
