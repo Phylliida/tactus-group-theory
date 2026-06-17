@@ -6825,6 +6825,51 @@ pub proof fn lemma_b_m_step_isomorphic(mm: ModMachine, qi: nat)
     }
 }
 
+//  Equiv-level tower faithfulness: two A-words equal in B(M) are equal in A.
+pub proof fn lemma_b_m_equiv_faithful(mm: ModMachine, w1: Word, w2: Word)
+    requires
+        mod_machine_wf(mm),
+        word_valid(w1, 3),
+        word_valid(w2, 3),
+        equiv_in_presentation(b_m(mm), w1, w2),
+    ensures
+        equiv_in_presentation(base_A(), w1, w2),
+{
+    let aa = base_A();
+    let bm = b_m(mm);
+    lemma_base_A_valid();
+    assert(presentation_valid(aa)) by { reveal(presentation_valid); }
+    lemma_b_m_valid(mm);
+    lemma_b_m_upto_num_generators(mm, mm.quads.len());
+    assert(bm == b_m_upto(mm, mm.quads.len()));
+    let ng = bm.num_generators;
+    let iw2 = inverse_word(w2);
+    lemma_inverse_word_valid(w2, 3);
+    lemma_concat_word_valid(w1, iw2, 3);
+    lemma_word_valid_mono(w1, 3, ng);
+    lemma_word_valid_mono(w2, 3, ng);
+    lemma_word_valid_mono(iw2, 3, ng);
+    lemma_concat_word_valid(w1, iw2, ng);
+    //  (1) equiv(bm, w1, w2)  ⟹  equiv(bm, w1·w2⁻¹, ε)
+    lemma_equiv_concat_left(bm, w1, w2, iw2);
+    lemma_word_inverse_right(bm, w2);
+    lemma_equiv_transitive(bm, w1 + iw2, w2 + iw2, empty_word());
+    //  (2) tower faithfulness:  w1·w2⁻¹ ≡_A ε
+    lemma_b_m_upto_faithful(mm, mm.quads.len(), w1 + iw2);
+    //  (3) equiv(base_A, w1·w2⁻¹, ε)  ⟹  equiv(base_A, w1, w2)
+    lemma_word_inverse_left(aa, w2);                          //  iw2·w2 ≡ ε
+    lemma_equiv_concat_right(aa, w1, iw2 + w2, empty_word()); //  w1·(iw2·w2) ≡ w1·ε
+    assert(w1 + (iw2 + w2) =~= (w1 + iw2) + w2);
+    assert(w1 + empty_word() =~= w1);
+    lemma_equiv_concat_left(aa, w1 + iw2, empty_word(), w2);  //  (w1·iw2)·w2 ≡ ε·w2
+    assert(empty_word() + w2 =~= w2);
+    //  w1 ≡ w1·(iw2·w2) = (w1·iw2)·w2 ≡ ε·w2 = w2
+    lemma_concat_word_valid(iw2, w2, 3);
+    lemma_concat_word_valid(w1, iw2 + w2, 3);
+    lemma_equiv_symmetric(aa, w1 + (iw2 + w2), w1);
+    lemma_equiv_transitive(aa, w1, w1 + (iw2 + w2), w2);
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
