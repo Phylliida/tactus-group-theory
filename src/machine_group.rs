@@ -6660,6 +6660,101 @@ pub proof fn lemma_l_step_associations_isomorphic(a: nat, b: nat, c: nat, m: nat
     }
 }
 
+//  ============================================================
+//  Tower base-faithfulness: an A-word trivial in B(M) up to level i is
+//  trivial in A.  Lifts property (iii) to every tower level (the per-step
+//  iso is built inline from the induction hypothesis).
+//  ============================================================
+pub proof fn lemma_b_m_upto_faithful(mm: ModMachine, i: nat, w: Word)
+    requires
+        mod_machine_wf(mm),
+        i <= mm.quads.len(),
+        word_valid(w, 3),
+        equiv_in_presentation(b_m_upto(mm, i), w, empty_word()),
+    ensures
+        equiv_in_presentation(base_A(), w, empty_word()),
+    decreases i,
+{
+    if i == 0 {
+        assert(b_m_upto(mm, 0) == base_A());
+    } else {
+        let qi = (i - 1) as nat;
+        let q = mm.quads[qi as int];
+        let m = mm.m;
+        let base = b_m_upto(mm, qi);
+        let assoc = quad_associations(q, m);
+        let step = HNNData { base, associations: assoc };
+        assert(b_m_upto(mm, i) == hnn_presentation(step));
+        lemma_b_m_upto_valid(mm, qi);
+        lemma_b_m_upto_num_generators(mm, qi);
+        assert(base.num_generators == (3 + qi) as nat);
+        let k = assoc.len();
+        assert(k == 3);
+        let a_words = Seq::new(k, |idx: int| assoc[idx].0);
+        let b_words = Seq::new(k, |idx: int| assoc[idx].1);
+        //  a-side is the same for R and L:  [t(a,b), xᵐ, yᵐ]
+        assert(a_words =~= seq![config_word(q.a, q.b), symbol_power(Symbol::Gen(1), m),
+            symbol_power(Symbol::Gen(2), m)]);
+        //  ---- (1) the per-step iso, built inline from the IH ----
+        lemma_quad_associations_valid(q, m, 3);
+        assert(hnn_associations_isomorphic(step)) by {
+            assert forall|ww: Word| word_valid(ww, k as nat) implies (
+                equiv_in_presentation(base, apply_embedding(a_words, ww), empty_word())
+                <==> equiv_in_presentation(base, apply_embedding(b_words, ww), empty_word())
+            ) by {
+                assert(m >= 1);
+                assert(m * m >= 1) by (nonlinear_arith) requires m >= 1;
+                lemma_quad_associations_valid(q, m, 3);
+                lemma_apply_embedding_valid(a_words, ww, 3);
+                lemma_apply_embedding_valid(b_words, ww, 3);
+                let ea = apply_embedding(a_words, ww);
+                let eb = apply_embedding(b_words, ww);
+                //  a-side:  emb(a_words,ww)≡_base ε  ⟺  ww≡_A ε
+                lemma_conj_scaling_trivial_iff(q.a, q.b, m, m, ww);
+                assert(apply_embedding(seq![config_word(q.a, q.b), symbol_power(Symbol::Gen(1), m),
+                    symbol_power(Symbol::Gen(2), m)], ww) =~= ea);
+                if equiv_in_presentation(base, ea, empty_word()) {
+                    lemma_b_m_upto_faithful(mm, qi, ea);
+                }
+                if equiv_in_presentation(base_A(), ea, empty_word()) {
+                    lemma_lift_bm_level(mm, 0, qi, ea, empty_word());
+                }
+                //  b-side:  dispatch on direction, same bridge
+                match q.dir {
+                    Dir::R => {
+                        assert(b_words =~= seq![config_word(q.c, 0), symbol_power(Symbol::Gen(1), m * m),
+                            symbol_power(Symbol::Gen(2), 1)]);
+                        lemma_conj_scaling_trivial_iff(q.c, 0, m * m, 1, ww);
+                        assert(apply_embedding(seq![config_word(q.c, 0), symbol_power(Symbol::Gen(1), m * m),
+                            symbol_power(Symbol::Gen(2), 1)], ww) =~= eb);
+                    }
+                    Dir::L => {
+                        assert(b_words =~= seq![config_word(0, q.c), symbol_power(Symbol::Gen(1), 1),
+                            symbol_power(Symbol::Gen(2), m * m)]);
+                        lemma_conj_scaling_trivial_iff(0, q.c, 1, m * m, ww);
+                        assert(apply_embedding(seq![config_word(0, q.c), symbol_power(Symbol::Gen(1), 1),
+                            symbol_power(Symbol::Gen(2), m * m)], ww) =~= eb);
+                    }
+                }
+                if equiv_in_presentation(base, eb, empty_word()) {
+                    lemma_b_m_upto_faithful(mm, qi, eb);
+                }
+                if equiv_in_presentation(base_A(), eb, empty_word()) {
+                    lemma_lift_bm_level(mm, 0, qi, eb, empty_word());
+                }
+            }
+        }
+        //  ---- (2) hnn_data_valid(step) ----
+        lemma_quad_associations_valid(q, m, base.num_generators);
+        assert(hnn_data_valid(step));
+        //  ---- (3) descend one level via single-HNN base faithfulness ----
+        lemma_word_valid_mono(w, 3, base.num_generators);
+        lemma_single_hnn_base_faithful(step, w);
+        //  ---- (4) descend the rest by induction ----
+        lemma_b_m_upto_faithful(mm, qi, w);
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
