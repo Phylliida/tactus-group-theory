@@ -6475,6 +6475,191 @@ pub proof fn lemma_xayb_commutes_ypow(a: nat, b: nat, m: nat)
     assert((ym + xa) + yb =~= ym + (xa + yb));
 }
 
+//  ψ_{p,q} is trivial-faithful:  ψ(w) ≡ ε  ⟺  w ≡ ε  (in A).
+pub proof fn lemma_psi_trivial_iff(p: nat, q: nat, w: Word)
+    requires
+        word_valid(w, 3),
+        p >= 1,
+        q >= 1,
+    ensures
+        equiv_in_presentation(base_A(), apply_embedding(psi_images(p, q), w), empty_word())
+            <==> equiv_in_presentation(base_A(), w, empty_word()),
+{
+    let aa = base_A();
+    let imgs = psi_images(p, q);
+    lemma_base_A_valid();
+    assert(presentation_valid(aa)) by { reveal(presentation_valid); }
+    assert(imgs[0] =~= seq![Symbol::Gen(0)]);
+    assert(imgs[1] =~= symbol_power(Symbol::Gen(1), p));
+    assert(imgs[2] =~= symbol_power(Symbol::Gen(2), q));
+    assert forall|i: int| 0 <= i < imgs.len() implies word_valid(#[trigger] imgs[i], 3) by {
+        if i == 0 {
+            assert(word_valid(imgs[0], 3)) by {
+                assert forall|kk: int| 0 <= kk < imgs[0].len() implies symbol_valid(#[trigger] imgs[0][kk], 3) by { }
+            }
+        } else if i == 1 {
+            lemma_symbol_power_valid(Symbol::Gen(1), p, 3);
+        } else {
+            lemma_symbol_power_valid(Symbol::Gen(2), q, 3);
+        }
+    }
+    //  forward:  ψ(w) ≡ ε  ⟹  w ≡ ε
+    if equiv_in_presentation(aa, apply_embedding(imgs, w), empty_word()) {
+        lemma_psi_A_injective(p, q, w);
+    }
+    //  backward:  w ≡ ε  ⟹  ψ(w) ≡ ψ(ε) = ε
+    if equiv_in_presentation(aa, w, empty_word()) {
+        assert forall|j: int| 0 <= j < aa.relators.len()
+            implies equiv_in_presentation(aa, apply_embedding(imgs, #[trigger] aa.relators[j]), empty_word())
+        by { lemma_psi_respects_relator(p, q); }
+        lemma_emb_respects_source_equiv(aa, aa, imgs, w, empty_word());
+        assert(apply_embedding(imgs, empty_word()) =~= empty_word());
+    }
+}
+
+//  The conjugated scaling is trivial-faithful: for g = xᵃyᵇ,
+//  emb([t(a,b), x^px, y^py], w) ≡ ε  ⟺  w ≡ ε.   (serves both quad sides)
+pub proof fn lemma_conj_scaling_trivial_iff(a: nat, b: nat, px: nat, py: nat, w: Word)
+    requires
+        px >= 1,
+        py >= 1,
+        word_valid(w, 3),
+    ensures
+        equiv_in_presentation(base_A(),
+            apply_embedding(seq![config_word(a, b), symbol_power(Symbol::Gen(1), px),
+                symbol_power(Symbol::Gen(2), py)], w),
+            empty_word())
+        <==> equiv_in_presentation(base_A(), w, empty_word()),
+{
+    let aa = base_A();
+    lemma_base_A_valid();
+    assert(presentation_valid(aa)) by { reveal(presentation_valid); }
+    reveal_with_fuel(inverse_word, 2);
+    let xpx = symbol_power(Symbol::Gen(1), px);
+    let ypy = symbol_power(Symbol::Gen(2), py);
+    let g = symbol_power(Symbol::Gen(1), a) + symbol_power(Symbol::Gen(2), b);
+    let ig = inverse_word(g);
+    let imgs = psi_images(px, py);
+    let aw: Seq<Word> = seq![config_word(a, b), xpx, ypy];
+    let ci = conj_images(g, imgs);
+    let pw = apply_embedding(imgs, w);
+    //  validity of g and ig
+    lemma_symbol_power_valid(Symbol::Gen(1), a, 3);
+    lemma_symbol_power_valid(Symbol::Gen(2), b, 3);
+    lemma_concat_word_valid(symbol_power(Symbol::Gen(1), a), symbol_power(Symbol::Gen(2), b), 3);
+    lemma_inverse_word_valid(g, 3);
+    //  imgs structure + validity
+    assert(imgs[0] =~= seq![Symbol::Gen(0)]);
+    assert(imgs[1] =~= xpx);
+    assert(imgs[2] =~= ypy);
+    lemma_symbol_power_valid(Symbol::Gen(1), px, 3);
+    lemma_symbol_power_valid(Symbol::Gen(2), py, 3);
+    //  ig = x⁻ᵃ y⁻ᵇ  (reversed); config_word(a,b) =~= ig + [t] + g
+    lemma_inverse_word_concat(symbol_power(Symbol::Gen(1), a), symbol_power(Symbol::Gen(2), b));
+    lemma_inverse_word_sympower(Symbol::Gen(1), a);
+    lemma_inverse_word_sympower(Symbol::Gen(2), b);
+    assert(config_word(a, b) =~= ig + seq![Symbol::Gen(0)] + g);
+    //  componentwise equiv  aw[i] ≡ ci[i]
+    assert(ci[0] =~= ig + seq![Symbol::Gen(0)] + g);
+    assert(ci[1] =~= ig + xpx + g);
+    assert(ci[2] =~= ig + ypy + g);
+    lemma_xayb_commutes_xpow(a, b, px);
+    lemma_conj_of_commuting(aa, g, xpx);                   //  ig·xpx·g ≡ xpx
+    lemma_equiv_symmetric(aa, ig + xpx + g, xpx);
+    lemma_xayb_commutes_ypow(a, b, py);
+    lemma_conj_of_commuting(aa, g, ypy);
+    lemma_equiv_symmetric(aa, ig + ypy + g, ypy);
+    //  validities for respects_image_equiv
+    lemma_config_word_valid(a, b);
+    lemma_concat_word_valid(ig + xpx, g, 3);
+    lemma_concat_word_valid(ig, xpx, 3);
+    lemma_concat_word_valid(ig + ypy, g, 3);
+    lemma_concat_word_valid(ig, ypy, 3);
+    lemma_concat_word_valid(ig + seq![Symbol::Gen(0)], g, 3);
+    assert(word_valid(seq![Symbol::Gen(0)], 3)) by {
+        assert forall|kk: int| 0 <= kk < 1 implies symbol_valid(#[trigger] seq![Symbol::Gen(0)][kk], 3) by { }
+    }
+    lemma_concat_word_valid(ig, seq![Symbol::Gen(0)], 3);
+    assert forall|i: int| 0 <= i < 3 implies (word_valid(#[trigger] aw[i], 3)
+        && word_valid(ci[i], 3) && equiv_in_presentation(aa, aw[i], ci[i])) by {
+        if i == 0 {
+            lemma_equiv_refl(aa, aw[0]);
+        } else if i == 1 {
+        } else {
+        }
+    }
+    //  emb(aw,w) ≡ emb(ci,w) ≡ ig·pw·g
+    lemma_apply_embedding_respects_image_equiv(aa, aw, ci, w, 3);
+    lemma_emb_conj_telescope(aa, g, imgs, w, 3);
+    lemma_equiv_transitive(aa, apply_embedding(aw, w), apply_embedding(ci, w), ig + pw + g);
+    //  ⟺ chain:  emb(aw,w)≡ε  ⟺  ig·pw·g≡ε  ⟺  pw≡ε  ⟺  w≡ε
+    lemma_conj_trivial_iff(aa, g, pw);
+    lemma_psi_trivial_iff(px, py, w);
+    lemma_apply_embedding_valid(aw, w, 3);
+    //  bridge emb(aw,w)≡ε ⟺ ig·pw·g≡ε via the established equiv
+    if equiv_in_presentation(aa, apply_embedding(aw, w), empty_word()) {
+        lemma_equiv_symmetric(aa, apply_embedding(aw, w), ig + pw + g);
+        lemma_equiv_transitive(aa, ig + pw + g, apply_embedding(aw, w), empty_word());
+    }
+    if equiv_in_presentation(aa, ig + pw + g, empty_word()) {
+        lemma_equiv_transitive(aa, apply_embedding(aw, w), ig + pw + g, empty_word());
+    }
+}
+
+//  Property (iii) for an R-quad: the associations are isomorphic.
+pub proof fn lemma_r_step_associations_isomorphic(a: nat, b: nat, c: nat, m: nat)
+    requires
+        m >= 1,
+    ensures
+        hnn_associations_isomorphic(r_step_data(a, b, c, m)),
+{
+    let data = r_step_data(a, b, c, m);
+    let k = data.associations.len();
+    let a_words = Seq::new(k, |i: int| data.associations[i].0);
+    let b_words = Seq::new(k, |i: int| data.associations[i].1);
+    assert(k == 3);
+    assert(a_words =~= seq![config_word(a, b), symbol_power(Symbol::Gen(1), m),
+        symbol_power(Symbol::Gen(2), m)]);
+    assert(b_words =~= seq![config_word(c, 0), symbol_power(Symbol::Gen(1), m * m),
+        symbol_power(Symbol::Gen(2), 1)]);
+    assert forall|w: Word| word_valid(w, k as nat) implies (
+        equiv_in_presentation(data.base, apply_embedding(a_words, w), empty_word())
+        <==> equiv_in_presentation(data.base, apply_embedding(b_words, w), empty_word())
+    ) by {
+        assert(word_valid(w, 3));
+        assert(m * m >= 1) by (nonlinear_arith) requires m >= 1;
+        lemma_conj_scaling_trivial_iff(a, b, m, m, w);
+        lemma_conj_scaling_trivial_iff(c, 0, m * m, 1, w);
+    }
+}
+
+//  Property (iii) for an L-quad: the associations are isomorphic.
+pub proof fn lemma_l_step_associations_isomorphic(a: nat, b: nat, c: nat, m: nat)
+    requires
+        m >= 1,
+    ensures
+        hnn_associations_isomorphic(l_step_data(a, b, c, m)),
+{
+    let data = l_step_data(a, b, c, m);
+    let k = data.associations.len();
+    let a_words = Seq::new(k, |i: int| data.associations[i].0);
+    let b_words = Seq::new(k, |i: int| data.associations[i].1);
+    assert(k == 3);
+    assert(a_words =~= seq![config_word(a, b), symbol_power(Symbol::Gen(1), m),
+        symbol_power(Symbol::Gen(2), m)]);
+    assert(b_words =~= seq![config_word(0, c), symbol_power(Symbol::Gen(1), 1),
+        symbol_power(Symbol::Gen(2), m * m)]);
+    assert forall|w: Word| word_valid(w, k as nat) implies (
+        equiv_in_presentation(data.base, apply_embedding(a_words, w), empty_word())
+        <==> equiv_in_presentation(data.base, apply_embedding(b_words, w), empty_word())
+    ) by {
+        assert(word_valid(w, 3));
+        assert(m * m >= 1) by (nonlinear_arith) requires m >= 1;
+        lemma_conj_scaling_trivial_iff(a, b, m, m, w);
+        lemma_conj_scaling_trivial_iff(0, c, 1, m * m, w);
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
