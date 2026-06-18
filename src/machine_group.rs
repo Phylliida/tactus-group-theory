@@ -8978,6 +8978,180 @@ pub proof fn lemma_concat_reduced(a: Word, b: Word)
     }
 }
 
+//  A nonzero signed-power block's endpoints both have generator index i.
+pub proof fn lemma_signed_power_endpoint_gen(i: nat, a: int)
+    requires
+        a != 0,
+    ensures
+        signed_power(i, a).len() >= 1,
+        generator_index(signed_power(i, a)[0]) == i,
+        generator_index(signed_power(i, a)[signed_power(i, a).len() - 1]) == i,
+{
+    let w = signed_power(i, a);
+    let s = if a >= 0 { Symbol::Gen(i) } else { Symbol::Inv(i) };
+    assert(w.len() == (if a >= 0 { a } else { -a }));
+    assert(w[0] == s);
+    assert(w[w.len() - 1] == s);
+}
+
+//  The combined word's first symbol is an x (generator 1), given a nonempty leading x-gap.
+pub proof fn lemma_fl_first_gen1(w: Seq<CanonLetter>, prev: int)
+    requires
+        w.len() >= 1 ==> prev != w[0].r,
+    ensures
+        fl_comb_acc(w, prev).len() >= 1 ==> generator_index(fl_comb_acc(w, prev)[0]) == 1,
+{
+    if w.len() == 0 {
+        if prev != 0 {
+            lemma_signed_power_endpoint_gen(1, prev);
+        }
+    } else {
+        let x = signed_power(1, prev - w[0].r);
+        lemma_signed_power_endpoint_gen(1, prev - w[0].r);
+        assert(fl_comb_acc(w, prev)[0] == x[0]);
+    }
+}
+
+//  The combined word is freely reduced (alternating x / t blocks, all nonzero internally).
+pub proof fn lemma_fl_comb_acc_reduced(w: Seq<CanonLetter>, prev: int)
+    requires
+        forall|j: int| 0 <= j < w.len() ==> (#[trigger] w[j]).e != 0,
+        forall|j: int| 0 <= j < w.len() - 1 ==> (#[trigger] w[j]).r != w[j + 1].r,
+    ensures
+        is_reduced(fl_comb_acc(w, prev)),
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        lemma_signed_power_is_reduced(1, prev);
+    } else {
+        let c = w[0];
+        let rest = w.drop_first();
+        let xx = signed_power(1, prev - c.r);
+        let tt = signed_power(0, c.e);
+        let rr = fl_comb_acc(rest, c.r);
+        assert(c.e != 0);
+        assert(forall|j: int| 0 <= j < rest.len() ==> (#[trigger] rest[j]).e != 0) by {
+            assert forall|j: int| 0 <= j < rest.len() implies (#[trigger] rest[j]).e != 0 by {
+                assert(rest[j] == w[j + 1]);
+            }
+        }
+        assert(forall|j: int| 0 <= j < rest.len() - 1 ==> (#[trigger] rest[j]).r != rest[j + 1].r) by {
+            assert forall|j: int| 0 <= j < rest.len() - 1 implies (#[trigger] rest[j]).r != rest[j + 1].r by {
+                assert(rest[j] == w[j + 1] && rest[j + 1] == w[j + 2]);
+            }
+        }
+        lemma_signed_power_is_reduced(1, prev - c.r);
+        lemma_signed_power_is_reduced(0, c.e);
+        lemma_fl_comb_acc_reduced(rest, c.r);
+        //  X/T boundary: x (gen 1) next to t (gen 0)
+        assert((xx.len() > 0 && tt.len() > 0) ==> !is_inverse_pair(xx[xx.len() - 1], tt[0])) by {
+            if xx.len() > 0 && tt.len() > 0 {
+                assert(prev - c.r != 0);
+                lemma_signed_power_endpoint_gen(1, prev - c.r);
+                lemma_signed_power_endpoint_gen(0, c.e);
+                lemma_inverse_preserves_index(xx[xx.len() - 1]);
+            }
+        }
+        lemma_concat_reduced(xx, tt);
+        let xt = xx + tt;
+        //  T/R boundary: t (gen 0) next to x (gen 1)
+        assert((xt.len() > 0 && rr.len() > 0) ==> !is_inverse_pair(xt[xt.len() - 1], rr[0])) by {
+            if xt.len() > 0 && rr.len() > 0 {
+                lemma_signed_power_endpoint_gen(0, c.e);
+                assert(xt[xt.len() - 1] == tt[tt.len() - 1]);
+                assert(rest.len() >= 1 ==> c.r != rest[0].r) by {
+                    if rest.len() >= 1 {
+                        assert(rest[0] == w[1]);
+                        assert(w[0].r != w[1].r);
+                    }
+                }
+                lemma_fl_first_gen1(rest, c.r);
+                lemma_inverse_preserves_index(xt[xt.len() - 1]);
+            }
+        }
+        lemma_concat_reduced(xt, rr);
+        assert(fl_comb_acc(w, prev) == xx + tt + rr);
+    }
+}
+
+//  All-s=0 config power is a valid 2-generator (t,x) word (y-parts empty).
+pub proof fn lemma_gsconfig_valid_s0(r: int, e: int)
+    ensures
+        word_valid(gsconfig(r, 0, e), 2),
+{
+    let b1 = signed_power(2, -0);
+    let b2 = signed_power(1, -r);
+    let b3 = signed_power(0, e);
+    let b4 = signed_power(1, r);
+    let b5 = signed_power(2, 0);
+    assert(b1 =~= empty_word());
+    assert(b5 =~= empty_word());
+    assert(word_valid(b1, 2));
+    assert(word_valid(b5, 2));
+    lemma_signed_power_valid(1, -r, 2);
+    lemma_signed_power_valid(0, e, 2);
+    lemma_signed_power_valid(1, r, 2);
+    lemma_concat_word_valid(b1, b2, 2);
+    lemma_concat_word_valid(b1 + b2, b3, 2);
+    lemma_concat_word_valid(b1 + b2 + b3, b4, 2);
+    lemma_concat_word_valid(b1 + b2 + b3 + b4, b5, 2);
+}
+
+pub proof fn lemma_canw_eval_valid_s0(w: Seq<CanonLetter>)
+    requires
+        canw_all_s_zero(w),
+    ensures
+        word_valid(canw_eval(w), 2),
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        assert(canw_eval(w) =~= empty_word());
+    } else {
+        assert(w[0].s == 0);
+        lemma_gsconfig_valid_s0(w[0].r, w[0].e);
+        assert(canw_all_s_zero(w.drop_first())) by {
+            assert forall|j: int| 0 <= j < w.drop_first().len()
+                implies (#[trigger] w.drop_first()[j]).s == 0 by {
+                assert(w.drop_first()[j] == w[j + 1]);
+            }
+        }
+        lemma_canw_eval_valid_s0(w.drop_first());
+        lemma_concat_word_valid(canl_eval(w[0]), canw_eval(w.drop_first()), 2);
+    }
+}
+
+//  ★ F-LEVEL injectivity: a reduced nonempty all-s=0 config word is nontrivial. ★
+pub proof fn lemma_canw_fl_nontrivial(w: Seq<CanonLetter>)
+    requires
+        canw_all_s_zero(w),
+        forall|j: int| 0 <= j < w.len() ==> (#[trigger] w[j]).e != 0,
+        forall|j: int| 0 <= j < w.len() - 1 ==> (#[trigger] w[j]).r != w[j + 1].r,
+        w.len() >= 1,
+    ensures
+        !equiv_in_presentation(base_A(), canw_eval(w), empty_word()),
+{
+    let cw = canw_eval(w);
+    let fc = fl_combined(w);
+    let pt = pres_tx();
+    assert(presentation_valid(pt)) by { reveal(presentation_valid); }
+    lemma_canw_eval_valid_s0(w);
+    lemma_canw_eval_equiv_fl_combined(w);          //  equiv(pt, cw, fc)
+    lemma_fl_comb_acc_reduced(w, 0);               //  is_reduced(fc)
+    lemma_fl_combined_nonempty(w);                 //  fc.len() >= 1
+    lemma_empty_is_reduced();
+    lemma_reduced_is_own_normal_form(empty_word());
+    assert(!equiv_in_presentation(base_A(), cw, empty_word())) by {
+        if equiv_in_presentation(base_A(), cw, empty_word()) {
+            lemma_a_base_faithful(cw);             //  equiv(pt, cw, ε)
+            lemma_equiv_symmetric(pt, cw, fc);     //  equiv(pt, fc, cw)
+            lemma_equiv_transitive(pt, fc, cw, empty_word());   //  equiv(pt, fc, ε)
+            lemma_no_relator_equiv_implies_freely_equivalent(pt, fc, empty_word());
+            lemma_normal_form_equiv_forward(fc, empty_word());  //  nf(fc) == nf(ε) == ε
+            lemma_reduced_is_own_normal_form(fc);  //  nf(fc) == fc, so fc == ε — contradicts len>=1
+        }
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
