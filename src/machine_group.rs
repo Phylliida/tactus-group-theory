@@ -8722,6 +8722,95 @@ pub proof fn lemma_canw_eval_gexp(w: Seq<CanonLetter>)
     }
 }
 
+//  ============================================================
+//  Free-group bridge: a no-relator derivation is pure free reduction
+//  ============================================================
+
+proof fn lemma_no_relator_steps_freely_equiv(
+    p: Presentation, steps: Seq<DerivationStep>, w1: Word, w2: Word,
+)
+    requires
+        p.relators.len() == 0,
+        derivation_produces(p, steps, w1) == Some(w2),
+    ensures
+        freely_equivalent(w1, w2),
+    decreases steps.len(),
+{
+    reveal_with_fuel(derivation_produces, 1);
+    reveal_with_fuel(reduces_in_steps, 1);
+    if steps.len() == 0 {
+        assert(w2 == w1);
+        lemma_reduces_to_refl(w1);
+        assert(freely_equivalent(w1, w2)) by { assert(reduces_to(w1, w1)); }
+    } else {
+        let step = steps.first();
+        let ostep = apply_step(p, w1, step);
+        assert(ostep is Some);
+        let wn = ostep.unwrap();
+        assert(ostep == Some(wn));
+        assert(derivation_produces(p, steps.drop_first(), wn) == Some(w2));
+        match step {
+            DerivationStep::FreeReduce { position } => {
+                assert(has_cancellation_at(w1, position) && wn == reduce_at(w1, position));
+                assert(reduces_one_step(w1, wn)) by {
+                    assert(has_cancellation_at(w1, position) && wn == reduce_at(w1, position));
+                }
+                assert(reduces_in_steps(w1, wn, 1)) by {
+                    assert(reduces_one_step(w1, wn) && reduces_in_steps(wn, wn, 0));
+                }
+                lemma_reduces_to_refl(wn);
+                assert(freely_equivalent(w1, wn)) by {
+                    assert(reduces_to(w1, wn) && reduces_to(wn, wn));
+                }
+            },
+            DerivationStep::FreeExpand { position, symbol } => {
+                assert(0 <= position <= w1.len() && symbol_valid(symbol, p.num_generators));
+                let pair = Seq::new(1, |_i: int| symbol) + Seq::new(1, |_i: int| inverse_symbol(symbol));
+                assert(wn == w1.subrange(0, position) + pair + w1.subrange(position, w1.len() as int));
+                assert(wn[position] == symbol);
+                assert(wn[position + 1] == inverse_symbol(symbol));
+                assert(has_cancellation_at(wn, position));
+                assert(reduce_at(wn, position) =~= w1) by {
+                    assert(wn.subrange(0, position) =~= w1.subrange(0, position));
+                    assert(wn.subrange(position + 2, wn.len() as int) =~= w1.subrange(position, w1.len() as int));
+                    assert(w1.subrange(0, position) + w1.subrange(position, w1.len() as int) =~= w1);
+                }
+                assert(reduces_one_step(wn, w1)) by {
+                    assert(has_cancellation_at(wn, position) && w1 == reduce_at(wn, position));
+                }
+                assert(reduces_in_steps(wn, w1, 1)) by {
+                    assert(reduces_one_step(wn, w1) && reduces_in_steps(w1, w1, 0));
+                }
+                lemma_reduces_to_refl(w1);
+                assert(freely_equivalent(w1, wn)) by {
+                    assert(reduces_to(w1, w1) && reduces_to(wn, w1));
+                }
+            },
+            DerivationStep::RelatorInsert { position, relator_index, inverted } => {
+                assert(apply_step(p, w1, step) is None);
+            },
+            DerivationStep::RelatorDelete { position, relator_index, inverted } => {
+                assert(apply_step(p, w1, step) is None);
+            },
+        }
+        lemma_no_relator_steps_freely_equiv(p, steps.drop_first(), wn, w2);
+        lemma_freely_equivalent_trans(w1, wn, w2);
+    }
+}
+
+//  In a presentation with no relators, equivalence is exactly free equivalence.
+pub proof fn lemma_no_relator_equiv_implies_freely_equivalent(p: Presentation, w1: Word, w2: Word)
+    requires
+        p.relators.len() == 0,
+        equiv_in_presentation(p, w1, w2),
+    ensures
+        freely_equivalent(w1, w2),
+{
+    let d = choose|d: Derivation| derivation_valid(p, d, w1, w2);
+    assert(derivation_valid(p, d, w1, w2));
+    lemma_no_relator_steps_freely_equiv(p, d.steps, w1, w2);
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
