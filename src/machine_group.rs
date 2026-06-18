@@ -7415,6 +7415,101 @@ pub proof fn lemma_b_m_level_descend(mm: ModMachine, level: nat, w: Word)
     lemma_single_hnn_base_faithful(step, w);
 }
 
+//  ============================================================
+//  Config conjugation algebra (toward property (ii) / T-freeness):
+//  conjugating a config by xᵐ shifts its first coordinate by m (residue preserved).
+//      x⁻ᵐ · t(r,s) · xᵐ  ≡  t(r+m, s)
+//  ============================================================
+pub proof fn lemma_config_conj_x(r: nat, s: nat, m: nat)
+    ensures
+        equiv_in_presentation(base_A(),
+            symbol_power(Symbol::Inv(1), m) + config_word(r, s) + symbol_power(Symbol::Gen(1), m),
+            config_word((r + m) as nat, s)),
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    assert(presentation_valid(a)) by { reveal(presentation_valid); }
+    let xim = symbol_power(Symbol::Inv(1), m);
+    let xm = symbol_power(Symbol::Gen(1), m);
+    let i2s = symbol_power(Symbol::Inv(2), s);
+    let i1r = symbol_power(Symbol::Inv(1), r);
+    let tt: Word = seq![Symbol::Gen(0)];
+    let g1r = symbol_power(Symbol::Gen(1), r);
+    let g2s = symbol_power(Symbol::Gen(2), s);
+    let i1rm = symbol_power(Symbol::Inv(1), (r + m) as nat);
+    let g1rm = symbol_power(Symbol::Gen(1), (r + m) as nat);
+    //  the two endpoints, flattened
+    let lhs = xim + config_word(r, s) + xm;
+    let rhs = config_word((r + m) as nat, s);
+    assert(lhs =~= xim + i2s + i1r + tt + g1r + g2s + xm);
+    assert(rhs =~= i2s + i1rm + tt + g1rm + g2s);
+    //  left swap: xim·i2s ~ i2s·xim  (x⁻ᵐ past y⁻ˢ); flip the commute to [Inv1,Inv2] order
+    lemma_xinv_yinv_commute_in_A();   //  equiv([Inv2,Inv1],[Inv1,Inv2])
+    let yx_inv: Word = seq![Symbol::Inv(2), Symbol::Inv(1)];
+    let xy_inv: Word = seq![Symbol::Inv(1), Symbol::Inv(2)];
+    assert(word_valid(yx_inv, 3)) by {
+        assert forall|t: int| 0 <= t < 2 implies symbol_valid(#[trigger] yx_inv[t], 3) by { }
+    }
+    lemma_equiv_symmetric(a, yx_inv, xy_inv);
+    lemma_power_commutes(a, Symbol::Inv(1), Symbol::Inv(2), m, s);
+    //  right swap: g2s·xm ~ xm·g2s  (yˢ past xᵐ)
+    lemma_comm_y_x();
+    lemma_power_commutes(a, Symbol::Gen(2), Symbol::Gen(1), s, m);
+    //  merges
+    lemma_symbol_power_merge(Symbol::Inv(1), m, r);   //  xim+i1r =~= x⁻⁽ᵐ⁺ʳ⁾
+    lemma_symbol_power_merge(Symbol::Gen(1), r, m);   //  g1r+xm =~= xʳ⁺ᵐ
+    //  mid word after the left swap (move xim right past i2s, merge into i1r)
+    let w1 = i2s + xim + i1r + tt + g1r + g2s + xm;
+    assert(equiv_in_presentation(a, lhs, w1)) by {
+        lemma_equiv_concat_left(a, xim + i2s, i2s + xim, i1r + tt + g1r + g2s + xm);
+        assert(lhs =~= (xim + i2s) + (i1r + tt + g1r + g2s + xm));
+        assert(w1 =~= (i2s + xim) + (i1r + tt + g1r + g2s + xm));
+    }
+    //  w1 =~= i2s + x⁻⁽ᵐ⁺ʳ⁾ + tt + g1r + g2s + xm  (merge xim+i1r)
+    let w2 = i2s + i1rm + tt + g1r + g2s + xm;
+    assert(w1 =~= w2) by {
+        assert(xim + i1r =~= i1rm);
+    }
+    //  right swap inside w2: g2s+xm ~ xm+g2s
+    let w3 = i2s + i1rm + tt + g1r + xm + g2s;
+    assert(equiv_in_presentation(a, w2, w3)) by {
+        lemma_equiv_concat_right(a, i2s + i1rm + tt + g1r, g2s + xm, xm + g2s);
+        assert(w2 =~= (i2s + i1rm + tt + g1r) + (g2s + xm));
+        assert(w3 =~= (i2s + i1rm + tt + g1r) + (xm + g2s));
+    }
+    //  w3 =~= rhs  (merge g1r+xm)
+    assert(w3 =~= rhs) by {
+        assert(g1r + xm =~= g1rm);
+    }
+    //  w1=~=w2 ⟹ equiv(lhs,w2); then transitivity with equiv(w2,w3); w3=~=rhs
+    assert(equiv_in_presentation(a, lhs, w2));
+    lemma_equiv_transitive(a, lhs, w2, w3);
+    assert(equiv_in_presentation(a, lhs, rhs));
+}
+
+//  Conjugating a config by yᵐ shifts its second coordinate by m:
+//      y⁻ᵐ · t(r,s) · yᵐ  ≡  t(r, s+m)   (pure merge — y⁻ᵐ absorbs into y⁻ˢ, yᵐ into yˢ)
+pub proof fn lemma_config_conj_y(r: nat, s: nat, m: nat)
+    ensures
+        equiv_in_presentation(base_A(),
+            symbol_power(Symbol::Inv(2), m) + config_word(r, s) + symbol_power(Symbol::Gen(2), m),
+            config_word(r, (s + m) as nat)),
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    assert(presentation_valid(a)) by { reveal(presentation_valid); }
+    let lhs = symbol_power(Symbol::Inv(2), m) + config_word(r, s) + symbol_power(Symbol::Gen(2), m);
+    let rhs = config_word(r, (s + m) as nat);
+    lemma_symbol_power_merge(Symbol::Inv(2), m, s);   //  y⁻ᵐ·y⁻ˢ =~= y⁻⁽ᵐ⁺ˢ⁾
+    lemma_symbol_power_merge(Symbol::Gen(2), s, m);   //  yˢ·yᵐ =~= y⁽ˢ⁺ᵐ⁾
+    assert(symbol_power(Symbol::Inv(2), m) + symbol_power(Symbol::Inv(2), s)
+        =~= symbol_power(Symbol::Inv(2), (s + m) as nat));
+    assert(symbol_power(Symbol::Gen(2), s) + symbol_power(Symbol::Gen(2), m)
+        =~= symbol_power(Symbol::Gen(2), (s + m) as nat));
+    assert(lhs =~= rhs);
+    lemma_equiv_refl(a, lhs);
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
