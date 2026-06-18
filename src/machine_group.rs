@@ -8934,6 +8934,50 @@ pub proof fn lemma_canw_eval_equiv_fl_combined(w: Seq<CanonLetter>)
     assert(fl_comb_acc(w, 0) == fl_combined(w));
 }
 
+//  A single signed-power block is freely reduced (all symbols equal).
+pub proof fn lemma_signed_power_is_reduced(i: nat, a: int)
+    ensures
+        is_reduced(signed_power(i, a)),
+{
+    let w = signed_power(i, a);
+    let s = if a >= 0 { Symbol::Gen(i) } else { Symbol::Inv(i) };
+    assert(!has_cancellation(w)) by {
+        assert forall|j: int| !has_cancellation_at(w, j) by {
+            if 0 <= j < w.len() - 1 {
+                assert(w[j] == s && w[j + 1] == s);
+                lemma_not_self_inverse(s);
+            }
+        }
+    }
+}
+
+//  Concatenation of reduced words with a non-cancelling boundary is reduced.
+pub proof fn lemma_concat_reduced(a: Word, b: Word)
+    requires
+        is_reduced(a),
+        is_reduced(b),
+        (a.len() > 0 && b.len() > 0) ==> !is_inverse_pair(a[a.len() - 1], b[0]),
+    ensures
+        is_reduced(a + b),
+{
+    let w = a + b;
+    assert(!has_cancellation(w)) by {
+        assert forall|i: int| !has_cancellation_at(w, i) by {
+            if 0 <= i < w.len() - 1 {
+                if i + 1 < a.len() {
+                    assert(w[i] == a[i] && w[i + 1] == a[i + 1]);
+                    assert(!has_cancellation_at(a, i));
+                } else if i == a.len() - 1 {
+                    assert(w[i] == a[a.len() - 1] && w[i + 1] == b[0]);
+                } else {
+                    assert(w[i] == b[i - a.len()] && w[i + 1] == b[i + 1 - a.len()]);
+                    assert(!has_cancellation_at(b, i - a.len()));
+                }
+            }
+        }
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
