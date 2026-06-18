@@ -7636,6 +7636,37 @@ pub proof fn lemma_signed_power_add(p: Presentation, i: nat, a: int, b: int)
     }
 }
 
+//  Signed x↔y commute in A:  x^A · y^B ≡ y^B · x^A  (signed A,B).
+pub proof fn lemma_signed_xy_commute(aa: int, bb: int)
+    ensures
+        equiv_in_presentation(base_A(),
+            signed_power(1, aa) + signed_power(2, bb),
+            signed_power(2, bb) + signed_power(1, aa)),
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    assert(presentation_valid(a)) by { reveal(presentation_valid); }
+    if aa >= 0 && bb >= 0 {
+        lemma_xy_commute_in_A();
+        lemma_power_commutes(a, Symbol::Gen(1), Symbol::Gen(2), aa as nat, bb as nat);
+    } else if aa >= 0 {
+        lemma_x_yinv_commute_in_A();
+        lemma_power_commutes(a, Symbol::Gen(1), Symbol::Inv(2), aa as nat, (-bb) as nat);
+    } else if bb >= 0 {
+        lemma_xinv_y_commute_in_A();
+        lemma_power_commutes(a, Symbol::Inv(1), Symbol::Gen(2), (-aa) as nat, bb as nat);
+    } else {
+        lemma_xinv_yinv_commute_in_A();
+        let yx: Word = seq![Symbol::Inv(2), Symbol::Inv(1)];
+        let xy: Word = seq![Symbol::Inv(1), Symbol::Inv(2)];
+        assert(word_valid(yx, 3)) by {
+            assert forall|t: int| 0 <= t < 2 implies symbol_valid(#[trigger] yx[t], 3) by { }
+        }
+        lemma_equiv_symmetric(a, yx, xy);
+        lemma_power_commutes(a, Symbol::Inv(1), Symbol::Inv(2), (-aa) as nat, (-bb) as nat);
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
