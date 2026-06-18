@@ -8562,6 +8562,96 @@ pub proof fn lemma_cw_gexp_nontrivial(w: Seq<ConfigLetter>)
     }
 }
 
+//  ============================================================
+//  Canonical config powers (for the F-level no-pinch / net-zero Britton core)
+//  ============================================================
+//
+//  gsconfig(r,s,e) = y⁻ˢ x⁻ʳ tᵉ xʳ yˢ — a config raised to integer power e.
+//  (e=1 is sconfig; e=−1 is its inverse.)  The canonical form uses one such
+//  letter per maximal equal-coordinate run, so distinct adjacent coords ⟹ the
+//  F-level word x⁻ʳ¹tᵉ¹xʳ¹⁻ʳ²… has all-nonzero x-gaps & t-powers ⟹ no pinch.
+
+pub open spec fn gsconfig(r: int, s: int, e: int) -> Word {
+    signed_power(2, -s) + signed_power(1, -r) + signed_power(0, e)
+        + signed_power(1, r) + signed_power(2, s)
+}
+
+pub proof fn lemma_gsconfig_valid(r: int, s: int, e: int)
+    ensures
+        word_valid(gsconfig(r, s, e), 3),
+{
+    let b1 = signed_power(2, -s);
+    let b2 = signed_power(1, -r);
+    let b3 = signed_power(0, e);
+    let b4 = signed_power(1, r);
+    let b5 = signed_power(2, s);
+    lemma_signed_power_valid(2, -s, 3);
+    lemma_signed_power_valid(1, -r, 3);
+    lemma_signed_power_valid(0, e, 3);
+    lemma_signed_power_valid(1, r, 3);
+    lemma_signed_power_valid(2, s, 3);
+    lemma_concat_word_valid(b1, b2, 3);
+    lemma_concat_word_valid(b1 + b2, b3, 3);
+    lemma_concat_word_valid(b1 + b2 + b3, b4, 3);
+    lemma_concat_word_valid(b1 + b2 + b3 + b4, b5, 3);
+}
+
+//  The t-exponent of gsconfig(r,s,e) is e.
+pub proof fn lemma_gsconfig_t_exp(r: int, s: int, e: int)
+    ensures
+        gexp(0, gsconfig(r, s, e)) == e,
+{
+    let b1 = signed_power(2, -s);
+    let b2 = signed_power(1, -r);
+    let b3 = signed_power(0, e);
+    let b4 = signed_power(1, r);
+    let b5 = signed_power(2, s);
+    assert(gsconfig(r, s, e) == b1 + b2 + b3 + b4 + b5);
+    lemma_gexp_signed_power(2, 0, -s);
+    lemma_gexp_signed_power(1, 0, -r);
+    lemma_gexp_signed_power(0, 0, e);
+    lemma_gexp_signed_power(1, 0, r);
+    lemma_gexp_signed_power(2, 0, s);
+    lemma_gexp_concat(0, b1, b2);
+    lemma_gexp_concat(0, b1 + b2, b3);
+    lemma_gexp_concat(0, b1 + b2 + b3, b4);
+    lemma_gexp_concat(0, b1 + b2 + b3 + b4, b5);
+}
+
+//  gsconfig(r,s,1) is the upright config word.
+pub proof fn lemma_gsconfig_pos_one(r: int, s: int)
+    ensures
+        gsconfig(r, s, 1) =~= sconfig(r, s),
+{
+    lemma_symbol_power_one(Symbol::Gen(0));
+    assert(signed_power(0, 1) =~= seq![Symbol::Gen(0)]);
+}
+
+//  gsconfig(r,s,−1) is the inverse config word.
+pub proof fn lemma_gsconfig_neg_one(r: int, s: int)
+    ensures
+        gsconfig(r, s, -1) =~= inverse_word(sconfig(r, s)),
+{
+    let b1 = signed_power(2, -s);
+    let b2 = signed_power(1, -r);
+    let b3: Word = seq![Symbol::Gen(0)];
+    let b4 = signed_power(1, r);
+    let b5 = signed_power(2, s);
+    assert(sconfig(r, s) == b1 + b2 + b3 + b4 + b5);
+    lemma_inverse_word_concat(b1 + b2 + b3 + b4, b5);
+    lemma_inverse_word_concat(b1 + b2 + b3, b4);
+    lemma_inverse_word_concat(b1 + b2, b3);
+    lemma_inverse_word_concat(b1, b2);
+    lemma_inverse_signed_power(2, s);
+    lemma_inverse_signed_power(1, r);
+    lemma_inverse_word_one(Symbol::Gen(0));
+    lemma_inverse_signed_power(1, -r);
+    lemma_inverse_signed_power(2, -s);
+    lemma_symbol_power_one(Symbol::Inv(0));
+    assert(signed_power(0, -1) =~= seq![Symbol::Inv(0)]);
+    assert(inverse_word(sconfig(r, s)) =~= b1 + b2 + seq![Symbol::Inv(0)] + b4 + b5);
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
