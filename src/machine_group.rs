@@ -8507,6 +8507,61 @@ pub proof fn lemma_cl_eval_nontrivial(c: ConfigLetter)
     }
 }
 
+//  Net sign of a config word: +1 per upright letter, −1 per inverse.
+pub open spec fn cw_net_sign(w: Seq<ConfigLetter>) -> int
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        0
+    } else {
+        (if w[0].inv { -1int } else { 1int }) + cw_net_sign(w.drop_first())
+    }
+}
+
+//  A config letter's t-exponent is its sign.
+pub proof fn lemma_cl_eval_gexp(c: ConfigLetter)
+    ensures
+        gexp(0, cl_eval(c)) == (if c.inv { -1int } else { 1int }),
+{
+    lemma_sconfig_t_exp(c.r, c.s);
+    if c.inv {
+        lemma_gexp_inverse(0, sconfig(c.r, c.s));
+    }
+}
+
+//  A config word's t-exponent is its net sign.
+pub proof fn lemma_cw_eval_gexp(w: Seq<ConfigLetter>)
+    ensures
+        gexp(0, cw_eval(w)) == cw_net_sign(w),
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        assert(cw_eval(w) =~= empty_word());
+        assert(gexp(0, empty_word()) == 0) by { reveal_with_fuel(gexp, 1); }
+    } else {
+        lemma_cl_eval_gexp(w[0]);
+        lemma_cw_eval_gexp(w.drop_first());
+        lemma_gexp_concat(0, cl_eval(w[0]), cw_eval(w.drop_first()));
+    }
+}
+
+//  Sign-unbalanced config words are nontrivial (the t-exponent ≠ 0).  This
+//  reduces config-basis injectivity to the NET-ZERO case (which needs Britton).
+pub proof fn lemma_cw_gexp_nontrivial(w: Seq<ConfigLetter>)
+    requires
+        cw_net_sign(w) != 0,
+    ensures
+        !equiv_in_presentation(base_A(), cw_eval(w), empty_word()),
+{
+    lemma_cw_eval_gexp(w);
+    assert(gexp(0, empty_word()) == 0) by { reveal_with_fuel(gexp, 1); }
+    assert(!equiv_in_presentation(base_A(), cw_eval(w), empty_word())) by {
+        if equiv_in_presentation(base_A(), cw_eval(w), empty_word()) {
+            lemma_equiv_in_A_preserves_gexp(0, cw_eval(w), empty_word());
+        }
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
