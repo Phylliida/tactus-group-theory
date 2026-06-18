@@ -9327,6 +9327,115 @@ pub proof fn lemma_canw_fl_not_in_x(w: Seq<CanonLetter>)
     }
 }
 
+//  ============================================================
+//  Y-LEVEL combined word: y⁻ˢ¹ h₁ yˢ¹⁻ˢ² h₂ … yˢⁿ  (y-powers merged, h-blocks intact)
+//  ============================================================
+
+//  hᵣᵉ = x⁻ʳ tᵉ xʳ  (the F-part of a config, without the y-conjugation).
+pub open spec fn hblock(r: int, e: int) -> Word {
+    signed_power(1, -r) + signed_power(0, e) + signed_power(1, r)
+}
+
+pub proof fn lemma_hblock_valid(r: int, e: int)
+    ensures
+        word_valid(hblock(r, e), 3),
+{
+    lemma_signed_power_valid(1, -r, 3);
+    lemma_signed_power_valid(0, e, 3);
+    lemma_signed_power_valid(1, r, 3);
+    lemma_concat_word_valid(signed_power(1, -r), signed_power(0, e), 3);
+    lemma_concat_word_valid(signed_power(1, -r) + signed_power(0, e), signed_power(1, r), 3);
+}
+
+//  gsconfig(r,s,e) = y⁻ˢ · hᵣᵉ · yˢ.
+pub proof fn lemma_gsconfig_split(r: int, s: int, e: int)
+    ensures
+        gsconfig(r, s, e) =~= signed_power(2, -s) + hblock(r, e) + signed_power(2, s),
+{
+}
+
+pub open spec fn yl_comb_acc(w: Seq<CanonLetter>, prev_y: int) -> Word
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        signed_power(2, prev_y)
+    } else {
+        signed_power(2, prev_y - w[0].s) + hblock(w[0].r, w[0].e)
+            + yl_comb_acc(w.drop_first(), w[0].s)
+    }
+}
+
+pub open spec fn yl_combined(w: Seq<CanonLetter>) -> Word {
+    yl_comb_acc(w, 0)
+}
+
+pub proof fn lemma_yl_comb_acc_valid(w: Seq<CanonLetter>, prev_y: int)
+    ensures
+        word_valid(yl_comb_acc(w, prev_y), 3),
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        lemma_signed_power_valid(2, prev_y, 3);
+    } else {
+        lemma_signed_power_valid(2, prev_y - w[0].s, 3);
+        lemma_hblock_valid(w[0].r, w[0].e);
+        lemma_yl_comb_acc_valid(w.drop_first(), w[0].s);
+        lemma_concat_word_valid(signed_power(2, prev_y - w[0].s), hblock(w[0].r, w[0].e), 3);
+        lemma_concat_word_valid(
+            signed_power(2, prev_y - w[0].s) + hblock(w[0].r, w[0].e),
+            yl_comb_acc(w.drop_first(), w[0].s), 3);
+    }
+}
+
+//  yᵖʳᵉᵛ · canw_eval(w) ≡ yl_comb_acc(w, prev)  (y-powers merge, h-blocks intact).
+pub proof fn lemma_ypow_canw_eval(w: Seq<CanonLetter>, prev: int)
+    ensures
+        equiv_in_presentation(base_A(), signed_power(2, prev) + canw_eval(w), yl_comb_acc(w, prev)),
+    decreases w.len(),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let yprev = signed_power(2, prev);
+    if w.len() == 0 {
+        assert(canw_eval(w) =~= empty_word());
+        assert(yprev + canw_eval(w) =~= yl_comb_acc(w, prev));
+        lemma_equiv_refl(p, yprev + canw_eval(w));
+    } else {
+        let c = w[0];
+        let rest = w.drop_first();
+        let yms = signed_power(2, -c.s);
+        let hb = hblock(c.r, c.e);
+        let ys = signed_power(2, c.s);
+        let cwr = canw_eval(rest);
+        lemma_gsconfig_split(c.r, c.s, c.e);
+        assert(canl_eval(c) =~= yms + hb + ys);
+        assert(canw_eval(w) == canl_eval(c) + cwr);
+        let merged = signed_power(2, prev - c.s);
+        let suffix = hb + (ys + cwr);
+        assert(yprev + canw_eval(w) =~= (yprev + yms) + suffix);
+        lemma_signed_power_add(p, 2, prev, -c.s);
+        assert(equiv_in_presentation(p, yprev + yms, merged));
+        lemma_equiv_concat_left(p, yprev + yms, merged, suffix);
+        assert(equiv_in_presentation(p, yprev + canw_eval(w), merged + suffix));
+        lemma_ypow_canw_eval(rest, c.s);
+        assert(merged + suffix =~= (merged + hb) + (ys + cwr));
+        lemma_equiv_concat_right(p, merged + hb, ys + cwr, yl_comb_acc(rest, c.s));
+        assert((merged + hb) + yl_comb_acc(rest, c.s) == yl_comb_acc(w, prev));
+        lemma_equiv_transitive(p, yprev + canw_eval(w), merged + suffix, yl_comb_acc(w, prev));
+    }
+}
+
+//  canw_eval(w) ≡ yl_combined(w)  in base_A.
+pub proof fn lemma_canw_eval_equiv_yl_combined(w: Seq<CanonLetter>)
+    ensures
+        equiv_in_presentation(base_A(), canw_eval(w), yl_combined(w)),
+{
+    lemma_ypow_canw_eval(w, 0);
+    assert(signed_power(2, 0) =~= empty_word());
+    assert(signed_power(2, 0) + canw_eval(w) =~= canw_eval(w));
+    assert(yl_comb_acc(w, 0) == yl_combined(w));
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
