@@ -9961,6 +9961,29 @@ pub proof fn lemma_yl_no_pinch(w: Seq<CanonLetter>, prev: int)
     }
 }
 
+//  ★★ CONFIG-BASIS INJECTIVITY (T-free): any reduced config word is nontrivial. ★★
+//  Dispatches: all-s=0 ⟹ F-level; some s≠0 ⟹ y-level (stable + no-pinch).
+pub proof fn lemma_canw_eval_nontrivial(w: Seq<CanonLetter>)
+    requires
+        w.len() >= 1,
+        forall|j: int| 0 <= j < w.len() ==> (#[trigger] w[j]).e != 0,
+        forall|j: int| 0 <= j < w.len() - 1 ==>
+            (#[trigger] w[j]).r != w[j + 1].r || w[j].s != w[j + 1].s,
+    ensures
+        !equiv_in_presentation(base_A(), canw_eval(w), empty_word()),
+{
+    if canw_all_s_zero(w) {
+        assert forall|j: int| 0 <= j < w.len() - 1 implies (#[trigger] w[j]).r != w[j + 1].r by {
+            assert(w[j].s == 0 && w[j + 1].s == 0);
+        }
+        lemma_canw_fl_nontrivial(w);
+    } else {
+        lemma_yl_has_stable(w);
+        lemma_yl_no_pinch(w, 0);
+        lemma_yl_combined_nontrivial(w);
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
