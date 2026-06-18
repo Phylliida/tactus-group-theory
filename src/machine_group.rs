@@ -9722,6 +9722,86 @@ pub proof fn lemma_yl_leading_run_split(w: Seq<CanonLetter>, prev: int)
     }
 }
 
+//  Every symbol of signed_power(i, a) has generator index i.
+pub proof fn lemma_signed_power_gen(i: nat, a: int)
+    ensures
+        forall|k: int| 0 <= k < signed_power(i, a).len()
+            ==> generator_index(#[trigger] signed_power(i, a)[k]) == i,
+{
+    assert forall|k: int| 0 <= k < signed_power(i, a).len()
+        implies generator_index(#[trigger] signed_power(i, a)[k]) == i by {
+        if a >= 0 {
+            assert(signed_power(i, a)[k] == Symbol::Gen(i));
+        } else {
+            assert(signed_power(i, a)[k] == Symbol::Inv(i));
+        }
+    }
+}
+
+//  An h-block has no y (its symbols are t/x, generator 0 or 1).
+pub proof fn lemma_hblock_no_stable(r: int, e: int)
+    ensures
+        forall|k: int| 0 <= k < hblock(r, e).len()
+            ==> !is_stable(a_as_hnn(), #[trigger] hblock(r, e)[k]),
+{
+    let a = signed_power(1, -r);
+    let b = signed_power(0, e);
+    let c = signed_power(1, r);
+    lemma_signed_power_gen(1, -r);
+    lemma_signed_power_gen(0, e);
+    lemma_signed_power_gen(1, r);
+    assert forall|k: int| 0 <= k < hblock(r, e).len()
+        implies !is_stable(a_as_hnn(), #[trigger] hblock(r, e)[k]) by {
+        if k < a.len() {
+            assert(hblock(r, e)[k] == a[k]);
+        } else if k < a.len() + b.len() {
+            assert(hblock(r, e)[k] == b[k - a.len()]);
+        } else {
+            assert(hblock(r, e)[k] == c[k - a.len() - b.len()]);
+        }
+    }
+}
+
+//  An h-run has no y.
+pub proof fn lemma_hrun_no_stable(w: Seq<CanonLetter>)
+    ensures
+        forall|k: int| 0 <= k < hrun(w).len() ==> !is_stable(a_as_hnn(), #[trigger] hrun(w)[k]),
+    decreases w.len(),
+{
+    if w.len() == 0 {
+    } else {
+        let hb = hblock(w[0].r, w[0].e);
+        lemma_hblock_no_stable(w[0].r, w[0].e);
+        lemma_hrun_no_stable(w.drop_first());
+        assert forall|k: int| 0 <= k < hrun(w).len()
+            implies !is_stable(a_as_hnn(), #[trigger] hrun(w)[k]) by {
+            if k < hb.len() {
+                assert(hrun(w)[k] == hb[k]);
+            } else {
+                assert(hrun(w)[k] == hrun(w.drop_first())[k - hb.len()]);
+            }
+        }
+    }
+}
+
+//  Run maximality: the config after the leading run breaks its s.
+pub proof fn lemma_run_maximal(w: Seq<CanonLetter>)
+    requires
+        run_len(w) < w.len(),
+    ensures
+        w[run_len(w) as int].s != w[0].s,
+    decreases w.len(),
+{
+    if w.len() <= 1 {
+    } else if w[1].s == w[0].s {
+        lemma_run_maximal(w.drop_first());
+        assert(w.drop_first()[run_len(w.drop_first()) as int] == w[run_len(w) as int]);
+        assert(w.drop_first()[0] == w[1]);
+    } else {
+        assert(w[run_len(w) as int] == w[1]);
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
