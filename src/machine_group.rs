@@ -9436,6 +9436,36 @@ pub proof fn lemma_canw_eval_equiv_yl_combined(w: Seq<CanonLetter>)
     assert(yl_comb_acc(w, 0) == yl_combined(w));
 }
 
+//  Y-LEVEL assembly: no pinch + a stable y ⟹ the config word is nontrivial.
+pub proof fn lemma_yl_combined_nontrivial(w: Seq<CanonLetter>)
+    requires
+        has_stable_letter(a_as_hnn(), yl_combined(w)),
+        !has_pinch(a_as_hnn(), yl_combined(w)),
+    ensures
+        !equiv_in_presentation(base_A(), canw_eval(w), empty_word()),
+{
+    let data = a_as_hnn();
+    let p = base_A();
+    let yc = yl_combined(w);
+    lemma_a_as_hnn_valid();
+    lemma_a_as_hnn_isomorphic();
+    lemma_a_as_hnn_presentation();
+    lemma_yl_comb_acc_valid(w, 0);
+    lemma_canw_eval_valid(w);
+    lemma_base_A_valid();
+    assert(presentation_valid(p)) by { reveal(presentation_valid); }
+    assert(word_valid(yc, hnn_presentation(data).num_generators));
+    lemma_no_pinch_stable_nontrivial(data, yc);
+    lemma_canw_eval_equiv_yl_combined(w);
+    assert(!equiv_in_presentation(p, canw_eval(w), empty_word())) by {
+        if equiv_in_presentation(p, canw_eval(w), empty_word()) {
+            lemma_equiv_symmetric(p, canw_eval(w), yc);
+            lemma_equiv_transitive(p, yc, canw_eval(w), empty_word());
+            lemma_base_A_to_a_hnn(yc, empty_word());
+        }
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
