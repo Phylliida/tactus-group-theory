@@ -7142,6 +7142,84 @@ pub proof fn lemma_stable_conj_factorization_rev(data: HNNData, u: Word)
         seq![st] + apply_embedding(bg, u) + seq![si]);
 }
 
+//  ============================================================
+//  factors ↔ embedding-word correspondence: a product of generators-or-inverses
+//  is apply_embedding(gens, u) for a word u over gens.len() generators.  This lets
+//  the conjugation telescope consume a pinch-middle.
+//  ============================================================
+
+//  Build the embedding word u from a factorization.
+pub open spec fn factors_to_word(gens: Seq<Word>, factors: Seq<Word>) -> Word
+    decreases factors.len(),
+{
+    if factors.len() == 0 {
+        empty_word()
+    } else {
+        let f = factors.first();
+        let j = choose|j: int| 0 <= j < gens.len() && (f == gens[j] || f == inverse_word(gens[j]));
+        let sym = if f == gens[j] { Symbol::Gen(j as nat) } else { Symbol::Inv(j as nat) };
+        seq![sym] + factors_to_word(gens, factors.drop_first())
+    }
+}
+
+pub proof fn lemma_factors_to_word_correct(gens: Seq<Word>, factors: Seq<Word>)
+    requires
+        factors_from_generators(gens, factors),
+    ensures
+        word_valid(factors_to_word(gens, factors), gens.len() as nat),
+        apply_embedding(gens, factors_to_word(gens, factors)) =~= concat_all(factors),
+    decreases factors.len(),
+{
+    if factors.len() == 0 {
+        assert(factors_to_word(gens, factors) =~= empty_word());
+        assert(concat_all(factors) =~= empty_word());
+    } else {
+        let f = factors.first();
+        let rest = factors.drop_first();
+        assert(is_generator_or_inverse(gens, f)) by { assert(factors[0] == f); }
+        let j = choose|j: int| 0 <= j < gens.len() && (f == gens[j] || f == inverse_word(gens[j]));
+        assert(0 <= j < gens.len() && (f == gens[j] || f == inverse_word(gens[j])));
+        let sym = if f == gens[j] { Symbol::Gen(j as nat) } else { Symbol::Inv(j as nat) };
+        assert(factors_from_generators(gens, rest)) by {
+            assert forall|k: int| 0 <= k < rest.len() implies is_generator_or_inverse(gens, #[trigger] rest[k])
+            by { assert(rest[k] == factors[k + 1]); }
+        }
+        lemma_factors_to_word_correct(gens, rest);
+        let u_rest = factors_to_word(gens, rest);
+        let u = factors_to_word(gens, factors);
+        assert(u =~= seq![sym] + u_rest);
+        assert(u.first() == sym);
+        assert(u.drop_first() =~= u_rest);
+        reveal_with_fuel(apply_embedding, 2);
+        assert(apply_embedding_symbol(gens, sym) == f);
+        assert(symbol_valid(sym, gens.len() as nat));
+        assert(apply_embedding(gens, u) =~= f + apply_embedding(gens, u_rest));
+        assert(concat_all(factors) =~= f + concat_all(rest));
+        assert(word_valid(u, gens.len() as nat)) by {
+            assert forall|t: int| 0 <= t < u.len() implies symbol_valid(#[trigger] u[t], gens.len() as nat)
+            by { if t == 0 { assert(u[0] == sym); } else { assert(u[t] == u_rest[t - 1]); } }
+        }
+    }
+}
+
+//  An element of ⟨gens⟩ is apply_embedding(gens, u) for some valid word u.
+pub proof fn lemma_in_gen_implies_emb(p: Presentation, gens: Seq<Word>, w: Word)
+    requires
+        in_generated_subgroup(p, gens, w),
+    ensures
+        exists|u: Word| word_valid(u, gens.len() as nat)
+            && #[trigger] equiv_in_presentation(p, apply_embedding(gens, u), w),
+{
+    let factors = choose|factors: Seq<Word>|
+        factors_from_generators(gens, factors) && equiv_in_presentation(p, concat_all(factors), w);
+    assert(factors_from_generators(gens, factors)
+        && equiv_in_presentation(p, concat_all(factors), w));
+    let u = factors_to_word(gens, factors);
+    lemma_factors_to_word_correct(gens, factors);
+    assert(word_valid(u, gens.len() as nat)
+        && equiv_in_presentation(p, apply_embedding(gens, u), w));
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
