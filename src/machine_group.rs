@@ -6934,6 +6934,179 @@ pub proof fn lemma_no_stable_implies_all_h0(mm: ModMachine, factors: Seq<Word>)
     }
 }
 
+//  ============================================================
+//  The conjugation telescope: stable⁻¹ · emb(a_gens,u) · stable ≡ emb(b_gens,u).
+//  This is the pinch-out's engine — it maps a pinch-middle (an associated-subgroup
+//  element) through the iso, which for a quad step is exactly one machine step.
+//  ============================================================
+
+pub open spec fn hnn_a_gens(data: HNNData) -> Seq<Word> {
+    Seq::new(data.associations.len(), |i: int| data.associations[i].0)
+}
+pub open spec fn hnn_b_gens(data: HNNData) -> Seq<Word> {
+    Seq::new(data.associations.len(), |i: int| data.associations[i].1)
+}
+
+//  Per-symbol conjugation.
+pub proof fn lemma_stable_conj_symbol(data: HNNData, s: Symbol)
+    requires
+        hnn_data_valid(data),
+        symbol_valid(s, data.associations.len() as nat),
+    ensures
+        equiv_in_presentation(hnn_presentation(data),
+            seq![stable_letter_inv(data)] + apply_embedding_symbol(hnn_a_gens(data), s)
+                + seq![stable_letter(data)],
+            apply_embedding_symbol(hnn_b_gens(data), s)),
+{
+    let p = hnn_presentation(data);
+    let st = stable_letter(data);
+    let si = stable_letter_inv(data);
+    let ng = data.base.num_generators;
+    let ag = hnn_a_gens(data);
+    let bg = hnn_b_gens(data);
+    lemma_hnn_presentation_valid(data);
+    assert(st == Symbol::Gen(ng) && si == Symbol::Inv(ng));
+    match s {
+        Symbol::Gen(i) => {
+            assert(ag[i as int] == data.associations[i as int].0);
+            assert(bg[i as int] == data.associations[i as int].1);
+            lemma_hnn_conjugation(data, i as int);
+            assert(Seq::new(1, |_j: int| si) =~= seq![si]);
+            assert(Seq::new(1, |_j: int| st) =~= seq![st]);
+            assert(apply_embedding_symbol(ag, s) == data.associations[i as int].0);
+        }
+        Symbol::Inv(i) => {
+            let a_i = data.associations[i as int].0;
+            let b_i = data.associations[i as int].1;
+            assert(ag[i as int] == a_i && bg[i as int] == b_i);
+            assert(apply_embedding_symbol(ag, s) == inverse_word(a_i));
+            assert(apply_embedding_symbol(bg, s) == inverse_word(b_i));
+            //  base relation:  [si] · a_i · [st] ≡ b_i
+            lemma_hnn_conjugation(data, i as int);
+            assert(Seq::new(1, |_j: int| si) =~= seq![si]);
+            assert(Seq::new(1, |_j: int| st) =~= seq![st]);
+            let conj = seq![si] + a_i + seq![st];
+            assert(equiv_in_presentation(p, conj, b_i));
+            //  validity of conj
+            assert(word_valid(a_i, ng));
+            let png = p.num_generators;
+            assert(png == ng + 1);
+            assert(symbol_valid(st, png) && symbol_valid(si, png));
+            lemma_word_valid_mono(a_i, ng, png);
+            assert(word_valid(seq![si], png)) by {
+                assert forall|t: int| 0 <= t < 1 implies symbol_valid(#[trigger] seq![si][t], png) by { }
+            }
+            assert(word_valid(seq![st], png)) by {
+                assert forall|t: int| 0 <= t < 1 implies symbol_valid(#[trigger] seq![st][t], png) by { }
+            }
+            lemma_concat_word_valid(seq![si], a_i, png);
+            lemma_concat_word_valid(seq![si] + a_i, seq![st], png);
+            //  invert:  inverse_word(conj) ≡ inverse_word(b_i)
+            lemma_equiv_inverse(p, conj, b_i);
+            //  inverse_word(conj) =~= [si] · inverse_word(a_i) · [st]
+            reveal_with_fuel(inverse_word, 2);
+            lemma_inverse_word_concat(seq![si] + a_i, seq![st]);
+            lemma_inverse_word_concat(seq![si], a_i);
+            assert(inverse_word(seq![st]) =~= seq![si]);
+            assert(inverse_word(seq![si]) =~= seq![st]);
+            assert(inverse_word(conj) =~= seq![si] + inverse_word(a_i) + seq![st]);
+        }
+    }
+}
+
+//  The conjugation telescope:  stable⁻¹ · emb(a_gens,u) · stable ≡ emb(b_gens,u).
+pub proof fn lemma_stable_conj_factorization(data: HNNData, u: Word)
+    requires
+        hnn_data_valid(data),
+        word_valid(u, data.associations.len() as nat),
+    ensures
+        equiv_in_presentation(hnn_presentation(data),
+            seq![stable_letter_inv(data)] + apply_embedding(hnn_a_gens(data), u)
+                + seq![stable_letter(data)],
+            apply_embedding(hnn_b_gens(data), u)),
+    decreases u.len(),
+{
+    let p = hnn_presentation(data);
+    let st = stable_letter(data);
+    let si = stable_letter_inv(data);
+    let ag = hnn_a_gens(data);
+    let bg = hnn_b_gens(data);
+    let k = data.associations.len();
+    let png = p.num_generators;
+    lemma_hnn_presentation_valid(data);
+    assert(png == k + data.base.num_generators - k + 1) by { assert(png == data.base.num_generators + 1); }
+    reveal_with_fuel(apply_embedding, 2);
+    assert(st == Symbol::Gen(data.base.num_generators) && si == Symbol::Inv(data.base.num_generators));
+    assert(symbol_valid(st, png) && symbol_valid(si, png));
+    assert(word_valid(seq![si], png)) by {
+        assert forall|t: int| 0 <= t < 1 implies symbol_valid(#[trigger] seq![si][t], png) by { }
+    }
+    assert(word_valid(seq![st], png)) by {
+        assert forall|t: int| 0 <= t < 1 implies symbol_valid(#[trigger] seq![st][t], png) by { }
+    }
+    if u.len() == 0 {
+        assert(apply_embedding(ag, u) =~= empty_word());
+        assert(apply_embedding(bg, u) =~= empty_word());
+        assert(seq![si] + apply_embedding(ag, u) + seq![st] =~= seq![si, st]);
+        lemma_cancel_pair_equiv_empty(p, si, st);
+    } else {
+        let s = u.first();
+        let rest = u.drop_first();
+        assert(u =~= seq![s] + rest);
+        assert(symbol_valid(s, k as nat)) by { assert(u[0] == s); }
+        assert(word_valid(rest, k as nat)) by {
+            assert forall|t: int| 0 <= t < rest.len() implies symbol_valid(#[trigger] rest[t], k as nat)
+            by { assert(rest[t] == u[t + 1]); }
+        }
+        let es = apply_embedding_symbol(ag, s);
+        let er = apply_embedding(ag, rest);
+        let es2 = apply_embedding_symbol(bg, s);
+        let er2 = apply_embedding(bg, rest);
+        lemma_apply_embedding_concat(ag, seq![s], rest);
+        lemma_apply_embedding_concat(bg, seq![s], rest);
+        assert(apply_embedding(ag, u) =~= es + er);
+        assert(apply_embedding(bg, u) =~= es2 + er2);
+        //  per-symbol + IH
+        lemma_stable_conj_symbol(data, s);                  //  [si]·es·[st] ≡ es2
+        lemma_stable_conj_factorization(data, rest);        //  [si]·er·[st] ≡ er2
+        //  validities of es, er over png
+        lemma_apply_embedding_valid(ag, seq![s], data.base.num_generators);
+        lemma_apply_embedding_valid(ag, rest, data.base.num_generators);
+        assert(forall|i: int| 0 <= i < ag.len() ==> #[trigger] word_valid(ag[i], data.base.num_generators)) by {
+            assert forall|i: int| 0 <= i < ag.len() implies word_valid(#[trigger] ag[i], data.base.num_generators)
+            by { assert(ag[i] == data.associations[i].0); }
+        }
+        assert(apply_embedding(ag, seq![s]) =~= es);
+        lemma_word_valid_mono(es, data.base.num_generators, png);
+        lemma_word_valid_mono(er, data.base.num_generators, png);
+        lemma_concat_word_valid(seq![si], es, png);
+        lemma_concat_word_valid(seq![si] + es, seq![st], png);
+        lemma_concat_word_valid(er, seq![st], png);
+        lemma_concat_word_valid(seq![si], er + seq![st], png);
+        //  insert the cancelling pair [st,si] ≡ ε  to split the conjugation
+        lemma_cancel_pair_equiv_empty(p, st, si);
+        lemma_insert_equiv_empty(p, seq![si] + es, seq![st, si], er + seq![st]);
+        assert((seq![si] + es) + (er + seq![st])
+            =~= seq![si] + apply_embedding(ag, u) + seq![st]);
+        assert((seq![si] + es) + (seq![st, si] + (er + seq![st]))
+            =~= (seq![si] + es + seq![st]) + (seq![si] + er + seq![st]));
+        //  congruence:  (… ≡ es2) · (… ≡ er2)
+        lemma_equiv_concat(p, seq![si] + es + seq![st], es2, seq![si] + er + seq![st], er2);
+        assert(es2 + er2 =~= apply_embedding(bg, u));
+        //  a ≡ b  (insert) and  b ≡ c  (congruence), then transitivity
+        assert(equiv_in_presentation(p,
+            seq![si] + apply_embedding(ag, u) + seq![st],
+            (seq![si] + es + seq![st]) + (seq![si] + er + seq![st])));
+        assert(equiv_in_presentation(p,
+            (seq![si] + es + seq![st]) + (seq![si] + er + seq![st]),
+            apply_embedding(bg, u)));
+        lemma_equiv_transitive(p,
+            seq![si] + apply_embedding(ag, u) + seq![st],
+            (seq![si] + es + seq![st]) + (seq![si] + er + seq![st]),
+            apply_embedding(bg, u));
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
