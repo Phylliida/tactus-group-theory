@@ -7220,6 +7220,138 @@ pub proof fn lemma_in_gen_implies_emb(p: Presentation, gens: Seq<Word>, w: Word)
         && equiv_in_presentation(p, apply_embedding(gens, u), w));
 }
 
+//  ============================================================
+//  General HNN pinch-out: delete a pinch, mapping the middle through the iso
+//  (forward telescope for t⁻¹·g·t, reverse for t·g·t⁻¹).  The replacement is a
+//  BASE word (no stable letter) — so the stable count drops.
+//  ============================================================
+pub proof fn lemma_hnn_pinch_out(data: HNNData, w: Word, i: int, j: int)
+    requires
+        hnn_data_valid(data),
+        word_valid(w, hnn_presentation(data).num_generators),
+        has_pinch_at(data, w, i, j),
+    ensures
+        exists|new_mid: Word|
+            word_valid(new_mid, data.base.num_generators)
+            && #[trigger] equiv_in_presentation(hnn_presentation(data), w,
+                 w.subrange(0, i) + new_mid + w.subrange(j + 1, w.len() as int)),
+{
+    let p = hnn_presentation(data);
+    let ng = data.base.num_generators;
+    let png = p.num_generators;
+    let st = stable_letter(data);
+    let stinv = stable_letter_inv(data);
+    let si = w[i];
+    let sj = w[j];
+    let u = w.subrange(i + 1, j);
+    let ag = hnn_a_gens(data);
+    let bg = hnn_b_gens(data);
+    let k = data.associations.len();
+    lemma_hnn_presentation_valid(data);
+    assert(has_adjacent_opposite_at(data, w, i, j));
+    assert(png == ng + 1);
+    assert(st == Symbol::Gen(ng) && stinv == Symbol::Inv(ng));
+    assert(ag =~= Seq::new(k, |t: int| data.associations[t].0));
+    assert(bg =~= Seq::new(k, |t: int| data.associations[t].1));
+    assert(word_valid(u, ng)) by {
+        assert forall|t: int| 0 <= t < u.len() implies symbol_valid(#[trigger] u[t], ng)
+        by { assert(u[t] == w[i + 1 + t]); assert(symbol_valid(w[i + 1 + t], png));
+             assert(!is_stable(data, w[i + 1 + t])); }
+    }
+    let mid = w.subrange(i, j + 1);
+    assert(mid =~= seq![si] + u + seq![sj]);
+    let pre = w.subrange(0, i);
+    let post = w.subrange(j + 1, w.len() as int);
+    assert(w =~= pre + mid + post);
+    //  generic-gens validity: ag[t]/bg[t] are valid base words
+    assert forall|t: int| 0 <= t < k implies (word_valid(#[trigger] ag[t], ng) && word_valid(bg[t], ng))
+    by { assert(ag[t] == data.associations[t].0 && bg[t] == data.associations[t].1); }
+    if si == st {
+        //  t · g · t⁻¹ with g ∈ ⟨b_gens⟩  ⟹  ≡ emb(a_gens, uw)  (reverse telescope)
+        assert(sj == stinv && in_generated_subgroup(data.base, bg, u));
+        lemma_in_gen_implies_emb(data.base, bg, u);
+        let uw = choose|uw: Word| word_valid(uw, bg.len() as nat)
+            && equiv_in_presentation(data.base, apply_embedding(bg, uw), u);
+        assert(word_valid(uw, k as nat) && equiv_in_presentation(data.base, apply_embedding(bg, uw), u));
+        let g = apply_embedding(bg, uw);
+        let new_mid = apply_embedding(ag, uw);
+        lemma_apply_embedding_valid(bg, uw, ng);
+        lemma_apply_embedding_valid(ag, uw, ng);
+        lemma_word_valid_mono(g, ng, png);
+        lemma_word_valid_mono(new_mid, ng, png);
+        lemma_base_embeds_in_hnn(data, g, u);                 //  g ≡_p u
+        lemma_equiv_symmetric(p, g, u);                       //  u ≡_p g
+        lemma_stable_conj_factorization_rev(data, uw);        //  [st]·g·[stinv] ≡ new_mid
+        //  mid = [si]·u·[sj] ≡ [si]·g·[sj] ≡ new_mid
+        lemma_equiv_concat_right(p, seq![si], u, g);
+        lemma_equiv_concat_left(p, seq![si] + u, seq![si] + g, seq![sj]);
+        assert((seq![si] + u) + seq![sj] =~= mid);
+        assert((seq![si] + g) + seq![sj] =~= seq![st] + g + seq![stinv]);
+        lemma_equiv_transitive(p, mid, (seq![si] + g) + seq![sj], new_mid);
+        lemma_pinch_assemble(p, w, i, j, new_mid);
+        assert(word_valid(new_mid, ng)
+            && equiv_in_presentation(p, w, pre + new_mid + post));
+    } else {
+        //  t⁻¹ · g · t with g ∈ ⟨a_gens⟩  ⟹  ≡ emb(b_gens, uw)  (forward telescope)
+        assert(si == stinv && sj == st && in_generated_subgroup(data.base, ag, u));
+        lemma_in_gen_implies_emb(data.base, ag, u);
+        let uw = choose|uw: Word| word_valid(uw, ag.len() as nat)
+            && equiv_in_presentation(data.base, apply_embedding(ag, uw), u);
+        assert(word_valid(uw, k as nat) && equiv_in_presentation(data.base, apply_embedding(ag, uw), u));
+        let g = apply_embedding(ag, uw);
+        let new_mid = apply_embedding(bg, uw);
+        lemma_apply_embedding_valid(ag, uw, ng);
+        lemma_apply_embedding_valid(bg, uw, ng);
+        lemma_word_valid_mono(g, ng, png);
+        lemma_word_valid_mono(new_mid, ng, png);
+        lemma_base_embeds_in_hnn(data, g, u);                 //  g ≡_p u
+        lemma_equiv_symmetric(p, g, u);                       //  u ≡_p g
+        lemma_stable_conj_factorization(data, uw);            //  [stinv]·g·[st] ≡ new_mid
+        lemma_equiv_concat_right(p, seq![si], u, g);
+        lemma_equiv_concat_left(p, seq![si] + u, seq![si] + g, seq![sj]);
+        assert((seq![si] + u) + seq![sj] =~= mid);
+        assert((seq![si] + g) + seq![sj] =~= seq![stinv] + g + seq![st]);
+        lemma_equiv_transitive(p, mid, (seq![si] + g) + seq![sj], new_mid);
+        lemma_pinch_assemble(p, w, i, j, new_mid);
+        assert(word_valid(new_mid, ng)
+            && equiv_in_presentation(p, w, pre + new_mid + post));
+    }
+}
+
+//  Assembly: w ≡ pre · new_mid · post  given  w[i..j+1] ≡ new_mid.
+pub proof fn lemma_pinch_assemble(p: Presentation, w: Word, i: int, j: int, new_mid: Word)
+    requires
+        presentation_valid(p),
+        word_valid(w, p.num_generators),
+        word_valid(new_mid, p.num_generators),
+        0 <= i < j < w.len(),
+        equiv_in_presentation(p, w.subrange(i, j + 1), new_mid),
+    ensures
+        equiv_in_presentation(p, w,
+            w.subrange(0, i) + new_mid + w.subrange(j + 1, w.len() as int)),
+{
+    let mid = w.subrange(i, j + 1);
+    let pre = w.subrange(0, i);
+    let post = w.subrange(j + 1, w.len() as int);
+    assert(word_valid(pre, p.num_generators)) by {
+        assert forall|t: int| 0 <= t < pre.len() implies symbol_valid(#[trigger] pre[t], p.num_generators)
+        by { assert(pre[t] == w[t]); }
+    }
+    assert(word_valid(mid, p.num_generators)) by {
+        assert forall|t: int| 0 <= t < mid.len() implies symbol_valid(#[trigger] mid[t], p.num_generators)
+        by { assert(mid[t] == w[i + t]); }
+    }
+    assert(word_valid(post, p.num_generators)) by {
+        assert forall|t: int| 0 <= t < post.len() implies symbol_valid(#[trigger] post[t], p.num_generators)
+        by { assert(post[t] == w[j + 1 + t]); }
+    }
+    assert(w =~= pre + mid + post);
+    lemma_equiv_concat_right(p, pre, mid, new_mid);
+    lemma_equiv_concat_left(p, pre + mid, pre + new_mid, post);
+    assert((pre + mid) + post =~= w);
+    assert((pre + new_mid) + post =~= pre + new_mid + post);
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
