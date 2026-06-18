@@ -9802,6 +9802,165 @@ pub proof fn lemma_run_maximal(w: Seq<CanonLetter>)
     }
 }
 
+//  A pinch lying entirely in the suffix is a pinch of the suffix.
+pub proof fn lemma_has_pinch_at_suffix(data: HNNData, p: Word, s: Word, i: int, j: int)
+    requires
+        0 <= p.len() <= i,
+        has_pinch_at(data, p + s, i, j),
+    ensures
+        has_pinch_at(data, s, i - p.len(), j - p.len()),
+{
+    let ps = p + s;
+    let pl = p.len() as int;
+    assert(ps[i] == s[i - pl]);
+    assert(ps[j] == s[j - pl]);
+    assert(ps.subrange(i + 1, j) =~= s.subrange(i - pl + 1, j - pl));
+    assert(has_adjacent_opposite_at(data, s, i - pl, j - pl)) by {
+        assert forall|k: int| (i - pl) < k < (j - pl) implies !is_stable(data, #[trigger] s[k]) by {
+            assert(s[k] == ps[k + pl]);
+        }
+    }
+}
+
+//  The combined word of a sequence whose first s differs from prev starts with a y.
+pub proof fn lemma_yl_first_stable(tail: Seq<CanonLetter>, s0: int)
+    requires
+        tail.len() >= 1,
+        s0 != tail[0].s,
+    ensures
+        is_stable(a_as_hnn(), yl_comb_acc(tail, s0)[0]),
+{
+    let yb = signed_power(2, s0 - tail[0].s);
+    assert(yb.len() >= 1);
+    assert(yl_comb_acc(tail, s0)[0] == yb[0]);
+    if s0 - tail[0].s >= 0 {
+        assert(yb[0] == Symbol::Gen(2));
+    } else {
+        assert(yb[0] == Symbol::Inv(2));
+    }
+}
+
+//  ★ THE NO-PINCH: a reduced config word's y-combined form has no pinch. ★
+pub proof fn lemma_yl_no_pinch(w: Seq<CanonLetter>, prev: int)
+    requires
+        forall|j: int| 0 <= j < w.len() ==> (#[trigger] w[j]).e != 0,
+        forall|j: int| 0 <= j < w.len() - 1 ==>
+            (#[trigger] w[j]).r != w[j + 1].r || w[j].s != w[j + 1].s,
+    ensures
+        !has_pinch(a_as_hnn(), yl_comb_acc(w, prev)),
+    decreases w.len(),
+{
+    let data = a_as_hnn();
+    let bw = yl_comb_acc(w, prev);
+    if w.len() == 0 {
+        lemma_signed_power_gen(2, prev);
+        if has_pinch(data, bw) {
+            let pr: (int, int) = choose|i: int, j: int| has_pinch_at(data, bw, i, j);
+            let i = pr.0;
+            let j = pr.1;
+            assert(has_pinch_at(data, bw, i, j));
+            if prev >= 0 {
+                assert(bw[i] == Symbol::Gen(2) && bw[j] == Symbol::Gen(2));
+            } else {
+                assert(bw[i] == Symbol::Inv(2) && bw[j] == Symbol::Inv(2));
+            }
+        }
+    } else {
+        lemma_run_len_bound(w);
+        lemma_yl_leading_run_split(w, prev);
+        lemma_run_const_s(w);
+        let rl = run_len(w) as int;
+        let s0 = w[0].s;
+        let run = w.subrange(0, rl);
+        let tail = w.subrange(rl, w.len() as int);
+        let fy = signed_power(2, prev - s0);
+        let hr = hrun(run);
+        let tlw = yl_comb_acc(tail, s0);
+        let pfx = fy + hr;
+        assert(bw =~= pfx + tlw);
+        let fl = fy.len() as int;
+        let hl = hr.len() as int;
+        lemma_hrun_no_stable(run);
+        //  run reduced (same s ⟹ distinct adjacent r)
+        assert forall|jj: int| 0 <= jj < run.len() implies (#[trigger] run[jj]).e != 0 by {
+            assert(run[jj] == w[jj]);
+        }
+        assert forall|jj: int| 0 <= jj < run.len() - 1 implies (#[trigger] run[jj]).r != run[jj + 1].r by {
+            assert(run[jj] == w[jj] && run[jj + 1] == w[jj + 1]);
+            assert(w[jj].s == w[0].s && w[jj + 1].s == w[0].s);
+        }
+        lemma_hrun_not_in_x(run);
+        //  tail reduced (for IH)
+        assert forall|jj: int| 0 <= jj < tail.len() implies (#[trigger] tail[jj]).e != 0 by {
+            assert(tail[jj] == w[rl + jj]);
+        }
+        assert forall|jj: int| 0 <= jj < tail.len() - 1 implies
+            (#[trigger] tail[jj]).r != tail[jj + 1].r || tail[jj].s != tail[jj + 1].s by {
+            assert(tail[jj] == w[rl + jj] && tail[jj + 1] == w[rl + jj + 1]);
+        }
+        lemma_yl_no_pinch(tail, s0);
+        if has_pinch(data, bw) {
+            let pr: (int, int) = choose|i: int, j: int| has_pinch_at(data, bw, i, j);
+            let i = pr.0;
+            let j = pr.1;
+            assert(has_pinch_at(data, bw, i, j));
+            //  bw == pfx + tlw, |pfx| = fl + hl.  Locate i, j.
+            //  i, j are stable, hr has no stable ⟹ neither is in [fl, fl+hl).
+            assert(forall|k: int| fl <= k < fl + hl ==> bw[k] == hr[k - fl]);
+            assert(!is_stable(data, bw[i]) == false);  //  is_stable(bw[i]) holds
+            assert(i < fl || i >= fl + hl);
+            assert(j < fl || j >= fl + hl);
+            if i >= fl + hl {
+                //  both in tail
+                lemma_has_pinch_at_suffix(data, pfx, tlw, i, j);
+            } else {
+                //  i < fl (FrontY)
+                if j < fl {
+                    //  both in FrontY: same symbol
+                    lemma_signed_power_gen(2, prev - s0);
+                    if prev - s0 >= 0 {
+                        assert(bw[i] == Symbol::Gen(2) && bw[j] == Symbol::Gen(2));
+                    } else {
+                        assert(bw[i] == Symbol::Inv(2) && bw[j] == Symbol::Inv(2));
+                    }
+                } else {
+                    //  cross-boundary: i < fl, j >= fl+hl.  between = hr ∉⟨x⟩.
+                    assert(j >= fl + hl);
+                    assert(tlw.len() >= 1);
+                    assert(bw[fl + hl] == tlw[0]);
+                    //  tlw[0] is a y (next run's leading y, or the trailing y-block)
+                    if rl < w.len() {
+                        lemma_run_maximal(w);
+                        assert(tail.len() >= 1 && tail[0] == w[rl] && tail[0].s != s0);
+                        lemma_yl_first_stable(tail, s0);
+                    } else {
+                        assert(tail.len() == 0);
+                        assert(tlw =~= signed_power(2, s0));
+                        if s0 >= 0 { assert(tlw[0] == Symbol::Gen(2)); } else { assert(tlw[0] == Symbol::Inv(2)); }
+                    }
+                    assert(is_stable(data, tlw[0]));
+                    //  fy is nonempty and uniform-stable
+                    assert(fl >= 1 && prev - s0 != 0);
+                    assert forall|k: int| 0 <= k < fl implies bw[k] == fy[k] && is_stable(data, bw[k]) by {
+                        if prev - s0 >= 0 { assert(fy[k] == Symbol::Gen(2)); } else { assert(fy[k] == Symbol::Inv(2)); }
+                    }
+                    //  no-y-between forces i = fl-1, j = fl+hl
+                    assert(i == fl - 1) by {
+                        if i < fl - 1 { assert(is_stable(data, bw[i + 1]) && i < i + 1 < j); }
+                    }
+                    assert(j == fl + hl) by {
+                        if j > fl + hl { assert(is_stable(data, bw[fl + hl]) && i < fl + hl < j); }
+                    }
+                    assert(bw.subrange(i + 1, j) =~= hr);
+                    //  a_gens = b_gens = [x]; between =~= hr ∉⟨x⟩ contradicts the pinch.
+                    assert(Seq::new(data.associations.len(), |k: int| data.associations[k].0) =~= seq![seq![Symbol::Gen(1)]]);
+                    assert(Seq::new(data.associations.len(), |k: int| data.associations[k].1) =~= seq![seq![Symbol::Gen(1)]]);
+                }
+            }
+        }
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
