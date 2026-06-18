@@ -9628,6 +9628,100 @@ pub proof fn lemma_hrun_not_in_x(w: Seq<CanonLetter>)
     lemma_canw_fl_not_in_x(zero_s(w));
 }
 
+//  Length of the maximal same-s prefix of w.
+pub open spec fn run_len(w: Seq<CanonLetter>) -> nat
+    decreases w.len(),
+{
+    if w.len() <= 1 {
+        w.len()
+    } else if w[1].s == w[0].s {
+        (1 + run_len(w.drop_first())) as nat
+    } else {
+        1
+    }
+}
+
+pub proof fn lemma_run_len_bound(w: Seq<CanonLetter>)
+    requires
+        w.len() >= 1,
+    ensures
+        1 <= run_len(w) <= w.len(),
+    decreases w.len(),
+{
+    if w.len() == 1 {
+    } else if w[1].s == w[0].s {
+        lemma_run_len_bound(w.drop_first());
+    } else {
+    }
+}
+
+//  Every config in the leading run shares w[0].s.
+pub proof fn lemma_run_const_s(w: Seq<CanonLetter>)
+    requires
+        w.len() >= 1,
+    ensures
+        forall|k: int| 0 <= k < run_len(w) ==> (#[trigger] w[k]).s == w[0].s,
+    decreases w.len(),
+{
+    if w.len() == 1 {
+    } else if w[1].s == w[0].s {
+        lemma_run_const_s(w.drop_first());
+        lemma_run_len_bound(w.drop_first());
+        assert forall|k: int| 0 <= k < run_len(w) implies (#[trigger] w[k]).s == w[0].s by {
+            if k >= 1 {
+                assert(w.drop_first()[k - 1] == w[k]);
+                assert(w.drop_first()[k - 1].s == w.drop_first()[0].s);
+                assert(w.drop_first()[0] == w[1]);
+            }
+        }
+    } else {
+    }
+}
+
+//  Leading-run decomposition: peel the maximal same-s prefix.
+//    yl_comb_acc(w, prev) =~= y^{prev-s₀} · hrun(run) · yl_comb_acc(tail, s₀)
+//  where run = w[0..run_len], tail = w[run_len..] (which starts with a NONZERO y-block).
+pub proof fn lemma_yl_leading_run_split(w: Seq<CanonLetter>, prev: int)
+    requires
+        w.len() >= 1,
+    ensures
+        yl_comb_acc(w, prev) =~= signed_power(2, prev - w[0].s)
+            + hrun(w.subrange(0, run_len(w) as int))
+            + yl_comb_acc(w.subrange(run_len(w) as int, w.len() as int), w[0].s),
+    decreases w.len(),
+{
+    lemma_run_len_bound(w);
+    reveal_with_fuel(hrun, 2);
+    let s0 = w[0].s;
+    let rl = run_len(w) as int;
+    let front = signed_power(2, prev - s0);
+    let hb1 = hblock(w[0].r, w[0].e);
+    let rest = w.drop_first();
+    if w.len() == 1 || w[1].s != w[0].s {
+        //  run_len = 1: leading run = [w[0]], tail = rest
+        assert(rl == 1);
+        assert(w.subrange(0, 1).drop_first() =~= Seq::<CanonLetter>::empty());
+        assert(w.subrange(0, 1)[0] == w[0]);
+        assert(hrun(w.subrange(0, 1)) =~= hb1);
+        assert(w.subrange(1, w.len() as int) =~= rest);
+    } else {
+        //  run continues: run_len(w) = 1 + run_len(rest), rest[0].s = s0
+        let m = run_len(rest) as int;
+        lemma_run_len_bound(rest);
+        assert(rest[0] == w[1] && rest[0].s == s0);
+        assert(rl == 1 + m);
+        lemma_yl_leading_run_split(rest, s0);
+        //  IH: yl_comb_acc(rest, s0) =~= sp(2,0) + hrun(rest[0..m]) + yl_comb_acc(rest[m..], s0)
+        assert(signed_power(2, s0 - rest[0].s) =~= Seq::<Symbol>::empty());
+        //  hrun(w[0..rl]) = hb1 + hrun(rest[0..m])
+        assert(w.subrange(0, rl)[0] == w[0]);
+        assert(w.subrange(0, rl).drop_first() =~= rest.subrange(0, m));
+        assert(hrun(w.subrange(0, rl)) =~= hb1 + hrun(rest.subrange(0, m)));
+        //  tail: w[rl..] = rest[m..]
+        assert(w.subrange(rl, w.len() as int) =~= rest.subrange(m, rest.len() as int));
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
