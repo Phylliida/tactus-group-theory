@@ -8652,6 +8652,76 @@ pub proof fn lemma_gsconfig_neg_one(r: int, s: int)
     assert(inverse_word(sconfig(r, s)) =~= b1 + b2 + seq![Symbol::Inv(0)] + b4 + b5);
 }
 
+//  ============================================================
+//  Canonical config words (one letter per maximal equal-coord run)
+//  ============================================================
+
+pub struct CanonLetter {
+    pub r: int,
+    pub s: int,
+    pub e: int,
+}
+
+pub open spec fn canl_eval(c: CanonLetter) -> Word {
+    gsconfig(c.r, c.s, c.e)
+}
+
+pub open spec fn canw_eval(w: Seq<CanonLetter>) -> Word
+    decreases w.len(),
+{
+    if w.len() == 0 { empty_word() } else { canl_eval(w[0]) + canw_eval(w.drop_first()) }
+}
+
+//  Canonical/reduced: every exponent nonzero, adjacent coordinates distinct.
+pub open spec fn canw_reduced(w: Seq<CanonLetter>) -> bool {
+    &&& (forall|i: int| 0 <= i < w.len() ==> (#[trigger] w[i]).e != 0)
+    &&& (forall|i: int| 0 <= i < w.len() - 1
+            ==> !((#[trigger] w[i]).r == w[i + 1].r && w[i].s == w[i + 1].s))
+}
+
+pub proof fn lemma_canl_eval_valid(c: CanonLetter)
+    ensures
+        word_valid(canl_eval(c), 3),
+{
+    lemma_gsconfig_valid(c.r, c.s, c.e);
+}
+
+pub proof fn lemma_canw_eval_valid(w: Seq<CanonLetter>)
+    ensures
+        word_valid(canw_eval(w), 3),
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        assert(canw_eval(w) =~= empty_word());
+    } else {
+        lemma_canl_eval_valid(w[0]);
+        lemma_canw_eval_valid(w.drop_first());
+        lemma_concat_word_valid(canl_eval(w[0]), canw_eval(w.drop_first()), 3);
+    }
+}
+
+//  Net t-exponent of a canonical word.
+pub open spec fn canw_net_e(w: Seq<CanonLetter>) -> int
+    decreases w.len(),
+{
+    if w.len() == 0 { 0 } else { w[0].e + canw_net_e(w.drop_first()) }
+}
+
+pub proof fn lemma_canw_eval_gexp(w: Seq<CanonLetter>)
+    ensures
+        gexp(0, canw_eval(w)) == canw_net_e(w),
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        assert(canw_eval(w) =~= empty_word());
+        assert(gexp(0, empty_word()) == 0) by { reveal_with_fuel(gexp, 1); }
+    } else {
+        lemma_gsconfig_t_exp(w[0].r, w[0].s, w[0].e);
+        lemma_canw_eval_gexp(w.drop_first());
+        lemma_gexp_concat(0, canl_eval(w[0]), canw_eval(w.drop_first()));
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
