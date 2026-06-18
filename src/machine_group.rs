@@ -7535,6 +7535,107 @@ pub proof fn lemma_sconfig_nat(r: int, s: int)
     assert(signed_power(2, s) =~= symbol_power(Symbol::Gen(2), s as nat));
 }
 
+//  ============================================================
+//  Generic signed-power algebra (free reduction — works in any presentation).
+//  ============================================================
+
+//  Genⁱᵃ · Invⁱᶜ  ≡  signed_power(i, a−c)   (cancel the boundary pairs).
+pub proof fn lemma_gen_inv_cancel(p: Presentation, i: nat, a: nat, c: nat)
+    ensures
+        equiv_in_presentation(p,
+            symbol_power(Symbol::Gen(i), a) + symbol_power(Symbol::Inv(i), c),
+            signed_power(i, a - c)),
+    decreases a + c,
+{
+    let g = Symbol::Gen(i);
+    let iv = Symbol::Inv(i);
+    let lhs = symbol_power(g, a) + symbol_power(iv, c);
+    if a == 0 {
+        assert(lhs =~= signed_power(i, a - c));
+        lemma_equiv_refl(p, lhs);
+    } else if c == 0 {
+        assert(lhs =~= signed_power(i, a - c));
+        lemma_equiv_refl(p, lhs);
+    } else {
+        lemma_symbol_power_one(g);
+        lemma_symbol_power_one(iv);
+        lemma_symbol_power_merge(g, (a - 1) as nat, 1);
+        lemma_symbol_power_merge(iv, 1, (c - 1) as nat);
+        let pre = symbol_power(g, (a - 1) as nat);
+        let suf = symbol_power(iv, (c - 1) as nat);
+        let pair: Word = seq![g, iv];
+        //  lhs =~= pre · [g,iv] · suf  (right-associated to match delete)
+        assert(lhs =~= concat(pre, concat(pair, suf)));
+        lemma_cancel_pair_equiv_empty(p, g, iv);
+        lemma_delete_equiv_empty(p, pre, pair, suf);
+        //  ⟹ equiv(p, pre·[g,iv]·suf, pre·suf);  pre·suf = Gen^(a-1)+Inv^(c-1)
+        assert(concat(pre, suf) =~= pre + suf);
+        lemma_gen_inv_cancel(p, i, (a - 1) as nat, (c - 1) as nat);
+        assert((a - 1) as int - (c - 1) as int == a as int - c as int);
+        lemma_equiv_transitive(p, lhs, pre + suf, signed_power(i, a - c));
+    }
+}
+
+//  Invⁱᶜ · Genⁱᵇ  ≡  signed_power(i, b−c).
+pub proof fn lemma_inv_gen_cancel(p: Presentation, i: nat, c: nat, b: nat)
+    ensures
+        equiv_in_presentation(p,
+            symbol_power(Symbol::Inv(i), c) + symbol_power(Symbol::Gen(i), b),
+            signed_power(i, b - c)),
+    decreases c + b,
+{
+    let g = Symbol::Gen(i);
+    let iv = Symbol::Inv(i);
+    let lhs = symbol_power(iv, c) + symbol_power(g, b);
+    if c == 0 {
+        assert(lhs =~= signed_power(i, b - c));
+        lemma_equiv_refl(p, lhs);
+    } else if b == 0 {
+        assert(lhs =~= signed_power(i, b - c));
+        lemma_equiv_refl(p, lhs);
+    } else {
+        lemma_symbol_power_one(g);
+        lemma_symbol_power_one(iv);
+        lemma_symbol_power_merge(iv, (c - 1) as nat, 1);
+        lemma_symbol_power_merge(g, 1, (b - 1) as nat);
+        let pre = symbol_power(iv, (c - 1) as nat);
+        let suf = symbol_power(g, (b - 1) as nat);
+        let pair: Word = seq![iv, g];
+        assert(lhs =~= concat(pre, concat(pair, suf)));
+        lemma_cancel_pair_equiv_empty(p, iv, g);
+        lemma_delete_equiv_empty(p, pre, pair, suf);
+        assert(concat(pre, suf) =~= pre + suf);
+        lemma_inv_gen_cancel(p, i, (c - 1) as nat, (b - 1) as nat);
+        assert((b - 1) as int - (c - 1) as int == b as int - c as int);
+        lemma_equiv_transitive(p, lhs, pre + suf, signed_power(i, b - c));
+    }
+}
+
+//  Signed-power merge:  signed_power(i,a) · signed_power(i,b) ≡ signed_power(i, a+b).
+pub proof fn lemma_signed_power_add(p: Presentation, i: nat, a: int, b: int)
+    ensures
+        equiv_in_presentation(p, signed_power(i, a) + signed_power(i, b), signed_power(i, a + b)),
+{
+    let lhs = signed_power(i, a) + signed_power(i, b);
+    if a >= 0 && b >= 0 {
+        lemma_symbol_power_merge(Symbol::Gen(i), a as nat, b as nat);
+        assert(lhs =~= signed_power(i, a + b));
+        lemma_equiv_refl(p, lhs);
+    } else if a < 0 && b < 0 {
+        lemma_symbol_power_merge(Symbol::Inv(i), (-a) as nat, (-b) as nat);
+        assert(lhs =~= signed_power(i, a + b));
+        lemma_equiv_refl(p, lhs);
+    } else if a >= 0 {
+        lemma_gen_inv_cancel(p, i, a as nat, (-b) as nat);
+        assert(lhs =~= symbol_power(Symbol::Gen(i), a as nat) + symbol_power(Symbol::Inv(i), (-b) as nat));
+        assert(a as int - (-b) as int == a + b);
+    } else {
+        lemma_inv_gen_cancel(p, i, (-a) as nat, b as nat);
+        assert(lhs =~= symbol_power(Symbol::Inv(i), (-a) as nat) + symbol_power(Symbol::Gen(i), b as nat));
+        assert(b as int - (-a) as int == a + b);
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
