@@ -8864,6 +8864,76 @@ pub proof fn lemma_fl_combined_nonempty(w: Seq<CanonLetter>)
             + fl_comb_acc(w.drop_first(), w[0].r).len());
 }
 
+//  All letters have s = 0 (the F-level / x-only case).
+pub open spec fn canw_all_s_zero(w: Seq<CanonLetter>) -> bool {
+    forall|j: int| 0 <= j < w.len() ==> (#[trigger] w[j]).s == 0
+}
+
+//  xᵖʳᵉᵛ · canw_eval(w)  ≡_{pres_tx}  fl_comb_acc(w, prev)   (x-powers merge).
+pub proof fn lemma_xpow_canw_eval(w: Seq<CanonLetter>, prev: int)
+    requires
+        canw_all_s_zero(w),
+    ensures
+        equiv_in_presentation(pres_tx(), signed_power(1, prev) + canw_eval(w), fl_comb_acc(w, prev)),
+    decreases w.len(),
+{
+    let p = pres_tx();
+    assert(presentation_valid(p)) by { reveal(presentation_valid); }
+    let xprev = signed_power(1, prev);
+    if w.len() == 0 {
+        assert(canw_eval(w) =~= empty_word());
+        assert(xprev + canw_eval(w) =~= fl_comb_acc(w, prev));
+        lemma_equiv_refl(p, xprev + canw_eval(w));
+    } else {
+        let c = w[0];
+        let rest = w.drop_first();
+        assert(c.s == 0);
+        assert(canw_all_s_zero(rest)) by {
+            assert forall|j: int| 0 <= j < rest.len() implies (#[trigger] rest[j]).s == 0 by {
+                assert(rest[j] == w[j + 1]);
+            }
+        }
+        let xmr = signed_power(1, -c.r);
+        let te = signed_power(0, c.e);
+        let xr = signed_power(1, c.r);
+        let g = xmr + te + xr;
+        let cwr = canw_eval(rest);
+        assert(signed_power(2, 0) =~= empty_word());
+        assert(signed_power(2, -0) =~= empty_word());
+        assert(canl_eval(c) =~= g);
+        assert(canw_eval(w) == canl_eval(c) + cwr);
+        let merged = signed_power(1, prev - c.r);
+        let suffix = te + (xr + cwr);
+        //  M0: re-associate, dropping the empty y-parts
+        assert(xprev + canw_eval(w) =~= (xprev + xmr) + suffix);
+        //  merge the leading x-powers
+        lemma_signed_power_add(p, 1, prev, -c.r);
+        assert(equiv_in_presentation(p, xprev + xmr, merged));
+        lemma_equiv_concat_left(p, xprev + xmr, merged, suffix);
+        assert(equiv_in_presentation(p, xprev + canw_eval(w), merged + suffix));
+        //  IH on the tail
+        lemma_xpow_canw_eval(rest, c.r);
+        assert(merged + suffix =~= (merged + te) + (xr + cwr));
+        lemma_equiv_concat_right(p, merged + te, xr + cwr, fl_comb_acc(rest, c.r));
+        assert((merged + te) + fl_comb_acc(rest, c.r) == fl_comb_acc(w, prev));
+        lemma_equiv_transitive(p, xprev + canw_eval(w), merged + suffix, fl_comb_acc(w, prev));
+    }
+}
+
+//  canw_eval(w) ≡_{pres_tx} fl_combined(w)  for the F-level.
+pub proof fn lemma_canw_eval_equiv_fl_combined(w: Seq<CanonLetter>)
+    requires
+        canw_all_s_zero(w),
+    ensures
+        equiv_in_presentation(pres_tx(), canw_eval(w), fl_combined(w)),
+{
+    let p = pres_tx();
+    lemma_xpow_canw_eval(w, 0);
+    assert(signed_power(1, 0) =~= empty_word());
+    assert(signed_power(1, 0) + canw_eval(w) =~= canw_eval(w));
+    assert(fl_comb_acc(w, 0) == fl_combined(w));
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
