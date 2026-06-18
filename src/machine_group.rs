@@ -7352,6 +7352,69 @@ pub proof fn lemma_pinch_assemble(p: Presentation, w: Word, i: int, j: int, new_
     assert((pre + new_mid) + post =~= pre + new_mid + post);
 }
 
+//  ============================================================
+//  Tower-Britton: find a pinch at the top tower level.
+//  ============================================================
+
+//  The top HNN step of B(M) (adds the last stable letter).
+pub open spec fn top_step_data(mm: ModMachine) -> HNNData {
+    HNNData {
+        base: b_m_upto(mm, (mm.quads.len() - 1) as nat),
+        associations: quad_associations(mm.quads[mm.quads.len() - 1], mm.m),
+    }
+}
+
+//  A trivial word with the top stable letter has a pinch (Britton at the top level).
+pub proof fn lemma_b_m_top_has_pinch(mm: ModMachine, w: Word)
+    requires
+        mod_machine_wf(mm),
+        mm.quads.len() >= 1,
+        word_valid(w, b_m(mm).num_generators),
+        equiv_in_presentation(b_m(mm), w, empty_word()),
+        has_stable_letter(top_step_data(mm), w),
+    ensures
+        has_pinch(top_step_data(mm), w),
+{
+    let n = mm.quads.len();
+    let td = top_step_data(mm);
+    assert(b_m(mm) == hnn_presentation(td)) by {
+        assert(n >= 1);
+        assert(b_m(mm) == b_m_upto(mm, n));
+    }
+    lemma_b_m_step_isomorphic(mm, (n - 1) as nat);
+    lemma_b_m_upto_valid(mm, (n - 1) as nat);
+    lemma_b_m_upto_num_generators(mm, (n - 1) as nat);
+    lemma_quad_associations_valid(mm.quads[n - 1], mm.m, td.base.num_generators);
+    assert(hnn_data_valid(td));
+    britton_lemma_full(td, w);
+}
+
+//  Descend one tower level: a lower-tower word trivial at level `level` is trivial
+//  one level down (single-HNN base faithfulness at the top step).
+pub proof fn lemma_b_m_level_descend(mm: ModMachine, level: nat, w: Word)
+    requires
+        mod_machine_wf(mm),
+        1 <= level <= mm.quads.len(),
+        word_valid(w, (3 + (level - 1)) as nat),
+        equiv_in_presentation(b_m_upto(mm, level), w, empty_word()),
+    ensures
+        equiv_in_presentation(b_m_upto(mm, (level - 1) as nat), w, empty_word()),
+{
+    let qi = (level - 1) as nat;
+    let step = HNNData {
+        base: b_m_upto(mm, qi),
+        associations: quad_associations(mm.quads[qi as int], mm.m),
+    };
+    assert(b_m_upto(mm, level) == hnn_presentation(step));
+    lemma_b_m_step_isomorphic(mm, qi);
+    lemma_b_m_upto_valid(mm, qi);
+    lemma_b_m_upto_num_generators(mm, qi);
+    lemma_quad_associations_valid(mm.quads[qi as int], mm.m, step.base.num_generators);
+    assert(hnn_data_valid(step));
+    assert(step.base.num_generators == (3 + qi) as nat);
+    lemma_single_hnn_base_faithful(step, w);
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
