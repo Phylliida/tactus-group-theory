@@ -10231,6 +10231,73 @@ pub proof fn lemma_pinch_out_phi(data: HNNData, a: Word) -> (phi_a: Word)
     phi_a
 }
 
+//  A well-formed modular machine is deterministic: a configuration yields a unique successor.
+pub proof fn lemma_yield_deterministic(mm: ModMachine, a: nat, b: nat, am: nat, bm: nat, a2: nat, b2: nat)
+    requires
+        mod_machine_wf(mm),
+        mm_yields(mm, a, b, am, bm),
+        mm_yields(mm, a, b, a2, b2),
+    ensures
+        am == a2 && bm == b2,
+{
+    let m = mm.m;
+    let i = choose|i: int| 0 <= i < mm.quads.len()
+        && quad_matches(mm.quads[i], m, a, b) && quad_step(mm.quads[i], m, a, b) == (am, bm);
+    let j = choose|j: int| 0 <= j < mm.quads.len()
+        && quad_matches(mm.quads[j], m, a, b) && quad_step(mm.quads[j], m, a, b) == (a2, b2);
+    assert(0 <= i < mm.quads.len() && quad_matches(mm.quads[i], m, a, b)
+        && quad_step(mm.quads[i], m, a, b) == (am, bm));
+    assert(0 <= j < mm.quads.len() && quad_matches(mm.quads[j], m, a, b)
+        && quad_step(mm.quads[j], m, a, b) == (a2, b2));
+    //  both quads match the same residue pair ⟹ same index (determinism)
+    assert(mm.quads[i].a == mm.quads[j].a && mm.quads[i].b == mm.quads[j].b);
+    assert(i == j);
+    assert(quad_step(mm.quads[i], m, a, b) == quad_step(mm.quads[j], m, a, b));
+}
+
+//  ★ PROPERTY (v) core: a machine step preserves H₀ in both directions. ★
+pub proof fn lemma_step_preserves_h0(mm: ModMachine, a: nat, b: nat, a2: nat, b2: nat)
+    requires
+        mod_machine_wf(mm),
+        mm_yields(mm, a, b, a2, b2),
+    ensures
+        mm_in_H0(mm, a, b) <==> mm_in_H0(mm, a2, b2),
+{
+    reveal_with_fuel(mm_reaches, 1);
+    //  ⟸ : (a2,b2)→*(0,0) in k  ⟹  (a,b)→*(0,0) in k+1
+    if mm_in_H0(mm, a2, b2) {
+        assert(mm_terminal(mm, 0, 0));
+        let k = choose|k: nat| mm_reaches(mm, a2, b2, 0, 0, k);
+        assert(mm_reaches(mm, a2, b2, 0, 0, k));
+        assert(mm_reaches(mm, a, b, 0, 0, (k + 1) as nat)) by {
+            assert(mm_yields(mm, a, b, a2, b2) && mm_reaches(mm, a2, b2, 0, 0, ((k + 1) - 1) as nat));
+        }
+        assert(mm_in_H0(mm, a, b));
+    }
+    //  ⟹ : (a,b)→*(0,0) in k ; yields ⟹ not terminal ⟹ k≥1 ; determinism peels to (a2,b2)→*(0,0) in k-1
+    if mm_in_H0(mm, a, b) {
+        assert(mm_terminal(mm, 0, 0));
+        let k = choose|k: nat| mm_reaches(mm, a, b, 0, 0, k);
+        assert(mm_reaches(mm, a, b, 0, 0, k));
+        //  (a,b) yields ⟹ not terminal ⟹ (a,b)≠(0,0) ⟹ k≥1
+        assert(!(a == 0 && b == 0)) by {
+            let i = choose|i: int| 0 <= i < mm.quads.len()
+                && quad_matches(mm.quads[i], mm.m, a, b) && quad_step(mm.quads[i], mm.m, a, b) == (a2, b2);
+            assert(0 <= i < mm.quads.len() && quad_matches(mm.quads[i], mm.m, a, b));
+            if a == 0 && b == 0 { assert(!quad_matches(mm.quads[i], mm.m, 0, 0)); }
+        }
+        assert(k >= 1);
+        let ambm: (nat, nat) = choose|am: nat, bm: nat| #![auto]
+            mm_yields(mm, a, b, am, bm) && mm_reaches(mm, am, bm, 0, 0, (k - 1) as nat);
+        let am = ambm.0;
+        let bm = ambm.1;
+        assert(mm_yields(mm, a, b, am, bm) && mm_reaches(mm, am, bm, 0, 0, (k - 1) as nat));
+        lemma_yield_deterministic(mm, a, b, am, bm, a2, b2);
+        assert(mm_reaches(mm, a2, b2, 0, 0, (k - 1) as nat));
+        assert(mm_in_H0(mm, a2, b2));
+    }
+}
+
 //  A base word (valid over the base generators) contains no stable letter.
 pub proof fn lemma_base_word_no_stable(data: HNNData, w: Word)
     requires
