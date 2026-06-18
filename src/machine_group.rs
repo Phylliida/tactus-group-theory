@@ -6870,6 +6870,70 @@ pub proof fn lemma_b_m_equiv_faithful(mm: ModMachine, w1: Word, w2: Word)
     lemma_equiv_transitive(aa, w1, w1 + (iw2 + w2), w2);
 }
 
+//  ============================================================
+//  The pinch-out (property vi):  in_T_stable(A-word) ⟹ in_T.
+//  Base case: a stable-free ⟨T(M),rᵢ,lⱼ⟩-factorization of an A-word lands in T(M).
+//  ============================================================
+pub proof fn lemma_h0_factorization_to_T(mm: ModMachine, factors: Seq<Word>, w: Word)
+    requires
+        mod_machine_wf(mm),
+        all_h0_factors(mm, factors),
+        equiv_in_presentation(b_m(mm), concat_all(factors), w),
+        word_valid(w, 3),
+    ensures
+        in_T(mm, w),
+{
+    lemma_concat_all_h0_valid(mm, factors);
+    lemma_b_m_equiv_faithful(mm, concat_all(factors), w);
+    assert(in_T(mm, w)) by {
+        assert(all_h0_factors(mm, factors)
+            && equiv_in_presentation(base_A(), concat_all(factors), w));
+    }
+}
+
+//  Number of stable (rᵢ/lⱼ) factors in a factorization — the pinch-out measure.
+pub open spec fn stable_factor_count(mm: ModMachine, factors: Seq<Word>) -> nat
+    decreases factors.len(),
+{
+    if factors.len() == 0 {
+        0
+    } else {
+        (if is_stable_factor(mm, factors.first()) { 1nat } else { 0nat })
+            + stable_factor_count(mm, factors.drop_first())
+    }
+}
+
+//  A T-stable factorization with no stable factors is an all-H₀ factorization.
+pub proof fn lemma_no_stable_implies_all_h0(mm: ModMachine, factors: Seq<Word>)
+    requires
+        all_T_stable_factors(mm, factors),
+        stable_factor_count(mm, factors) == 0,
+    ensures
+        all_h0_factors(mm, factors),
+    decreases factors.len(),
+{
+    if factors.len() == 0 {
+    } else {
+        let f = factors.first();
+        let rest = factors.drop_first();
+        assert(!is_stable_factor(mm, f));
+        assert(is_T_stable_factor(mm, f)) by { assert(factors[0] == f); }
+        assert(is_h0_factor(mm, f));
+        assert(all_T_stable_factors(mm, rest)) by {
+            assert forall|i: int| 0 <= i < rest.len()
+                implies is_T_stable_factor(mm, #[trigger] rest[i])
+            by { assert(rest[i] == factors[i + 1]); }
+        }
+        lemma_no_stable_implies_all_h0(mm, rest);
+        assert forall|i: int| 0 <= i < factors.len()
+            implies is_h0_factor(mm, #[trigger] factors[i])
+        by {
+            if i == 0 { assert(factors[0] == f); }
+            else { assert(factors[i] == rest[i - 1]); }
+        }
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
