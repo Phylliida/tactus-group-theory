@@ -71,6 +71,37 @@ the **preservation** bookkeeping (φ(a) stays in `⟨T(M)⟩`).
 - **To build:** pinch-out helper (1), middle-in-K (2), single-HNN property (II) (3, the core), (iv),
   (v), (vi) tower recursion, (vii) forward-membership, E, F.
 
+## ★ REFINEMENT (after building sub-brick 1) — the real structure of the core
+
+Building (1) and thinking harder clarified (2)/(3). The clean textbook proof works on the
+**alternating form** `g = k₀ · p^{ε₁} · k₁ · … · p^{εₙ} · kₙ` (each `kᵢ ∈ K`), NOT on raw positional
+sub-words:
+
+- **Induct on `n` = the number of `p`-letters in this form** (a *factorization*-level count), not on
+  the word's stable symbols.
+- **`n ≥ 1`:** `g ∈ A` + Britton ⟹ a pinch `p^{εᵣ}·kᵣ·p^{ε_{r+1}}` with `εᵣ = -ε_{r+1}` and the
+  K-block `kᵣ ∈ A_p`. Crucially `kᵣ` is a **single K-factor**, so `kᵣ ∈ K`; thus `kᵣ ∈ K ∩ A_p`,
+  and **property (v)** gives `φ(kᵣ) ∈ K ∩ A_{-p}`. Replace `p^{εᵣ}·kᵣ·p^{ε_{r+1}}` by `φ(kᵣ) ∈ K`,
+  merge into the neighbouring K-blocks ⟹ an alternating form with `n-1` p's, still `= g`. IH.
+- **`n = 0`:** `g = k₀ ∈ K`. Done.
+
+Two subtleties this exposes:
+1. **`respects_equiv` is NOT enough for the induction.** `v' ≡ v ∈ ⟨K,p⟩` does preserve *set*
+   membership, but it does **not** reduce the p-count of the *factorization* — and the n=0 base case
+   needs a p-free factorization. So we must **construct the reduced alternating form explicitly**,
+   which is exactly where **property (v)** is essential: it makes `φ(kᵣ)` land in `⟨K_gens⟩` so the
+   new form is still a valid `⟨K_gens,p⟩`-factorization. (Property v is not optional plumbing — it's
+   load-bearing here.)
+2. **The factor↔position bridge is the crux (sub-brick 2).** Britton's pinch is *positional*
+   (`has_pinch_at` at symbol indices); the alternating form is *factor-level*. The bridge:
+   stable symbols of `g` ↔ the `p`-letters of the form (K-blocks have no stable symbols), so the
+   pinch-middle = the K-block `kᵣ` between two p's. Build this as the alternating-form representation
+   + "the segment between consecutive p's is a K-block" lemma.
+
+**Revised sub-brick (3) = represent `g` in alternating form (embedding word `u` over `⟨K_gens,p⟩`
+indices works) + the p-count induction above.** Sub-brick (2) is the factor↔position bridge feeding it.
+Both genuinely intricate — this is the hardest remaining piece, on par with the no-pinch.
+
 ## Risk notes
 
 - **Sub-brick 3 (single-HNN property II) is the crux** — the stable-count induction with preservation.
