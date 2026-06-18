@@ -8402,6 +8402,111 @@ pub proof fn lemma_config_nontrivial(r: nat, s: nat)
     }
 }
 
+//  ============================================================
+//  Config-word framework (for the full T-freeness / config-basis injectivity)
+//  ============================================================
+//
+//  A "config word" is a Seq of config letters z_{r,s}^{±1}; its eval is the
+//  concatenation of the signed sconfig words.  Goal (built incrementally below):
+//  a REDUCED nonempty config word evals to a NONTRIVIAL element of A.
+
+pub struct ConfigLetter {
+    pub r: int,
+    pub s: int,
+    pub inv: bool,
+}
+
+//  The word a single config letter evaluates to.
+pub open spec fn cl_eval(c: ConfigLetter) -> Word {
+    if c.inv { inverse_word(sconfig(c.r, c.s)) } else { sconfig(c.r, c.s) }
+}
+
+//  The word a config word evaluates to (left-fold concatenation).
+pub open spec fn cw_eval(w: Seq<ConfigLetter>) -> Word
+    decreases w.len(),
+{
+    if w.len() == 0 { empty_word() } else { cl_eval(w[0]) + cw_eval(w.drop_first()) }
+}
+
+//  Two adjacent letters cancel: same coordinate, opposite sign.
+pub open spec fn cl_cancels(c: ConfigLetter, d: ConfigLetter) -> bool {
+    c.r == d.r && c.s == d.s && c.inv != d.inv
+}
+
+//  A reduced config word: no adjacent cancelling pair.
+pub open spec fn cw_reduced(w: Seq<ConfigLetter>) -> bool {
+    forall|i: int| 0 <= i < w.len() - 1 ==> !cl_cancels(#[trigger] w[i], w[i + 1])
+}
+
+//  A single config letter evals to a valid 3-generator word.
+pub proof fn lemma_cl_eval_valid(c: ConfigLetter)
+    ensures
+        word_valid(cl_eval(c), 3),
+{
+    lemma_sconfig_valid(c.r, c.s, 3);
+    if c.inv {
+        lemma_inverse_word_valid(sconfig(c.r, c.s), 3);
+    }
+}
+
+//  A config word evals to a valid 3-generator word.
+pub proof fn lemma_cw_eval_valid(w: Seq<ConfigLetter>)
+    ensures
+        word_valid(cw_eval(w), 3),
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        assert(cw_eval(w) =~= empty_word());
+    } else {
+        lemma_cl_eval_valid(w[0]);
+        lemma_cw_eval_valid(w.drop_first());
+        lemma_concat_word_valid(cl_eval(w[0]), cw_eval(w.drop_first()), 3);
+    }
+}
+
+//  A signed config word has t-exponent 1.
+pub proof fn lemma_sconfig_t_exp(r: int, s: int)
+    ensures
+        gexp(0, sconfig(r, s)) == 1,
+{
+    let b1 = signed_power(2, -s);
+    let b2 = signed_power(1, -r);
+    let b3: Word = seq![Symbol::Gen(0)];
+    let b4 = signed_power(1, r);
+    let b5 = signed_power(2, s);
+    assert(sconfig(r, s) == b1 + b2 + b3 + b4 + b5);
+    lemma_gexp_signed_power(2, 0, -s);
+    lemma_gexp_signed_power(1, 0, -r);
+    lemma_gexp_singleton(0, Symbol::Gen(0));
+    lemma_gexp_signed_power(1, 0, r);
+    lemma_gexp_signed_power(2, 0, s);
+    lemma_gexp_concat(0, b1, b2);
+    lemma_gexp_concat(0, b1 + b2, b3);
+    lemma_gexp_concat(0, b1 + b2 + b3, b4);
+    lemma_gexp_concat(0, b1 + b2 + b3 + b4, b5);
+}
+
+//  n=1 base case: a single config letter is nontrivial (t-exponent ±1 ≠ 0).
+pub proof fn lemma_cl_eval_nontrivial(c: ConfigLetter)
+    ensures
+        !equiv_in_presentation(base_A(), cl_eval(c), empty_word()),
+{
+    lemma_sconfig_t_exp(c.r, c.s);
+    let e = cl_eval(c);
+    if c.inv {
+        lemma_gexp_inverse(0, sconfig(c.r, c.s));
+        assert(gexp(0, e) == -1);
+    } else {
+        assert(gexp(0, e) == 1);
+    }
+    assert(gexp(0, empty_word()) == 0) by { reveal_with_fuel(gexp, 1); }
+    assert(!equiv_in_presentation(base_A(), e, empty_word())) by {
+        if equiv_in_presentation(base_A(), e, empty_word()) {
+            lemma_equiv_in_A_preserves_gexp(0, e, empty_word());
+        }
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
