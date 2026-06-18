@@ -13,7 +13,7 @@ use crate::britton_via_tower::lemma_insert_equiv_empty;
 use crate::britton_via_tower::lemma_delete_equiv_empty;
 use crate::britton_via_tower::{britton_lemma_full, has_pinch, has_pinch_at,
     has_adjacent_opposite_at, is_stable, has_stable_letter};
-use crate::benign::{in_generated_subgroup, concat_all, lemma_concat_all_singleton, lemma_concat_all_empty, is_generator_or_inverse, factors_from_generators};
+use crate::benign::{in_generated_subgroup, concat_all, lemma_concat_all_singleton, lemma_concat_all_empty, is_generator_or_inverse, factors_from_generators, lemma_identity_in_generated_subgroup, lemma_generator_in_generated_subgroup};
 use crate::free_product::{free_product, shift_relators, shift_word, shift_symbol};
 use crate::quotient::add_relator;
 use crate::tietze::lemma_add_derivable_relator_reverse;
@@ -9982,6 +9982,157 @@ pub proof fn lemma_canw_eval_nontrivial(w: Seq<CanonLetter>)
         lemma_yl_no_pinch(w, 0);
         lemma_yl_combined_nontrivial(w);
     }
+}
+
+//  ============================================================
+//  Obligation E — reusable subgroup-membership closures
+//  ============================================================
+
+//  The generated subgroup is closed under products.
+pub proof fn lemma_product_in_subgroup(p: Presentation, gens: Seq<Word>, w1: Word, w2: Word)
+    requires
+        in_generated_subgroup(p, gens, w1),
+        in_generated_subgroup(p, gens, w2),
+    ensures
+        in_generated_subgroup(p, gens, w1 + w2),
+{
+    let f1 = choose|f: Seq<Word>|
+        factors_from_generators(gens, f) && equiv_in_presentation(p, concat_all(f), w1);
+    let f2 = choose|f: Seq<Word>|
+        factors_from_generators(gens, f) && equiv_in_presentation(p, concat_all(f), w2);
+    assert(factors_from_generators(gens, f1) && equiv_in_presentation(p, concat_all(f1), w1));
+    assert(factors_from_generators(gens, f2) && equiv_in_presentation(p, concat_all(f2), w2));
+    let f = f1 + f2;
+    assert(factors_from_generators(gens, f)) by {
+        assert forall|k: int| 0 <= k < f.len() implies is_generator_or_inverse(gens, #[trigger] f[k]) by {
+            if k < f1.len() { assert(f[k] == f1[k]); } else { assert(f[k] == f2[k - f1.len()]); }
+        }
+    }
+    lemma_concat_all_distributes(f1, f2);
+    lemma_equiv_concat_left(p, concat_all(f1), w1, concat_all(f2));
+    lemma_equiv_concat_right(p, w1, concat_all(f2), w2);
+    lemma_equiv_transitive(p, concat_all(f1) + concat_all(f2), w1 + concat_all(f2), w1 + w2);
+    assert(concat_all(f) =~= concat_all(f1) + concat_all(f2));
+    assert(in_generated_subgroup(p, gens, w1 + w2)) by {
+        assert(factors_from_generators(gens, f) && equiv_in_presentation(p, concat_all(f), w1 + w2));
+    }
+}
+
+//  n-fold concatenation of a word.
+pub open spec fn word_power(w: Word, n: nat) -> Word
+    decreases n,
+{
+    if n == 0 { empty_word() } else { w + word_power(w, (n - 1) as nat) }
+}
+
+//  word_power of a symbol-power is the merged symbol-power.
+pub proof fn lemma_word_power_symbol(s: Symbol, m: nat, n: nat)
+    ensures
+        word_power(symbol_power(s, m), n) =~= symbol_power(s, m * n),
+    decreases n,
+{
+    if n == 0 {
+        assert(symbol_power(s, m * 0) =~= empty_word());
+    } else {
+        let k = (n - 1) as nat;
+        lemma_word_power_symbol(s, m, k);
+        lemma_symbol_power_merge(s, m, m * k);
+        assert(m + m * k == m * n) by (nonlinear_arith)
+            requires n == k + 1;
+    }
+}
+
+//  A power of a generator (or its inverse) lies in the subgroup.
+pub proof fn lemma_word_power_in_subgroup(p: Presentation, gens: Seq<Word>, w: Word, n: nat)
+    requires
+        is_generator_or_inverse(gens, w),
+    ensures
+        in_generated_subgroup(p, gens, word_power(w, n)),
+    decreases n,
+{
+    if n == 0 {
+        lemma_identity_in_generated_subgroup(p, gens);
+    } else {
+        assert(in_generated_subgroup(p, gens, w)) by {
+            let factors = seq![w];
+            assert(factors_from_generators(gens, factors)) by {
+                assert forall|k: int| 0 <= k < factors.len()
+                    implies is_generator_or_inverse(gens, #[trigger] factors[k]) by {
+                    assert(factors[k] == w);
+                }
+            }
+            lemma_concat_all_singleton(w);
+            lemma_equiv_refl(p, w);
+        }
+        lemma_word_power_in_subgroup(p, gens, w, (n - 1) as nat);
+        lemma_product_in_subgroup(p, gens, w, word_power(w, (n - 1) as nat));
+    }
+}
+
+//  A symbol-power block `symbol_power(sym, m·n)` lies in the subgroup, given a
+//  generator/inverse `w` equal to `symbol_power(sym, m)`.
+pub proof fn lemma_block_in_subgroup(
+    p: Presentation, gens: Seq<Word>, w: Word, sym: Symbol, m: nat, n: nat,
+)
+    requires
+        is_generator_or_inverse(gens, w),
+        w =~= symbol_power(sym, m),
+    ensures
+        in_generated_subgroup(p, gens, symbol_power(sym, m * n)),
+{
+    lemma_word_power_in_subgroup(p, gens, w, n);
+    lemma_word_power_symbol(sym, m, n);
+    assert(word_power(w, n) =~= symbol_power(sym, m * n));
+}
+
+//  ★ PROPERTY (ii)⊇: t(am+i, bm+j) ∈ ⟨t(i,j), xᵐ, yᵐ⟩. ★
+pub proof fn lemma_config_in_associated_subgroup(i: nat, j: nat, a: nat, b: nat, m: nat)
+    ensures
+        in_generated_subgroup(
+            base_A(),
+            seq![config_word(i, j), symbol_power(Symbol::Gen(1), m), symbol_power(Symbol::Gen(2), m)],
+            config_word((a * m + i) as nat, (b * m + j) as nat),
+        ),
+{
+    let p = base_A();
+    let gens = seq![config_word(i, j), symbol_power(Symbol::Gen(1), m), symbol_power(Symbol::Gen(2), m)];
+    lemma_base_A_valid();
+    assert(gens[0] == config_word(i, j) && gens[1] == symbol_power(Symbol::Gen(1), m) && gens[2] == symbol_power(Symbol::Gen(2), m));
+    assert(is_generator_or_inverse(gens, gens[1]));
+    assert(is_generator_or_inverse(gens, gens[2]));
+    assert(is_generator_or_inverse(gens, inverse_word(gens[1])));
+    assert(is_generator_or_inverse(gens, inverse_word(gens[2])));
+    assert(m * a == a * m && m * b == b * m) by (nonlinear_arith);
+    //  the five blocks of config_target(a,i,b,j,m)
+    lemma_inverse_word_sympower(Symbol::Gen(2), m);
+    assert(inverse_word(gens[2]) =~= symbol_power(Symbol::Inv(2), m));
+    lemma_block_in_subgroup(p, gens, inverse_word(gens[2]), Symbol::Inv(2), m, b);  //  B1
+    lemma_inverse_word_sympower(Symbol::Gen(1), m);
+    assert(inverse_word(gens[1]) =~= symbol_power(Symbol::Inv(1), m));
+    lemma_block_in_subgroup(p, gens, inverse_word(gens[1]), Symbol::Inv(1), m, a);  //  B2
+    lemma_generator_in_generated_subgroup(p, gens, 0);                              //  B3 = gens[0]
+    assert(gens[1] =~= symbol_power(Symbol::Gen(1), m));
+    lemma_block_in_subgroup(p, gens, gens[1], Symbol::Gen(1), m, a);                //  B4
+    assert(gens[2] =~= symbol_power(Symbol::Gen(2), m));
+    lemma_block_in_subgroup(p, gens, gens[2], Symbol::Gen(2), m, b);                //  B5
+    let b1 = symbol_power(Symbol::Inv(2), b * m);
+    let b2 = symbol_power(Symbol::Inv(1), a * m);
+    let b3 = config_word(i, j);
+    let b4 = symbol_power(Symbol::Gen(1), a * m);
+    let b5 = symbol_power(Symbol::Gen(2), b * m);
+    //  product-closure chain over the five blocks
+    lemma_product_in_subgroup(p, gens, b1, b2);
+    lemma_product_in_subgroup(p, gens, b1 + b2, b3);
+    lemma_product_in_subgroup(p, gens, b1 + b2 + b3, b4);
+    lemma_product_in_subgroup(p, gens, b1 + b2 + b3 + b4, b5);
+    assert(config_target(a, i, b, j, m) =~= b1 + b2 + b3 + b4 + b5);
+    //  config_word ≡ config_target, lift membership across the equivalence
+    lemma_config_decompose(a, i, b, j, m);
+    let cw = config_word((a * m + i) as nat, (b * m + j) as nat);
+    lemma_config_word_valid(a * m + i, b * m + j);
+    lemma_word_valid_mono(cw, 3, 3);
+    lemma_equiv_symmetric(p, cw, config_target(a, i, b, j, m));
+    lemma_in_subgroup_respects_equiv(p, gens, config_target(a, i, b, j, m), cw);
 }
 
 //  ψ multiplies the y-stable-count by q.
