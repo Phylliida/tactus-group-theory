@@ -10135,6 +10135,102 @@ pub proof fn lemma_config_in_associated_subgroup(i: nat, j: nat, a: nat, b: nat,
     lemma_in_subgroup_respects_equiv(p, gens, config_target(a, i, b, j, m), cw);
 }
 
+//  apply_embedding(gens, u) is a product of generators, hence in ⟨gens⟩.
+pub proof fn lemma_apply_embedding_in_subgroup(p: Presentation, gens: Seq<Word>, u: Word)
+    requires
+        word_valid(u, gens.len() as nat),
+    ensures
+        in_generated_subgroup(p, gens, apply_embedding(gens, u)),
+    decreases u.len(),
+{
+    reveal_with_fuel(apply_embedding, 2);
+    if u.len() == 0 {
+        assert(apply_embedding(gens, u) =~= empty_word());
+        lemma_identity_in_generated_subgroup(p, gens);
+    } else {
+        let s = u.first();
+        let rest = u.drop_first();
+        assert(symbol_valid(s, gens.len() as nat)) by { assert(u[0] == s); }
+        assert(word_valid(rest, gens.len() as nat)) by {
+            assert forall|t: int| 0 <= t < rest.len() implies symbol_valid(#[trigger] rest[t], gens.len() as nat)
+            by { assert(rest[t] == u[t + 1]); }
+        }
+        let es = apply_embedding_symbol(gens, s);
+        let gi = generator_index(s) as int;
+        assert(es == gens[gi] || es == inverse_word(gens[gi]));
+        assert(in_generated_subgroup(p, gens, es)) by {
+            let factors = seq![es];
+            assert(factors_from_generators(gens, factors)) by {
+                assert(is_generator_or_inverse(gens, es)) by {
+                    assert(0 <= gi < gens.len() && (es == gens[gi] || es == inverse_word(gens[gi])));
+                }
+            }
+            lemma_concat_all_singleton(es);
+            lemma_equiv_refl(p, es);
+        }
+        lemma_apply_embedding_in_subgroup(p, gens, rest);
+        assert(apply_embedding(gens, u) =~= es + apply_embedding(gens, rest));
+        lemma_product_in_subgroup(p, gens, es, apply_embedding(gens, rest));
+    }
+}
+
+//  ★ SUB-BRICK (1): pinch-out.  If a ∈ ⟨a_gens⟩, then sᵢ⁻¹·a·sᵢ ≡ φ(a) with φ(a) ∈ ⟨b_gens⟩. ★
+pub proof fn lemma_pinch_out_phi(data: HNNData, a: Word) -> (phi_a: Word)
+    requires
+        hnn_data_valid(data),
+        in_generated_subgroup(data.base, hnn_a_gens(data), a),
+    ensures
+        word_valid(phi_a, data.base.num_generators),
+        equiv_in_presentation(hnn_presentation(data),
+            seq![stable_letter_inv(data)] + a + seq![stable_letter(data)], phi_a),
+        in_generated_subgroup(data.base, hnn_b_gens(data), phi_a),
+{
+    let base = data.base;
+    let ag = hnn_a_gens(data);
+    let bg = hnn_b_gens(data);
+    let p = hnn_presentation(data);
+    let si = stable_letter_inv(data);
+    let st = stable_letter(data);
+    let png = p.num_generators;
+    lemma_hnn_presentation_valid(data);
+    //  a ≡ apply_embedding(ag, u) for some u over the association indices
+    lemma_in_gen_implies_emb(base, ag, a);
+    let u = choose|u: Word| word_valid(u, ag.len() as nat)
+        && equiv_in_presentation(base, apply_embedding(ag, u), a);
+    assert(word_valid(u, ag.len() as nat)
+        && equiv_in_presentation(base, apply_embedding(ag, u), a));
+    assert(ag.len() == data.associations.len() && bg.len() == data.associations.len());
+    let ea = apply_embedding(ag, u);
+    let phi_a = apply_embedding(bg, u);
+    //  validity of ea, phi_a over base then png
+    assert forall|i: int| 0 <= i < ag.len() implies word_valid(#[trigger] ag[i], base.num_generators)
+        by { assert(ag[i] == data.associations[i].0); }
+    assert forall|i: int| 0 <= i < bg.len() implies word_valid(#[trigger] bg[i], base.num_generators)
+        by { assert(bg[i] == data.associations[i].1); }
+    lemma_apply_embedding_valid(ag, u, base.num_generators);
+    lemma_apply_embedding_valid(bg, u, base.num_generators);
+    lemma_word_valid_mono(ea, base.num_generators, png);
+    //  lift  a ≡ ea  into the HNN, then wrap in si·_·st
+    lemma_base_embeds_in_hnn(data, ea, a);
+    lemma_equiv_symmetric(p, ea, a);
+    assert(symbol_valid(si, png) && symbol_valid(st, png)) by {
+        assert(si == Symbol::Inv(base.num_generators) && st == Symbol::Gen(base.num_generators));
+    }
+    assert(word_valid(seq![si], png) && word_valid(seq![st], png)) by {
+        assert forall|t: int| 0 <= t < 1 implies symbol_valid(#[trigger] seq![si][t], png) && symbol_valid(seq![st][t], png) by { }
+    }
+    lemma_equiv_concat_right(p, seq![si], a, ea);
+    lemma_equiv_concat_left(p, seq![si] + a, seq![si] + ea, seq![st]);
+    assert(seq![si] + a + seq![st] == (seq![si] + a) + seq![st]);
+    assert(seq![si] + ea + seq![st] == (seq![si] + ea) + seq![st]);
+    //  the pinch-out telescope
+    lemma_stable_conj_factorization(data, u);
+    lemma_equiv_transitive(p, seq![si] + a + seq![st], seq![si] + ea + seq![st], phi_a);
+    //  φ(a) ∈ ⟨b_gens⟩
+    lemma_apply_embedding_in_subgroup(base, bg, u);
+    phi_a
+}
+
 //  A base word (valid over the base generators) contains no stable letter.
 pub proof fn lemma_base_word_no_stable(data: HNNData, w: Word)
     requires
