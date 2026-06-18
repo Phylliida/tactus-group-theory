@@ -8368,6 +8368,40 @@ pub proof fn lemma_config_accumulator_emit(aa: nat, bb: nat, mm: nat, nn: nat, u
     factors
 }
 
+//  ============================================================
+//  T-freeness (config-basis injectivity) — toward faithfulness E step 3
+//  ============================================================
+
+//  A single config word is nontrivial in A (it has t-exponent 1).
+pub proof fn lemma_config_nontrivial(r: nat, s: nat)
+    ensures
+        !equiv_in_presentation(base_A(), config_word(r, s), empty_word()),
+{
+    let cw = config_word(r, s);
+    let a1 = symbol_power(Symbol::Inv(2), s);
+    let a2 = symbol_power(Symbol::Inv(1), r);
+    let a3: Word = seq![Symbol::Gen(0)];
+    let a4 = symbol_power(Symbol::Gen(1), r);
+    let a5 = symbol_power(Symbol::Gen(2), s);
+    assert(cw == a1 + a2 + a3 + a4 + a5);
+    lemma_gexp_symbol_power(0, Symbol::Inv(2), s);
+    lemma_gexp_symbol_power(0, Symbol::Inv(1), r);
+    lemma_gexp_symbol_power(0, Symbol::Gen(1), r);
+    lemma_gexp_symbol_power(0, Symbol::Gen(2), s);
+    lemma_gexp_singleton(0, Symbol::Gen(0));
+    lemma_gexp_concat(0, a1, a2);
+    lemma_gexp_concat(0, a1 + a2, a3);
+    lemma_gexp_concat(0, a1 + a2 + a3, a4);
+    lemma_gexp_concat(0, a1 + a2 + a3 + a4, a5);
+    assert(gexp(0, cw) == 1);
+    assert(gexp(0, empty_word()) == 0) by { reveal_with_fuel(gexp, 1); }
+    assert(!equiv_in_presentation(base_A(), cw, empty_word())) by {
+        if equiv_in_presentation(base_A(), cw, empty_word()) {
+            lemma_equiv_in_A_preserves_gexp(0, cw, empty_word());
+        }
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
