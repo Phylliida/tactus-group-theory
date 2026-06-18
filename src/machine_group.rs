@@ -10135,6 +10135,79 @@ pub proof fn lemma_config_in_associated_subgroup(i: nat, j: nat, a: nat, b: nat,
     lemma_in_subgroup_respects_equiv(p, gens, config_target(a, i, b, j, m), cw);
 }
 
+//  A base word (valid over the base generators) contains no stable letter.
+pub proof fn lemma_base_word_no_stable(data: HNNData, w: Word)
+    requires
+        word_valid(w, data.base.num_generators),
+    ensures
+        forall|i: int| 0 <= i < w.len() ==> !is_stable(data, #[trigger] w[i]),
+{
+    let ng = data.base.num_generators;
+    assert forall|i: int| 0 <= i < w.len() implies !is_stable(data, #[trigger] w[i]) by {
+        assert(symbol_valid(w[i], ng));
+    }
+}
+
+//  ★ PROPERTY (III): if the stable letter commutes with a base word h
+//  (k⁻¹·h·k ≡ h), then h lies in the associated subgroup ⟨a_gens⟩. ★
+pub proof fn lemma_stable_commute_implies_member(data: HNNData, h: Word)
+    requires
+        hnn_data_valid(data),
+        hnn_associations_isomorphic(data),
+        word_valid(h, data.base.num_generators),
+        equiv_in_presentation(hnn_presentation(data),
+            seq![stable_letter_inv(data)] + h + seq![stable_letter(data)], h),
+    ensures
+        in_generated_subgroup(data.base, hnn_a_gens(data), h),
+{
+    let p = hnn_presentation(data);
+    let ng = data.base.num_generators;
+    let si = stable_letter_inv(data);
+    let st = stable_letter(data);
+    let png = p.num_generators;
+    let hi = inverse_word(h);
+    let lhs: Word = seq![si] + h + seq![st];
+    let w: Word = lhs + hi;
+    let hl = h.len() as int;
+    lemma_hnn_presentation_valid(data);
+    assert(st == Symbol::Gen(ng) && si == Symbol::Inv(ng));
+    assert(png == ng + 1);
+    lemma_inverse_word_valid(h, ng);
+    lemma_base_word_no_stable(data, h);
+    lemma_base_word_no_stable(data, hi);
+    //  validity of w over png (= ng+1)
+    lemma_word_valid_mono(h, ng, png);
+    lemma_word_valid_mono(hi, ng, png);
+    assert(symbol_valid(si, png) && symbol_valid(st, png));
+    assert(word_valid(seq![si], png) && word_valid(seq![st], png)) by {
+        assert forall|t: int| 0 <= t < 1 implies symbol_valid(#[trigger] seq![si][t], png) && symbol_valid(seq![st][t], png) by { }
+    }
+    lemma_concat_word_valid(seq![si], h, png);
+    lemma_concat_word_valid(seq![si] + h, seq![st], png);
+    lemma_concat_word_valid(lhs, hi, png);
+    //  w ≡ ε  (hypothesis k⁻¹hk ≡ h, then h·h⁻¹ cancels)
+    lemma_equiv_concat_left(p, lhs, h, hi);
+    lemma_word_inverse_right(p, h);
+    lemma_equiv_transitive(p, lhs + hi, h + hi, empty_word());
+    //  positions: w[0]=si, w[1..hl]=h, w[hl+1]=st, w[hl+2..]=hi
+    assert(w[0] == si);
+    assert(w[hl + 1] == st);
+    assert(forall|q: int| 1 <= q <= hl ==> w[q] == h[q - 1]);
+    assert(forall|q: int| hl + 2 <= q < w.len() ==> w[q] == hi[q - hl - 2]);
+    assert(has_stable_letter(data, w)) by { assert(0 <= 0 < w.len() && is_stable(data, w[0])); }
+    //  the only stable positions are 0 and hl+1
+    assert(forall|q: int| 0 <= q < w.len() && is_stable(data, #[trigger] w[q]) ==> q == 0 || q == hl + 1);
+    britton_lemma_full(data, w);
+    let pr: (int, int) = choose|i: int, j: int| has_pinch_at(data, w, i, j);
+    let i = pr.0;
+    let j = pr.1;
+    assert(has_pinch_at(data, w, i, j));
+    assert(is_stable(data, w[i]) && is_stable(data, w[j]) && 0 <= i < j < w.len());
+    assert(i == 0 && j == hl + 1);
+    assert(w.subrange(i + 1, j) =~= h);
+    assert(in_generated_subgroup(data.base, hnn_a_gens(data), h));
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
