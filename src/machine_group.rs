@@ -9466,6 +9466,94 @@ pub proof fn lemma_yl_combined_nontrivial(w: Seq<CanonLetter>)
     }
 }
 
+//  ============================================================
+//  Y-LEVEL gap 1: has_stable_letter (some s≠0 ⟹ a y appears)
+//  ============================================================
+
+//  No stable letter splits over concatenation.
+pub proof fn lemma_has_stable_no_concat(data: HNNData, a: Word, b: Word)
+    requires
+        !has_stable_letter(data, a + b),
+    ensures
+        !has_stable_letter(data, a),
+        !has_stable_letter(data, b),
+{
+    assert(!has_stable_letter(data, a)) by {
+        if has_stable_letter(data, a) {
+            let i = choose|i: int| 0 <= i < a.len() && is_stable(data, a[i]);
+            assert((a + b)[i] == a[i]);
+        }
+    }
+    assert(!has_stable_letter(data, b)) by {
+        if has_stable_letter(data, b) {
+            let i = choose|i: int| 0 <= i < b.len() && is_stable(data, b[i]);
+            assert((a + b)[i + a.len()] == b[i]);
+        }
+    }
+}
+
+//  A nonzero y-block is stable.
+pub proof fn lemma_signed_power_y_stable(n: int)
+    requires
+        n != 0,
+    ensures
+        has_stable_letter(a_as_hnn(), signed_power(2, n)),
+{
+    let data = a_as_hnn();
+    let yb = signed_power(2, n);
+    let s = if n >= 0 { Symbol::Gen(2) } else { Symbol::Inv(2) };
+    assert(yb[0] == s);
+    assert(is_stable(data, s));
+    assert(0 <= 0 < yb.len() && is_stable(data, yb[0]));
+}
+
+//  If yl_comb_acc has no y, every s equals prev (all y-gaps vanish).
+pub proof fn lemma_yl_no_y_const(w: Seq<CanonLetter>, prev: int)
+    requires
+        !has_stable_letter(a_as_hnn(), yl_comb_acc(w, prev)),
+    ensures
+        forall|j: int| 0 <= j < w.len() ==> (#[trigger] w[j]).s == prev,
+    decreases w.len(),
+{
+    let data = a_as_hnn();
+    if w.len() == 0 {
+    } else {
+        let c = w[0];
+        let rest = w.drop_first();
+        let y0 = signed_power(2, prev - c.s);
+        let h1 = hblock(c.r, c.e);
+        let r = yl_comb_acc(rest, c.s);
+        assert(yl_comb_acc(w, prev) == (y0 + h1) + r);
+        lemma_has_stable_no_concat(data, y0 + h1, r);
+        lemma_has_stable_no_concat(data, y0, h1);
+        if prev - c.s != 0 {
+            lemma_signed_power_y_stable(prev - c.s);
+        }
+        assert(c.s == prev);
+        lemma_yl_no_y_const(rest, c.s);
+        assert forall|j: int| 0 <= j < w.len() implies (#[trigger] w[j]).s == prev by {
+            if j >= 1 {
+                assert(rest[j - 1] == w[j]);
+                assert(rest[j - 1].s == c.s);
+            }
+        }
+    }
+}
+
+//  Some s≠0 ⟹ yl_combined has a stable y.
+pub proof fn lemma_yl_has_stable(w: Seq<CanonLetter>)
+    requires
+        w.len() >= 1,
+        !canw_all_s_zero(w),
+    ensures
+        has_stable_letter(a_as_hnn(), yl_combined(w)),
+{
+    if !has_stable_letter(a_as_hnn(), yl_combined(w)) {
+        lemma_yl_no_y_const(w, 0);
+        assert forall|j: int| 0 <= j < w.len() implies (#[trigger] w[j]).s == 0 by {}
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
