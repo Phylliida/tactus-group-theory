@@ -8130,6 +8130,244 @@ pub proof fn lemma_acc_emit_config_inv(pp: int, qq: int, r: int, s: int)
     lemma_equiv_transitive(a, lhs, mid, rhs);
 }
 
+//  ============================================================
+//  THE ACCUMULATOR INDUCTION (property (ii) core)
+//  ============================================================
+
+//  The "a-side" generators of a quad: a config and the m-scaled x,y.
+pub open spec fn acc_gens(aa: nat, bb: nat, mm: nat, nn: nat) -> Seq<Word> {
+    seq![config_word(aa, bb), symbol_power(Symbol::Gen(1), mm), symbol_power(Symbol::Gen(2), nn)]
+}
+
+//  A factor is a config (or its inverse) at the residue class of (aa,bb) mod (mm,nn).
+pub open spec fn residue_config(f: Word, aa: nat, bb: nat, mm: nat, nn: nat) -> bool {
+    exists|k: int, l: int| #![trigger sconfig((aa + mm * k), (bb + nn * l))]
+        f == sconfig((aa + mm * k), (bb + nn * l))
+        || f == inverse_word(sconfig((aa + mm * k), (bb + nn * l)))
+}
+
+pub open spec fn all_residue_configs(factors: Seq<Word>, aa: nat, bb: nat, mm: nat, nn: nat) -> bool {
+    forall|i: int| 0 <= i < factors.len() ==> residue_config(#[trigger] factors[i], aa, bb, mm, nn)
+}
+
+//  emb(acc_gens, uw)  ≡  (product of residue-(aa,bb) configs) · x^{m·χ₁} · y^{n·χ₂},
+//  where χᵢ = gexp(i, uw).  Induction on |uw| (drop_last).
+pub proof fn lemma_accumulator_inv(aa: nat, bb: nat, mm: nat, nn: nat, uw: Word) -> (factors: Seq<Word>)
+    requires
+        mm > 0,
+        nn > 0,
+        word_valid(uw, 3),
+    ensures
+        all_residue_configs(factors, aa, bb, mm, nn),
+        equiv_in_presentation(base_A(),
+            apply_embedding(acc_gens(aa, bb, mm, nn), uw),
+            concat_all(factors) + signed_power(1, mm * gexp(1, uw)) + signed_power(2, nn * gexp(2, uw))),
+    decreases uw.len(),
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    assert(presentation_valid(a)) by { reveal(presentation_valid); }
+    let gens = acc_gens(aa, bb, mm, nn);
+    if uw.len() == 0 {
+        reveal_with_fuel(apply_embedding, 1);
+        let factors: Seq<Word> = Seq::empty();
+        assert(gexp(1, uw) == 0 && gexp(2, uw) == 0) by { reveal_with_fuel(gexp, 1); }
+        assert(apply_embedding(gens, uw) =~= empty_word());
+        assert(concat_all(factors) =~= empty_word()) by { lemma_concat_all_empty(); }
+        assert(concat_all(factors) + signed_power(1, mm * gexp(1, uw)) + signed_power(2, nn * gexp(2, uw))
+            =~= empty_word());
+        lemma_equiv_refl(a, apply_embedding(gens, uw));
+        factors
+    } else {
+        let last = uw.last();
+        let pre = uw.drop_last();
+        let pre_factors = lemma_accumulator_inv(aa, bb, mm, nn, pre);
+        let pp1 = mm * gexp(1, pre);
+        let qq1 = nn * gexp(2, pre);
+        let xP = signed_power(1, pp1);
+        let yQ = signed_power(2, qq1);
+        let ihrhs = concat_all(pre_factors) + xP + yQ;
+        //  --- common: emb(uw) ≡ ihrhs · emb_sym(last) ---
+        let es = apply_embedding_symbol(gens, last);
+        assert(uw =~= pre + seq![last]);
+        lemma_apply_embedding_concat(gens, pre, seq![last]);
+        reveal_with_fuel(apply_embedding, 1);
+        assert(seq![last].first() == last);
+        assert(seq![last].drop_first() =~= empty_word());
+        assert(apply_embedding(gens, empty_word()) =~= empty_word());
+        assert(apply_embedding(gens, seq![last]) =~= es);
+        assert(apply_embedding(gens, uw) =~= apply_embedding(gens, pre) + es);
+        lemma_equiv_concat_left(a, apply_embedding(gens, pre), ihrhs, es);
+        assert(equiv_in_presentation(a, apply_embedding(gens, uw), ihrhs + es));
+        //  gexp bookkeeping
+        lemma_gexp_concat(1, pre, seq![last]);
+        lemma_gexp_concat(2, pre, seq![last]);
+        assert(gexp(1, seq![last]) == sym_exp(1, last)) by { reveal_with_fuel(gexp, 2); }
+        assert(gexp(2, seq![last]) == sym_exp(2, last)) by { reveal_with_fuel(gexp, 2); }
+        lemma_accumulator_step(a, aa, bb, mm, nn, uw, pre, last, pre_factors, pp1, qq1, es)
+    }
+}
+
+//  The per-symbol step of the accumulator: given emb(uw) ≡ cc·xᴾ·yᵠ·es, fold es in.
+pub proof fn lemma_accumulator_step(
+    a: Presentation, aa: nat, bb: nat, mm: nat, nn: nat, uw: Word, pre: Word, last: Symbol,
+    pre_factors: Seq<Word>, pp1: int, qq1: int, es: Word,
+) -> (factors: Seq<Word>)
+    requires
+        a == base_A(),
+        mm > 0, nn > 0,
+        word_valid(uw, 3),
+        uw.len() > 0,
+        last == uw.last(),
+        symbol_valid(last, 3),
+        pp1 == mm * gexp(1, pre),
+        qq1 == nn * gexp(2, pre),
+        es == apply_embedding_symbol(acc_gens(aa, bb, mm, nn), last),
+        all_residue_configs(pre_factors, aa, bb, mm, nn),
+        equiv_in_presentation(a, apply_embedding(acc_gens(aa, bb, mm, nn), uw),
+            concat_all(pre_factors) + signed_power(1, pp1) + signed_power(2, qq1) + es),
+        gexp(1, uw) == gexp(1, pre) + sym_exp(1, last),
+        gexp(2, uw) == gexp(2, pre) + sym_exp(2, last),
+    ensures
+        all_residue_configs(factors, aa, bb, mm, nn),
+        equiv_in_presentation(a, apply_embedding(acc_gens(aa, bb, mm, nn), uw),
+            concat_all(factors) + signed_power(1, mm * gexp(1, uw)) + signed_power(2, nn * gexp(2, uw))),
+{
+    lemma_base_A_valid();
+    assert(presentation_valid(a)) by { reveal(presentation_valid); }
+    let gens = acc_gens(aa, bb, mm, nn);
+    let cc = concat_all(pre_factors);
+    let xP = signed_power(1, pp1);
+    let yQ = signed_power(2, qq1);
+    let emb = apply_embedding(gens, uw);
+    let gi = generator_index(last);
+    assert(gi < 3);
+    assert((cc + xP + yQ) + es =~= cc + (xP + yQ + es));
+    assert(equiv_in_presentation(a, emb, cc + (xP + yQ + es)));
+    if gi == 0 {
+        //  --- config emit (t / t⁻¹) ---  sym_exp(1/2, last)==0 so powers unchanged
+        assert(sym_exp(1, last) == 0 && sym_exp(2, last) == 0);
+        assert(mm * gexp(1, uw) == pp1 && nn * gexp(2, uw) == qq1);
+        let newc0 = sconfig((aa - pp1), (bb - qq1));
+        lemma_sconfig_nat(aa as int, bb as int);
+        let is_gen = last == Symbol::Gen(0);
+        let newc = if is_gen { newc0 } else { inverse_word(newc0) };
+        let new_factors = pre_factors.push(newc);
+        if is_gen {
+            assert(es =~= sconfig(aa as int, bb as int));
+            lemma_acc_emit_config(pp1, qq1, aa as int, bb as int);
+        } else {
+            assert(es =~= inverse_word(sconfig(aa as int, bb as int)));
+            lemma_acc_emit_config_inv(pp1, qq1, aa as int, bb as int);
+        }
+        assert(equiv_in_presentation(a, xP + yQ + es, newc + xP + yQ));
+        lemma_equiv_concat_right(a, cc, xP + yQ + es, newc + xP + yQ);
+        lemma_concat_all_distributes(pre_factors, seq![newc]);
+        lemma_concat_all_singleton(newc);
+        assert(new_factors =~= pre_factors + seq![newc]);
+        assert(concat_all(new_factors) =~= cc + newc);
+        assert(cc + (newc + xP + yQ) =~= concat_all(new_factors) + xP + yQ);
+        lemma_equiv_transitive(a, emb, cc + (xP + yQ + es), cc + (newc + xP + yQ));
+        assert(equiv_in_presentation(a, emb, concat_all(new_factors) + xP + yQ));
+        assert(all_residue_configs(new_factors, aa, bb, mm, nn)) by {
+            assert forall|i: int| 0 <= i < new_factors.len()
+                implies residue_config(#[trigger] new_factors[i], aa, bb, mm, nn) by {
+                if i < pre_factors.len() {
+                    assert(new_factors[i] == pre_factors[i]);
+                } else {
+                    assert(new_factors[i] == newc);
+                    assert(aa + mm * (-gexp(1, pre)) == aa - pp1) by (nonlinear_arith)
+                        requires pp1 == mm * gexp(1, pre);
+                    assert(bb + nn * (-gexp(2, pre)) == bb - qq1) by (nonlinear_arith)
+                        requires qq1 == nn * gexp(2, pre);
+                    assert(newc == sconfig((aa + mm * (-gexp(1, pre))), (bb + nn * (-gexp(2, pre))))
+                        || newc == inverse_word(sconfig((aa + mm * (-gexp(1, pre))), (bb + nn * (-gexp(2, pre))))));
+                }
+            }
+        }
+        new_factors
+    } else if gi == 1 {
+        //  --- x-power emit ---  factors unchanged
+        assert(last == Symbol::Gen(1) || last == Symbol::Inv(1)) by { assert(generator_index(last) == 1); }
+        assert(sym_exp(2, last) == 0);
+        let sgn = sym_exp(1, last);
+        let mmm = mm * sgn;
+        assert(es =~= signed_power(1, mmm)) by {
+            if last == Symbol::Gen(1) {
+                assert(es == symbol_power(Symbol::Gen(1), mm));
+                assert(mmm == mm as int);
+            } else {
+                lemma_inverse_word_sympower(Symbol::Gen(1), mm);
+                assert(mmm == -(mm as int));
+            }
+        }
+        lemma_acc_emit_power_x(pp1, qq1, mmm);
+        assert(equiv_in_presentation(a, xP + yQ + es, signed_power(1, pp1 + mmm) + yQ));
+        lemma_equiv_concat_right(a, cc, xP + yQ + es, signed_power(1, pp1 + mmm) + yQ);
+        assert(gexp(1, uw) == gexp(1, pre) + sgn);
+        assert(mm * gexp(1, uw) == pp1 + mmm) by (nonlinear_arith)
+            requires mm * gexp(1, pre) == pp1, mm * sgn == mmm, gexp(1, uw) == gexp(1, pre) + sgn;
+        assert(gexp(2, uw) == gexp(2, pre));
+        assert(nn * gexp(2, uw) == qq1);
+        let tgt = concat_all(pre_factors) + signed_power(1, mm * gexp(1, uw)) + signed_power(2, nn * gexp(2, uw));
+        assert(cc + (signed_power(1, pp1 + mmm) + yQ) =~= tgt);
+        lemma_equiv_transitive(a, emb, cc + (xP + yQ + es), cc + (signed_power(1, pp1 + mmm) + yQ));
+        assert(equiv_in_presentation(a, emb, tgt));
+        pre_factors
+    } else {
+        //  --- y-power emit ---  factors unchanged
+        assert(last == Symbol::Gen(2) || last == Symbol::Inv(2)) by { assert(generator_index(last) == 2); }
+        assert(sym_exp(1, last) == 0);
+        let sgn = sym_exp(2, last);
+        let nnn = nn * sgn;
+        assert(es =~= signed_power(2, nnn)) by {
+            if last == Symbol::Gen(2) {
+                assert(es == symbol_power(Symbol::Gen(2), nn));
+                assert(nnn == nn as int);
+            } else {
+                lemma_inverse_word_sympower(Symbol::Gen(2), nn);
+                assert(nnn == -(nn as int));
+            }
+        }
+        lemma_acc_emit_power_y(pp1, qq1, nnn);
+        assert(equiv_in_presentation(a, xP + yQ + es, xP + signed_power(2, qq1 + nnn)));
+        lemma_equiv_concat_right(a, cc, xP + yQ + es, xP + signed_power(2, qq1 + nnn));
+        assert(gexp(1, uw) == gexp(1, pre));
+        assert(mm * gexp(1, uw) == pp1);
+        assert(gexp(2, uw) == gexp(2, pre) + sgn);
+        assert(nn * gexp(2, uw) == qq1 + nnn) by (nonlinear_arith)
+            requires nn * gexp(2, pre) == qq1, nn * sgn == nnn, gexp(2, uw) == gexp(2, pre) + sgn;
+        let tgt = concat_all(pre_factors) + signed_power(1, mm * gexp(1, uw)) + signed_power(2, nn * gexp(2, uw));
+        assert(cc + (xP + signed_power(2, qq1 + nnn)) =~= tgt);
+        lemma_equiv_transitive(a, emb, cc + (xP + yQ + es), cc + (xP + signed_power(2, qq1 + nnn)));
+        assert(equiv_in_presentation(a, emb, tgt));
+        pre_factors
+    }
+}
+
+//  ★ PROPERTY (ii) ★  emb(acc_gens, uw) with net-zero x/y exponent is a product of
+//  residue-(aa,bb) configs.  (The accumulator powers vanish.)
+pub proof fn lemma_config_accumulator_emit(aa: nat, bb: nat, mm: nat, nn: nat, uw: Word) -> (factors: Seq<Word>)
+    requires
+        mm > 0,
+        nn > 0,
+        word_valid(uw, 3),
+        gexp(1, uw) == 0,
+        gexp(2, uw) == 0,
+    ensures
+        all_residue_configs(factors, aa, bb, mm, nn),
+        equiv_in_presentation(base_A(), apply_embedding(acc_gens(aa, bb, mm, nn), uw), concat_all(factors)),
+{
+    let factors = lemma_accumulator_inv(aa, bb, mm, nn, uw);
+    assert(mm * gexp(1, uw) == 0) by (nonlinear_arith) requires gexp(1, uw) == 0;
+    assert(nn * gexp(2, uw) == 0) by (nonlinear_arith) requires gexp(2, uw) == 0;
+    assert(signed_power(1, mm * gexp(1, uw)) =~= empty_word());
+    assert(signed_power(2, nn * gexp(2, uw)) =~= empty_word());
+    assert(concat_all(factors) + signed_power(1, mm * gexp(1, uw)) + signed_power(2, nn * gexp(2, uw))
+        =~= concat_all(factors));
+    factors
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
