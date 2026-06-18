@@ -7510,6 +7510,31 @@ pub proof fn lemma_config_conj_y(r: nat, s: nat, m: nat)
     lemma_equiv_refl(a, lhs);
 }
 
+//  ============================================================
+//  Signed configs (integer coordinates) — needed because the property-(ii)
+//  accumulator emits configs whose coordinates can be negative at intermediate
+//  points (net is 0, but partial sums of ±m are signed).
+//      sconfig(r,s) = y⁻ˢ · x⁻ʳ · t · xʳ · yˢ   with r,s : int
+//  ============================================================
+pub open spec fn sconfig(r: int, s: int) -> Word {
+    signed_power(2, -s) + signed_power(1, -r) + seq![Symbol::Gen(0)]
+        + signed_power(1, r) + signed_power(2, s)
+}
+
+//  For nonnegative coordinates, sconfig is the ordinary config word.
+pub proof fn lemma_sconfig_nat(r: int, s: int)
+    requires
+        r >= 0,
+        s >= 0,
+    ensures
+        sconfig(r, s) =~= config_word(r as nat, s as nat),
+{
+    assert(signed_power(2, -s) =~= symbol_power(Symbol::Inv(2), s as nat));
+    assert(signed_power(1, -r) =~= symbol_power(Symbol::Inv(1), r as nat));
+    assert(signed_power(1, r) =~= symbol_power(Symbol::Gen(1), r as nat));
+    assert(signed_power(2, s) =~= symbol_power(Symbol::Gen(2), s as nat));
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
