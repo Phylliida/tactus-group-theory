@@ -8811,6 +8811,59 @@ pub proof fn lemma_no_relator_equiv_implies_freely_equivalent(p: Presentation, w
     lemma_no_relator_steps_freely_equiv(p, d.steps, w1, w2);
 }
 
+//  ============================================================
+//  F-level combined word: x⁻ʳ¹ tᵉ¹ xʳ¹⁻ʳ² tᵉ² … tᵉⁿ xʳⁿ  (x-powers merged)
+//  ============================================================
+//  prev_x is the trailing x-power carried from the previous letter.
+
+pub open spec fn fl_comb_acc(w: Seq<CanonLetter>, prev_x: int) -> Word
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        signed_power(1, prev_x)
+    } else {
+        signed_power(1, prev_x - w[0].r) + signed_power(0, w[0].e)
+            + fl_comb_acc(w.drop_first(), w[0].r)
+    }
+}
+
+pub open spec fn fl_combined(w: Seq<CanonLetter>) -> Word {
+    fl_comb_acc(w, 0)
+}
+
+pub proof fn lemma_fl_comb_acc_valid(w: Seq<CanonLetter>, prev_x: int)
+    ensures
+        word_valid(fl_comb_acc(w, prev_x), 2),
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        lemma_signed_power_valid(1, prev_x, 2);
+    } else {
+        lemma_signed_power_valid(1, prev_x - w[0].r, 2);
+        lemma_signed_power_valid(0, w[0].e, 2);
+        lemma_fl_comb_acc_valid(w.drop_first(), w[0].r);
+        lemma_concat_word_valid(signed_power(1, prev_x - w[0].r), signed_power(0, w[0].e), 2);
+        lemma_concat_word_valid(signed_power(1, prev_x - w[0].r) + signed_power(0, w[0].e),
+            fl_comb_acc(w.drop_first(), w[0].r), 2);
+    }
+}
+
+//  A canonical-reduced nonempty word has a nonempty combined form (it carries a tᵉ¹).
+pub proof fn lemma_fl_combined_nonempty(w: Seq<CanonLetter>)
+    requires
+        w.len() >= 1,
+        w[0].e != 0,
+    ensures
+        fl_combined(w).len() >= 1,
+{
+    let body = signed_power(0, w[0].e);
+    assert(body.len() == (if w[0].e >= 0 { w[0].e } else { -w[0].e }));
+    assert(body.len() >= 1);
+    assert(fl_combined(w).len()
+        == signed_power(1, 0 - w[0].r).len() + body.len()
+            + fl_comb_acc(w.drop_first(), w[0].r).len());
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
