@@ -9554,6 +9554,80 @@ pub proof fn lemma_yl_has_stable(w: Seq<CanonLetter>)
     }
 }
 
+//  ============================================================
+//  Y-LEVEL gap 2: !has_pinch — run machinery
+//  ============================================================
+
+//  The concatenated h-blocks of a config sequence (no y's).
+pub open spec fn hrun(w: Seq<CanonLetter>) -> Word
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        empty_word()
+    } else {
+        hblock(w[0].r, w[0].e) + hrun(w.drop_first())
+    }
+}
+
+//  Zero out every s (turn a run into an all-s=0 config sequence).
+pub open spec fn zero_s(w: Seq<CanonLetter>) -> Seq<CanonLetter> {
+    Seq::new(w.len(), |k: int| CanonLetter { r: w[k].r, s: 0, e: w[k].e })
+}
+
+//  canw_eval of the s-zeroed sequence is exactly the h-run (the y's vanish).
+pub proof fn lemma_canw_eval_zero_s(w: Seq<CanonLetter>)
+    ensures
+        canw_eval(zero_s(w)) =~= hrun(w),
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        assert(canw_eval(zero_s(w)) =~= empty_word());
+    } else {
+        let zw = zero_s(w);
+        assert(zw[0] == CanonLetter { r: w[0].r, s: 0, e: w[0].e });
+        assert(canw_eval(zw) == canl_eval(zw[0]) + canw_eval(zw.drop_first()));
+        lemma_gsconfig_split(w[0].r, 0, w[0].e);
+        assert(canl_eval(zw[0]) =~= hblock(w[0].r, w[0].e));
+        assert(zw.drop_first() =~= zero_s(w.drop_first()));
+        lemma_canw_eval_zero_s(w.drop_first());
+    }
+}
+
+//  zero_s preserves reducedness (distinct adjacent r, e≠0); s becomes uniformly 0.
+pub proof fn lemma_zero_s_reduced(w: Seq<CanonLetter>)
+    requires
+        forall|j: int| 0 <= j < w.len() ==> (#[trigger] w[j]).e != 0,
+        forall|j: int| 0 <= j < w.len() - 1 ==> (#[trigger] w[j]).r != w[j + 1].r,
+    ensures
+        canw_all_s_zero(zero_s(w)),
+        forall|j: int| 0 <= j < zero_s(w).len() ==> (#[trigger] zero_s(w)[j]).e != 0,
+        forall|j: int| 0 <= j < zero_s(w).len() - 1 ==> (#[trigger] zero_s(w)[j]).r != zero_s(w)[j + 1].r,
+        zero_s(w).len() == w.len(),
+{
+    let zw = zero_s(w);
+    assert forall|j: int| 0 <= j < zw.len() implies (#[trigger] zw[j]).e != 0 && (zw[j]).s == 0 by {
+        assert(zw[j] == CanonLetter { r: w[j].r, s: 0, e: w[j].e });
+    }
+    assert forall|j: int| 0 <= j < zw.len() - 1 implies (#[trigger] zw[j]).r != zw[j + 1].r by {
+        assert(zw[j] == CanonLetter { r: w[j].r, s: 0, e: w[j].e });
+        assert(zw[j + 1] == CanonLetter { r: w[j + 1].r, s: 0, e: w[j + 1].e });
+    }
+}
+
+//  A reduced nonempty h-run is not in ⟨x⟩ (via the keystone on its s-zeroing).
+pub proof fn lemma_hrun_not_in_x(w: Seq<CanonLetter>)
+    requires
+        w.len() >= 1,
+        forall|j: int| 0 <= j < w.len() ==> (#[trigger] w[j]).e != 0,
+        forall|j: int| 0 <= j < w.len() - 1 ==> (#[trigger] w[j]).r != w[j + 1].r,
+    ensures
+        !in_generated_subgroup(pres_tx(), seq![seq![Symbol::Gen(1)]], hrun(w)),
+{
+    lemma_canw_eval_zero_s(w);
+    lemma_zero_s_reduced(w);
+    lemma_canw_fl_not_in_x(zero_s(w));
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
