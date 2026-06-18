@@ -7814,6 +7814,205 @@ pub proof fn lemma_sconfig_conj_y(r: int, s: int, qq: int)
     lemma_equiv_transitive(a, lhs, m1, rhs);
 }
 
+//  ============================================================
+//  Accumulator emit-moves: a trailing xᴹ / yᴺ folds into the accumulator.
+//  ============================================================
+
+//  xᴾ · yᵠ · xᴹ  ≡  x⁽ᴾ⁺ᴹ⁾ · yᵠ.
+pub proof fn lemma_acc_emit_power_x(pp: int, qq: int, mm: int)
+    ensures
+        equiv_in_presentation(base_A(),
+            signed_power(1, pp) + signed_power(2, qq) + signed_power(1, mm),
+            signed_power(1, pp + mm) + signed_power(2, qq)),
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    assert(presentation_valid(a)) by { reveal(presentation_valid); }
+    let xP = signed_power(1, pp);
+    let yQ = signed_power(2, qq);
+    let xM = signed_power(1, mm);
+    let xPM = signed_power(1, pp + mm);
+    lemma_signed_xy_commute(mm, qq);
+    lemma_equiv_symmetric(a, xM + yQ, yQ + xM);
+    lemma_signed_power_add(a, 1, pp, mm);
+    let lhs = xP + yQ + xM;
+    let mid = xP + xM + yQ;
+    let rhs = xPM + yQ;
+    assert(equiv_in_presentation(a, lhs, mid)) by {
+        lemma_equiv_concat_right(a, xP, yQ + xM, xM + yQ);
+        assert(lhs =~= xP + (yQ + xM));
+        assert(mid =~= xP + (xM + yQ));
+    }
+    assert(equiv_in_presentation(a, mid, rhs)) by {
+        lemma_equiv_concat_left(a, xP + xM, xPM, yQ);
+        assert(mid =~= (xP + xM) + yQ);
+        assert(rhs =~= xPM + yQ);
+    }
+    lemma_equiv_transitive(a, lhs, mid, rhs);
+}
+
+//  xᴾ · yᵠ · yᴺ  ≡  xᴾ · y⁽ᵠ⁺ᴺ⁾.
+pub proof fn lemma_acc_emit_power_y(pp: int, qq: int, nn: int)
+    ensures
+        equiv_in_presentation(base_A(),
+            signed_power(1, pp) + signed_power(2, qq) + signed_power(2, nn),
+            signed_power(1, pp) + signed_power(2, qq + nn)),
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    assert(presentation_valid(a)) by { reveal(presentation_valid); }
+    let xP = signed_power(1, pp);
+    let yQ = signed_power(2, qq);
+    let yN = signed_power(2, nn);
+    let yQN = signed_power(2, qq + nn);
+    lemma_signed_power_add(a, 2, qq, nn);
+    let lhs = xP + yQ + yN;
+    let rhs = xP + yQN;
+    assert(equiv_in_presentation(a, lhs, rhs)) by {
+        lemma_equiv_concat_right(a, xP, yQ + yN, yQN);
+        assert(lhs =~= xP + (yQ + yN));
+        assert(rhs =~= xP + yQN);
+    }
+}
+
+//  signed_power(i,·) is valid over any base with i < k generators.
+pub proof fn lemma_signed_power_valid(i: nat, a: int, k: nat)
+    requires
+        i < k,
+    ensures
+        word_valid(signed_power(i, a), k),
+{
+    if a >= 0 {
+        assert(symbol_valid(Symbol::Gen(i), k));
+        lemma_symbol_power_valid(Symbol::Gen(i), a as nat, k);
+    } else {
+        assert(symbol_valid(Symbol::Inv(i), k));
+        lemma_symbol_power_valid(Symbol::Inv(i), (-a) as nat, k);
+    }
+}
+
+//  sconfig is valid over any base with ≥3 generators.
+pub proof fn lemma_sconfig_valid(r: int, s: int, k: nat)
+    requires
+        k >= 3,
+    ensures
+        word_valid(sconfig(r, s), k),
+{
+    lemma_signed_power_valid(2, -s, k);
+    lemma_signed_power_valid(1, -r, k);
+    lemma_signed_power_valid(1, r, k);
+    lemma_signed_power_valid(2, s, k);
+    let t0: Word = seq![Symbol::Gen(0)];
+    assert(word_valid(t0, k)) by {
+        assert forall|j: int| 0 <= j < t0.len() implies symbol_valid(#[trigger] t0[j], k) by { }
+    }
+    lemma_concat_word_valid(signed_power(2, -s), signed_power(1, -r), k);
+    lemma_concat_word_valid(signed_power(2, -s) + signed_power(1, -r), t0, k);
+    lemma_concat_word_valid(signed_power(2, -s) + signed_power(1, -r) + t0, signed_power(1, r), k);
+    lemma_concat_word_valid(signed_power(2, -s) + signed_power(1, -r) + t0 + signed_power(1, r),
+        signed_power(2, s), k);
+}
+
+//  xᴾ · sconfig(r,s)  ≡  sconfig(r−P, s) · xᴾ   (slide a config left past xᴾ).
+pub proof fn lemma_x_past_config(pp: int, r: int, s: int)
+    ensures
+        equiv_in_presentation(base_A(),
+            signed_power(1, pp) + sconfig(r, s),
+            sconfig(r - pp, s) + signed_power(1, pp)),
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    assert(presentation_valid(a)) by { reveal(presentation_valid); }
+    let xP = signed_power(1, pp);
+    let xmP = signed_power(1, -pp);
+    let cfg = sconfig(r - pp, s);
+    let cc = xmP + cfg + xP;
+    lemma_sconfig_conj_x(r - pp, s, pp);                 //  cc ≡ sconfig((r-pp)+pp, s) = sconfig(r,s)
+    assert((r - pp) + pp == r);
+    lemma_signed_power_valid(1, -pp, 3);
+    lemma_signed_power_valid(1, pp, 3);
+    lemma_sconfig_valid(r - pp, s, 3);
+    assert(word_valid(cc, 3)) by {
+        lemma_concat_word_valid(xmP, cfg, 3);
+        lemma_concat_word_valid(xmP + cfg, xP, 3);
+    }
+    lemma_equiv_symmetric(a, cc, sconfig(r, s));         //  sconfig(r,s) ≡ cc
+    lemma_equiv_concat_right(a, xP, sconfig(r, s), cc);  //  xP·sconfig ≡ xP·cc
+    lemma_signed_power_add(a, 1, pp, -pp);               //  xP·xmP ≡ x⁰ = ε
+    assert(signed_power(1, pp + -pp) =~= empty_word());
+    lemma_equiv_concat_left(a, xP + xmP, empty_word(), cfg + xP);
+    let lhs = xP + sconfig(r, s);
+    let rhs = cfg + xP;
+    assert(xP + cc =~= (xP + xmP) + (cfg + xP));
+    assert(empty_word() + (cfg + xP) =~= cfg + xP);
+    lemma_equiv_transitive(a, lhs, xP + cc, rhs);
+}
+
+//  yᵠ · sconfig(r,s)  ≡  sconfig(r, s−Q) · yᵠ.
+pub proof fn lemma_y_past_config(qq: int, r: int, s: int)
+    ensures
+        equiv_in_presentation(base_A(),
+            signed_power(2, qq) + sconfig(r, s),
+            sconfig(r, s - qq) + signed_power(2, qq)),
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    assert(presentation_valid(a)) by { reveal(presentation_valid); }
+    let yQ = signed_power(2, qq);
+    let ymQ = signed_power(2, -qq);
+    let cfg = sconfig(r, s - qq);
+    let cc = ymQ + cfg + yQ;
+    lemma_sconfig_conj_y(r, s - qq, qq);                 //  cc ≡ sconfig(r, (s-qq)+qq) = sconfig(r,s)
+    assert((s - qq) + qq == s);
+    lemma_signed_power_valid(2, -qq, 3);
+    lemma_signed_power_valid(2, qq, 3);
+    lemma_sconfig_valid(r, s - qq, 3);
+    assert(word_valid(cc, 3)) by {
+        lemma_concat_word_valid(ymQ, cfg, 3);
+        lemma_concat_word_valid(ymQ + cfg, yQ, 3);
+    }
+    lemma_equiv_symmetric(a, cc, sconfig(r, s));
+    lemma_equiv_concat_right(a, yQ, sconfig(r, s), cc);
+    lemma_signed_power_add(a, 2, qq, -qq);
+    assert(signed_power(2, qq + -qq) =~= empty_word());
+    lemma_equiv_concat_left(a, yQ + ymQ, empty_word(), cfg + yQ);
+    let lhs = yQ + sconfig(r, s);
+    let rhs = cfg + yQ;
+    assert(yQ + cc =~= (yQ + ymQ) + (cfg + yQ));
+    assert(empty_word() + (cfg + yQ) =~= cfg + yQ);
+    lemma_equiv_transitive(a, lhs, yQ + cc, rhs);
+}
+
+//  xᴾ · yᵠ · sconfig(r,s)  ≡  sconfig(r−P, s−Q) · xᴾ · yᵠ   (the gen0 emit).
+pub proof fn lemma_acc_emit_config(pp: int, qq: int, r: int, s: int)
+    ensures
+        equiv_in_presentation(base_A(),
+            signed_power(1, pp) + signed_power(2, qq) + sconfig(r, s),
+            sconfig(r - pp, s - qq) + signed_power(1, pp) + signed_power(2, qq)),
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    assert(presentation_valid(a)) by { reveal(presentation_valid); }
+    let xP = signed_power(1, pp);
+    let yQ = signed_power(2, qq);
+    lemma_y_past_config(qq, r, s);                       //  yQ·sconfig(r,s) ≡ sconfig(r,s-qq)·yQ
+    lemma_x_past_config(pp, r, s - qq);                  //  xP·sconfig(r,s-qq) ≡ sconfig(r-pp,s-qq)·xP
+    let lhs = xP + yQ + sconfig(r, s);
+    let mid = xP + sconfig(r, s - qq) + yQ;
+    let rhs = sconfig(r - pp, s - qq) + xP + yQ;
+    assert(equiv_in_presentation(a, lhs, mid)) by {
+        lemma_equiv_concat_right(a, xP, yQ + sconfig(r, s), sconfig(r, s - qq) + yQ);
+        assert(lhs =~= xP + (yQ + sconfig(r, s)));
+        assert(mid =~= xP + (sconfig(r, s - qq) + yQ));
+    }
+    assert(equiv_in_presentation(a, mid, rhs)) by {
+        lemma_equiv_concat_left(a, xP + sconfig(r, s - qq), sconfig(r - pp, s - qq) + xP, yQ);
+        assert(mid =~= (xP + sconfig(r, s - qq)) + yQ);
+        assert(rhs =~= (sconfig(r - pp, s - qq) + xP) + yQ);
+    }
+    lemma_equiv_transitive(a, lhs, mid, rhs);
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
