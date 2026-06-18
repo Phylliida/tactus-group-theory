@@ -8013,6 +8013,123 @@ pub proof fn lemma_acc_emit_config(pp: int, qq: int, r: int, s: int)
     lemma_equiv_transitive(a, lhs, mid, rhs);
 }
 
+//  inverse_word(signed_power(i,a)) =~= signed_power(i,-a).
+pub proof fn lemma_inverse_signed_power(i: nat, a: int)
+    ensures
+        inverse_word(signed_power(i, a)) =~= signed_power(i, -a),
+{
+    if a >= 0 {
+        lemma_inverse_word_sympower(Symbol::Gen(i), a as nat);
+    } else {
+        lemma_inverse_word_sympower(Symbol::Inv(i), (-a) as nat);
+    }
+}
+
+//  Inverse-config slide (x):  xᴾ · inv(sconfig(r,s)) ≡ inv(sconfig(r−P,s)) · xᴾ.
+//  Derived by inverting lemma_x_past_config(−P, r−P, s).
+pub proof fn lemma_x_past_config_inv(pp: int, r: int, s: int)
+    ensures
+        equiv_in_presentation(base_A(),
+            signed_power(1, pp) + inverse_word(sconfig(r, s)),
+            inverse_word(sconfig(r - pp, s)) + signed_power(1, pp)),
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    assert(presentation_valid(a)) by { reveal(presentation_valid); }
+    let xmP = signed_power(1, -pp);
+    let xP = signed_power(1, pp);
+    lemma_x_past_config(-pp, r - pp, s);            //  xmP·sconfig(r-pp,s) ≡ sconfig(r,s)·xmP
+    assert((r - pp) - (-pp) == r);
+    let aa = xmP + sconfig(r - pp, s);
+    let bb = sconfig(r, s) + xmP;
+    lemma_signed_power_valid(1, -pp, 3);
+    lemma_sconfig_valid(r - pp, s, 3);
+    lemma_sconfig_valid(r, s, 3);
+    assert(word_valid(aa, 3)) by { lemma_concat_word_valid(xmP, sconfig(r - pp, s), 3); }
+    assert(word_valid(bb, 3)) by { lemma_concat_word_valid(sconfig(r, s), xmP, 3); }
+    lemma_equiv_inverse(a, aa, bb);                 //  inv(aa) ≡ inv(bb)
+    lemma_inverse_word_concat(xmP, sconfig(r - pp, s));
+    lemma_inverse_word_concat(sconfig(r, s), xmP);
+    lemma_inverse_signed_power(1, -pp);             //  inv(xmP) =~= xP
+    let lia = inverse_word(sconfig(r - pp, s)) + xP;
+    let lib = xP + inverse_word(sconfig(r, s));
+    assert(inverse_word(aa) =~= lia);
+    assert(inverse_word(bb) =~= lib);
+    assert(equiv_in_presentation(a, lia, lib));
+    lemma_signed_power_valid(1, pp, 3);
+    lemma_inverse_word_valid(sconfig(r - pp, s), 3);
+    assert(word_valid(lia, 3)) by { lemma_concat_word_valid(inverse_word(sconfig(r - pp, s)), xP, 3); }
+    lemma_equiv_symmetric(a, lia, lib);
+}
+
+//  Inverse-config slide (y):  yᵠ · inv(sconfig(r,s)) ≡ inv(sconfig(r,s−Q)) · yᵠ.
+pub proof fn lemma_y_past_config_inv(qq: int, r: int, s: int)
+    ensures
+        equiv_in_presentation(base_A(),
+            signed_power(2, qq) + inverse_word(sconfig(r, s)),
+            inverse_word(sconfig(r, s - qq)) + signed_power(2, qq)),
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    assert(presentation_valid(a)) by { reveal(presentation_valid); }
+    let ymQ = signed_power(2, -qq);
+    let yQ = signed_power(2, qq);
+    lemma_y_past_config(-qq, r, s - qq);            //  ymQ·sconfig(r,s-qq) ≡ sconfig(r,s)·ymQ
+    assert((s - qq) - (-qq) == s);
+    let aa = ymQ + sconfig(r, s - qq);
+    let bb = sconfig(r, s) + ymQ;
+    lemma_signed_power_valid(2, -qq, 3);
+    lemma_sconfig_valid(r, s - qq, 3);
+    lemma_sconfig_valid(r, s, 3);
+    assert(word_valid(aa, 3)) by { lemma_concat_word_valid(ymQ, sconfig(r, s - qq), 3); }
+    assert(word_valid(bb, 3)) by { lemma_concat_word_valid(sconfig(r, s), ymQ, 3); }
+    lemma_equiv_inverse(a, aa, bb);
+    lemma_inverse_word_concat(ymQ, sconfig(r, s - qq));
+    lemma_inverse_word_concat(sconfig(r, s), ymQ);
+    lemma_inverse_signed_power(2, -qq);
+    let lia = inverse_word(sconfig(r, s - qq)) + yQ;
+    let lib = yQ + inverse_word(sconfig(r, s));
+    assert(inverse_word(aa) =~= lia);
+    assert(inverse_word(bb) =~= lib);
+    assert(equiv_in_presentation(a, lia, lib));
+    lemma_signed_power_valid(2, qq, 3);
+    lemma_inverse_word_valid(sconfig(r, s - qq), 3);
+    assert(word_valid(lia, 3)) by { lemma_concat_word_valid(inverse_word(sconfig(r, s - qq)), yQ, 3); }
+    lemma_equiv_symmetric(a, lia, lib);
+}
+
+//  xᴾ · yᵠ · inv(sconfig(r,s))  ≡  inv(sconfig(r−P,s−Q)) · xᴾ · yᵠ   (the Inv(0) emit).
+pub proof fn lemma_acc_emit_config_inv(pp: int, qq: int, r: int, s: int)
+    ensures
+        equiv_in_presentation(base_A(),
+            signed_power(1, pp) + signed_power(2, qq) + inverse_word(sconfig(r, s)),
+            inverse_word(sconfig(r - pp, s - qq)) + signed_power(1, pp) + signed_power(2, qq)),
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    assert(presentation_valid(a)) by { reveal(presentation_valid); }
+    let xP = signed_power(1, pp);
+    let yQ = signed_power(2, qq);
+    lemma_y_past_config_inv(qq, r, s);
+    lemma_x_past_config_inv(pp, r, s - qq);
+    let lhs = xP + yQ + inverse_word(sconfig(r, s));
+    let mid = xP + inverse_word(sconfig(r, s - qq)) + yQ;
+    let rhs = inverse_word(sconfig(r - pp, s - qq)) + xP + yQ;
+    assert(equiv_in_presentation(a, lhs, mid)) by {
+        lemma_equiv_concat_right(a, xP, yQ + inverse_word(sconfig(r, s)),
+            inverse_word(sconfig(r, s - qq)) + yQ);
+        assert(lhs =~= xP + (yQ + inverse_word(sconfig(r, s))));
+        assert(mid =~= xP + (inverse_word(sconfig(r, s - qq)) + yQ));
+    }
+    assert(equiv_in_presentation(a, mid, rhs)) by {
+        lemma_equiv_concat_left(a, xP + inverse_word(sconfig(r, s - qq)),
+            inverse_word(sconfig(r - pp, s - qq)) + xP, yQ);
+        assert(mid =~= (xP + inverse_word(sconfig(r, s - qq))) + yQ);
+        assert(rhs =~= (inverse_word(sconfig(r - pp, s - qq)) + xP) + yQ);
+    }
+    lemma_equiv_transitive(a, lhs, mid, rhs);
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
