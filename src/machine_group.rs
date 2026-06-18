@@ -9152,6 +9152,181 @@ pub proof fn lemma_canw_fl_nontrivial(w: Seq<CanonLetter>)
     }
 }
 
+//  ============================================================
+//  Y-LEVEL keystone: a reduced F-config word is not in ⟨x⟩
+//  ============================================================
+//  Strategy: free reduction never introduces a t (gen 0); an x-word has no t;
+//  but the F-level normal form (fl_combined) carries a t.  So no x-word can be
+//  freely equivalent to a reduced F-config word ⟹ it's outside ⟨x⟩.
+
+//  A word contains no t (generator 0).
+pub open spec fn no_gen0(w: Word) -> bool {
+    forall|k: int| 0 <= k < w.len() ==> generator_index(#[trigger] w[k]) != 0
+}
+
+pub proof fn lemma_no_gen0_reduce_at(w: Word, pos: int)
+    requires
+        no_gen0(w),
+        has_cancellation_at(w, pos),
+    ensures
+        no_gen0(reduce_at(w, pos)),
+{
+    let r = reduce_at(w, pos);
+    assert forall|k: int| 0 <= k < r.len() implies generator_index(#[trigger] r[k]) != 0 by {
+        if k < pos {
+            assert(r[k] == w[k]);
+        } else {
+            assert(r[k] == w[k + 2]);
+        }
+    }
+}
+
+pub proof fn lemma_no_gen0_reduces_in_steps(w: Word, w2: Word, n: nat)
+    requires
+        no_gen0(w),
+        reduces_in_steps(w, w2, n),
+    ensures
+        no_gen0(w2),
+    decreases n,
+{
+    if n == 0 {
+    } else if w == w2 {
+    } else {
+        let wmid = choose|wmid: Word|
+            reduces_one_step(w, wmid) && reduces_in_steps(wmid, w2, (n - 1) as nat);
+        assert(reduces_one_step(w, wmid) && reduces_in_steps(wmid, w2, (n - 1) as nat));
+        let i = choose|i: int| has_cancellation_at(w, i) && wmid == reduce_at(w, i);
+        assert(has_cancellation_at(w, i) && wmid == reduce_at(w, i));
+        lemma_no_gen0_reduce_at(w, i);
+        lemma_no_gen0_reduces_in_steps(wmid, w2, (n - 1) as nat);
+    }
+}
+
+pub proof fn lemma_no_gen0_normal_form(w: Word)
+    requires
+        no_gen0(w),
+    ensures
+        no_gen0(normal_form(w)),
+{
+    lemma_reduces_to_normal_form(w);
+    let n = choose|n: nat| reduces_in_steps(w, normal_form(w), n);
+    assert(reduces_in_steps(w, normal_form(w), n));
+    lemma_no_gen0_reduces_in_steps(w, normal_form(w), n);
+}
+
+pub proof fn lemma_no_gen0_concat(a: Word, b: Word)
+    requires
+        no_gen0(a),
+        no_gen0(b),
+    ensures
+        no_gen0(a + b),
+{
+    assert forall|k: int| 0 <= k < (a + b).len()
+        implies generator_index(#[trigger] (a + b)[k]) != 0 by {
+        if k < a.len() {
+            assert((a + b)[k] == a[k]);
+        } else {
+            assert((a + b)[k] == b[k - a.len()]);
+        }
+    }
+}
+
+//  The combined word carries a t (gen 0) — from its first t-block.
+pub proof fn lemma_fl_comb_acc_has_gen0(w: Seq<CanonLetter>, prev: int)
+    requires
+        w.len() >= 1,
+        w[0].e != 0,
+    ensures
+        !no_gen0(fl_comb_acc(w, prev)),
+{
+    let c = w[0];
+    let xx = signed_power(1, prev - c.r);
+    let tt = signed_power(0, c.e);
+    let rr = fl_comb_acc(w.drop_first(), c.r);
+    let fc = fl_comb_acc(w, prev);
+    assert(fc == (xx + tt) + rr);
+    lemma_signed_power_endpoint_gen(0, c.e);
+    assert((xx + tt)[xx.len() as int] == tt[0]);
+    assert(fc[xx.len() as int] == tt[0]);
+    assert(generator_index(fc[xx.len() as int]) == 0);
+    assert(0 <= xx.len() < fc.len());
+}
+
+//  A product of x-factors (each [Gen1] or [Inv1]) contains no t.
+pub proof fn lemma_x_factors_no_gen0(factors: Seq<Word>)
+    requires
+        factors_from_generators(seq![seq![Symbol::Gen(1)]], factors),
+    ensures
+        no_gen0(concat_all(factors)),
+    decreases factors.len(),
+{
+    let xgens: Seq<Word> = seq![seq![Symbol::Gen(1)]];
+    if factors.len() == 0 {
+        assert(concat_all(factors) =~= empty_word());
+    } else {
+        let f0 = factors.first();
+        assert(is_generator_or_inverse(xgens, f0)) by { assert(factors[0] == f0); }
+        lemma_inverse_word_one(Symbol::Gen(1));
+        assert(no_gen0(f0)) by {
+            let j = choose|j: int|
+                0 <= j < xgens.len() && (f0 == xgens[j] || f0 == inverse_word(xgens[j]));
+            assert(0 <= j < xgens.len() && (f0 == xgens[j] || f0 == inverse_word(xgens[j])));
+            assert(xgens[j] == seq![Symbol::Gen(1)]);
+            assert forall|k: int| 0 <= k < f0.len()
+                implies generator_index(#[trigger] f0[k]) != 0 by {
+                if f0 == seq![Symbol::Gen(1)] {
+                    assert(f0[k] == Symbol::Gen(1));
+                } else {
+                    assert(f0 =~= seq![Symbol::Inv(1)]);
+                    assert(f0[k] == Symbol::Inv(1));
+                }
+            }
+        }
+        assert(factors_from_generators(xgens, factors.drop_first())) by {
+            assert forall|k: int| 0 <= k < factors.drop_first().len()
+                implies is_generator_or_inverse(xgens, #[trigger] factors.drop_first()[k]) by {
+                assert(factors.drop_first()[k] == factors[k + 1]);
+            }
+        }
+        lemma_x_factors_no_gen0(factors.drop_first());
+        assert(concat_all(factors) == f0 + concat_all(factors.drop_first()));
+        lemma_no_gen0_concat(f0, concat_all(factors.drop_first()));
+    }
+}
+
+//  ★ THE Y-LEVEL KEYSTONE: a reduced nonempty F-config word is not in ⟨x⟩. ★
+pub proof fn lemma_canw_fl_not_in_x(w: Seq<CanonLetter>)
+    requires
+        canw_all_s_zero(w),
+        forall|j: int| 0 <= j < w.len() ==> (#[trigger] w[j]).e != 0,
+        forall|j: int| 0 <= j < w.len() - 1 ==> (#[trigger] w[j]).r != w[j + 1].r,
+        w.len() >= 1,
+    ensures
+        !in_generated_subgroup(pres_tx(), seq![seq![Symbol::Gen(1)]], canw_eval(w)),
+{
+    let pt = pres_tx();
+    let xgens: Seq<Word> = seq![seq![Symbol::Gen(1)]];
+    let cw = canw_eval(w);
+    let fc = fl_combined(w);
+    assert(presentation_valid(pt)) by { reveal(presentation_valid); }
+    lemma_canw_eval_equiv_fl_combined(w);
+    lemma_fl_comb_acc_reduced(w, 0);
+    lemma_fl_comb_acc_has_gen0(w, 0);
+    lemma_reduced_is_own_normal_form(fc);
+    assert forall|factors: Seq<Word>|
+        #[trigger] factors_from_generators(xgens, factors)
+        implies !equiv_in_presentation(pt, concat_all(factors), cw) by {
+        if equiv_in_presentation(pt, concat_all(factors), cw) {
+            let u = concat_all(factors);
+            lemma_x_factors_no_gen0(factors);
+            lemma_equiv_transitive(pt, u, cw, fc);
+            lemma_no_relator_equiv_implies_freely_equivalent(pt, u, fc);
+            lemma_normal_form_equiv_forward(u, fc);
+            lemma_no_gen0_normal_form(u);
+        }
+    }
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
