@@ -7107,6 +7107,41 @@ pub proof fn lemma_stable_conj_factorization(data: HNNData, u: Word)
     }
 }
 
+//  Reverse telescope:  stable · emb(b_gens,u) · stable⁻¹ ≡ emb(a_gens,u).
+//  (For the t·g·t⁻¹ pinch orientation.)  Derived from the forward telescope via conj-solve.
+pub proof fn lemma_stable_conj_factorization_rev(data: HNNData, u: Word)
+    requires
+        hnn_data_valid(data),
+        word_valid(u, data.associations.len() as nat),
+    ensures
+        equiv_in_presentation(hnn_presentation(data),
+            seq![stable_letter(data)] + apply_embedding(hnn_b_gens(data), u)
+                + seq![stable_letter_inv(data)],
+            apply_embedding(hnn_a_gens(data), u)),
+{
+    let p = hnn_presentation(data);
+    let st = stable_letter(data);
+    let si = stable_letter_inv(data);
+    let ag = hnn_a_gens(data);
+    let bg = hnn_b_gens(data);
+    let png = p.num_generators;
+    lemma_hnn_presentation_valid(data);
+    //  forward telescope:  [si] · emb(ag,u) · [st] ≡ emb(bg,u)
+    lemma_stable_conj_factorization(data, u);
+    //  validity of emb(ag,u) over png
+    assert forall|i: int| 0 <= i < ag.len() implies word_valid(#[trigger] ag[i], data.base.num_generators)
+    by { assert(ag[i] == data.associations[i].0); }
+    lemma_apply_embedding_valid(ag, u, data.base.num_generators);
+    lemma_word_valid_mono(apply_embedding(ag, u), data.base.num_generators, png);
+    assert(st == Symbol::Gen(data.base.num_generators) && si == Symbol::Inv(data.base.num_generators));
+    assert(symbol_valid(st, png));
+    assert(is_inverse_pair(st, si));
+    //  conj-solve:  emb(ag,u) ≡ [st] · emb(bg,u) · [si]
+    lemma_conj_solve(p, st, si, apply_embedding(ag, u), apply_embedding(bg, u));
+    lemma_equiv_symmetric(p, apply_embedding(ag, u),
+        seq![st] + apply_embedding(bg, u) + seq![si]);
+}
+
 //  ψ multiplies the y-stable-count by q.
 pub proof fn lemma_psi_A_stable_count_scales(p: nat, q: nat, w: Word)
     requires
