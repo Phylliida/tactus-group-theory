@@ -10311,6 +10311,67 @@ pub proof fn lemma_gen_in_subgroup_pred(p: Presentation, pred: spec_fn(Word) -> 
     }
 }
 
+//  ============================================================
+//  T(M) and ⟨T(M), rᵢ, lⱼ⟩ as predicate-based subgroups
+//  ============================================================
+
+//  A T(M)-generator-or-inverse: a config word t(a,b) for an H₀ config, or its inverse.
+pub open spec fn is_tm_gen(mm: ModMachine, w: Word) -> bool {
+    exists|a: nat, b: nat| #![trigger config_word(a, b)]
+        mm_in_H0(mm, a, b) && (w == config_word(a, b) || w == inverse_word(config_word(a, b)))
+}
+
+//  A ⟨T(M), rᵢ, lⱼ⟩-generator-or-inverse: a T(M)-gen, or a stable letter Gen(3+i)/Inv(3+i).
+pub open spec fn is_tmstable_gen(mm: ModMachine, w: Word) -> bool {
+    is_tm_gen(mm, w)
+    || (exists|i: int| #![trigger mm.quads[i]] 0 <= i < mm.quads.len()
+        && (w == seq![Symbol::Gen((3 + i) as nat)] || w == seq![Symbol::Inv((3 + i) as nat)]))
+}
+
+//  Named predicate values (single spec_fn value per mm — avoids closure-identity trouble).
+pub open spec fn tm_pred(mm: ModMachine) -> spec_fn(Word) -> bool {
+    |x: Word| is_tm_gen(mm, x)
+}
+pub open spec fn tmstable_pred(mm: ModMachine) -> spec_fn(Word) -> bool {
+    |x: Word| is_tmstable_gen(mm, x)
+}
+
+//  Membership in T(M) (a subgroup of A) and in ⟨T(M), rᵢ, lⱼ⟩ (a subgroup of B(M)).
+pub open spec fn in_TM(mm: ModMachine, w: Word) -> bool {
+    in_subgroup_pred(base_A(), tm_pred(mm), w)
+}
+pub open spec fn in_TMstable(mm: ModMachine, w: Word) -> bool {
+    in_subgroup_pred(b_m(mm), tmstable_pred(mm), w)
+}
+
+//  A config word for an H₀ config is in T(M).
+pub proof fn lemma_config_in_TM(mm: ModMachine, a: nat, b: nat)
+    requires
+        mm_in_H0(mm, a, b),
+    ensures
+        in_TM(mm, config_word(a, b)),
+{
+    assert(is_tm_gen(mm, config_word(a, b))) by {
+        assert(mm_in_H0(mm, a, b) && config_word(a, b) == config_word(a, b));
+    }
+    assert(tm_pred(mm)(config_word(a, b)) == is_tm_gen(mm, config_word(a, b)));
+    lemma_gen_in_subgroup_pred(base_A(), tm_pred(mm), config_word(a, b));
+}
+
+//  t = t(0,0) ∈ T(M)  (since (0,0) ∈ H₀ when (0,0) is terminal).
+pub proof fn lemma_t_in_TM(mm: ModMachine)
+    requires
+        mm_terminal(mm, 0, 0),
+    ensures
+        in_TM(mm, config_word(0, 0)),
+{
+    reveal_with_fuel(mm_reaches, 1);
+    assert(mm_in_H0(mm, 0, 0)) by {
+        assert(mm_reaches(mm, 0, 0, 0, 0, 0));
+    }
+    lemma_config_in_TM(mm, 0, 0);
+}
+
 //  A well-formed modular machine is deterministic: a configuration yields a unique successor.
 pub proof fn lemma_yield_deterministic(mm: ModMachine, a: nat, b: nat, am: nat, bm: nat, a2: nat, b2: nat)
     requires
