@@ -101,6 +101,184 @@ pub proof fn lemma_kill_t_concat_all_trivial(factors: Seq<Word>)
 }
 
 //  ============================================================
+//  (ii)⊆ via exponent counting (gexp respects equiv — already proven).
+//  ============================================================
+
+//  A (signed) config word has zero x- and y-exponent (the x's and y's cancel; only t remains).
+pub proof fn lemma_gexp_config_signed_zero(i: nat, r: int, s: int)
+    requires
+        i == 1 || i == 2,
+    ensures
+        gexp(i, config_word_signed(r, s)) == 0,
+{
+    let a_ = signed_power(2, -s);
+    let b_ = signed_power(1, -r);
+    let c_: Word = seq![Symbol::Gen(0)];
+    let d_ = signed_power(1, r);
+    let e_ = signed_power(2, s);
+    lemma_gexp_concat(i, a_ + b_ + c_ + d_, e_);
+    lemma_gexp_concat(i, a_ + b_ + c_, d_);
+    lemma_gexp_concat(i, a_ + b_, c_);
+    lemma_gexp_concat(i, a_, b_);
+    lemma_gexp_signed_power(2, i, -s);
+    lemma_gexp_signed_power(1, i, -r);
+    lemma_gexp_signed_power(1, i, r);
+    lemma_gexp_signed_power(2, i, s);
+    lemma_gexp_singleton(i, Symbol::Gen(0));
+}
+
+//  gexp(i,·) of a product of factors, each with gexp(i)=0, is 0.
+pub proof fn lemma_gexp_concat_all_zero(i: nat, factors: Seq<Word>)
+    requires
+        forall|k: int| 0 <= k < factors.len() ==> gexp(i, #[trigger] factors[k]) == 0,
+    ensures
+        gexp(i, concat_all(factors)) == 0,
+    decreases factors.len(),
+{
+    if factors.len() == 0 {
+        assert(concat_all(factors) =~= empty_word());
+    } else {
+        let first = factors.first();
+        let rest = factors.drop_first();
+        assert forall|k: int| 0 <= k < rest.len() implies gexp(i, #[trigger] rest[k]) == 0 by {
+            assert(rest[k] == factors[k + 1]);
+        }
+        lemma_gexp_concat_all_zero(i, rest);
+        assert(concat_all(factors) =~= concat(first, concat_all(rest)));
+        lemma_gexp_concat(i, first, concat_all(rest));
+        assert(gexp(i, first) == 0) by { assert(first == factors[0]); }
+    }
+}
+
+//  A residue gen (config word or its inverse) has zero x/y-exponent.
+pub proof fn lemma_gexp_residue_gen_zero(i: nat, ires: int, jres: int, m: int, w: Word)
+    requires
+        i == 1 || i == 2,
+        is_residue_gen(ires, jres, m, w),
+    ensures
+        gexp(i, w) == 0,
+{
+    let rs = choose|r: int, s: int| #![trigger config_word_signed(r, s)]
+        (r - ires) % m == 0 && (s - jres) % m == 0
+        && (w == config_word_signed(r, s) || w == inverse_word(config_word_signed(r, s)));
+    let r = rs.0;
+    let s = rs.1;
+    assert(w == config_word_signed(r, s) || w == inverse_word(config_word_signed(r, s)));
+    lemma_gexp_config_signed_zero(i, r, s);
+    if w != config_word_signed(r, s) {
+        lemma_gexp_inverse(i, config_word_signed(r, s));   // gexp(i, t(r,s)⁻¹) = -gexp(i, t(r,s)) = 0
+    }
+}
+
+//  Every element of the residue subgroup has zero x/y-exponent.
+pub proof fn lemma_gexp_residue_subgroup_zero(i: nat, ires: int, jres: int, m: int, u: Word)
+    requires
+        i == 1 || i == 2,
+        in_residue_class(ires, jres, m, u),
+    ensures
+        gexp(i, u) == 0,
+{
+    let pred = residue_pred(ires, jres, m);
+    let factors = choose|factors: Seq<Word>| #![trigger factors_from_pred(pred, factors)]
+        factors_from_pred(pred, factors) && equiv_in_presentation(base_A(), concat_all(factors), u);
+    assert(factors_from_pred(pred, factors)
+        && equiv_in_presentation(base_A(), concat_all(factors), u));
+    assert forall|k: int| 0 <= k < factors.len() implies gexp(i, #[trigger] factors[k]) == 0 by {
+        assert(pred(factors[k]) == is_residue_gen(ires, jres, m, factors[k]));
+        lemma_gexp_residue_gen_zero(i, ires, jres, m, factors[k]);
+    }
+    lemma_gexp_concat_all_zero(i, factors);
+    lemma_equiv_in_A_preserves_gexp(i, concat_all(factors), u);
+}
+
+//  A product of generators of ⟨t(i,j),xᵐ,yᵐ⟩ is a valid word over A's 3 generators.
+pub proof fn lemma_decomp_factors_valid(i: nat, j: nat, m: nat, factors: Seq<Word>)
+    requires
+        factors_from_generators(
+            seq![config_word(i, j), signed_power(1, m as int), signed_power(2, m as int)], factors),
+    ensures
+        word_valid(concat_all(factors), 3),
+    decreases factors.len(),
+{
+    let gens = seq![config_word(i, j), signed_power(1, m as int), signed_power(2, m as int)];
+    if factors.len() == 0 {
+        assert(concat_all(factors) =~= empty_word());
+        assert(word_valid(empty_word(), 3));
+    } else {
+        let first = factors.first();
+        let rest = factors.drop_first();
+        assert(factors_from_generators(gens, rest)) by {
+            assert forall|k: int| 0 <= k < rest.len() implies is_generator_or_inverse(gens, #[trigger] rest[k]) by {
+                assert(rest[k] == factors[k + 1]);
+            }
+        }
+        assert(is_generator_or_inverse(gens, first)) by { assert(first == factors[0]); }
+        lemma_config_word_valid(i, j);
+        lemma_signed_power_valid(1, m as int, 3);
+        lemma_signed_power_valid(2, m as int, 3);
+        let jj = choose|jj: int| 0 <= jj < 3 && (first == gens[jj] || first == inverse_word(gens[jj]));
+        assert(0 <= jj < 3 && (first == gens[jj] || first == inverse_word(gens[jj])));
+        assert(word_valid(gens[jj], 3));
+        if first != gens[jj] { lemma_inverse_word_valid(gens[jj], 3); }
+        lemma_decomp_factors_valid(i, j, m, rest);
+        assert(concat_all(factors) =~= concat(first, concat_all(rest)));
+        lemma_concat_word_valid(first, concat_all(rest), 3);
+    }
+}
+
+//  ============================================================
+//  PROPERTY (ii)⊆ — the assembly.
+//  ============================================================
+//
+//  If w ∈ ⟨t(i,j),xᵐ,yᵐ⟩ has zero x- and y-exponent (e.g. w ∈ T), then w lies in the
+//  residue-class subgroup ⟨t(r,s):r≡i,s≡j (mod m)⟩.
+pub proof fn lemma_ii_subset(i: nat, j: nat, m: nat, w: Word)
+    requires
+        m > 0,
+        gexp(1, w) == 0,
+        gexp(2, w) == 0,
+        in_generated_subgroup(base_A(),
+            seq![config_word(i, j), signed_power(1, m as int), signed_power(2, m as int)], w),
+    ensures
+        in_residue_class(i as int, j as int, m as int, w),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let gens = seq![config_word(i, j), signed_power(1, m as int), signed_power(2, m as int)];
+    let factors = choose|factors: Seq<Word>| #![trigger factors_from_generators(gens, factors)]
+        factors_from_generators(gens, factors) && equiv_in_presentation(p, concat_all(factors), w);
+    assert(factors_from_generators(gens, factors) && equiv_in_presentation(p, concat_all(factors), w));
+    let cf = concat_all(factors);
+    lemma_decomp_factors_valid(i, j, m, factors);               // word_valid(cf, 3)
+    let dec = lemma_decompose_factors(i, j, m, factors);
+    let u = dec.0; let ax = dec.1; let by = dec.2;
+    let nf = signed_power(1, ax) + signed_power(2, by) + u;      // cf ≡ nf
+    //  gexp(1, w) = gexp(1, nf) = ax + 0 + 0;  gexp(2, w) = by
+    lemma_equiv_symmetric(p, cf, w);                            // w ≡ cf
+    lemma_equiv_transitive(p, w, cf, nf);                       // w ≡ nf
+    lemma_equiv_in_A_preserves_gexp(1, w, nf);
+    lemma_equiv_in_A_preserves_gexp(2, w, nf);
+    lemma_gexp_concat(1, signed_power(1, ax) + signed_power(2, by), u);
+    lemma_gexp_concat(1, signed_power(1, ax), signed_power(2, by));
+    lemma_gexp_signed_power(1, 1, ax);
+    lemma_gexp_signed_power(2, 1, by);
+    lemma_gexp_residue_subgroup_zero(1, i as int, j as int, m as int, u);
+    lemma_gexp_concat(2, signed_power(1, ax) + signed_power(2, by), u);
+    lemma_gexp_concat(2, signed_power(1, ax), signed_power(2, by));
+    lemma_gexp_signed_power(1, 2, ax);
+    lemma_gexp_signed_power(2, 2, by);
+    lemma_gexp_residue_subgroup_zero(2, i as int, j as int, m as int, u);
+    assert(ax == 0 && by == 0);
+    //  nf collapses to u, so w ≡ u
+    assert(signed_power(1, ax) =~= empty_word());
+    assert(signed_power(2, by) =~= empty_word());
+    assert(nf =~= u);
+    lemma_equiv_symmetric(p, cf, u);                            // u ≡ cf
+    lemma_equiv_transitive(p, u, cf, w);                        // u ≡ w
+    lemma_in_subgroup_pred_respects_equiv(p, residue_pred(i as int, j as int, m as int), u, w);
+}
+
+//  ============================================================
 //  Move lemmas: slide a config word past an x/y power (index-shift, rearranged).
 //  ============================================================
 
