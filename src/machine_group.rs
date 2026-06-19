@@ -10311,6 +10311,35 @@ pub proof fn lemma_gen_in_subgroup_pred(p: Presentation, pred: spec_fn(Word) -> 
     }
 }
 
+//  A finitely-generated subgroup whose generators (and inverses) all satisfy a predicate
+//  is contained in the predicate-generated subgroup.
+pub proof fn lemma_finite_gens_in_pred_subgroup(
+    p: Presentation, gens: Seq<Word>, pred: spec_fn(Word) -> bool, w: Word,
+)
+    requires
+        in_generated_subgroup(p, gens, w),
+        forall|j: int| 0 <= j < gens.len() ==> #[trigger] pred(gens[j]) && pred(inverse_word(gens[j])),
+    ensures
+        in_subgroup_pred(p, pred, w),
+{
+    let factors = choose|f: Seq<Word>|
+        factors_from_generators(gens, f) && equiv_in_presentation(p, concat_all(f), w);
+    assert(factors_from_generators(gens, factors) && equiv_in_presentation(p, concat_all(factors), w));
+    assert(factors_from_pred(pred, factors)) by {
+        assert forall|k: int| 0 <= k < factors.len() implies pred(#[trigger] factors[k]) by {
+            assert(is_generator_or_inverse(gens, factors[k]));
+            let j = choose|j: int| 0 <= j < gens.len()
+                && (factors[k] == gens[j] || factors[k] == inverse_word(gens[j]));
+            assert(0 <= j < gens.len()
+                && (factors[k] == gens[j] || factors[k] == inverse_word(gens[j])));
+            assert(pred(gens[j]) && pred(inverse_word(gens[j])));
+        }
+    }
+    assert(in_subgroup_pred(p, pred, w)) by {
+        assert(factors_from_pred(pred, factors) && equiv_in_presentation(p, concat_all(factors), w));
+    }
+}
+
 //  ============================================================
 //  T(M) and ⟨T(M), rᵢ, lⱼ⟩ as predicate-based subgroups
 //  ============================================================
@@ -10324,7 +10353,10 @@ pub open spec fn is_tm_gen(mm: ModMachine, w: Word) -> bool {
 //  A ⟨T(M), rᵢ, lⱼ⟩-generator-or-inverse: a T(M)-gen, or a stable letter Gen(3+i)/Inv(3+i).
 pub open spec fn is_tmstable_gen(mm: ModMachine, w: Word) -> bool {
     is_tm_gen(mm, w)
-    || (exists|i: int| #![trigger mm.quads[i]] 0 <= i < mm.quads.len()
+    || (exists|i: int|
+        #![trigger seq![Symbol::Gen((3 + i) as nat)]]
+        #![trigger seq![Symbol::Inv((3 + i) as nat)]]
+        0 <= i < mm.quads.len()
         && (w == seq![Symbol::Gen((3 + i) as nat)] || w == seq![Symbol::Inv((3 + i) as nat)]))
 }
 
@@ -10370,6 +10402,63 @@ pub proof fn lemma_t_in_TM(mm: ModMachine)
         assert(mm_reaches(mm, 0, 0, 0, 0, 0));
     }
     lemma_config_in_TM(mm, 0, 0);
+}
+
+//  ★ PROPERTY (vii)⊆ :  ⟨t, rᵢ, lⱼ⟩ ⊆ ⟨T(M), rᵢ, lⱼ⟩. ★
+//  (This is what property (III)'s output — t(α,β) ∈ ⟨hnn_a_gens(g_m)⟩ — feeds into.)
+pub proof fn lemma_vii_subset(mm: ModMachine, w: Word)
+    requires
+        mm_terminal(mm, 0, 0),
+        in_generated_subgroup(
+            b_m(mm),
+            hnn_a_gens(HNNData { base: b_m(mm), associations: g_m_associations(mm) }),
+            w,
+        ),
+    ensures
+        in_TMstable(mm, w),
+{
+    let gdata = HNNData { base: b_m(mm), associations: g_m_associations(mm) };
+    let gens = hnn_a_gens(gdata);
+    let pred = tmstable_pred(mm);
+    let ga = g_m_associations(mm);
+    //  (0,0) ∈ H₀
+    reveal_with_fuel(mm_reaches, 1);
+    assert(mm_in_H0(mm, 0, 0)) by { assert(mm_reaches(mm, 0, 0, 0, 0, 0)); }
+    lemma_config_word_zero();
+    assert(gens.len() == ga.len() && ga.len() == 1 + mm.quads.len());
+    //  every generator and its inverse satisfies the predicate
+    assert forall|j: int| 0 <= j < gens.len()
+        implies #[trigger] pred(gens[j]) && pred(inverse_word(gens[j])) by {
+        assert(gens[j] == ga[j].0);
+        if j == 0 {
+            assert(ga[j].0 == seq![Symbol::Gen(0)]);
+            lemma_inverse_word_one(Symbol::Gen(0));
+            assert(inverse_word(gens[j]) =~= seq![Symbol::Inv(0)]);
+            assert(inverse_word(config_word(0, 0)) =~= seq![Symbol::Inv(0)]);
+            assert(is_tm_gen(mm, gens[j])) by {
+                assert(mm_in_H0(mm, 0, 0) && gens[j] == config_word(0, 0));
+            }
+            assert(is_tm_gen(mm, inverse_word(gens[j]))) by {
+                assert(mm_in_H0(mm, 0, 0) && inverse_word(gens[j]) == inverse_word(config_word(0, 0)));
+            }
+        } else {
+            let i = j - 1;
+            assert(0 <= i < mm.quads.len());
+            assert(ga[j].0 == seq![Symbol::Gen((3 + i) as nat)]);
+            lemma_inverse_word_one(Symbol::Gen((3 + i) as nat));
+            assert(inverse_word(gens[j]) =~= seq![Symbol::Inv((3 + i) as nat)]);
+            assert(is_tmstable_gen(mm, gens[j])) by {
+                assert(0 <= i < mm.quads.len() && gens[j] == seq![Symbol::Gen((3 + i) as nat)]);
+            }
+            assert(is_tmstable_gen(mm, inverse_word(gens[j]))) by {
+                assert(0 <= i < mm.quads.len() && inverse_word(gens[j]) == seq![Symbol::Inv((3 + i) as nat)]);
+            }
+        }
+        assert(pred(gens[j]) == is_tmstable_gen(mm, gens[j]));
+        assert(pred(inverse_word(gens[j])) == is_tmstable_gen(mm, inverse_word(gens[j])));
+        assert(is_tmstable_gen(mm, gens[j]) && is_tmstable_gen(mm, inverse_word(gens[j])));
+    }
+    lemma_finite_gens_in_pred_subgroup(b_m(mm), gens, pred, w);
 }
 
 //  A well-formed modular machine is deterministic: a configuration yields a unique successor.
