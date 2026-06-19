@@ -10462,6 +10462,43 @@ pub proof fn lemma_vii_subset(mm: ModMachine, w: Word)
 }
 
 //  ============================================================
+//  Residue-class subgroup  ⟨ t(r,s) : r≡i, s≡j (mod m) ⟩  (for property (ii)⊆)
+//  ============================================================
+
+//  A residue-class generator-or-inverse: a signed config word t(r,s) with r≡i, s≡j (mod m), or inverse.
+pub open spec fn is_residue_gen(i: int, j: int, m: int, w: Word) -> bool {
+    exists|r: int, s: int| #![trigger config_word_signed(r, s)]
+        (r - i) % m == 0 && (s - j) % m == 0
+        && (w == config_word_signed(r, s) || w == inverse_word(config_word_signed(r, s)))
+}
+
+pub open spec fn residue_pred(i: int, j: int, m: int) -> spec_fn(Word) -> bool {
+    |w: Word| is_residue_gen(i, j, m, w)
+}
+
+//  Membership in ⟨ t(r,s) : r≡i, s≡j (mod m) ⟩ (a subgroup of A).
+pub open spec fn in_residue_class(i: int, j: int, m: int, w: Word) -> bool {
+    in_subgroup_pred(base_A(), residue_pred(i, j, m), w)
+}
+
+//  A signed config word in the residue class is in the subgroup.
+pub proof fn lemma_residue_gen_in_class(i: int, j: int, m: int, r: int, s: int)
+    requires
+        (r - i) % m == 0,
+        (s - j) % m == 0,
+    ensures
+        in_residue_class(i, j, m, config_word_signed(r, s)),
+{
+    assert(is_residue_gen(i, j, m, config_word_signed(r, s))) by {
+        assert((r - i) % m == 0 && (s - j) % m == 0
+            && config_word_signed(r, s) == config_word_signed(r, s));
+    }
+    assert(residue_pred(i, j, m)(config_word_signed(r, s))
+        == is_residue_gen(i, j, m, config_word_signed(r, s)));
+    lemma_gen_in_subgroup_pred(base_A(), residue_pred(i, j, m), config_word_signed(r, s));
+}
+
+//  ============================================================
 //  The kill-t homomorphism A → ⟨x,y⟩  (for property (ii)⊆)
 //  ============================================================
 //
