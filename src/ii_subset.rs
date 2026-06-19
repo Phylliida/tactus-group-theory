@@ -279,6 +279,24 @@ pub proof fn lemma_ii_subset(i: nat, j: nat, m: nat, w: Word)
 }
 
 //  ============================================================
+//  Property (vii), the easy half:  every H₀ config word is in ⟨t, rᵢ, lⱼ⟩.
+//  ============================================================
+//  Composes brick-19 (reaches ⟹ k-commutes) with E1 (k-commutes ⟹ subgroup membership).
+//  This is the T(M) ⊆ ⟨t,rᵢ,lⱼ⟩ direction of (vii).
+pub proof fn lemma_h0_config_in_subgroup(mm: ModMachine, alpha: nat, beta: nat)
+    requires
+        mod_machine_wf(mm),
+        mm_in_H0(mm, alpha, beta),
+    ensures
+        in_generated_subgroup(b_m(mm), g_subgens(mm), config_word(alpha, beta)),
+{
+    let k = choose|k: nat| mm_reaches(mm, alpha, beta, 0, 0, k);
+    assert(mm_reaches(mm, alpha, beta, 0, 0, k));
+    lemma_reaches_implies_k_commutes(mm, alpha, beta, k);
+    lemma_k_commutes_implies_subgroup(mm, alpha, beta);
+}
+
+//  ============================================================
 //  Move lemmas: slide a config word past an x/y power (index-shift, rearranged).
 //  ============================================================
 
