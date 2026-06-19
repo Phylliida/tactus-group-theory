@@ -10461,6 +10461,92 @@ pub proof fn lemma_vii_subset(mm: ModMachine, w: Word)
     lemma_finite_gens_in_pred_subgroup(b_m(mm), gens, pred, w);
 }
 
+//  ============================================================
+//  The kill-t homomorphism A → ⟨x,y⟩  (for property (ii)⊆)
+//  ============================================================
+//
+//  t ↦ 1, x ↦ x, y ↦ y — the canonical projection A → A/T = ⟨x,y⟩ that kills the
+//  normal subgroup T = ⟨t⟩^A.  Aanderaa–Cohen use exactly this quotient in property (ii)
+//  (p.213): "any element of ⟨t(i,j),xᵐ,yⁿ⟩ is u·xᵃᵐyᵇⁿ …; intersecting with T kills xᵃᵐyᵇⁿ."
+pub open spec fn kill_t_images() -> Seq<Word> {
+    seq![ empty_word(), seq![Symbol::Gen(1)], seq![Symbol::Gen(2)] ]
+}
+
+//  apply_embedding of a symbol-power is the word-power of the symbol's image.
+pub proof fn lemma_apply_embedding_sympower(imgs: Seq<Word>, sym: Symbol, n: nat)
+    ensures
+        apply_embedding(imgs, symbol_power(sym, n))
+            =~= word_power(apply_embedding_symbol(imgs, sym), n),
+    decreases n,
+{
+    reveal_with_fuel(apply_embedding, 2);
+    if n == 0 {
+        assert(symbol_power(sym, 0) =~= empty_word());
+    } else {
+        let rest = symbol_power(sym, (n - 1) as nat);
+        assert(symbol_power(sym, n).first() == sym);
+        assert(symbol_power(sym, n).drop_first() =~= rest);
+        lemma_apply_embedding_sympower(imgs, sym, (n - 1) as nat);
+    }
+}
+
+//  kill_t fixes any x/y symbol-power (t doesn't occur).
+pub proof fn lemma_kill_t_sympower(sym: Symbol, n: nat)
+    requires
+        sym == Symbol::Gen(1) || sym == Symbol::Gen(2)
+            || sym == Symbol::Inv(1) || sym == Symbol::Inv(2),
+    ensures
+        apply_embedding(kill_t_images(), symbol_power(sym, n)) =~= symbol_power(sym, n),
+{
+    let imgs = kill_t_images();
+    reveal_with_fuel(apply_embedding, 2);
+    lemma_inverse_word_one(Symbol::Gen(1));
+    lemma_inverse_word_one(Symbol::Gen(2));
+    assert(apply_embedding_symbol(imgs, sym) =~= seq![sym]);
+    lemma_apply_embedding_sympower(imgs, sym, n);
+    assert(seq![sym] =~= symbol_power(sym, 1));
+    lemma_word_power_symbol(sym, 1, n);
+    assert(1 * n == n);
+    assert(word_power(seq![sym], n) =~= word_power(symbol_power(sym, 1), n));
+}
+
+//  ★ The kill-t map sends every config word to the identity:  kill_t(t(r,s)) ≡ 1. ★
+//  (= "intersecting with T kills xᵃᵐyᵇⁿ" — the engine of property (ii)⊆.)
+pub proof fn lemma_kill_t_config_trivial(r: nat, s: nat)
+    ensures
+        equiv_in_presentation(base_A(), apply_embedding(kill_t_images(), config_word(r, s)), empty_word()),
+{
+    let imgs = kill_t_images();
+    let p = base_A();
+    lemma_base_A_valid();
+    reveal_with_fuel(apply_embedding, 2);
+    let a_ = symbol_power(Symbol::Inv(2), s);
+    let b_ = symbol_power(Symbol::Inv(1), r);
+    let c_: Word = seq![Symbol::Gen(0)];
+    let d_ = symbol_power(Symbol::Gen(1), r);
+    let e_ = symbol_power(Symbol::Gen(2), s);
+    //  distribute apply_embedding over the five blocks of config_word
+    lemma_apply_embedding_concat(imgs, a_ + b_ + c_ + d_, e_);
+    lemma_apply_embedding_concat(imgs, a_ + b_ + c_, d_);
+    lemma_apply_embedding_concat(imgs, a_ + b_, c_);
+    lemma_apply_embedding_concat(imgs, a_, b_);
+    lemma_kill_t_sympower(Symbol::Inv(2), s);
+    lemma_kill_t_sympower(Symbol::Inv(1), r);
+    lemma_kill_t_sympower(Symbol::Gen(1), r);
+    lemma_kill_t_sympower(Symbol::Gen(2), s);
+    assert(apply_embedding(imgs, c_) =~= empty_word());
+    assert(apply_embedding(imgs, config_word(r, s)) =~= a_ + b_ + d_ + e_);
+    //  a_ + b_ = inverse_word(d_ + e_), so the whole thing is  w⁻¹ · w
+    let v = d_ + e_;
+    lemma_inverse_word_concat(d_, e_);
+    lemma_inverse_word_sympower(Symbol::Gen(1), r);
+    lemma_inverse_word_sympower(Symbol::Gen(2), s);
+    assert(inverse_word(v) =~= a_ + b_);
+    assert(apply_embedding(imgs, config_word(r, s)) =~= inverse_word(v) + v);
+    lemma_word_inverse_left(p, v);
+    assert(concat(inverse_word(v), v) =~= inverse_word(v) + v);
+}
+
 //  A well-formed modular machine is deterministic: a configuration yields a unique successor.
 pub proof fn lemma_yield_deterministic(mm: ModMachine, a: nat, b: nat, am: nat, bm: nat, a2: nat, b2: nat)
     requires
