@@ -5,8 +5,100 @@ use crate::presentation::*;
 use crate::presentation_lemmas::*;
 use crate::machine_group::*;
 use crate::benign::{in_generated_subgroup, factors_from_generators, is_generator_or_inverse, concat_all};
+use crate::benign::{apply_embedding, apply_embedding_symbol, lemma_apply_embedding_concat};
 
 verus! {
+
+//  ============================================================
+//  kill_t kills the residue-class subgroup (for the (ii)⊆ assembly).
+//  ============================================================
+
+//  kill_t fixes any signed x/y power (t doesn't occur).
+pub proof fn lemma_kill_t_signed_power(i: nat, a: int)
+    requires
+        i == 1 || i == 2,
+    ensures
+        apply_embedding(kill_t_images(), signed_power(i, a)) =~= signed_power(i, a),
+{
+    if a >= 0 {
+        lemma_kill_t_sympower(Symbol::Gen(i), a as nat);
+    } else {
+        lemma_kill_t_sympower(Symbol::Inv(i), (-a) as nat);
+    }
+}
+
+//  kill_t sends every (signed) config word to the identity:  kill_t(t(r,s)) ≡ 1.
+pub proof fn lemma_kill_t_config_signed_trivial(r: int, s: int)
+    ensures
+        equiv_in_presentation(base_A(), apply_embedding(kill_t_images(), config_word_signed(r, s)), empty_word()),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let imgs = kill_t_images();
+    reveal_with_fuel(apply_embedding, 2);
+    let a_ = signed_power(2, -s);
+    let b_ = signed_power(1, -r);
+    let c_: Word = seq![Symbol::Gen(0)];
+    let d_ = signed_power(1, r);
+    let e_ = signed_power(2, s);
+    lemma_apply_embedding_concat(imgs, a_ + b_ + c_ + d_, e_);
+    lemma_apply_embedding_concat(imgs, a_ + b_ + c_, d_);
+    lemma_apply_embedding_concat(imgs, a_ + b_, c_);
+    lemma_apply_embedding_concat(imgs, a_, b_);
+    lemma_kill_t_signed_power(2, -s);
+    lemma_kill_t_signed_power(1, -r);
+    lemma_kill_t_signed_power(1, r);
+    lemma_kill_t_signed_power(2, s);
+    assert(apply_embedding(imgs, c_) =~= empty_word());
+    assert(apply_embedding(imgs, config_word_signed(r, s)) =~= a_ + b_ + d_ + e_);
+    let v = d_ + e_;
+    lemma_inverse_word_concat(d_, e_);
+    lemma_signed_power_inverse(1, r);
+    lemma_signed_power_inverse(2, s);
+    assert(inverse_word(v) =~= a_ + b_);
+    assert(apply_embedding(imgs, config_word_signed(r, s)) =~= inverse_word(v) + v);
+    lemma_word_inverse_left(p, v);
+    assert(concat(inverse_word(v), v) =~= inverse_word(v) + v);
+}
+
+//  If kill_t kills every factor, it kills their product.
+pub proof fn lemma_kill_t_concat_all_trivial(factors: Seq<Word>)
+    requires
+        forall|k: int| 0 <= k < factors.len() ==>
+            equiv_in_presentation(base_A(), apply_embedding(kill_t_images(), #[trigger] factors[k]), empty_word()),
+    ensures
+        equiv_in_presentation(base_A(), apply_embedding(kill_t_images(), concat_all(factors)), empty_word()),
+    decreases factors.len(),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let imgs = kill_t_images();
+    if factors.len() == 0 {
+        assert(concat_all(factors) =~= empty_word());
+        reveal_with_fuel(apply_embedding, 2);
+        assert(apply_embedding(imgs, empty_word()) =~= empty_word());
+        lemma_equiv_refl(p, empty_word());
+    } else {
+        let first = factors.first();
+        let rest = factors.drop_first();
+        assert forall|k: int| 0 <= k < rest.len() implies
+            equiv_in_presentation(p, apply_embedding(imgs, #[trigger] rest[k]), empty_word()) by {
+            assert(rest[k] == factors[k + 1]);
+        }
+        lemma_kill_t_concat_all_trivial(rest);                  // kill_t(concat_all(rest)) ≡ ε
+        assert(concat_all(factors) =~= concat(first, concat_all(rest)));
+        lemma_apply_embedding_concat(imgs, first, concat_all(rest));
+        assert(equiv_in_presentation(p, apply_embedding(imgs, first), empty_word())) by {
+            assert(first == factors[0]);
+        }
+        let aa = apply_embedding(imgs, first);
+        let bb = apply_embedding(imgs, concat_all(rest));
+        lemma_equiv_concat_left(p, aa, empty_word(), bb);       // aa·bb ≡ ε·bb
+        assert(empty_word() + bb =~= bb);
+        lemma_equiv_transitive(p, aa + bb, bb, empty_word());   // aa·bb ≡ bb ≡ ε
+        assert(apply_embedding(imgs, concat_all(factors)) =~= aa + bb);
+    }
+}
 
 //  ============================================================
 //  Move lemmas: slide a config word past an x/y power (index-shift, rearranged).
