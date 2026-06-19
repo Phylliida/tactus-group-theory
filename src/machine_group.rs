@@ -10611,6 +10611,105 @@ pub proof fn lemma_conj_config_by_xpow(r: nat, s: nat, k: nat)
     assert(equiv_in_presentation(p, lhs, config_word((r + k) as nat, s)));
 }
 
+//  Signed config word  t(r,s) = y⁻ˢ x⁻ʳ t xʳ yˢ  for r,s ∈ ℤ  (Aanderaa–Cohen's t(r,s), r,s∈ℤ).
+//  The structural decomposition of (ii)⊆ shifts indices by ±m, which can go negative — so the
+//  residue class lives over ℤ.  The nat config_word is the special case (bridge below).
+pub open spec fn config_word_signed(r: int, s: int) -> Word {
+    signed_power(2, -s) + signed_power(1, -r) + seq![Symbol::Gen(0)] + signed_power(1, r) + signed_power(2, s)
+}
+
+//  For nat indices the signed config word is the ordinary one.
+pub proof fn lemma_config_signed_matches_nat(r: nat, s: nat)
+    ensures
+        config_word_signed(r as int, s as int) =~= config_word(r, s),
+{
+    assert(signed_power(2, -(s as int)) =~= symbol_power(Symbol::Inv(2), s));
+    assert(signed_power(1, -(r as int)) =~= symbol_power(Symbol::Inv(1), r));
+    assert(signed_power(1, r as int) =~= symbol_power(Symbol::Gen(1), r));
+    assert(signed_power(2, s as int) =~= symbol_power(Symbol::Gen(2), s));
+}
+
+//  Left half:  x⁻ᵏ · y⁻ˢ · x⁻ʳ ≡ y⁻ˢ · x⁻⁽ᵏ⁺ʳ⁾.
+pub proof fn lemma_signed_x_left(r: int, s: int, k: int)
+    ensures
+        equiv_in_presentation(base_A(),
+            signed_power(1, -k) + signed_power(2, -s) + signed_power(1, -r),
+            signed_power(2, -s) + signed_power(1, -(k + r))),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let i1k = signed_power(1, -k);
+    let i2s = signed_power(2, -s);
+    let i1r = signed_power(1, -r);
+    lemma_signed_xy_commute(-k, -s);                          // i1k·i2s ≡ i2s·i1k
+    lemma_equiv_concat_left(p, i1k + i2s, i2s + i1k, i1r);
+    lemma_signed_power_add(p, 1, -k, -r);                     // i1k·i1r ≡ x⁻⁽ᵏ⁺ʳ⁾
+    lemma_equiv_concat_right(p, i2s, i1k + i1r, signed_power(1, -(k + r)));
+    assert((i1k + i2s) + i1r =~= i1k + i2s + i1r);
+    assert((i2s + i1k) + i1r =~= i2s + (i1k + i1r));
+    assert(i2s + (i1k + i1r) =~= i2s + i1k + i1r);
+    lemma_equiv_transitive(p, i1k + i2s + i1r, i2s + (i1k + i1r), i2s + signed_power(1, -(k + r)));
+}
+
+//  Right half:  xʳ · yˢ · xᵏ ≡ x⁽ʳ⁺ᵏ⁾ · yˢ.
+pub proof fn lemma_signed_x_right(r: int, s: int, k: int)
+    ensures
+        equiv_in_presentation(base_A(),
+            signed_power(1, r) + signed_power(2, s) + signed_power(1, k),
+            signed_power(1, r + k) + signed_power(2, s)),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let g1r = signed_power(1, r);
+    let g2s = signed_power(2, s);
+    let g1k = signed_power(1, k);
+    lemma_signed_xy_commute(k, s);
+    lemma_equiv_symmetric(p, g1k + g2s, g2s + g1k);          // g2s·g1k ≡ g1k·g2s
+    lemma_equiv_concat_right(p, g1r, g2s + g1k, g1k + g2s);
+    lemma_signed_power_add(p, 1, r, k);                      // g1r·g1k ≡ x⁽ʳ⁺ᵏ⁾
+    lemma_equiv_concat_left(p, g1r + g1k, signed_power(1, r + k), g2s);
+    assert(g1r + (g2s + g1k) =~= g1r + g2s + g1k);
+    assert(g1r + (g1k + g2s) =~= (g1r + g1k) + g2s);
+    lemma_equiv_transitive(p, g1r + g2s + g1k, g1r + (g1k + g2s), signed_power(1, r + k) + g2s);
+}
+
+//  Signed index-shift:  x⁻ᵏ · t(r,s) · xᵏ ≡ t(r+k, s)  for r,s,k ∈ ℤ.  (left + right + congruence)
+pub proof fn lemma_conj_config_signed_by_x(r: int, s: int, k: int)
+    ensures
+        equiv_in_presentation(base_A(),
+            signed_power(1, -k) + config_word_signed(r, s) + signed_power(1, k),
+            config_word_signed(r + k, s)),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let i1k = signed_power(1, -k);
+    let i2s = signed_power(2, -s);
+    let i1r = signed_power(1, -r);
+    let t0: Word = seq![Symbol::Gen(0)];
+    let g1r = signed_power(1, r);
+    let g2s = signed_power(2, s);
+    let g1k = signed_power(1, k);
+    let left = i1k + i2s + i1r;
+    let right = g1r + g2s + g1k;
+    let leftR = i2s + signed_power(1, -(k + r));
+    let rightR = signed_power(1, r + k) + g2s;
+    lemma_signed_x_left(r, s, k);                            // left ≡ leftR
+    lemma_signed_x_right(r, s, k);                           // right ≡ rightR
+    //  x⁻ᵏ · t(r,s) · xᵏ  =  left · t · right
+    let lhs = i1k + config_word_signed(r, s) + g1k;
+    assert(lhs =~= left + (t0 + right));
+    //  congruence: left·(t·right) ≡ leftR·(t·right) ≡ leftR·(t·rightR)
+    lemma_equiv_concat_left(p, left, leftR, t0 + right);
+    lemma_equiv_concat_right(p, leftR + t0, right, rightR);
+    assert(left + (t0 + right) =~= lhs);
+    assert(leftR + (t0 + right) =~= (leftR + t0) + right);
+    assert((leftR + t0) + rightR =~= leftR + (t0 + rightR));
+    assert(leftR + (t0 + rightR) =~= config_word_signed(r + k, s)) by {
+        assert(-(k + r) == -(r + k));
+    }
+    lemma_equiv_transitive(p, lhs, (leftR + t0) + right, leftR + (t0 + rightR));
+}
+
 //  y⁻ᵏ · t(r,s) · yᵏ ≡ t(r, s+k).  Simpler than x: the y-powers are already adjacent (no commute).
 pub proof fn lemma_conj_config_by_ypow(r: nat, s: nat, k: nat)
     ensures
