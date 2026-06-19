@@ -88,3 +88,8 @@ pub mod tietze;
 // stub whose config word q_state·αᵃ·βᵇ was provably wrong.
 #[cfg(verus_keep_ghost)]
 pub mod machine_group;
+
+// ii_subset: property (ii)⊆ structural-decomposition work — kept in its own module so its
+// predicate-heavy in_residue_class goals don't pollute machine_group's triggers.
+#[cfg(verus_keep_ghost)]
+pub mod ii_subset;
