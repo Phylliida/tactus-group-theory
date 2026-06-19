@@ -90,6 +90,127 @@ pub proof fn lemma_config_move_xy(r: int, s: int, aa: int, bb: int)
     lemma_equiv_transitive(p, cw + xa + yb, xa + (cwa + yb), xa + (yb + cwab));
 }
 
+//  inverse_word(xᵏ) = x⁻ᵏ.
+pub proof fn lemma_signed_power_inverse(i: nat, k: int)
+    ensures
+        inverse_word(signed_power(i, k)) =~= signed_power(i, -k),
+{
+    if k >= 0 {
+        lemma_inverse_word_sympower(Symbol::Gen(i), k as nat);
+        assert(inverse_symbol(Symbol::Gen(i)) == Symbol::Inv(i));
+    } else {
+        lemma_inverse_word_sympower(Symbol::Inv(i), (-k) as nat);
+        assert(inverse_symbol(Symbol::Inv(i)) == Symbol::Gen(i));
+    }
+}
+
+//  config_word_signed(r,s) is a valid word over A's 3 generators.
+pub proof fn lemma_config_signed_valid(r: int, s: int)
+    ensures
+        word_valid(config_word_signed(r, s), 3),
+{
+    lemma_signed_power_valid(2, -s, 3);
+    lemma_signed_power_valid(1, -r, 3);
+    lemma_signed_power_valid(1, r, 3);
+    lemma_signed_power_valid(2, s, 3);
+    let t0: Word = seq![Symbol::Gen(0)];
+    assert(word_valid(t0, 3)) by {
+        assert forall|k: int| 0 <= k < t0.len() implies symbol_valid(#[trigger] t0[k], 3) by { }
+    }
+    lemma_concat_word_valid(signed_power(2, -s), signed_power(1, -r), 3);
+    lemma_concat_word_valid(signed_power(2, -s) + signed_power(1, -r), t0, 3);
+    lemma_concat_word_valid(signed_power(2, -s) + signed_power(1, -r) + t0, signed_power(1, r), 3);
+    lemma_concat_word_valid(signed_power(2, -s) + signed_power(1, -r) + t0 + signed_power(1, r),
+        signed_power(2, s), 3);
+}
+
+//  inverse_word(t(r,s)) · xᵏ ≡ xᵏ · inverse_word(t(r+k, s)).  (from config_move_x at (r+k,s,-k))
+pub proof fn lemma_config_inv_move_x(r: int, s: int, k: int)
+    ensures
+        equiv_in_presentation(base_A(),
+            inverse_word(config_word_signed(r, s)) + signed_power(1, k),
+            signed_power(1, k) + inverse_word(config_word_signed(r + k, s))),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let cw = config_word_signed(r, s);
+    let cwk = config_word_signed(r + k, s);
+    let xnk = signed_power(1, -k);
+    //  t(r+k,s)·x⁻ᵏ ≡ x⁻ᵏ·t(r,s)
+    lemma_config_move_x(r + k, s, -k);
+    //  validity for inversion
+    lemma_config_signed_valid(r, s);
+    lemma_config_signed_valid(r + k, s);
+    lemma_signed_power_valid(1, -k, 3);
+    lemma_concat_word_valid(cwk, xnk, 3);
+    lemma_concat_word_valid(xnk, cw, 3);
+    crate::normal_form_afp_textbook::lemma_equiv_inverse(p, cwk + xnk, xnk + cw);
+    //  compute the two inverses
+    lemma_inverse_word_concat(cwk, xnk);
+    lemma_inverse_word_concat(xnk, cw);
+    lemma_signed_power_inverse(1, -k);                      // inverse_word(x⁻ᵏ) =~= xᵏ
+    assert(inverse_word(cwk + xnk) =~= signed_power(1, k) + inverse_word(cwk));
+    assert(inverse_word(xnk + cw) =~= inverse_word(cw) + signed_power(1, k));
+    lemma_inverse_word_valid(cwk, 3);
+    lemma_signed_power_valid(1, k, 3);
+    lemma_concat_word_valid(signed_power(1, k), inverse_word(cwk), 3);
+    lemma_equiv_symmetric(p, signed_power(1, k) + inverse_word(cwk), inverse_word(cw) + signed_power(1, k));
+}
+
+//  inverse_word(t(r,s)) · yᵏ ≡ yᵏ · inverse_word(t(r, s+k)).
+pub proof fn lemma_config_inv_move_y(r: int, s: int, k: int)
+    ensures
+        equiv_in_presentation(base_A(),
+            inverse_word(config_word_signed(r, s)) + signed_power(2, k),
+            signed_power(2, k) + inverse_word(config_word_signed(r, s + k))),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let cw = config_word_signed(r, s);
+    let cwk = config_word_signed(r, s + k);
+    let ynk = signed_power(2, -k);
+    lemma_config_move_y(r, s + k, -k);
+    lemma_config_signed_valid(r, s);
+    lemma_config_signed_valid(r, s + k);
+    lemma_signed_power_valid(2, -k, 3);
+    lemma_concat_word_valid(cwk, ynk, 3);
+    lemma_concat_word_valid(ynk, cw, 3);
+    crate::normal_form_afp_textbook::lemma_equiv_inverse(p, cwk + ynk, ynk + cw);
+    lemma_inverse_word_concat(cwk, ynk);
+    lemma_inverse_word_concat(ynk, cw);
+    lemma_signed_power_inverse(2, -k);
+    assert(inverse_word(cwk + ynk) =~= signed_power(2, k) + inverse_word(cwk));
+    assert(inverse_word(ynk + cw) =~= inverse_word(cw) + signed_power(2, k));
+    lemma_inverse_word_valid(cwk, 3);
+    lemma_signed_power_valid(2, k, 3);
+    lemma_concat_word_valid(signed_power(2, k), inverse_word(cwk), 3);
+    lemma_equiv_symmetric(p, signed_power(2, k) + inverse_word(cwk), inverse_word(cw) + signed_power(2, k));
+}
+
+//  inverse_word(t(r,s)) · xᵃ · yᵇ ≡ xᵃ · yᵇ · inverse_word(t(r+a, s+b)).
+pub proof fn lemma_config_inv_move_xy(r: int, s: int, aa: int, bb: int)
+    ensures
+        equiv_in_presentation(base_A(),
+            inverse_word(config_word_signed(r, s)) + signed_power(1, aa) + signed_power(2, bb),
+            signed_power(1, aa) + signed_power(2, bb) + inverse_word(config_word_signed(r + aa, s + bb))),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let xa = signed_power(1, aa);
+    let yb = signed_power(2, bb);
+    let icw = inverse_word(config_word_signed(r, s));
+    let icwa = inverse_word(config_word_signed(r + aa, s));
+    let icwab = inverse_word(config_word_signed(r + aa, s + bb));
+    lemma_config_inv_move_x(r, s, aa);                      // icw·xa ≡ xa·icwa
+    lemma_equiv_concat_left(p, icw + xa, xa + icwa, yb);
+    lemma_config_inv_move_y(r + aa, s, bb);                 // icwa·yb ≡ yb·icwab
+    lemma_equiv_concat_right(p, xa, icwa + yb, yb + icwab);
+    assert((icw + xa) + yb =~= icw + xa + yb);
+    assert((xa + icwa) + yb =~= xa + (icwa + yb));
+    assert(xa + (yb + icwab) =~= xa + yb + icwab);
+    lemma_equiv_transitive(p, icw + xa + yb, xa + (icwa + yb), xa + (yb + icwab));
+}
+
 //  ============================================================
 //  Property (ii)⊆ — structural decomposition (separate module)
 //  ============================================================
