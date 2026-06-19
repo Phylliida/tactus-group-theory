@@ -297,6 +297,59 @@ pub proof fn lemma_h0_config_in_subgroup(mm: ModMachine, alpha: nat, beta: nat)
 }
 
 //  ============================================================
+//  E2.C — generic property-II: the ⟨K,p⟩-word representation.
+//  ============================================================
+//  See docs/e2c-property-ii-design.md.  A ⟨K,p⟩-word is ALTERNATING — K-syllables interleaved
+//  with signed stable letters — so every pinch-middle is a K-syllable by construction.
+
+pub struct KPWord {
+    pub head: Word,
+    pub tail: Seq<(bool, Word)>,
+}
+
+//  The word a KP-word represents:  head · p^{s₁} · k₁ · p^{s₂} · k₂ · …  (sᵢ: true=p, false=p⁻¹).
+pub open spec fn kp_value(stable: Symbol, kp: KPWord) -> Word
+    decreases kp.tail.len(),
+{
+    if kp.tail.len() == 0 {
+        kp.head
+    } else {
+        let p_sym = if kp.tail.first().0 { stable } else { inverse_symbol(stable) };
+        kp.head + seq![p_sym]
+            + kp_value(stable, KPWord { head: kp.tail.first().1, tail: kp.tail.drop_first() })
+    }
+}
+
+//  The induction measure: the number of stable letters.
+pub open spec fn kp_pcount(kp: KPWord) -> nat {
+    kp.tail.len()
+}
+
+//  Every syllable (head and each kᵢ) is a K-element.
+pub open spec fn is_kp_word(in_k: spec_fn(Word) -> bool, kp: KPWord) -> bool {
+    &&& in_k(kp.head)
+    &&& forall|i: int| 0 <= i < kp.tail.len() ==> in_k(#[trigger] kp.tail[i].1)
+}
+
+//  A tail-free KP-word is just its head.
+pub proof fn lemma_kp_value_empty(stable: Symbol, head: Word)
+    ensures
+        kp_value(stable, KPWord { head, tail: Seq::empty() }) =~= head,
+{
+}
+
+//  Unfolding identity: value of a non-empty KP-word peels off head · p^{s₁} · (value of the rest).
+pub proof fn lemma_kp_value_cons(stable: Symbol, kp: KPWord)
+    requires
+        kp.tail.len() > 0,
+    ensures
+        kp_value(stable, kp) =~= kp.head
+            + seq![if kp.tail.first().0 { stable } else { inverse_symbol(stable) }]
+            + kp_value(stable, KPWord { head: kp.tail.first().1, tail: kp.tail.drop_first() }),
+{
+}
+
+//  ============================================================
 //  Move lemmas: slide a config word past an x/y power (index-shift, rearranged).
 //  ============================================================
 
