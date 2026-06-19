@@ -10547,6 +10547,86 @@ pub proof fn lemma_kill_t_config_trivial(r: nat, s: nat)
     assert(concat(inverse_word(v), v) =~= inverse_word(v) + v);
 }
 
+//  ============================================================
+//  Index-shift: conjugating a config word by x (or y) shifts its index.
+//  ============================================================
+//
+//  x⁻ᵏ · t(r,s) · xᵏ ≡ t(r+k, s).  The engine of property (ii)⊆'s structural step
+//  (sliding the xᵐ,yᵐ through the t(i,j)'s within a residue class).
+pub proof fn lemma_conj_config_by_xpow(r: nat, s: nat, k: nat)
+    ensures
+        equiv_in_presentation(base_A(),
+            symbol_power(Symbol::Inv(1), k) + config_word(r, s) + symbol_power(Symbol::Gen(1), k),
+            config_word((r + k) as nat, s)),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let i2s = symbol_power(Symbol::Inv(2), s);
+    let i1k = symbol_power(Symbol::Inv(1), k);
+    let i1r = symbol_power(Symbol::Inv(1), r);
+    let t0: Word = seq![Symbol::Gen(0)];
+    let g1r = symbol_power(Symbol::Gen(1), r);
+    let g2s = symbol_power(Symbol::Gen(2), s);
+    let g1k = symbol_power(Symbol::Gen(1), k);
+    //  the inner "t-core":  t · xʳ   and   y⁻ˢ ... appear on both sides; we move the outer x's in.
+    //  Work on the two halves: left  i1k·i2s·i1r  →  i2s·i1(k+r);  right  g2s·g1k → g1k·g2s,
+    //  combined with the merges, gives config_word(r+k, s).
+    //  --- commute x⁻ᵏ past y⁻ˢ ---
+    lemma_xinv_yinv_commute_in_A();
+    lemma_equiv_symmetric(p, seq![Symbol::Inv(2), Symbol::Inv(1)], seq![Symbol::Inv(1), Symbol::Inv(2)]);
+    lemma_power_commutes(p, Symbol::Inv(1), Symbol::Inv(2), k, s);   // i1k·i2s ≡ i2s·i1k
+    //  --- commute yˢ past xᵏ ---
+    lemma_xy_commute_in_A();
+    lemma_equiv_symmetric(p, seq![Symbol::Gen(1), Symbol::Gen(2)], seq![Symbol::Gen(2), Symbol::Gen(1)]);
+    lemma_power_commutes(p, Symbol::Gen(2), Symbol::Gen(1), s, k);   // g2s·g1k ≡ g1k·g2s
+    //  --- merges ---
+    lemma_symbol_power_merge(Symbol::Inv(1), k, r);   // i1k·i1r =~= i1(k+r)
+    lemma_symbol_power_merge(Symbol::Gen(1), r, k);   // g1r·g1k =~= g1(r+k)
+    //  --- assemble the chain ---
+    let lhs = i1k + config_word(r, s) + g1k;
+    //  step A: lhs  =~=  i1k + i2s + i1r + t0 + g1r + g2s + g1k  (config_word unfolds)
+    assert(lhs =~= i1k + i2s + i1r + t0 + g1r + g2s + g1k);
+    //  step B: commute the left x⁻ᵏ past y⁻ˢ  →  i2s + i1k + i1r + t0 + g1r + g2s + g1k
+    let wB = i2s + i1k + i1r + t0 + g1r + g2s + g1k;
+    assert(equiv_in_presentation(p, lhs, wB)) by {
+        lemma_equiv_concat_left(p, i1k + i2s, i2s + i1k, i1r + t0 + g1r + g2s + g1k);
+        assert((i1k + i2s) + (i1r + t0 + g1r + g2s + g1k) =~= lhs);
+        assert((i2s + i1k) + (i1r + t0 + g1r + g2s + g1k) =~= wB);
+    }
+    //  step C: merge i1k·i1r  →  i2s + i1(k+r) + t0 + g1r + g2s + g1k
+    let wC = i2s + symbol_power(Symbol::Inv(1), (k + r) as nat) + t0 + g1r + g2s + g1k;
+    assert(wB =~= wC);
+    //  step D: commute g2s past g1k  →  i2s + i1(k+r) + t0 + g1r + g1k + g2s
+    let wD = i2s + symbol_power(Symbol::Inv(1), (k + r) as nat) + t0 + g1r + g1k + g2s;
+    assert(equiv_in_presentation(p, wC, wD)) by {
+        lemma_equiv_concat_right(p, i2s + symbol_power(Symbol::Inv(1), (k + r) as nat) + t0 + g1r,
+            g2s + g1k, g1k + g2s);
+        assert((i2s + symbol_power(Symbol::Inv(1), (k + r) as nat) + t0 + g1r) + (g2s + g1k) =~= wC);
+        assert((i2s + symbol_power(Symbol::Inv(1), (k + r) as nat) + t0 + g1r) + (g1k + g2s) =~= wD);
+    }
+    //  step E: merge g1r·g1k  →  config_word(r+k, s)
+    assert(wD =~= config_word((r + k) as nat, s));
+    //  chain: wB =~= wC so equiv(lhs,wB) is equiv(lhs,wC); transit through wD; wD =~= config.
+    lemma_equiv_transitive(p, lhs, wC, wD);
+    assert(equiv_in_presentation(p, lhs, config_word((r + k) as nat, s)));
+}
+
+//  y⁻ᵏ · t(r,s) · yᵏ ≡ t(r, s+k).  Simpler than x: the y-powers are already adjacent (no commute).
+pub proof fn lemma_conj_config_by_ypow(r: nat, s: nat, k: nat)
+    ensures
+        equiv_in_presentation(base_A(),
+            symbol_power(Symbol::Inv(2), k) + config_word(r, s) + symbol_power(Symbol::Gen(2), k),
+            config_word(r, (s + k) as nat)),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    lemma_symbol_power_merge(Symbol::Inv(2), k, s);
+    lemma_symbol_power_merge(Symbol::Gen(2), s, k);
+    let lhs = symbol_power(Symbol::Inv(2), k) + config_word(r, s) + symbol_power(Symbol::Gen(2), k);
+    assert(lhs =~= config_word(r, (s + k) as nat));
+    lemma_equiv_refl(p, lhs);
+}
+
 //  A well-formed modular machine is deterministic: a configuration yields a unique successor.
 pub proof fn lemma_yield_deterministic(mm: ModMachine, a: nat, b: nat, am: nat, bm: nat, a2: nat, b2: nat)
     requires
