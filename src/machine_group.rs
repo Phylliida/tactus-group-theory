@@ -10710,6 +10710,41 @@ pub proof fn lemma_conj_config_signed_by_x(r: int, s: int, k: int)
     lemma_equiv_transitive(p, lhs, (leftR + t0) + right, leftR + (t0 + rightR));
 }
 
+//  Signed index-shift:  y⁻ᵏ · t(r,s) · yᵏ ≡ t(r, s+k)  for r,s,k ∈ ℤ.
+//  Simpler than x: the y-powers are already adjacent — just two signed merges, no commute.
+pub proof fn lemma_conj_config_signed_by_y(r: int, s: int, k: int)
+    ensures
+        equiv_in_presentation(base_A(),
+            signed_power(2, -k) + config_word_signed(r, s) + signed_power(2, k),
+            config_word_signed(r, s + k)),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let i2k = signed_power(2, -k);
+    let i2s = signed_power(2, -s);
+    let i1r = signed_power(1, -r);
+    let t0: Word = seq![Symbol::Gen(0)];
+    let g1r = signed_power(1, r);
+    let g2s = signed_power(2, s);
+    let g2k = signed_power(2, k);
+    let lhs = i2k + config_word_signed(r, s) + g2k;
+    let mid = signed_power(2, -(k + s)) + i1r + t0 + g1r + g2s + g2k;
+    let prefix = signed_power(2, -(k + s)) + i1r + t0 + g1r;
+    //  step 1: merge the two left y-powers  i2k·i2s
+    lemma_signed_power_add(p, 2, -k, -s);
+    lemma_equiv_concat_left(p, i2k + i2s, signed_power(2, -(k + s)), i1r + t0 + g1r + g2s + g2k);
+    assert((i2k + i2s) + (i1r + t0 + g1r + g2s + g2k) =~= lhs);
+    assert(signed_power(2, -(k + s)) + (i1r + t0 + g1r + g2s + g2k) =~= mid);
+    //  step 2: merge the two right y-powers  g2s·g2k
+    lemma_signed_power_add(p, 2, s, k);
+    lemma_equiv_concat_right(p, prefix, g2s + g2k, signed_power(2, s + k));
+    assert(prefix + (g2s + g2k) =~= mid);
+    assert(prefix + signed_power(2, s + k) =~= config_word_signed(r, s + k)) by {
+        assert(-(k + s) == -(s + k));
+    }
+    lemma_equiv_transitive(p, lhs, mid, config_word_signed(r, s + k));
+}
+
 //  y⁻ᵏ · t(r,s) · yᵏ ≡ t(r, s+k).  Simpler than x: the y-powers are already adjacent (no commute).
 pub proof fn lemma_conj_config_by_ypow(r: nat, s: nat, k: nat)
     ensures
