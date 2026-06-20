@@ -564,6 +564,79 @@ pub proof fn lemma_hnn_conjugation_subgroup(data: HNNData, wit: Word)
 }
 
 //  ============================================================
+//  Brick B — subgroup membership ⟹ an embedding witness word.
+//  ============================================================
+//  in_generated_subgroup uses a factor sequence (each factor a generator-or-inverse word).
+//  To feed the conjugation engine (which works on a witness word over the k indices), we
+//  convert: a factor sequence over `gens` becomes a witness word `wit` with
+//  apply_embedding(gens, wit) = concat_all(factors).
+
+//  Build the witness word from a factor sequence: map each factor to its index-symbol.
+pub proof fn lemma_factors_to_witness(gens: Seq<Word>, factors: Seq<Word>) -> (wit: Word)
+    requires
+        factors_from_generators(gens, factors),
+    ensures
+        word_valid(wit, gens.len()),
+        apply_embedding(gens, wit) =~= concat_all(factors),
+    decreases factors.len(),
+{
+    if factors.len() == 0 {
+        assert(concat_all(factors) =~= empty_word());
+        assert(apply_embedding(gens, empty_word()) =~= empty_word());
+        empty_word()
+    } else {
+        let first = factors.first();
+        let rest = factors.drop_first();
+        assert(factors_from_generators(gens, rest)) by {
+            assert forall|q: int| 0 <= q < rest.len() implies is_generator_or_inverse(gens, #[trigger] rest[q]) by {
+                assert(rest[q] == factors[q + 1]);
+            }
+        }
+        let wit_rest = lemma_factors_to_witness(gens, rest);
+        assert(is_generator_or_inverse(gens, first)) by { assert(first == factors[0]); }
+        let j = choose|j: int| 0 <= j < gens.len() && (first == gens[j] || first == inverse_word(gens[j]));
+        assert(0 <= j < gens.len() && (first == gens[j] || first == inverse_word(gens[j])));
+        let sym = if first == gens[j] { Symbol::Gen(j as nat) } else { Symbol::Inv(j as nat) };
+        let symw: Word = seq![sym];
+        let wit = symw + wit_rest;
+        //  validity
+        assert(symbol_valid(sym, gens.len()));
+        assert(word_valid(symw, gens.len())) by {
+            assert forall|q: int| 0 <= q < symw.len() implies symbol_valid(#[trigger] symw[q], gens.len()) by {
+                assert(symw[q] == sym);
+            }
+        }
+        lemma_concat_word_valid(symw, wit_rest, gens.len());
+        //  value:  apply_embedding(gens, wit) = apply_embedding_symbol(gens, sym) + φ(wit_rest)
+        lemma_apply_embedding_concat(gens, symw, wit_rest);
+        reveal_with_fuel(apply_embedding, 2);
+        assert(symw.drop_first() =~= empty_word());
+        assert(apply_embedding(gens, symw) =~= apply_embedding_symbol(gens, sym));
+        //  apply_embedding_symbol(gens, sym) = first  (both Gen and Inv cases)
+        assert(apply_embedding_symbol(gens, sym) =~= first);
+        assert(concat_all(factors) =~= concat(first, concat_all(rest)));
+        wit
+    }
+}
+
+//  Membership form:  g ∈ ⟨gens⟩ ⟹ ∃ witness word `wit` with apply_embedding(gens, wit) ≡ g.
+pub proof fn lemma_subgroup_member_to_witness(p: Presentation, gens: Seq<Word>, w: Word) -> (wit: Word)
+    requires
+        in_generated_subgroup(p, gens, w),
+    ensures
+        word_valid(wit, gens.len()),
+        equiv_in_presentation(p, apply_embedding(gens, wit), w),
+{
+    let factors = choose|factors: Seq<Word>| #![trigger factors_from_generators(gens, factors)]
+        factors_from_generators(gens, factors) && equiv_in_presentation(p, concat_all(factors), w);
+    assert(factors_from_generators(gens, factors) && equiv_in_presentation(p, concat_all(factors), w));
+    let wit = lemma_factors_to_witness(gens, factors);
+    //  apply_embedding(gens, wit) =~= concat_all(factors) ≡ w
+    assert(apply_embedding(gens, wit) =~= concat_all(factors));
+    wit
+}
+
+//  ============================================================
 //  Move lemmas: slide a config word past an x/y power (index-shift, rearranged).
 //  ============================================================
 
