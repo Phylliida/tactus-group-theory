@@ -26,7 +26,8 @@ use crate::machine_group::{hnn_a_gens, hnn_b_gens, lemma_stable_conj_factorizati
     lemma_word_valid_mono};
 use crate::benign::{in_generated_subgroup, apply_embedding, lemma_apply_embedding_valid};
 use crate::ii_subset::{KPWord, kp_value, kp_pcount, is_kp_word, lemma_kp_value_cons};
-use crate::britton_via_tower::{is_stable, has_stable_letter};
+use crate::britton_via_tower::{is_stable, has_stable_letter, has_pinch_at, has_pinch,
+    has_adjacent_opposite_at};
 
 verus! {
 
@@ -433,6 +434,386 @@ pub proof fn lemma_base_word_no_stable(data: HNNData, w: Word)
     assert(generator_index(Symbol::Gen(ng)) == ng && generator_index(Symbol::Inv(ng)) == ng);
     assert forall|i: int| 0 <= i < w.len() implies !is_stable(data, #[trigger] w[i]) by {
         assert(symbol_valid(w[i], ng));   //  generator_index(w[i]) < ng ⟹ w[i] ∉ {Gen(ng), Inv(ng)}
+    }
+}
+
+//  ============================================================
+//  3c — the structural core: no-KP-pinch ⟹ no-raw-pinch.
+//  ============================================================
+//  W := kp_value(t, kp) is ALTERNATING: head and each syllable kᵢ are BASE words (kp_syllables_valid),
+//  so the only stable letters of W are the n separators p^{sᵢ}.  Hence a raw Britton pinch (two
+//  adjacent-opposite stable letters with a base-word middle) must land on two CONSECUTIVE separators
+//  whose middle is exactly a syllable kₘ — and the pinch condition on it is exactly kp_has_pinch_at(kp,m).
+//  Proven by head-peeling induction on kp.tail.  Modular helpers keep each Z3 context small.
+
+//  Per-index version of lemma_base_word_no_stable: a base word's k-th symbol is never stable.
+pub proof fn lemma_base_word_index_no_stable(data: HNNData, w: Word, k: int)
+    requires
+        word_valid(w, data.base.num_generators),
+        0 <= k < w.len(),
+    ensures
+        !is_stable(data, w[k]),
+{
+    let ng = data.base.num_generators;
+    assert(symbol_valid(w[k], ng));                  //  generator_index(w[k]) < ng
+    assert(generator_index(Symbol::Gen(ng)) == ng);
+    assert(generator_index(Symbol::Inv(ng)) == ng);  //  both stable symbols have index ng > index(w[k])
+}
+
+//  Subrange of a concatenation lying entirely in the right part shifts down by |pre|.
+pub proof fn lemma_word_subrange_concat_right(pre: Word, w2: Word, a: int, b: int)
+    requires
+        pre.len() <= a,
+        a <= b,
+        b <= pre.len() + w2.len(),
+    ensures
+        (pre + w2).subrange(a, b) =~= w2.subrange(a - pre.len() as int, b - pre.len() as int),
+{
+    let lhs = (pre + w2).subrange(a, b);
+    let rhs = w2.subrange(a - pre.len() as int, b - pre.len() as int);
+    assert(lhs.len() == rhs.len());
+    assert forall|k: int| 0 <= k < lhs.len() implies lhs[k] == rhs[k] by {
+        assert(lhs[k] == (pre + w2)[a + k]);
+        assert(a + k >= pre.len());
+        assert(a + k < (pre + w2).len());
+        assert((pre + w2)[a + k] == w2[a + k - pre.len() as int]);
+        assert(rhs[k] == w2[(a - pre.len() as int) + k]);
+    }
+}
+
+//  The pinch generator-lists (inline Seq::new in has_pinch_at) coincide with hnn_a_gens / hnn_b_gens.
+pub proof fn lemma_pinch_gens_eq(data: HNNData)
+    ensures
+        Seq::new(data.associations.len(), |k: int| data.associations[k].0) =~= hnn_a_gens(data),
+        Seq::new(data.associations.len(), |k: int| data.associations[k].1) =~= hnn_b_gens(data),
+{
+    assert(Seq::new(data.associations.len(), |k: int| data.associations[k].0) =~= hnn_a_gens(data));
+    assert(Seq::new(data.associations.len(), |k: int| data.associations[k].1) =~= hnn_b_gens(data));
+}
+
+//  First-stable structure of W = kp_value(t, kp) when the tail is non-empty:  the head occupies the
+//  initial |head| positions (all base/non-stable), and position |head| is the first separator p^{s₀}.
+pub proof fn lemma_kp_first_stable(data: HNNData, kp: KPWord)
+    requires
+        kp_syllables_valid(data, kp),
+        kp.tail.len() >= 1,
+    ensures
+        kp_value(stable_letter(data), kp).len() > kp.head.len(),
+        forall|k: int| 0 <= k < kp.head.len()
+            ==> !is_stable(data, #[trigger] kp_value(stable_letter(data), kp)[k]),
+        is_stable(data, kp_value(stable_letter(data), kp)[kp.head.len() as int]),
+        kp_value(stable_letter(data), kp)[kp.head.len() as int]
+            == (if kp.tail.first().0 { stable_letter(data) } else { inverse_symbol(stable_letter(data)) }),
+        kp_value(stable_letter(data), kp).subrange(0, kp.head.len() as int) =~= kp.head,
+{
+    let st = stable_letter(data);
+    let ng = data.base.num_generators;
+    let p_sym = if kp.tail.first().0 { st } else { inverse_symbol(st) };
+    let rest = KPWord { head: kp.tail.first().1, tail: kp.tail.drop_first() };
+    let Wp = kp_value(st, rest);
+    let W = kp_value(st, kp);
+    let pre = kp.head + seq![p_sym];
+    let H = kp.head.len() as int;
+    lemma_kp_value_cons(st, kp);
+    assert(W =~= pre + Wp);
+    assert(pre.len() == H + 1);
+    assert(W.len() == pre.len() + Wp.len());
+    assert(W.len() > H);
+    //  head positions are non-stable
+    assert forall|k: int| 0 <= k < H implies !is_stable(data, #[trigger] W[k]) by {
+        assert(W[k] == pre[k]);            //  k < H+1 = pre.len()
+        assert(pre[k] == kp.head[k]);      //  k < H = kp.head.len()
+        lemma_base_word_index_no_stable(data, kp.head, k);
+    }
+    //  position H is the first separator
+    assert(W[H] == pre[H]);                //  H < H+1
+    assert(H >= kp.head.len());
+    assert(pre[H] == seq![p_sym][0]);      //  H >= |head| ⟹ index into the [p_sym] tail of pre
+    assert(W[H] == p_sym);
+    assert(st == Symbol::Gen(ng) && inverse_symbol(st) == Symbol::Inv(ng));
+    assert(is_stable(data, p_sym));
+    //  prefix subrange == head
+    assert(W.subrange(0, H) =~= kp.head) by {
+        assert(W.subrange(0, H).len() == H);
+        assert forall|k: int| 0 <= k < H implies #[trigger] W.subrange(0, H)[k] == kp.head[k] by {
+            assert(W.subrange(0, H)[k] == W[k]);
+            assert(W[k] == pre[k]);
+            assert(pre[k] == kp.head[k]);
+        }
+    }
+}
+
+//  Case A of the head-peel: when the raw pinch's first stable letter IS the leading separator p^{s₀}
+//  (position |head|), the pinch is exactly kp_has_pinch_at(kp, 0) — its middle is the first syllable k₀.
+pub proof fn lemma_kp_pinch_case_a(data: HNNData, kp: KPWord, i: int, j: int)
+    requires
+        kp_syllables_valid(data, kp),
+        kp.tail.len() >= 1,
+        i == kp.head.len() as int,
+        has_pinch_at(data, kp_value(stable_letter(data), kp), i, j),
+    ensures
+        kp_has_pinch_at(data, kp, 0),
+{
+    let st = stable_letter(data);
+    let ng = data.base.num_generators;
+    let W = kp_value(st, kp);
+    let H = kp.head.len() as int;
+    let p_sym = if kp.tail.first().0 { st } else { inverse_symbol(st) };
+    let rest = KPWord { head: kp.tail.first().1, tail: kp.tail.drop_first() };
+    let Wp = kp_value(st, rest);
+    let pre = kp.head + seq![p_sym];
+    lemma_kp_value_cons(st, kp);
+    assert(W =~= pre + Wp);
+    assert(pre.len() == H + 1);
+    assert(W.len() == pre.len() + Wp.len());
+    //  surface the raw-pinch facts
+    assert(is_stable(data, W[i]) && is_stable(data, W[j]) && W[i] != W[j] && 0 <= i < j < W.len());
+    //  first separator: W[H] == p_sym, W[i] == p_sym
+    lemma_kp_first_stable(data, kp);
+    assert(kp.tail.first() == kp.tail[0]);
+    assert(W[i] == p_sym);
+    //  the second stable letter lives in Wp at jp
+    assert(j >= H + 1);
+    assert(j >= pre.len());
+    let jp = j - (H + 1);
+    assert(W[j] == Wp[jp]);
+    assert(jp >= 0 && jp < Wp.len());
+    assert(is_stable(data, Wp[jp]));
+    //  no stable strictly before jp in Wp (mapped from "no stable between i and j" in W)
+    assert forall|k2: int| 0 <= k2 < jp implies !is_stable(data, #[trigger] Wp[k2]) by {
+        assert(k2 + (H + 1) >= pre.len());
+        assert(k2 + (H + 1) < W.len());
+        assert(W[k2 + (H + 1)] == Wp[k2]);
+        assert(i < k2 + (H + 1) < j);          //  i == H
+    }
+    //  Wp must contain a separator ⟹ rest.tail is non-empty
+    if rest.tail.len() == 0 {
+        assert(Wp == rest.head);
+        lemma_base_word_index_no_stable(data, rest.head, jp);
+        assert(false);
+    }
+    assert(rest.tail.len() >= 1);
+    assert(rest.tail.len() == kp.tail.len() - 1);
+    assert(kp.tail.len() >= 2);
+    //  syllable-validity of rest
+    assert(kp_syllables_valid(data, rest)) by {
+        assert(kp.tail[0] == kp.tail.first());
+        assert(word_valid(rest.head, ng));
+        assert forall|t: int| 0 <= t < rest.tail.len()
+            implies word_valid(#[trigger] rest.tail[t].1, ng) by {
+            assert(rest.tail[t] == kp.tail[t + 1]);
+        }
+    }
+    //  first-stable of Wp pins jp == |rest.head|
+    lemma_kp_first_stable(data, rest);
+    let Hp = rest.head.len() as int;
+    if jp < Hp { assert(!is_stable(data, Wp[jp])); assert(false); }
+    if jp > Hp { assert(0 <= Hp < jp); assert(!is_stable(data, Wp[Hp])); assert(false); }
+    assert(jp == Hp);
+    //  second separator p^{s₁}
+    assert(rest.tail.first() == kp.tail[1]) by {
+        assert(rest.tail =~= kp.tail.drop_first());
+        assert(rest.tail.first() == kp.tail.drop_first()[0]);
+        assert(kp.tail.drop_first()[0] == kp.tail[1]);
+    }
+    let p1_sym = if kp.tail[1].0 { st } else { inverse_symbol(st) };
+    assert(Wp[Hp] == p1_sym);
+    assert(W[j] == p1_sym);
+    //  signs differ
+    assert(st == Symbol::Gen(ng) && inverse_symbol(st) == Symbol::Inv(ng));
+    assert(st != inverse_symbol(st));
+    assert(kp.tail[0].0 != kp.tail[1].0) by {
+        if kp.tail[0].0 == kp.tail[1].0 {
+            assert(p_sym == p1_sym);
+            assert(W[i] == W[j]);
+            assert(false);
+        }
+    }
+    //  middle == k₀ = kp.tail[0].1
+    lemma_word_subrange_concat_right(pre, Wp, i + 1, j);
+    assert(i + 1 - pre.len() == 0);
+    assert(j - pre.len() == jp);
+    assert((pre + Wp).subrange(i + 1, j) =~= Wp.subrange(0, jp));
+    assert(W.subrange(i + 1, j) =~= Wp.subrange(0, jp));
+    assert(Wp.subrange(0, jp) =~= rest.head);                  //  jp == Hp; first-stable(rest) prefix
+    assert(rest.head == kp.tail[0].1);
+    assert(W.subrange(i + 1, j) =~= kp.tail[0].1);
+    //  gens bridge
+    let a_gens = Seq::new(data.associations.len(), |k: int| data.associations[k].0);
+    let b_gens = Seq::new(data.associations.len(), |k: int| data.associations[k].1);
+    lemma_pinch_gens_eq(data);
+    assert(a_gens == hnn_a_gens(data));
+    assert(b_gens == hnn_b_gens(data));
+    //  conclude kp_has_pinch_at(kp, 0)
+    assert(kp_has_pinch_at(data, kp, 0)) by {
+        assert(0 + 1 < kp.tail.len());
+        assert(kp.tail[0].0 != kp.tail[1].0);
+        if kp.tail[0].0 == false {
+            assert(W[i] == Symbol::Inv(ng));               //  p_sym == inverse_symbol(st) == Inv(ng)
+            assert(in_generated_subgroup(data.base, a_gens, W.subrange(i + 1, j)));
+            assert(W.subrange(i + 1, j) == kp.tail[0].1);
+            assert(in_generated_subgroup(data.base, hnn_a_gens(data), kp.tail[0].1));
+        }
+        if kp.tail[0].0 == true {
+            assert(W[i] == Symbol::Gen(ng));               //  p_sym == st == Gen(ng)
+            assert(in_generated_subgroup(data.base, b_gens, W.subrange(i + 1, j)));
+            assert(W.subrange(i + 1, j) == kp.tail[0].1);
+            assert(in_generated_subgroup(data.base, hnn_b_gens(data), kp.tail[0].1));
+        }
+    }
+}
+
+//  Case B of the head-peel: when the raw pinch lies strictly past the leading separator, it is a raw
+//  pinch of the peeled word Wp = kp_value(t, rest), shifted down by |head|+1.
+pub proof fn lemma_kp_pinch_transfer_tail(data: HNNData, kp: KPWord, i: int, j: int)
+    requires
+        kp_syllables_valid(data, kp),
+        kp.tail.len() >= 1,
+        i > kp.head.len() as int,
+        has_pinch_at(data, kp_value(stable_letter(data), kp), i, j),
+    ensures
+        has_pinch_at(data, kp_value(stable_letter(data),
+            KPWord { head: kp.tail.first().1, tail: kp.tail.drop_first() }),
+            i - (kp.head.len() as int + 1), j - (kp.head.len() as int + 1)),
+{
+    let st = stable_letter(data);
+    let W = kp_value(st, kp);
+    let H = kp.head.len() as int;
+    let p_sym = if kp.tail.first().0 { st } else { inverse_symbol(st) };
+    let rest = KPWord { head: kp.tail.first().1, tail: kp.tail.drop_first() };
+    let Wp = kp_value(st, rest);
+    let pre = kp.head + seq![p_sym];
+    lemma_kp_value_cons(st, kp);
+    assert(W =~= pre + Wp);
+    assert(pre.len() == H + 1);
+    assert(W.len() == pre.len() + Wp.len());
+    let ip = i - (H + 1);
+    let jp = j - (H + 1);
+    assert(is_stable(data, W[i]) && is_stable(data, W[j]) && W[i] != W[j] && 0 <= i < j < W.len());
+    assert(i >= H + 1 && i >= pre.len() && j >= pre.len());
+    assert(ip >= 0 && ip < jp && jp < Wp.len());
+    assert(W[i] == Wp[ip]);
+    assert(W[j] == Wp[jp]);
+    //  no stable strictly between ip and jp in Wp
+    assert forall|k2: int| ip < k2 < jp implies !is_stable(data, #[trigger] Wp[k2]) by {
+        assert(k2 + (H + 1) >= pre.len());
+        assert(k2 + (H + 1) < W.len());
+        assert(W[k2 + (H + 1)] == Wp[k2]);
+        assert(i < k2 + (H + 1) < j);
+    }
+    //  middle subrange is preserved (shifted)
+    lemma_word_subrange_concat_right(pre, Wp, i + 1, j);
+    assert(i + 1 - pre.len() == ip + 1);
+    assert(j - pre.len() == jp);
+    assert((pre + Wp).subrange(i + 1, j) =~= Wp.subrange(ip + 1, jp));
+    assert(W.subrange(i + 1, j) =~= Wp.subrange(ip + 1, jp));
+    //  assemble has_pinch_at(Wp, ip, jp): symbols and middle (and the inline gen-lists) all match W's
+    assert(has_pinch_at(data, Wp, ip, jp)) by {
+        assert(0 <= ip < jp < Wp.len());
+        assert(is_stable(data, Wp[ip]) && is_stable(data, Wp[jp]) && Wp[ip] != Wp[jp]);
+        assert(Wp.subrange(ip + 1, jp) == W.subrange(i + 1, j));
+    }
+}
+
+//  Index-shift for KP-pinches under head-peeling:  a KP-pinch of rest at m is a KP-pinch of kp at m+1.
+pub proof fn lemma_kp_pinch_lift(data: HNNData, kp: KPWord, m: int)
+    requires
+        kp.tail.len() >= 1,
+        kp_has_pinch_at(data, KPWord { head: kp.tail.first().1, tail: kp.tail.drop_first() }, m),
+    ensures
+        kp_has_pinch_at(data, kp, m + 1),
+{
+    let rest = KPWord { head: kp.tail.first().1, tail: kp.tail.drop_first() };
+    assert(rest.tail =~= kp.tail.drop_first());
+    assert(rest.tail.len() == kp.tail.len() - 1);
+    assert(rest.tail[m] == kp.tail[m + 1]) by {
+        assert(rest.tail[m] == kp.tail.drop_first()[m]);
+        assert(kp.tail.drop_first()[m] == kp.tail[m + 1]);
+    }
+    assert(rest.tail[m + 1] == kp.tail[m + 2]) by {
+        assert(rest.tail[m + 1] == kp.tail.drop_first()[m + 1]);
+        assert(kp.tail.drop_first()[m + 1] == kp.tail[m + 2]);
+    }
+    assert(kp_has_pinch_at(data, kp, m + 1)) by {
+        assert(0 <= m + 1);
+        assert((m + 1) + 1 < kp.tail.len());
+        assert(kp.tail[m + 1].0 == rest.tail[m].0 && kp.tail[m + 1].1 == rest.tail[m].1);
+        assert(kp.tail[m + 2].0 == rest.tail[m + 1].0);
+    }
+}
+
+//  The structural core (3c, witness form):  a raw pinch of W = kp_value(t, kp) yields a KP-pinch of kp.
+pub proof fn lemma_kp_raw_pinch_gives_kp_pinch(data: HNNData, kp: KPWord, i: int, j: int) -> (m: int)
+    requires
+        kp_syllables_valid(data, kp),
+        has_pinch_at(data, kp_value(stable_letter(data), kp), i, j),
+    ensures
+        kp_has_pinch_at(data, kp, m),
+    decreases kp.tail.len(),
+{
+    let st = stable_letter(data);
+    let W = kp_value(st, kp);
+    let H = kp.head.len() as int;
+    if kp.tail.len() == 0 {
+        //  W = head, a base word ⟹ no stable letters ⟹ the pinch is impossible.
+        assert(W == kp.head);
+        assert(0 <= i < j < W.len());
+        lemma_base_word_index_no_stable(data, kp.head, i);
+        assert(is_stable(data, W[i]));
+        assert(false);
+        0
+    } else {
+        lemma_kp_first_stable(data, kp);
+        //  i >= H: positions before H are non-stable, but W[i] is stable
+        if i < H {
+            assert(0 <= i < H);
+            assert(!is_stable(data, W[i]));
+            assert(is_stable(data, W[i]));
+            assert(false);
+        }
+        assert(i >= H);
+        if i == H {
+            lemma_kp_pinch_case_a(data, kp, i, j);
+            0
+        } else {
+            assert(i > H);
+            let rest = KPWord { head: kp.tail.first().1, tail: kp.tail.drop_first() };
+            lemma_kp_pinch_transfer_tail(data, kp, i, j);
+            assert(kp_syllables_valid(data, rest)) by {
+                let ng = data.base.num_generators;
+                assert(kp.tail[0] == kp.tail.first());
+                assert(word_valid(rest.head, ng));
+                assert forall|t: int| 0 <= t < rest.tail.len()
+                    implies word_valid(#[trigger] rest.tail[t].1, ng) by {
+                    assert(rest.tail[t] == kp.tail[t + 1]);
+                }
+            }
+            assert(rest.tail.len() < kp.tail.len());
+            let mp = lemma_kp_raw_pinch_gives_kp_pinch(data, rest, i - (H + 1), j - (H + 1));
+            lemma_kp_pinch_lift(data, kp, mp);
+            mp + 1
+        }
+    }
+}
+
+//  3c (the headline):  a KP-pinch-free KP-word with base-word syllables has a RAW-pinch-free value —
+//  exactly what britton_lemma_full needs (the design's flagged "no KP-pinch ⟹ no raw-pinch").
+pub proof fn lemma_kp_no_raw_pinch(data: HNNData, kp: KPWord)
+    requires
+        kp_syllables_valid(data, kp),
+        kp_pinch_free(data, kp),
+    ensures
+        !has_pinch(data, kp_value(stable_letter(data), kp)),
+{
+    let st = stable_letter(data);
+    let W = kp_value(st, kp);
+    if has_pinch(data, W) {
+        let ij = choose|i: int, j: int| has_pinch_at(data, W, i, j);
+        assert(has_pinch_at(data, W, ij.0, ij.1));
+        let m = lemma_kp_raw_pinch_gives_kp_pinch(data, kp, ij.0, ij.1);
+        assert(kp_has_pinch_at(data, kp, m));
+        assert(!kp_has_pinch_at(data, kp, m));   //  from kp_pinch_free
+        assert(false);
     }
 }
 
