@@ -5,7 +5,8 @@ use crate::presentation::*;
 use crate::presentation_lemmas::*;
 use crate::machine_group::*;
 use crate::benign::{in_generated_subgroup, factors_from_generators, is_generator_or_inverse, concat_all};
-use crate::benign::{apply_embedding, lemma_apply_embedding_concat, lemma_identity_in_generated_subgroup};
+use crate::benign::{apply_embedding, lemma_apply_embedding_concat, lemma_identity_in_generated_subgroup,
+    lemma_generator_in_generated_subgroup};
 
 verus! {
 
@@ -417,6 +418,107 @@ pub proof fn lemma_spow_int_mult_in_G(gens: Seq<Word>, gi: nat, m: int, k: int)
         assert((-k) * m == -(k * m)) by(nonlinear_arith);   //  pure distribution
         assert(-(nn * m) == k * m);                         //  chain ⟹ exponents match
     }
+}
+
+//  ============================================================
+//  (ii)⊇ core:  a residue config word t(r,s) (r≡i, s≡j mod m) lies in ⟨t(i,j),xᵐ,yᵐ⟩.
+//  ============================================================
+//  Build t(r,s) ≡ x^{-(r-i)}·y^{-(s-j)}·t(i,j)·y^{s-j}·x^{r-i} (two conjugations), each factor in
+//  ⟨gens⟩: t(i,j)=gens[0]; the conjugating powers are m-multiples (r-i, s-j ≡ 0 mod m) handled by
+//  the power infra; then product closure + respects_equiv.
+
+//  x % m == 0 (m > 0) ⟹ x == (x/m)·m.  (Lean int div-mod: m·(x/m) + x%m = x.)
+pub proof fn lemma_exact_div(x: int, m: int)
+    requires
+        m > 0,
+        x % m == 0,
+    ensures
+        x == (x / m) * m
+by {
+    have h1 := Int.ediv_add_emod x m
+    have h2 := Int.mul_comm (x / m) m
+    omega
+}
+
+pub proof fn lemma_config_signed_in_G(i: nat, j: nat, m: nat, r: int, s: int)
+    requires
+        m > 0,
+        (r - i) % (m as int) == 0,
+        (s - j) % (m as int) == 0,
+    ensures
+        in_generated_subgroup(base_A(),
+            seq![config_word(i, j), signed_power(1, m as int), signed_power(2, m as int)],
+            config_word_signed(r, s)),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let mm = m as int;
+    let gens = seq![config_word(i, j), signed_power(1, mm), signed_power(2, mm)];
+    let dx = r - i as int;
+    let dy = s - j as int;
+    //  --- the three generators + the two inverse powers are in ⟨gens⟩ ---
+    lemma_generator_in_generated_subgroup(p, gens, 0);      //  config_word(i,j) = gens[0]
+    lemma_generator_in_generated_subgroup(p, gens, 1);      //  x^m = gens[1]
+    lemma_generator_in_generated_subgroup(p, gens, 2);      //  y^m = gens[2]
+    assert(gens[0] == config_word(i, j));
+    assert(gens[1] == signed_power(1, mm));
+    assert(gens[2] == signed_power(2, mm));
+    lemma_signed_power_inverse(1, mm);                      //  inverse_word(x^m) =~= x^{-m}
+    lemma_signed_power_inverse(2, mm);
+    assert(is_generator_or_inverse(gens, signed_power(1, -mm))) by {
+        assert(signed_power(1, -mm) =~= inverse_word(gens[1]));
+    }
+    lemma_gen_or_inv_in_subgroup(gens, signed_power(1, -mm));
+    assert(is_generator_or_inverse(gens, signed_power(2, -mm))) by {
+        assert(signed_power(2, -mm) =~= inverse_word(gens[2]));
+    }
+    lemma_gen_or_inv_in_subgroup(gens, signed_power(2, -mm));
+    //  --- the conjugating powers x^{±dx}, y^{±dy} are m-multiples, hence in ⟨gens⟩ ---
+    let dr = dx / mm;
+    let ds = dy / mm;
+    lemma_exact_div(dx, mm);                                //  dx == dr·mm
+    lemma_exact_div(dy, mm);                                //  dy == ds·mm
+    assert(dr * mm == dx);
+    assert(ds * mm == dy);
+    assert((-dr) * mm == -(dr * mm)) by(nonlinear_arith);   //  pure distribution
+    assert((-ds) * mm == -(ds * mm)) by(nonlinear_arith);
+    assert((-dr) * mm == -dx);                              //  chain with dr·mm == dx
+    assert((-ds) * mm == -dy);
+    lemma_spow_int_mult_in_G(gens, 1, mm, dr);             //  x^{dr·mm} = x^{dx} ∈ G
+    lemma_spow_int_mult_in_G(gens, 1, mm, -dr);            //  x^{-dx} ∈ G
+    lemma_spow_int_mult_in_G(gens, 2, mm, ds);            //  y^{dy} ∈ G
+    lemma_spow_int_mult_in_G(gens, 2, mm, -ds);           //  y^{-dy} ∈ G
+    let xnd = signed_power(1, -dx);
+    let xpd = signed_power(1, dx);
+    let ynd = signed_power(2, -dy);
+    let ypd = signed_power(2, dy);
+    let t0 = config_word_signed(i as int, j as int);
+    let tis = config_word_signed(i as int, s);
+    //  t0 = config_word_signed(i,j) =~= config_word(i,j) = gens[0] ∈ G
+    lemma_config_signed_matches_nat(i, j);
+    assert(t0 =~= gens[0]);
+    //  --- membership of CONJ = xnd · (ynd · t0 · ypd) · xpd ---
+    let mid = ynd + t0 + ypd;
+    lemma_product_in_subgroup(p, gens, ynd, t0);
+    lemma_product_in_subgroup(p, gens, ynd + t0, ypd);     //  mid ∈ G
+    lemma_product_in_subgroup(p, gens, xnd, mid);
+    let conj = xnd + mid + xpd;
+    lemma_product_in_subgroup(p, gens, xnd + mid, xpd);    //  conj ∈ G
+    //  --- conj ≡ config_word_signed(r,s) ---
+    //  inner:  mid ≡ t(i, j+dy) = tis  (by_y)
+    lemma_conj_config_signed_by_y(i as int, j as int, dy);
+    assert((j as int) + dy == s);
+    assert(equiv_in_presentation(p, mid, tis));
+    //  congruence:  xnd · mid · xpd ≡ xnd · tis · xpd
+    lemma_equiv_concat_right(p, xnd, mid, tis);            //  xnd·mid ≡ xnd·tis
+    lemma_equiv_concat_left(p, xnd + mid, xnd + tis, xpd); //  (xnd·mid)·xpd ≡ (xnd·tis)·xpd
+    //  outer:  xnd · tis · xpd ≡ t(i+dx, s) = t(r,s)  (by_x)
+    lemma_conj_config_signed_by_x(i as int, s, dx);
+    assert((i as int) + dx == r);
+    assert(equiv_in_presentation(p, xnd + tis + xpd, config_word_signed(r, s)));
+    lemma_equiv_transitive(p, conj, xnd + tis + xpd, config_word_signed(r, s));
+    //  conj ∈ G ∧ conj ≡ t(r,s) ⟹ t(r,s) ∈ G
+    lemma_in_subgroup_respects_equiv(p, gens, conj, config_word_signed(r, s));
 }
 
 //  ============================================================
