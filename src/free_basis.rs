@@ -638,4 +638,119 @@ pub proof fn lemma_config_emb_eq_canw(alphas: Seq<nat>, w: Word)
     }
 }
 
+// ============================================================================
+// F2c — From CanonLetter triviality to free-group triviality.
+//
+// `cw_reduce` (Layer 1's CanonLetter reduction) merges adjacent equal-coordinate
+// letters by SUMMING exponents and drops zero-exponent letters. When the alphas
+// are DISTINCT, "same coordinate (α_i, 0)" ⟺ "same free generator x_i", so the
+// CanonLetter reduction simulates free-group reduction. We make this precise by
+// SPELLING a reduced CanonLetter sequence back into a free word (`canon_to_free`)
+// and proving the invariant
+//   `w ≡_{free_group(k)}  canon_to_free(cw_reduce(w_to_canon(alphas, w)))`.
+// Hence `cw_reduce(canon) = []` (Layer-1 triviality) forces `w ≡_free ε`.
+// The single-generator power algebra is `lemma_signed_power_add` (machine_group).
+// ============================================================================
+
+/// The index of value `r` among `alphas` (the unique `j` with `alphas[j] = r`,
+/// when present; arbitrary otherwise).
+pub open spec fn alpha_index(alphas: Seq<nat>, r: int) -> nat {
+    (choose|j: int| 0 <= j < alphas.len() && alphas[j] as int == r) as nat
+}
+
+/// One reduced CanonLetter `{r, 0, e}` spelled as the free word `x_{idx(r)}^e`.
+pub open spec fn canl_to_free(alphas: Seq<nat>, c: CanonLetter) -> Word {
+    signed_power(alpha_index(alphas, c.r), c.e)
+}
+
+/// A reduced CanonLetter sequence spelled as a free word.
+pub open spec fn canon_to_free(alphas: Seq<nat>, red: Seq<CanonLetter>) -> Word
+    decreases red.len(),
+{
+    if red.len() == 0 {
+        empty_word()
+    } else {
+        canl_to_free(alphas, red[0]) + canon_to_free(alphas, red.drop_first())
+    }
+}
+
+/// A CanonLetter at `s = 0` whose coordinate `r` is one of the `alphas`.
+pub open spec fn canl_in_alphas(alphas: Seq<nat>, c: CanonLetter) -> bool {
+    c.s == 0 && (exists|i: int| 0 <= i < alphas.len() && alphas[i] as int == c.r)
+}
+
+/// Every letter of `red` is an `alphas`-coordinate at `s = 0`.
+pub open spec fn canon_in_alphas(alphas: Seq<nat>, red: Seq<CanonLetter>) -> bool {
+    forall|j: int| 0 <= j < red.len() ==> canl_in_alphas(alphas, #[trigger] red[j])
+}
+
+/// `alpha_index` lands in range and hits `r` whenever `r` is present.
+pub proof fn lemma_alpha_index_spec(alphas: Seq<nat>, r: int)
+    requires exists|i: int| 0 <= i < alphas.len() && alphas[i] as int == r,
+    ensures
+        alpha_index(alphas, r) < alphas.len(),
+        alphas[alpha_index(alphas, r) as int] as int == r,
+{
+    // the choose witness satisfies its predicate
+}
+
+/// With distinct alphas, `alpha_index(alphas[i]) = i`.
+pub proof fn lemma_alpha_index_at(alphas: Seq<nat>, i: int)
+    requires 0 <= i < alphas.len(), alphas.no_duplicates(),
+    ensures alpha_index(alphas, alphas[i] as int) == i,
+{
+    assert(0 <= i < alphas.len() && alphas[i] as int == alphas[i] as int);
+    lemma_alpha_index_spec(alphas, alphas[i] as int);
+    let j = alpha_index(alphas, alphas[i] as int) as int;
+    assert(alphas[j] == alphas[i]);    // both as-int equal to alphas[i] as int
+    // no_duplicates: j != i ⟹ alphas[j] != alphas[i]; contrapositive gives j == i.
+    assert(j == i);
+}
+
+/// A `w`-symbol round-trips: `canl_to_free(sym_to_canl(s)) = [s]` (distinct alphas).
+pub proof fn lemma_sym_to_canl_free(alphas: Seq<nat>, s: Symbol)
+    requires symbol_valid(s, alphas.len()), alphas.no_duplicates(),
+    ensures canl_to_free(alphas, sym_to_canl(alphas, s)) =~= seq![s],
+{
+    match s {
+        Symbol::Gen(i) => {
+            assert(i < alphas.len());
+            lemma_alpha_index_at(alphas, i as int);
+            // canl_to_free = signed_power(i, 1) = symbol_power(Gen(i),1) = [Gen(i)]
+            lemma_symbol_power_one(Symbol::Gen(i));
+        },
+        Symbol::Inv(i) => {
+            assert(i < alphas.len());
+            lemma_alpha_index_at(alphas, i as int);
+            // canl_to_free = signed_power(i, -1) = symbol_power(Inv(i),1) = [Inv(i)]
+            lemma_symbol_power_one(Symbol::Inv(i));
+        },
+    }
+}
+
+/// `canon_to_free(red)` is a valid free word over `k = alphas.len()` generators.
+pub proof fn lemma_canon_to_free_valid(alphas: Seq<nat>, red: Seq<CanonLetter>)
+    requires canon_in_alphas(alphas, red),
+    ensures word_valid(canon_to_free(alphas, red), alphas.len()),
+    decreases red.len(),
+{
+    let k = alphas.len();
+    if red.len() == 0 {
+        assert(canon_to_free(alphas, red) =~= empty_word());
+    } else {
+        assert(canl_in_alphas(alphas, red[0]));
+        lemma_alpha_index_spec(alphas, red[0].r);
+        lemma_signed_power_valid(alpha_index(alphas, red[0].r), red[0].e, k);
+        assert(canon_in_alphas(alphas, red.drop_first())) by {
+            assert forall|j: int| 0 <= j < red.drop_first().len()
+                implies canl_in_alphas(alphas, #[trigger] red.drop_first()[j]) by {
+                assert(red.drop_first()[j] == red[j + 1]);
+            }
+        }
+        lemma_canon_to_free_valid(alphas, red.drop_first());
+        lemma_concat_word_valid(canl_to_free(alphas, red[0]),
+            canon_to_free(alphas, red.drop_first()), k);
+    }
+}
+
 } // verus!
