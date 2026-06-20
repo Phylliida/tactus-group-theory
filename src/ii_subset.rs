@@ -334,6 +334,92 @@ pub proof fn lemma_pred_subgroup_in_generated(
 }
 
 //  ============================================================
+//  (ii)⊇ powers:  m-multiple signed powers of a base generator lie in ⟨gens⟩.
+//  ============================================================
+//  Given xᵐ (= signed_power(gi, m)) and x⁻ᵐ in ⟨gens⟩, every x^{k·m} is too — built by peeling one
+//  ±m at a time with lemma_signed_power_add + product closure.  Used to place the conjugating powers
+//  x^{±(r-i)}, y^{±(s-j)} (r≡i, s≡j mod m ⟹ multiples of m) into ⟨t(i,j),xᵐ,yᵐ⟩.
+
+//  is_generator_or_inverse ⟹ in_generated_subgroup (the n=1 case of word_power closure).
+pub proof fn lemma_gen_or_inv_in_subgroup(gens: Seq<Word>, w: Word)
+    requires
+        is_generator_or_inverse(gens, w),
+    ensures
+        in_generated_subgroup(base_A(), gens, w),
+{
+    lemma_word_power_in_subgroup(base_A(), gens, w, 1);
+    assert(word_power(w, 0) =~= empty_word());
+    assert(word_power(w, 1) =~= w);                          //  w + ε
+}
+
+//  signed_power(gi, n·m) ∈ ⟨gens⟩, for n: nat (peel +m).
+pub proof fn lemma_spow_pos_mult_in_G(gens: Seq<Word>, gi: nat, m: int, n: nat)
+    requires
+        in_generated_subgroup(base_A(), gens, signed_power(gi, m)),
+    ensures
+        in_generated_subgroup(base_A(), gens, signed_power(gi, n * m)),
+    decreases n,
+{
+    let p = base_A();
+    if n == 0 {
+        lemma_identity_in_generated_subgroup(p, gens);
+        assert(signed_power(gi, 0) =~= empty_word());
+        assert((n * m) == 0);
+    } else {
+        lemma_spow_pos_mult_in_G(gens, gi, m, (n - 1) as nat);   //  signed_power(gi, (n-1)·m) ∈ G
+        lemma_signed_power_add(p, gi, (n - 1) as int * m, m);    //  x^{(n-1)m}·x^m ≡ x^{(n-1)m+m}
+        lemma_product_in_subgroup(p, gens, signed_power(gi, (n - 1) as int * m), signed_power(gi, m));
+        assert((n - 1) as int * m + m == n * m) by(nonlinear_arith);
+        lemma_in_subgroup_respects_equiv(p, gens,
+            signed_power(gi, (n - 1) as int * m) + signed_power(gi, m), signed_power(gi, n * m));
+    }
+}
+
+//  signed_power(gi, -(n·m)) ∈ ⟨gens⟩, for n: nat (peel -m).
+pub proof fn lemma_spow_neg_mult_in_G(gens: Seq<Word>, gi: nat, m: int, n: nat)
+    requires
+        in_generated_subgroup(base_A(), gens, signed_power(gi, -m)),
+    ensures
+        in_generated_subgroup(base_A(), gens, signed_power(gi, -(n * m))),
+    decreases n,
+{
+    let p = base_A();
+    if n == 0 {
+        lemma_identity_in_generated_subgroup(p, gens);
+        assert(signed_power(gi, 0) =~= empty_word());
+        assert(-(n * m) == 0);
+    } else {
+        lemma_spow_neg_mult_in_G(gens, gi, m, (n - 1) as nat);   //  signed_power(gi, -((n-1)·m)) ∈ G
+        lemma_signed_power_add(p, gi, -((n - 1) as int * m), -m); //  x^{-(n-1)m}·x^{-m} ≡ x^{-(n-1)m-m}
+        lemma_product_in_subgroup(p, gens, signed_power(gi, -((n - 1) as int * m)), signed_power(gi, -m));
+        assert(-((n - 1) as int * m) + -m == -(n * m)) by(nonlinear_arith);
+        lemma_in_subgroup_respects_equiv(p, gens,
+            signed_power(gi, -((n - 1) as int * m)) + signed_power(gi, -m), signed_power(gi, -(n * m)));
+    }
+}
+
+//  signed_power(gi, k·m) ∈ ⟨gens⟩ for any integer k (given both ±m in ⟨gens⟩).
+pub proof fn lemma_spow_int_mult_in_G(gens: Seq<Word>, gi: nat, m: int, k: int)
+    requires
+        in_generated_subgroup(base_A(), gens, signed_power(gi, m)),
+        in_generated_subgroup(base_A(), gens, signed_power(gi, -m)),
+    ensures
+        in_generated_subgroup(base_A(), gens, signed_power(gi, k * m)),
+{
+    if k >= 0 {
+        lemma_spow_pos_mult_in_G(gens, gi, m, k as nat);
+        assert((k as nat) * m == k * m);
+    } else {
+        let nn = (-k) as nat;
+        assert(nn as int == -k);                            //  k < 0 ⟹ -k > 0 (cast identity)
+        lemma_spow_neg_mult_in_G(gens, gi, m, nn);          //  signed_power(gi, -(nn·m)) ∈ G
+        assert((nn as int) * m == (-k) * m);                //  congruence from nn as int == -k
+        assert((-k) * m == -(k * m)) by(nonlinear_arith);   //  pure distribution
+        assert(-(nn * m) == k * m);                         //  chain ⟹ exponents match
+    }
+}
+
+//  ============================================================
 //  Property (vii), the easy half:  every H₀ config word is in ⟨t, rᵢ, lⱼ⟩.
 //  ============================================================
 //  Composes brick-19 (reaches ⟹ k-commutes) with E1 (k-commutes ⟹ subgroup membership).
