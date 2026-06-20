@@ -20,32 +20,65 @@ Take the modular machine `M` (and modulus `m`) so that:
 
 ## The HNN tower (book p.280–281), ending in the f.p. group H₃
 
-Write `t_α := t(α,0)` (Layer-1 config word). `{t_α : α∈I}` freely generate.
+> **VERIFIED TRANSCRIPTION (book p.279–281, scans read 2026-06-20).** The earlier draft of this
+> section had two errors, now corrected: H₁ is a **free product** (not a direct product) and its
+> middle factor carries `C`; and `A₋` uses `b_j c_j` (not `b_j`). Exact relators below.
 
-1. **`H₁ = K_M × ⟨b₁,…,bₙ⟩ × ⟨d⟩`** (direct product; `b_{n+i}=b_i⁻¹`).
-   `{ t_α w_α(b) d : α∈I }` is a free basis of the subgroup it generates (Prop 1.8 Cor 1).
-2. **`H₂ = ⟨ H₁, p | p⁻¹ t_α p = t_α w_α(b) d,  all α∈I ⟩`** — HNN, stable letter `p`.
-   **`C` embeds in `H₂`** (via `c_j ↦ b_j`-ish; the `S`-relators become derivable).
-   The single "schematic" relation is `p⁻¹ t p = t d`; the family over `α∈I` follows.
-3. Subgroups for the next HNN (book p.280):
+Write `t_α := t(α,0)` (Layer-1 config word, `config_word(α,0)`). `{t_α : α∈I}` freely generate
+(Layer-1 property (i)). `b_{n+i} := b_i⁻¹`.
+
+1. **`H₁ = K_M ∗ (C × ⟨b₁,…,bₙ⟩) ∗ ⟨d⟩`** — a **FREE product** of three factors:
+   - `K_M` = the Layer-1 machine group `G(M)`;
+   - `C × ⟨b₁,…,bₙ⟩` = the **direct** product of `C=⟨c₁,…,cₙ;S⟩` with the free group on the `b_j`
+     (so `c_i b_j = b_j c_i`, i.e. relation `b_i c_j = c_j b_i`); **this is where `C` lives**;
+   - `⟨d⟩` = infinite cyclic.
+
+   Mapping `H₁ → K_M` (identity on `K_M`, kill all other gens) and Cor 1 to Prop 1.8 ⟹
+   `{ t_α w_α(b) d : α∈I }` is a **free basis** of the subgroup it generates.
+2. **`H₂ = ⟨ H₁, p ∣ p⁻¹ t_α p = t_α w_α(b) d,  all α∈I ⟩`** — HNN, stable letter `p`.
+   **`C ⊆ H₂`** (already `C ⊆ H₁`). The single "schematic" relation noted for later is
+   `p⁻¹ t p = t d` (`α=0`: `t_0=t`, `w_0(b)=1`).
+   `A := ⟨t, x, d, b_j (1≤j≤n), p⟩` is the HNN extension of free `F=⟨t,x,d,b_j (1≤j≤n)⟩` by `p`
+   with those relations restricted to `α∈I` — i.e. `A` is itself the relevant `p`-HNN piece.
+3. Subgroups for the top HNN (book p.280), all of `H₂`:
    - `A   = ⟨ t, x, d, b_j (1≤j≤n), p ⟩`
-   - `A_i = ⟨ t_i, xᵐ, b_i d, b_j (1≤j≤n), p ⟩`   (for 1≤i≤2n)
-   - `A₊ = ⟨ U, d, b_j, p ⟩`, `A₋ = ⟨ U, d, b_j, p ⟩` where **`U = { t, all r-symbols, all l-symbols }`**
-     (`U ⊆ K_M`; `⟨U⟩∩K_M = ⟨t_α : (α,0)∈H₀(M)⟩` = the faithfulness fact from Layer 1).
-4. **`H₃ = ⟨ H₂, a_i (1≤i≤2n), k | a_i: A ↔ A_i,  k: A₊ ↔ A₋ ⟩`** — HNN, stable letters `a_i, k`.
-   **`H₃` contains `C` and is FINITELY PRESENTED.**
+   - `A_i = ⟨ t_i, xᵐ, b_i d, b_j (1≤j≤n), p ⟩`   (for `1≤i≤2n`)
+   - `A₊ = ⟨ U, d, b_j (1≤j≤n), p ⟩`
+   - `A₋ = ⟨ U, d, b_j c_j (1≤j≤n), p ⟩`   ← **`b_j c_j`, the only difference from `A₊`**
+   - `U = { t } ∪ { all r-symbols } ∪ { all l-symbols }` ⊆ `K_M` (= Layer-1 `g_subgens`).
+     Faithfulness fact (Layer 1): `⟨U⟩ ∩ ⟨t_α : α∈I⟩ = ⟨t_α : α∈I, (α,0)∈H₀(M)⟩`
+     — i.e. `t_α ∈ ⟨U⟩  ⟺  (α,0)∈H₀(M)` (this is `in_TM` / Theorem 1's `(vi)/(vii)`).
+   - **Isomorphism `A → A_i`** (stated gens ↦ stated gens): `t↦t_i, x↦xᵐ, d↦b_i d, b_j↦b_j, p↦p`.
+     Well-defined because `A`,`A_i` are HNN extensions of free groups on the stated generators with
+     "the same" `p`-relations (uses `w_{αm+i}(b)=w_α(b) b_i`).
+   - **Isomorphism `A₊ → A₋`** (stated gens ↦ stated gens): `U↦U (pointwise), d↦d, b_j↦b_j c_j, p↦p`.
+     Inverse comes from the endomorphism of `H₂` killing every `c_j` (maps `A₋ → A₊`).
+4. **`H₃ = ⟨ H₂, a_i (1≤i≤2n), k ∣ a_i: A ↔ A_i,  k: A₊ ↔ A₋ ⟩`** — HNN, stable letters `a_i, k`.
+   I.e. `a_i⁻¹ g a_i = φ_i(g)` for the stated gens `g` of `A` (`φ_i = A→A_i` iso); `k⁻¹ h k = ψ(h)`
+   for stated gens `h` of `A₊` (`ψ = A₊→A₋` iso). **`H₃ ⊇ C` and is FINITELY PRESENTED.**
 
 **The finite presentation `H₃` — relation set (I), book p.281 (the payoff):**
-- the finitely many **relations of `K_M`** (Layer 1: A-relations `xy=yx`, the `r_i`/`l_j` HNN
-  relations, `k'` commutations — see Layer-1 doc);
-- `b_i c_j = c_j b_i` for `1≤i,j≤n`;
-- `p⁻¹ t p = t d`;
-- the finitely many HNN relations for the stable letters `a_i, k` of `H₃` (the `A↔A_i`, `A₊↔A₋`
-  associations above).
+- **(I)** (FINITE):
+  - the finitely many **relations of `K_M`** (Layer 1: `A`-relation `xy=yx`, the `r_i`/`l_j` HNN
+    relations, `k'`(=Layer-1 `k`) commutations — see `aanderaa-cohen-construction.md`);
+  - `b_i c_j = c_j b_i` for `1≤i,j≤n`;
+  - the single relation `p⁻¹ t p = t d`;
+  - the finitely many HNN relations for `H₃`'s stable letters `a_i, k`: the `a_i: A↔A_i` and
+    `k: A₊↔A₋` associations (each stated-gen ↦ stated-gen rule above).
+- **(II)** (infinite) `p⁻¹ t_α p = t_α w_α(b) d`, all `α∈I`, `α≠0`.
+- **(III)** (infinite) `w_α(c) = 1`, all `α∈I` with `(α,0)∈H₀(M)`.
 
-Cohen proves the infinite families **(II)** `p⁻¹ t_α p = t_α w_α(b) d` and **(III)** `w_α(c)=1`
-for `(α,0)∈H₀(M)` are *consequences* of the finite set (I). *"Since (I) is finite, we have proved
-Higman's Embedding Theorem."*
+**Cohen's argument that (II),(III) are consequences of (I)** (book p.281 — this IS the proof body):
+- *(III) from (I)+(II):* If `(α,0)∈H₀(M)` then, by the relations of `K_M`, `t_α` is a product of
+  elements of `U∪U⁻¹` (faithfulness). The `k`-relations fix `U` pointwise, and `k⁻¹pk=p`,
+  `k⁻¹dk=d`, so `k⁻¹ t_α k = t_α`. Conjugating (II) `p⁻¹t_α p = t_α w_α(b)d` by `k` then gives
+  `k⁻¹ w_α(b) k = w_α(b)`. But (I)'s `k: b_j ↦ b_j c_j` gives `k⁻¹ w_α(b) k = w_α(bc) =
+  w_α(b)·w_α(c)` (the `c_j` commute with `b_i`, so `w_α(bc)` splits). Hence `w_α(c)=1`.
+- *(II) from (I):* Write `w_α(b)` with only positive `b_i` (`1≤i≤2n`, `b_{n+i}=b_i⁻¹`); let
+  `w_α(a)` replace each `b_i` by `a_i`. By induction on word length, (I) gives
+  `w_α(a)⁻¹ t w_α(a) = t_α` and `w_α(a)⁻¹ d w_α(a) = w_α(b) d`. With `p⁻¹tp=td` and `a_i⁻¹ p a_i = p`
+  (both in (I)), conjugating gives `p⁻¹ t_α p = t_α w_α(b) d`. Hence all of (II) follows from (I).
+- *"Since (I) is finite, we have proved Higman's Embedding Theorem."*
 
 ## Full chain for our goal (and a needed pre-layer)
 

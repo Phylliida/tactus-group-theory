@@ -113,3 +113,9 @@ pub mod config_reduce;
 // prop_v: E2.B — property (v) assembly (prop_v_holds), consuming config_reduce + the quad wiring.
 #[cfg(verus_keep_ghost)]
 pub mod prop_v;
+
+// word_numbering: Layer 2 / Brick 1 — pure word combinatorics for Cohen §9.6's α↔word numbering
+// (w_α(c), w_α(b), w_α(bc) substitution maps + the numbering predicate I). Self-contained on
+// symbol.rs / word.rs; abstract base-offsets leave the global layout to Brick 2 (h1.rs).
+#[cfg(verus_keep_ghost)]
+pub mod word_numbering;
