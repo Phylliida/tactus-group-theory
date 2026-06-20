@@ -139,3 +139,8 @@ pub mod h2;
 // finite a_i (φ_i) / k (ψ) HNN associations of set (I); iterated single-letter HNN over h2_pres.
 #[cfg(verus_keep_ghost)]
 pub mod h3;
+
+// free_basis: Layer 2 / Brick 2 (deep half) — the kill homomorphism φ:H₁→K_M (identity on K_M,
+// kill c/b/d) + validity, toward "{t_α w_α(b) d} is a free basis" (blueprint p.279).
+#[cfg(verus_keep_ghost)]
+pub mod free_basis;
