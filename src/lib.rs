@@ -129,3 +129,8 @@ pub mod layout;
 // layout bases + the b_i c_j = c_j b_i commutator relators of set (I)). Approach (b): finite only.
 #[cfg(verus_keep_ghost)]
 pub mod h1;
+
+// h2: Layer 2 / Brick 3 — the p-level HNN H₂ = HNN(H₁, p | p⁻¹ t p = t d). The single schematic
+// p-relation of set (I); built over h1_base, stable letter at the layout's p slot.
+#[cfg(verus_keep_ghost)]
+pub mod h2;
