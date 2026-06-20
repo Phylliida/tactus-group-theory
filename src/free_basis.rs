@@ -841,4 +841,110 @@ pub proof fn lemma_canon_cons_free(alphas: Seq<nat>, c: CanonLetter, red: Seq<Ca
     }
 }
 
+/// **The invariant.** `w ≡_free canon_to_free(cw_reduce(w_to_canon(alphas, w)))`. By
+/// induction on `w`, gluing the cons step onto the reduced tail (distinct alphas).
+pub proof fn lemma_w_canon_free(alphas: Seq<nat>, w: Word)
+    requires word_valid(w, alphas.len()), alphas.no_duplicates(),
+    ensures
+        equiv_in_presentation(free_group(alphas.len()), w,
+            canon_to_free(alphas, cw_reduce(w_to_canon(alphas, w)))),
+    decreases w.len(),
+{
+    let k = alphas.len();
+    let fg = free_group(k);
+    lemma_free_group_valid(k);
+    let canon = w_to_canon(alphas, w);
+    if w.len() == 0 {
+        assert(canon =~= Seq::<CanonLetter>::empty());
+        assert(cw_reduce(canon).len() == 0);
+        assert(canon_to_free(alphas, cw_reduce(canon)) =~= empty_word());
+        assert(w =~= empty_word());
+        lemma_equiv_refl(fg, w);
+    } else {
+        let s = w.first();
+        let rest = w.drop_first();
+        let c = sym_to_canl(alphas, s);
+        assert(symbol_valid(s, k)) by { assert(w[0] == s); }
+        assert(word_valid(rest, k)) by {
+            assert forall|i: int| 0 <= i < rest.len() implies symbol_valid(#[trigger] rest[i], k) by {
+                assert(rest[i] == w[i + 1]);
+            }
+        }
+        let R = cw_reduce(w_to_canon(alphas, rest));
+        // cw_reduce(canon) = cw_cons(canon[0], cw_reduce(canon.drop_first())) = cw_cons(c, R).
+        assert(canon[0] == c) by { assert(w[0] == s); }
+        assert(canon.drop_first() =~= w_to_canon(alphas, rest)) by {
+            assert forall|j: int| 0 <= j < rest.len() implies
+                canon.drop_first()[j] == w_to_canon(alphas, rest)[j] by {
+                assert(canon.drop_first()[j] == canon[j + 1]);
+                assert(rest[j] == w[j + 1]);
+            }
+        }
+        assert(cw_reduce(canon) == cw_cons(canon[0], cw_reduce(canon.drop_first())));
+        assert(cw_reduce(canon.drop_first()) == R);
+        assert(cw_reduce(canon) =~= cw_cons(c, R));
+
+        // facts about c
+        assert(c.e != 0 && canl_in_alphas(alphas, c)) by {
+            match s {
+                Symbol::Gen(i) => { assert(0 <= i < k && alphas[i as int] as int == c.r); },
+                Symbol::Inv(i) => { assert(0 <= i < k && alphas[i as int] as int == c.r); },
+            }
+        }
+        lemma_wcanon_reduce_in_alphas(alphas, rest);     // canon_in_alphas(R)
+
+        // IH + congruence:  w =~= [s]+rest ≡ [s]+canon_to_free(R).
+        lemma_w_canon_free(alphas, rest);
+        assert(w =~= seq![s] + rest);
+        lemma_equiv_concat_right(fg, seq![s], rest, canon_to_free(alphas, R));
+
+        // [s] = canl_to_free(c); cons step lands on canon_to_free(cw_cons(c,R)) = canon_to_free(cw_reduce(canon)).
+        lemma_sym_to_canl_free(alphas, s);
+        assert(seq![s] + canon_to_free(alphas, R) =~= canl_to_free(alphas, c) + canon_to_free(alphas, R));
+        lemma_canon_cons_free(alphas, c, R);
+        assert(canon_to_free(alphas, cw_cons(c, R)) =~= canon_to_free(alphas, cw_reduce(canon)));
+
+        lemma_equiv_transitive(fg, w, seq![s] + canon_to_free(alphas, R),
+            canon_to_free(alphas, cw_reduce(canon)));
+    }
+}
+
+// ============================================================================
+// F2 — The config words are a FREE family in K_M = g_m.
+// ============================================================================
+
+/// **F2.** For DISTINCT `alphas`, a config-word product trivial in `K_M = g_m` comes
+/// from a freely-trivial `w`: `apply_embedding(config_emb, w) ≡_{g_m} ε ⟹ w ≡_free ε`.
+/// (Descend `g_m → base_A`, identify with `canw_eval`, reduce to `[]` via Layer-1's
+/// `lemma_cw_reduce_trivial_empty`, then the invariant gives `w ≡_free ε`.)
+pub proof fn lemma_config_emb_free(mm: ModMachine, alphas: Seq<nat>, w: Word)
+    requires
+        mod_machine_wf(mm),
+        alphas.no_duplicates(),
+        word_valid(w, alphas.len()),
+        equiv_in_presentation(g_m(mm), apply_embedding(config_emb(alphas), w), empty_word()),
+    ensures
+        equiv_in_presentation(free_group(alphas.len()), w, empty_word()),
+{
+    let emb = config_emb(alphas);
+    let P = apply_embedding(emb, w);
+    // P is a base_A word (config words use gens {0,1,2}).
+    assert forall|i: int| 0 <= i < emb.len() implies word_valid(#[trigger] emb[i], 3) by {
+        assert(emb[i] == config_word(alphas[i], 0));
+        lemma_config_word_valid(alphas[i], 0);
+    }
+    lemma_apply_embedding_valid(emb, w, 3);
+    // descend g_m → base_A
+    lemma_g_m_base_faithful(mm, P);
+    // F2b: P =~= canw_eval(canon)
+    lemma_config_emb_eq_canw(alphas, w);
+    let canon = w_to_canon(alphas, w);
+    assert(equiv_in_presentation(base_A(), canw_eval(canon), empty_word()));
+    // reduce to []
+    lemma_cw_reduce_trivial_empty(canon);
+    assert(canon_to_free(alphas, cw_reduce(canon)) =~= empty_word());
+    // invariant: w ≡_free canon_to_free(cw_reduce(canon)) = ε
+    lemma_w_canon_free(alphas, w);
+}
+
 } // verus!
