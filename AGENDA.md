@@ -91,23 +91,23 @@ Reference: `docs/aanderaa-cohen-construction.md` (Layer 1), `docs/higman-embeddi
   - [x] **L1 — pinch-elimination** DONE — `lemma_kp_eliminate_pinch` (+ `lemma_kp_phi_fwd/rev`,
         `lemma_kp_value_head_split`). `kp_pinch` 6/0.
   - [x] **L2 — reduce to pinch-free** DONE — `lemma_kp_reduce_pinch_free` (induction on `kp_pcount`).
-  - [ ] **no-KP-pinch ⟹ no-raw-pinch** + **junction** + **assembly** — **← current next brick.**
+  - [ ] **no-KP-pinch ⟹ no-raw-pinch** (DONE, see 3c) + **junction** + **assembly** — **← junction next.**
     - [x] **3a/3b foundation** DONE — `kp_syllables_valid` (every syllable is a BASE word ⟹
           stable-free, since the stable letter is gen index `base.num_generators`) +
           `lemma_kp_value_word_valid` (so `W = kp_value(t, kp)` can feed `britton_lemma_full`).
-    - [ ] **3c — the structural core** (no-raw-pinch): `kp_syllables_valid ∧ kp_pinch_free ⟹
-          ¬has_pinch(data, kp_value(t, kp))`. *Plan (head-peeling induction on `kp.tail`):* the only
-          stable letters of `W` are the `p` separators (syllables are base words). Peel
-          `W = head ++ [p₀] ++ W'` (`W' = kp_value(rest)`, `rest = {head: tail[0].1, tail: drop_first}`).
-          Any raw pinch `(i,j)`: both `W[i],W[j]` stable ⟹ both separators; "no stable between" ⟹
-          **consecutive** separators ⟹ middle `= kₘ = tail[m].1`; opposite + assoc-subgroup is exactly
-          `kp_has_pinch_at(kp, m)` — ruled out by `kp_pinch_free`. Two cases in the induction: pinch
-          uses `p₀` (⟹ `kp_has_pinch_at(kp,0)`, since the next stable in `W'` is `p₁` with middle `k₀`)
-          or pinch lives entirely in `W'` (⟹ IH, using `kp_pinch_free(kp) ⟹ kp_pinch_free(rest)` and
-          `kp_has_pinch_at(rest,m) ↔ kp_has_pinch_at(kp,m+1)`). Needs moderate subrange/position
-          helpers: head contributes no stable letter; first stable of `W` is `p₀` at `|head|`.
+    - [x] **3c — the structural core** (no-raw-pinch) DONE — `lemma_kp_no_raw_pinch`
+          (`kp_syllables_valid ∧ kp_pinch_free ⟹ ¬has_pinch(data, kp_value(t, kp))`), `kp_pinch` 16/0.
+          Built witness-form via head-peeling induction `lemma_kp_raw_pinch_gives_kp_pinch` (a raw pinch
+          of `W` yields a KP-pinch index), with modular helpers: `lemma_kp_first_stable` (head occupies
+          positions `0..|head|`, all base/non-stable; position `|head|` is the first separator `p₀`),
+          `lemma_kp_pinch_case_a` (pinch hits `p₀` ⟹ `kp_has_pinch_at(kp,0)`, middle `= k₀`),
+          `lemma_kp_pinch_transfer_tail` (pinch past `p₀` ⟹ shifted raw pinch of `W' = kp_value(rest)`),
+          `lemma_kp_pinch_lift` (`kp_has_pinch_at(rest,m) ⟹ kp_has_pinch_at(kp,m+1)`), plus
+          `lemma_word_subrange_concat_right`, `lemma_base_word_index_no_stable`, `lemma_pinch_gens_eq`
+          (bridges the inline `Seq::new` gen-lists of `has_pinch_at` to `hnn_a_gens`/`hnn_b_gens`).
     - [ ] **junction** (`W` raw-pinch-free ∧ `u` stable-free ⟹ `W·u` raw-pinch-free) — appending a
-          `p`-free word adds no stable letters, so no adjacent-stable middle changes.
+          `p`-free word adds no stable letters, so no adjacent-stable middle changes. **← current next
+          brick.** (Reuse `lemma_base_word_no_stable` + the position helpers from 3c.)
     - [ ] **assembly** — (1) `g ∈ ⟨K,p⟩ ⟹ ∃ KPWord kp₀, kp_value ≡ g`; (2) L2 ⟹ pinch-free `kp`;
           (3) 3c+junction ⟹ `W·g⁻¹` raw-pinch-free; (4) `britton_lemma_full`: `≡ε ∧ raw-pinch-free
           ⟹ stable-free`; (5) stable-free ⟹ `tail` empty ⟹ `g ≡ head ∈ K`. E1
