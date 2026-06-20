@@ -11,12 +11,14 @@
 //  Part A0 (here first): the run-merge and zero-drop atoms the reduction rests on.
 
 use vstd::prelude::*;
+use crate::symbol::*;
 use crate::word::*;
 use crate::presentation::*;
 use crate::presentation_lemmas::*;
 use crate::machine_group::*;
 use crate::britton_via_tower::lemma_delete_equiv_empty;
 use crate::ii_subset::lemma_signed_power_inverse;
+use crate::benign::{concat_all, lemma_concat_all_empty};
 
 verus! {
 
@@ -813,6 +815,76 @@ pub proof fn lemma_tfree_coord_restrict(u: Seq<CanonLetter>, v: Seq<CanonLetter>
         assert(coord_in(cw_reduce_from(revinv(v), cw_reduce(u)), r, s));
         assert(cw_reduce_from(revinv(v), cw_reduce(u)).len() == 0);
         assert(false);
+    }
+}
+
+//  ============================================================
+//  Part B — bridging the accumulator / in_TM factor lists into CanonLetter form.
+//  ============================================================
+//  A factor word f is the evaluation of a signed CanonLetter c (e = ±1).
+pub open spec fn is_canl_word(f: Word, c: CanonLetter) -> bool {
+    (c.e == 1 && f == sconfig(c.r, c.s)) || (c.e == -1 && f == inverse_word(sconfig(c.r, c.s)))
+}
+
+//  sconfig is the e=1 config power.
+pub proof fn lemma_sconfig_is_gsconfig1(r: int, s: int)
+    ensures
+        sconfig(r, s) =~= gsconfig(r, s, 1),
+{
+    assert(signed_power(0, 1) =~= seq![Symbol::Gen(0)]);
+}
+
+//  is_canl_word ⟹ the letter's evaluation matches the factor word.
+pub proof fn lemma_is_canl_word_eval(f: Word, c: CanonLetter)
+    requires
+        is_canl_word(f, c),
+    ensures
+        canl_eval(c) =~= f,
+{
+    lemma_sconfig_is_gsconfig1(c.r, c.s);
+    if c.e == 1 {
+        assert(canl_eval(c) =~= gsconfig(c.r, c.s, 1));
+    } else {
+        //  canl_eval(c) = gsconfig(r,s,-1) =~= inverse_word(gsconfig(r,s,1)) =~= inverse_word(sconfig(r,s)) = f
+        lemma_gsconfig_inverse(c.r, c.s, 1);
+        assert(canl_eval(c) =~= gsconfig(c.r, c.s, -1));
+        assert(inverse_word(gsconfig(c.r, c.s, 1)) =~= gsconfig(c.r, c.s, -1));
+    }
+}
+
+//  A CanonLetter list represents a factor list: same length, pointwise is_canl_word.
+pub open spec fn canon_represents(factors: Seq<Word>, canon: Seq<CanonLetter>) -> bool {
+    &&& factors.len() == canon.len()
+    &&& (forall|i: int| 0 <= i < factors.len() ==> is_canl_word(#[trigger] factors[i], canon[i]))
+}
+
+//  A representing CanonLetter list evaluates to the same word as concat_all of the factors.
+pub proof fn lemma_canon_represents_eval(factors: Seq<Word>, canon: Seq<CanonLetter>)
+    requires
+        canon_represents(factors, canon),
+    ensures
+        concat_all(factors) =~= canw_eval(canon),
+    decreases factors.len(),
+{
+    if factors.len() == 0 {
+        lemma_concat_all_empty();
+        assert(canw_eval(canon) =~= empty_word());
+    } else {
+        reveal_with_fuel(concat_all, 1);
+        assert(concat_all(factors) =~= factors.first() + concat_all(factors.drop_first()));
+        //  head: canl_eval(canon[0]) =~= factors[0]
+        lemma_is_canl_word_eval(factors[0], canon[0]);
+        assert(canw_eval(canon) =~= canl_eval(canon[0]) + canw_eval(canon.drop_first()));
+        //  tail represents
+        assert(canon_represents(factors.drop_first(), canon.drop_first())) by {
+            assert forall|i: int| 0 <= i < factors.drop_first().len()
+                implies is_canl_word(#[trigger] factors.drop_first()[i], canon.drop_first()[i]) by {
+                assert(factors.drop_first()[i] == factors[i + 1]);
+                assert(canon.drop_first()[i] == canon[i + 1]);
+            }
+        }
+        lemma_canon_represents_eval(factors.drop_first(), canon.drop_first());
+        assert(factors.first() == factors[0]);
     }
 }
 
