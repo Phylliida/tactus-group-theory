@@ -265,6 +265,111 @@ pub proof fn lemma_bc_gen_commute(mm: ModMachine, n: nat, i: nat, j: nat)
     lemma_equiv_transitive(p, x, r + y, y);               // x ≡ y  = commutes(gB, gC)
 }
 
+/// A b-letter `alphabet_letter(b_base,n,d)` commutes with any single c-block symbol `s`
+/// (generator index in `[c_base, c_base+n)`).
+pub proof fn lemma_b_alpha_commutes_c_symbol(mm: ModMachine, n: nat, d: nat, s: Symbol)
+    requires
+        1 <= d <= 2 * n,
+        c_base(g_m(mm).num_generators) <= generator_index(s) < c_base(g_m(mm).num_generators) + n,
+    ensures
+        commutes(h1_base(mm, n), seq![alphabet_letter(b_base(g_m(mm).num_generators, n), n, d)], seq![s]),
+{
+    let nk = g_m(mm).num_generators;
+    let p = h1_base(mm, n);
+    let ng = h1_num_gens(nk, n);
+    lemma_h1_base_valid(mm, n);
+    let ep = generator_index(s);                 // ∈ [nk, nk+n)
+    let j = (ep - nk + 1) as nat;                // ∈ [1, n]
+    assert(1 <= j <= n);
+    assert(c_idx(nk, j) == ep);                  // nk + (j-1) = ep
+    let i = if d <= n { d } else { (d - n) as nat };
+    assert(1 <= i <= n);
+    let bb = b_idx(nk, n, i);
+    assert(bb < ng);                             // nk+n+i-1 ≤ nk+2n-1 < nk+2n+1
+    assert(ep < ng);                             // ep < nk+n < ng
+    lemma_bc_gen_commute(mm, n, i, j);           // commutes([Gen bb], [Gen ep])
+    lemma_gen_commute_to_combos(p, bb, ep);      // all four sign combos
+    let bl = alphabet_letter(b_base(nk, n), n, d);
+    if d <= n {
+        assert(bl == Symbol::Gen(bb));
+    } else {
+        assert(bl == Symbol::Inv(bb));
+    }
+    match s {
+        Symbol::Gen(g) => { assert(g == ep); assert(seq![s] == seq![Symbol::Gen(ep)]); },
+        Symbol::Inv(g) => { assert(g == ep); assert(seq![s] == seq![Symbol::Inv(ep)]); },
+    }
+    assert(seq![bl] == (if d <= n { seq![Symbol::Gen(bb)] } else { seq![Symbol::Inv(bb)] }));
+}
+
+/// A b-letter commutes with any word whose symbols all live in the c-block.
+pub proof fn lemma_b_alpha_commutes_c_word(mm: ModMachine, n: nat, d: nat, w: Word)
+    requires
+        1 <= d <= 2 * n,
+        forall|k: int| 0 <= k < w.len() ==>
+            c_base(g_m(mm).num_generators) <= generator_index(#[trigger] w[k])
+                < c_base(g_m(mm).num_generators) + n,
+    ensures
+        commutes(h1_base(mm, n), seq![alphabet_letter(b_base(g_m(mm).num_generators, n), n, d)], w),
+    decreases w.len(),
+{
+    let nk = g_m(mm).num_generators;
+    let p = h1_base(mm, n);
+    let bl_w: Word = seq![alphabet_letter(b_base(nk, n), n, d)];
+    if w.len() == 0 {
+        lemma_commutes_empty_right(p, bl_w);
+        assert(w =~= empty_word());
+    } else {
+        let s = w.first();
+        let rest = w.drop_first();
+        assert(c_base(nk) <= generator_index(s) < c_base(nk) + n) by { assert(w[0] == s); }
+        lemma_b_alpha_commutes_c_symbol(mm, n, d, s);     // commutes(bl_w, [s])
+        assert forall|k: int| 0 <= k < rest.len() implies
+            c_base(nk) <= generator_index(#[trigger] rest[k]) < c_base(nk) + n by {
+            assert(rest[k] == w[k + 1]);
+        }
+        lemma_b_alpha_commutes_c_word(mm, n, d, rest);    // commutes(bl_w, rest)
+        lemma_commutes_concat_right(p, bl_w, seq![s], rest);  // commutes(bl_w, [s]+rest)
+        assert(seq![s] + rest =~= w);
+    }
+}
+
+/// `bc_letter(d) ≡ b_letter(d) · c_letter(d)`: for `d ≤ n` it IS `b_d c_d`; for `d > n` it is
+/// `c_i⁻¹ b_i⁻¹` which commutes to `b_i⁻¹ c_i⁻¹`.
+pub proof fn lemma_bc_letter_split(mm: ModMachine, n: nat, d: nat)
+    requires 1 <= d <= 2 * n,
+    ensures
+        equiv_in_presentation(h1_base(mm, n),
+            bc_letter(b_base(g_m(mm).num_generators, n), c_base(g_m(mm).num_generators), n, d),
+            seq![alphabet_letter(b_base(g_m(mm).num_generators, n), n, d)]
+                + seq![alphabet_letter(c_base(g_m(mm).num_generators), n, d)]),
+{
+    let nk = g_m(mm).num_generators;
+    let p = h1_base(mm, n);
+    let ng = h1_num_gens(nk, n);
+    lemma_h1_base_valid(mm, n);
+    let bb = b_base(nk, n);
+    let cb = c_base(nk);
+    let bl = alphabet_letter(bb, n, d);
+    let cl = alphabet_letter(cb, n, d);
+    let bc = bc_letter(bb, cb, n, d);
+    if d <= n {
+        assert(bl == Symbol::Gen((bb + d - 1) as nat));
+        assert(cl == Symbol::Gen((cb + d - 1) as nat));
+        assert(bc =~= seq![bl] + seq![cl]);
+        lemma_equiv_refl(p, seq![bl] + seq![cl]);
+    } else {
+        assert(bc =~= seq![cl] + seq![bl]);
+        lemma_alphabet_letter_gen_in_block(cb, n, d);     // cl index ∈ [cb, cb+n)
+        lemma_b_alpha_commutes_c_symbol(mm, n, d, cl);    // commutes([bl], [cl])
+        lemma_alphabet_letter_valid(bb, n, d, ng);        // bb+n = nk+2n ≤ ng
+        lemma_alphabet_letter_valid(cb, n, d, ng);        // cb+n = nk+n ≤ ng
+        assert(word_valid(seq![bl], ng)) by { assert(seq![bl][0] == bl); }
+        assert(word_valid(seq![cl], ng)) by { assert(seq![cl][0] == cl); }
+        lemma_commutes_sym(p, seq![bl], seq![cl]);        // equiv([cl]+[bl], [bl]+[cl])
+    }
+}
+
 /// One rung: an equivalence in `h3_upto(l)` lifts to `h3_upto(l+1)` (the `a_{l+1}` HNN whose
 /// base is exactly `h3_upto(l)`).
 pub proof fn lemma_h3_upto_step_embeds(mm: ModMachine, n: nat, m: nat, l: nat, w1: Word, w2: Word)
