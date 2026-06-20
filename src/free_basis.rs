@@ -753,4 +753,92 @@ pub proof fn lemma_canon_to_free_valid(alphas: Seq<nat>, red: Seq<CanonLetter>)
     }
 }
 
+/// Every letter of `cw_reduce(w_to_canon(alphas, w))` is an `alphas`-coordinate at
+/// `s = 0` (reduction only retains coordinates already present in the input).
+pub proof fn lemma_wcanon_reduce_in_alphas(alphas: Seq<nat>, w: Word)
+    requires word_valid(w, alphas.len()),
+    ensures canon_in_alphas(alphas, cw_reduce(w_to_canon(alphas, w))),
+{
+    let canon = w_to_canon(alphas, w);
+    let red = cw_reduce(canon);
+    lemma_cw_reduce_coords(canon);
+    assert forall|j: int| 0 <= j < red.len() implies canl_in_alphas(alphas, #[trigger] red[j]) by {
+        assert(coord_in(canon, red[j].r, red[j].s));
+        let m = choose|mm: int| 0 <= mm < canon.len() && canon[mm].r == red[j].r && canon[mm].s == red[j].s;
+        assert(0 <= m < canon.len() && canon[m].r == red[j].r && canon[m].s == red[j].s);
+        assert(canon[m] == sym_to_canl(alphas, w[m]));
+        // w[m] valid ⟹ its generator index i < k; sym_to_canl gives r = alphas[i], s = 0.
+        assert(symbol_valid(w[m], alphas.len()));
+        match w[m] {
+            Symbol::Gen(i) => {
+                assert(canon[m].r == alphas[i as int] as int && canon[m].s == 0);
+                assert(0 <= i < alphas.len() && alphas[i as int] as int == red[j].r);
+            },
+            Symbol::Inv(i) => {
+                assert(canon[m].r == alphas[i as int] as int && canon[m].s == 0);
+                assert(0 <= i < alphas.len() && alphas[i as int] as int == red[j].r);
+            },
+        }
+    }
+}
+
+/// **The cons step.** Prepending letter `c` and reducing commutes with spelling:
+/// `canl_to_free(c) · canon_to_free(red) ≡_free canon_to_free(cw_cons(c, red))`.
+/// This is where `cw_cons`'s exponent-merge becomes free-group power addition
+/// (`lemma_signed_power_add`) and its zero-cancellation becomes free reduction.
+pub proof fn lemma_canon_cons_free(alphas: Seq<nat>, c: CanonLetter, red: Seq<CanonLetter>)
+    requires
+        c.e != 0,
+        canl_in_alphas(alphas, c),
+        canon_in_alphas(alphas, red),
+    ensures
+        equiv_in_presentation(free_group(alphas.len()),
+            canl_to_free(alphas, c) + canon_to_free(alphas, red),
+            canon_to_free(alphas, cw_cons(c, red))),
+{
+    let k = alphas.len();
+    let fg = free_group(k);
+    lemma_free_group_valid(k);
+    let idx = alpha_index(alphas, c.r);
+    let lhs = canl_to_free(alphas, c) + canon_to_free(alphas, red);
+
+    if red.len() > 0 && red[0].r == c.r && red[0].s == c.s {
+        // MERGE.
+        assert(canl_in_alphas(alphas, red[0]));
+        let rest = canon_to_free(alphas, red.drop_first());
+        let me = c.e + red[0].e;
+        // canon_to_free(red) = sp(idx, red[0].e) + rest   (red[0].r == c.r ⟹ idx matches).
+        assert(alpha_index(alphas, red[0].r) == idx);
+        assert(canon_to_free(alphas, red) =~= signed_power(idx, red[0].e) + rest);
+        // group: lhs =~= (sp(c.e) + sp(red[0].e)) + rest.
+        let g = signed_power(idx, c.e) + signed_power(idx, red[0].e);
+        assert(lhs =~= g + rest);
+        lemma_signed_power_add(fg, idx, c.e, red[0].e);     // g ≡ sp(idx, me)
+        lemma_equiv_concat_left(fg, g, signed_power(idx, me), rest);  // g+rest ≡ sp(me)+rest
+        if me == 0 {
+            // cw_cons = red.drop_first(); sp(idx,0) = ε ⟹ sp(me)+rest =~= rest = RHS.
+            assert(cw_cons(c, red) == red.drop_first());
+            assert(signed_power(idx, me) =~= empty_word());
+            assert(signed_power(idx, me) + rest =~= rest);
+            assert(canon_to_free(alphas, cw_cons(c, red)) =~= rest);
+        } else {
+            // cw_cons = [{c.r,c.s,me}] + red.drop_first(); RHS = sp(idx,me) + rest.
+            let merged = CanonLetter { r: c.r, s: c.s, e: me };
+            assert(cw_cons(c, red) =~= seq![merged] + red.drop_first());
+            assert((seq![merged] + red.drop_first())[0] == merged);
+            assert((seq![merged] + red.drop_first()).drop_first() =~= red.drop_first());
+            assert(canon_to_free(alphas, cw_cons(c, red))
+                =~= canl_to_free(alphas, merged) + rest);
+            assert(canl_to_free(alphas, merged) == signed_power(idx, me));  // merged.r == c.r
+        }
+    } else {
+        // PREPEND.  cw_cons = [c] + red ⟹ RHS = canl_to_free(c) + canon_to_free(red) = lhs.
+        assert(cw_cons(c, red) =~= seq![c] + red);
+        assert((seq![c] + red)[0] == c);
+        assert((seq![c] + red).drop_first() =~= red);
+        assert(canon_to_free(alphas, cw_cons(c, red)) =~= lhs);
+        lemma_equiv_refl(fg, lhs);
+    }
+}
+
 } // verus!
