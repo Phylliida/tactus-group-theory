@@ -24,7 +24,8 @@ use crate::hnn::*;
 use crate::machine_group::{hnn_a_gens, hnn_b_gens, lemma_stable_conj_factorization,
     lemma_stable_conj_factorization_rev, lemma_in_gen_implies_emb, lemma_hnn_presentation_valid,
     lemma_word_valid_mono};
-use crate::benign::{in_generated_subgroup, apply_embedding, lemma_apply_embedding_valid};
+use crate::benign::{in_generated_subgroup, apply_embedding, lemma_apply_embedding_valid,
+    concat_all, lemma_concat_all_empty};
 use crate::ii_subset::{KPWord, kp_value, kp_pcount, is_kp_word, lemma_kp_value_cons};
 use crate::britton_via_tower::{is_stable, has_stable_letter, has_pinch_at, has_pinch,
     has_adjacent_opposite_at, britton_lemma_full, britton_lemma_unconditional};
@@ -949,6 +950,142 @@ pub proof fn lemma_kp_junction(data: HNNData, w: Word, u: Word)
 }
 
 //  ============================================================
+//  Assembly step 1 — the ⟨K,p⟩ membership form, and its conversion to a KP-word.
+//  ============================================================
+//  ⟨K,p⟩ membership in flat form: g is HNN-equivalent to a product of "kp-factors", each of which is
+//  either a K-element (a base word with in_k) or a single stable letter p^{±1}.  We then fold any such
+//  factor list into the ALTERNATING KP-word form (collecting consecutive K-runs into syllables),
+//  feeding the Britton core.  This makes property II invocable from a plain membership hypothesis.
+
+//  A kp-factor is a K-element (base word), or [p], or [p⁻¹].
+pub open spec fn is_kp_factor(data: HNNData, in_k: spec_fn(Word) -> bool, f: Word) -> bool {
+    ||| (in_k(f) && word_valid(f, data.base.num_generators))
+    ||| f == seq![stable_letter(data)]
+    ||| f == seq![stable_letter_inv(data)]
+}
+
+pub open spec fn all_kp_factors(data: HNNData, in_k: spec_fn(Word) -> bool, factors: Seq<Word>) -> bool {
+    forall|i: int| 0 <= i < factors.len() ==> is_kp_factor(data, in_k, #[trigger] factors[i])
+}
+
+//  g ∈ ⟨K,p⟩: HNN-equivalent to a concatenation of kp-factors.
+pub open spec fn in_kp_subgroup(data: HNNData, in_k: spec_fn(Word) -> bool, g: Word) -> bool {
+    exists|factors: Seq<Word>| #[trigger] all_kp_factors(data, in_k, factors)
+        && equiv_in_presentation(hnn_presentation(data), concat_all(factors), g)
+}
+
+//  Fold a kp-factor list into a KP-word with the SAME value (prepend each factor to the front):
+//  a K-element absorbs into the head; a p^{±1} pushes the old head into a new leading syllable.
+pub proof fn lemma_kp_factors_to_kpword(
+    data: HNNData, in_k: spec_fn(Word) -> bool, factors: Seq<Word>,
+) -> (kp: KPWord)
+    requires
+        hnn_data_valid(data),
+        in_k(empty_word()),
+        forall|a: Word, b: Word| in_k(a) && in_k(b) ==> in_k(#[trigger] (a + b)),
+        all_kp_factors(data, in_k, factors),
+    ensures
+        is_kp_word(in_k, kp),
+        kp_syllables_valid(data, kp),
+        kp_value(stable_letter(data), kp) =~= concat_all(factors),
+    decreases factors.len(),
+{
+    let st = stable_letter(data);
+    let si = stable_letter_inv(data);
+    let ng = data.base.num_generators;
+    if factors.len() == 0 {
+        let kp = KPWord { head: empty_word(), tail: Seq::<(bool, Word)>::empty() };
+        lemma_concat_all_empty();
+        assert(concat_all(factors) =~= empty_word());
+        assert(kp_value(st, kp) =~= kp.head);            //  empty-tail branch
+        assert(kp_value(st, kp) =~= concat_all(factors));
+        kp
+    } else {
+        let f0 = factors.first();
+        let rest = factors.drop_first();
+        //  classify f0 and set up rest
+        assert(factors[0] == f0);
+        assert(is_kp_factor(data, in_k, f0));            //  all_kp_factors at i=0
+        assert(all_kp_factors(data, in_k, rest)) by {
+            assert forall|i: int| 0 <= i < rest.len()
+                implies is_kp_factor(data, in_k, #[trigger] rest[i]) by {
+                assert(rest[i] == factors[i + 1]);
+            }
+        }
+        let kp_rest = lemma_kp_factors_to_kpword(data, in_k, rest);
+        //  concat_all unfold:  concat_all(factors) = f0 + concat_all(rest)
+        assert(concat_all(factors) =~= f0 + concat_all(rest));
+        assert(kp_value(st, kp_rest) =~= concat_all(rest));   //  IH
+
+        if f0 == seq![st] || f0 == seq![si] {
+            //  ===== p-prepend: push old head into a new leading syllable =====
+            let b: bool = f0 == seq![st];
+            let kp = KPWord { head: empty_word(), tail: seq![(b, kp_rest.head)] + kp_rest.tail };
+            //  value:  kp_value = [p^b] + kp_value(kp_rest)  (cons), and f0 = [p^b]
+            assert(kp.tail.len() >= 1);
+            assert(kp.tail.first() == (b, kp_rest.head));
+            assert(kp.tail.drop_first() =~= kp_rest.tail);
+            lemma_kp_value_cons(st, kp);
+            let p_sym = if b { st } else { si };
+            assert(seq![p_sym] =~= f0);
+            assert(kp_value(st, KPWord { head: kp.tail.first().1, tail: kp.tail.drop_first() })
+                =~= kp_value(st, kp_rest)) by {
+                assert(kp.tail.first().1 == kp_rest.head);
+                assert(kp.tail.drop_first() =~= kp_rest.tail);
+            }
+            assert(kp_value(st, kp) =~= empty_word() + seq![p_sym] + kp_value(st, kp_rest));
+            assert(kp_value(st, kp) =~= f0 + concat_all(rest));
+            assert(kp_value(st, kp) =~= concat_all(factors));
+            //  is_kp_word + syllable-validity
+            assert(is_kp_word(in_k, kp)) by {
+                assert(in_k(kp.head));                   //  in_k(ε)
+                assert forall|j: int| 0 <= j < kp.tail.len()
+                    implies in_k(#[trigger] kp.tail[j].1) by {
+                    if j == 0 { assert(kp.tail[0].1 == kp_rest.head); }
+                    else { assert(kp.tail[j] == kp_rest.tail[j - 1]); }
+                }
+            }
+            assert(kp_syllables_valid(data, kp)) by {
+                assert(word_valid(kp.head, ng));
+                assert forall|j: int| 0 <= j < kp.tail.len()
+                    implies word_valid(#[trigger] kp.tail[j].1, ng) by {
+                    if j == 0 { assert(kp.tail[0].1 == kp_rest.head); }
+                    else { assert(kp.tail[j] == kp_rest.tail[j - 1]); }
+                }
+            }
+            kp
+        } else {
+            //  ===== K-prepend: absorb f0 into the head =====
+            assert(in_k(f0) && word_valid(f0, ng));      //  is_kp_factor disjunction, not [p]/[p⁻¹]
+            let kp = KPWord { head: f0 + kp_rest.head, tail: kp_rest.tail };
+            //  value:  kp_value = (f0 + head_rest) + tailval = f0 + kp_value(kp_rest)
+            lemma_kp_value_head_split(st, f0 + kp_rest.head, kp_rest.tail);
+            lemma_kp_value_head_split(st, kp_rest.head, kp_rest.tail);
+            assert(kp_value(st, kp) =~= f0 + kp_value(st, kp_rest));
+            assert(kp_value(st, kp) =~= f0 + concat_all(rest));
+            assert(kp_value(st, kp) =~= concat_all(factors));
+            //  is_kp_word + syllable-validity
+            assert(is_kp_word(in_k, kp)) by {
+                assert(in_k(kp.head));                   //  in_k(f0) ∧ in_k(head_rest) ⟹ H_mul
+                assert forall|j: int| 0 <= j < kp.tail.len()
+                    implies in_k(#[trigger] kp.tail[j].1) by {
+                    assert(kp.tail[j] == kp_rest.tail[j]);
+                }
+            }
+            lemma_concat_word_valid(f0, kp_rest.head, ng);
+            assert(kp_syllables_valid(data, kp)) by {
+                assert(word_valid(kp.head, ng));
+                assert forall|j: int| 0 <= j < kp.tail.len()
+                    implies word_valid(#[trigger] kp.tail[j].1, ng) by {
+                    assert(kp.tail[j] == kp_rest.tail[j]);
+                }
+            }
+            kp
+        }
+    }
+}
+
+//  ============================================================
 //  Assembly — the generic property-II Britton core (steps 2–5 of the design's assembly).
 //  ============================================================
 //  Given a KP-word `kp` (every syllable ∈ K and a base word) whose value is HNN-equivalent to a
@@ -1083,6 +1220,47 @@ pub proof fn lemma_kp_property_ii_core(
 
     //  --- conclude in_k(g) via H_resp (in_k(W), W ≡_base g) ---
     assert(in_k(g));
+}
+
+//  ============================================================
+//  Property II — the headline (HNN subgroup-intersection lemma).
+//  ============================================================
+//  g a stable-free base word ∧ g ∈ ⟨K,p⟩  ⟹  g ∈ K, given K ≤ H subgroup-closed (H_id, H_mul,
+//  H_resp) with φ-compatibility (H_ab, H_ba).  Folds the membership witness into a KP-word (step 1)
+//  and runs the Britton core (steps 2–5).  K is abstract (in_k); instantiates to T(M) downstream.
+pub proof fn lemma_property_ii(
+    data: HNNData, in_k: spec_fn(Word) -> bool, g: Word,
+)
+    requires
+        hnn_data_valid(data),
+        hnn_associations_isomorphic(data),
+        in_k(empty_word()),
+        forall|a: Word, b: Word| in_k(a) && #[trigger] equiv_in_presentation(data.base, a, b) ==> in_k(b),
+        forall|a: Word, b: Word| in_k(a) && in_k(b) ==> in_k(#[trigger] (a + b)),
+        forall|uw: Word| word_valid(uw, data.associations.len() as nat)
+            && in_k(apply_embedding(hnn_a_gens(data), uw))
+            ==> in_k(#[trigger] apply_embedding(hnn_b_gens(data), uw)),
+        forall|uw: Word| word_valid(uw, data.associations.len() as nat)
+            && in_k(apply_embedding(hnn_b_gens(data), uw))
+            ==> in_k(#[trigger] apply_embedding(hnn_a_gens(data), uw)),
+        word_valid(g, data.base.num_generators),
+        in_kp_subgroup(data, in_k, g),
+    ensures
+        in_k(g),
+{
+    let st = stable_letter(data);
+    let pres = hnn_presentation(data);
+    //  unpack the membership witness
+    let factors = choose|factors: Seq<Word>| all_kp_factors(data, in_k, factors)
+        && equiv_in_presentation(pres, concat_all(factors), g);
+    assert(all_kp_factors(data, in_k, factors)
+        && equiv_in_presentation(pres, concat_all(factors), g));
+    //  fold to a KP-word (step 1):  kp_value(kp) =~= concat_all(factors)
+    let kp = lemma_kp_factors_to_kpword(data, in_k, factors);
+    assert(kp_value(st, kp) =~= concat_all(factors));
+    assert(equiv_in_presentation(pres, kp_value(st, kp), g));   //  rewrite via the =~= equality
+    //  Britton core (steps 2–5)
+    lemma_kp_property_ii_core(data, in_k, kp, g);
 }
 
 } //  verus!
