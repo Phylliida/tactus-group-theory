@@ -69,3 +69,52 @@ Brick 1 is the only fully self-contained piece (no Layer-1 / HNN dependency) —
 the generator-layout convention and the `w_α` algebra, then bricks 2→5 in order (each needs the
 prior). Bricks 2 and 4 carry the two real proof obligations (free-basis pullback; iso well-defined);
 brick 5 is where Layer 1's faithfulness is finally consumed.
+
+---
+
+## STATUS (2026-06-20) — Brick 1 DONE
+
+`src/word_numbering.rs` landed & verified (`9 verified, 0 errors`, commit e54c765), wired into
+`lib.rs` after `prop_v`. It deliberately left the generator layout ABSTRACT (base-offset params
+`c_base`/`b_base`/`n`/`m`), per the design; the global layout is pinned below for Brick 2.
+
+### De-risking: infinite relation families are NOT a representation blocker
+The recursively-presented intermediate groups carry infinite relation families — `S` (= C's
+relators, r.e. via `w_α(c)∈S ⟺ (α,0)∈H₀(M)`), and H₂'s `p`-HNN whose associated subgroup
+`⟨t_α : α∈I⟩` is **infinitely generated**. Both `Presentation.relators` and
+`HNNData.associations` are **finite `Seq`s**, so they can't hold these directly. BUT the Layer-1
+code already solves this: subgroup membership is carried by a **`spec_fn(Word) -> bool` predicate**
+(`ii_subset.rs:318` `pred: spec_fn(Word)->bool`; the entire E2.C/`kp_pinch` property-II engine is
+abstract over `in_k: spec_fn(Word)->bool`), and `benign.rs` is the dedicated Higman r.e.-subgroup
+("benign") framing (G ↪ f.p. K, H = G∩L). So H₂'s `p`-HNN associated subgroup is a predicate
+`in_t_alpha_subgroup: spec_fn(Word)->bool` (≈ "is a product of `t_α`, α∈I"), and its faithfulness
+goes through the existing `kp_pinch`-style engine. **No new core representation needed** — reuse
+the predicate-subgroup abstraction. (Only the FINAL `H₃` set (I) is a literal finite `Presentation`.)
+
+### Global generator layout table (pin in Brick 2 `h1.rs`, reuse in bricks 3–5)
+Let `N_K := g_m(mm).num_generators = 4 + |mm.quads|` (K_M's count) and `n` = #c-gens = #b-gens.
+K_M's own layout (from `machine_group.rs`): `0=t, 1=x, 2=y`, then `3 .. N_K-2` = the per-quad
+r/l HNN stable letters (= `U`/`g_subgens` minus `t`), and `N_K-1 = 3+|quads|` = `k'` (`k_gen`, the
+Layer-1 commutator witness). Order the H₃ factors **K_M, then (C×⟨b⟩), then ⟨d⟩, p, a-block, k**
+so `free_product`'s left-to-right offset convention places each block at the index below:
+
+| block        | symbols          | base index            | count | end index (excl) |
+|--------------|------------------|-----------------------|-------|------------------|
+| K_M          | t,x,y,(r/l)…,k'  | `0`                   | `N_K` | `N_K`            |
+| c            | c₁…cₙ            | `c_base = N_K`        | `n`   | `N_K+n`          |
+| b            | b₁…bₙ            | `b_base = N_K+n`      | `n`   | `N_K+2n`         |
+| d            | d                | `N_K+2n`              | `1`   | `N_K+2n+1`       |
+| p (H₂ stbl)  | p                | `N_K+2n+1`            | `1`   | `N_K+2n+2`       |
+| a (H₃ stbl)  | a₁…a₂ₙ           | `a_base = N_K+2n+2`   | `2n`  | `N_K+4n+2`       |
+| k (H₃ top)   | k                | `k_top = N_K+4n+2`    | `1`   | `N_K+4n+3`       |
+
+`total = N_K + 4n + 3 = 7 + |quads| + 4n`. **Naming clash guard:** Layer-1's `k'` (commutator
+witness, index `N_K-1`) is DISTINCT from Layer-2's top stable letter `k` (index `N_K+4n+2`) — keep
+them separate (`k_machine`/`k_gen` vs `k_top`). Word-numbering instantiation: `w_α(c)` at `c_base=N_K`,
+`w_α(b)` at `b_base=N_K+n`. H₁ only uses blocks K_M..d (`0 .. N_K+2n`); p/a/k enter at H₂/H₃.
+
+### Recommended Brick 2 first step (verifiable, self-contained)
+A small `layout.rs` (or the head of `h1.rs`): spec fns `c_base(mm,n)`, `b_base(mm,n)`, `d_idx`,
+`p_idx`, `a_base`, `k_top`, `h3_num_gens` + disjointness/coverage lemmas (blocks partition
+`0..total`). Pure index bookkeeping, no hard proofs — locks the convention before the H₁ presentation
+and the free-basis lemma (the genuine Brick-2 obligation).
