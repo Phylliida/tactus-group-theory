@@ -350,4 +350,100 @@ pub proof fn lemma_emb_tpow(gens: Seq<Word>, a: nat, b: nat, e: int)
     }
 }
 
+//  ── The generic per-letter embedding lemma (combines distribution + scaling + conjugation). ──
+//  For gens = [config_word(a,b), xᵖˣ, yᵖʸ],  apply_embedding(gens, gsconfig(k,l,e)) ≡_A
+//  gsconfig(a + px·k, b + py·l, e).  Serves all three quad sides (a-side px=py=m; R b-side px=m²,py=1;
+//  L b-side px=1,py=m²).  The b-side image lands at the quad_step-relabelled coordinate.
+#[verifier::rlimit(300)]
+pub proof fn lemma_emb_gsconfig(gens: Seq<Word>, a: nat, b: nat, px: nat, py: nat, k: int, l: int, e: int)
+    requires
+        gens.len() == 3,
+        gens[0] =~= config_word(a, b),
+        gens[1] =~= signed_power(1, px as int),
+        gens[2] =~= signed_power(2, py as int),
+    ensures
+        equiv_in_presentation(base_A(), apply_embedding(gens, gsconfig(k, l, e)),
+            gsconfig(a as int + (px as int) * k, b as int + (py as int) * l, e)),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let ai = a as int;
+    let bi = b as int;
+    let pxk = (px as int) * k;
+    let pyl = (py as int) * l;
+    let s1 = signed_power(2, -l);
+    let s2 = signed_power(1, -k);
+    let s3 = signed_power(0, e);
+    let s4 = signed_power(1, k);
+    let s5 = signed_power(2, l);
+    assert(gsconfig(k, l, e) == s1 + s2 + s3 + s4 + s5);
+    let ae1 = apply_embedding(gens, s1);
+    let ae2 = apply_embedding(gens, s2);
+    let ae3 = apply_embedding(gens, s3);
+    let ae4 = apply_embedding(gens, s4);
+    let ae5 = apply_embedding(gens, s5);
+    //  --- distribution: AE(gsconfig) =~= ae1+ae2+ae3+ae4+ae5 ---
+    let w12 = s1 + s2;
+    let w123 = s1 + s2 + s3;
+    let w1234 = s1 + s2 + s3 + s4;
+    lemma_apply_embedding_concat(gens, w1234, s5);
+    lemma_apply_embedding_concat(gens, w123, s4);
+    lemma_apply_embedding_concat(gens, w12, s3);
+    lemma_apply_embedding_concat(gens, s1, s2);
+    assert(apply_embedding(gens, gsconfig(k, l, e)) =~= ae1 + ae2 + ae3 + ae4 + ae5);
+    //  --- scaling: ae1,ae2,ae4,ae5 are signed powers ---
+    lemma_emb_signed_scaled(gens, 2, py, -l);
+    lemma_emb_signed_scaled(gens, 1, px, -k);
+    lemma_emb_signed_scaled(gens, 1, px, k);
+    lemma_emb_signed_scaled(gens, 2, py, l);
+    assert((py as int) * (-l) == -((py as int) * l)) by (nonlinear_arith);
+    assert((px as int) * (-k) == -((px as int) * k)) by (nonlinear_arith);
+    assert((py as int) * (-l) == -pyl);
+    assert((px as int) * (-k) == -pxk);
+    assert(ae1 =~= signed_power(2, -pyl));
+    assert(ae2 =~= signed_power(1, -pxk));
+    assert(ae4 =~= signed_power(1, pxk));
+    assert(ae5 =~= signed_power(2, pyl));
+    //  ae3 ≡_A gsconfig(a,b,e)
+    lemma_emb_tpow(gens, a, b, e);
+    let g0 = gsconfig(ai, bi, e);
+    //  --- replace ae3 by g0 in the middle (congruence) ---
+    //  D := ae1+ae2+ae3+ae4+ae5 =~= sp(2,-pyl)+sp(1,-pxk)+ae3+sp(1,pxk)+sp(2,pyl)
+    let xL = signed_power(1, -pxk);
+    let xR = signed_power(1, pxk);
+    let yL = signed_power(2, -pyl);
+    let yR = signed_power(2, pyl);
+    assert(ae1 + ae2 + ae3 + ae4 + ae5 =~= yL + xL + ae3 + xR + yR);
+    //  middle x-conjugation on ae3 ≡ g0:  xL+ae3+xR ≡ xL+g0+xR
+    let mxA = xL + ae3 + xR;
+    let mxB = xL + g0 + xR;
+    assert(equiv_in_presentation(p, mxA, mxB)) by {
+        lemma_equiv_concat_left(p, ae3, g0, xR);              //  ae3+xR ≡ g0+xR
+        lemma_equiv_concat_right(p, xL, ae3 + xR, g0 + xR);   //  xL+(ae3+xR) ≡ xL+(g0+xR)
+        assert(mxA =~= xL + (ae3 + xR));
+        assert(mxB =~= xL + (g0 + xR));
+    }
+    //  conj-by-x:  xL + g0 + xR ≡ gsconfig(a+pxk, b, e)
+    lemma_conj_gsconfig_by_x(ai, bi, e, pxk);
+    let g1 = gsconfig(ai + pxk, bi, e);
+    lemma_equiv_transitive(p, mxA, mxB, g1);
+    //  now wrap with y:  yL + mxA + yR ≡ yL + g1 + yR ≡ gsconfig(a+pxk, b+pyl, e)
+    let fullA = yL + mxA + yR;
+    let fullB = yL + g1 + yR;
+    assert(equiv_in_presentation(p, fullA, fullB)) by {
+        lemma_equiv_concat_left(p, mxA, g1, yR);              //  mxA+yR ≡ g1+yR
+        lemma_equiv_concat_right(p, yL, mxA + yR, g1 + yR);   //  yL+(mxA+yR) ≡ yL+(g1+yR)
+        assert(fullA =~= yL + (mxA + yR));
+        assert(fullB =~= yL + (g1 + yR));
+    }
+    lemma_conj_gsconfig_by_y(ai + pxk, bi, e, pyl);
+    let g2 = gsconfig(ai + pxk, bi + pyl, e);
+    lemma_equiv_transitive(p, fullA, fullB, g2);
+    //  assemble:  AE(gsconfig) =~= yL+xL+ae3+xR+yR =~= fullA ≡ g2
+    assert(yL + xL + ae3 + xR + yR =~= fullA);
+    lemma_equiv_refl(p, apply_embedding(gens, gsconfig(k, l, e)));
+    assert(equiv_in_presentation(p, apply_embedding(gens, gsconfig(k, l, e)), fullA));
+    lemma_equiv_transitive(p, apply_embedding(gens, gsconfig(k, l, e)), fullA, g2);
+}
+
 } //  verus!
