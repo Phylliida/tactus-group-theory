@@ -14,6 +14,8 @@
 use vstd::prelude::*;
 use crate::symbol::*;
 use crate::word::*;
+use crate::presentation::*;
+use crate::machine_group::*;
 use crate::word_numbering::*;
 use crate::layout::*;
 
@@ -90,6 +92,87 @@ pub proof fn lemma_comm_relator_valid(nk: nat, n: nat, i: nat, j: nat, ng: nat)
         } else if k == 1 {
         } else if k == 2 {
         } else {
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// The full commutator family + the H₁-literal base presentation (Approach (b))
+// ----------------------------------------------------------------------------
+
+/// All `n²` commutator relators `b_i c_j = c_j b_i` (1 ≤ i,j ≤ n), flattened
+/// row-major: index `idx` ↦ `(i,j)` with `i = idx/n + 1`, `j = idx%n + 1`.
+pub open spec fn comm_relators(nk: nat, n: nat) -> Seq<Word> {
+    Seq::new((n * n) as nat,
+        |idx: int| comm_relator(nk, n, (idx / (n as int) + 1) as nat, (idx % (n as int) + 1) as nat))
+}
+
+/// Every commutator relator is valid for any `ng ≥ nk + 2n`.
+pub proof fn lemma_comm_relators_valid(nk: nat, n: nat, ng: nat)
+    requires nk + 2 * n <= ng,
+    ensures forall|idx: int| 0 <= idx < comm_relators(nk, n).len()
+        ==> word_valid(#[trigger] comm_relators(nk, n)[idx], ng),
+{
+    assert forall|idx: int| 0 <= idx < comm_relators(nk, n).len()
+        implies word_valid(#[trigger] comm_relators(nk, n)[idx], ng) by {
+        // 0 ≤ idx < n·n forces n ≥ 1, then idx/n ∈ [0,n) and idx%n ∈ [0,n).
+        assert(n > 0) by { if n == 0 { assert(n * n == 0); } }
+        vstd::arithmetic::div_mod::lemma_multiply_divide_lt(idx, n as int, n as int);
+        vstd::arithmetic::div_mod::lemma_div_pos_is_pos(idx, n as int);
+        vstd::arithmetic::div_mod::lemma_mod_bound(idx, n as int);
+        let i = (idx / (n as int) + 1) as nat;
+        let j = (idx % (n as int) + 1) as nat;
+        assert(1 <= i <= n);
+        assert(1 <= j <= n);
+        assert(comm_relators(nk, n)[idx] == comm_relator(nk, n, i, j));
+        lemma_comm_relator_valid(nk, n, i, j, ng);
+    }
+}
+
+/// The H₁-literal base presentation under Approach (b): the K_M presentation
+/// `g_m(mm)` (at offset 0; its generator indices are unchanged) together with
+/// the free c/b/d generators and the `n²` commutators of set (I). Crucially it
+/// does NOT carry `C`'s relator set `S` — `S` (= relation family (III)) holds in
+/// `H₃` only as a DERIVED consequence of the finite set (I).
+pub open spec fn h1_base(mm: ModMachine, n: nat) -> Presentation {
+    Presentation {
+        num_generators: h1_num_gens(g_m(mm).num_generators, n),
+        relators: g_m(mm).relators + comm_relators(g_m(mm).num_generators, n),
+    }
+}
+
+/// `h1_base` has `h1_num_gens(4+|quads|, n)` generators.
+pub proof fn lemma_h1_base_num_generators(mm: ModMachine, n: nat)
+    ensures h1_base(mm, n).num_generators == h1_num_gens((4 + mm.quads.len()) as nat, n),
+{
+    lemma_g_m_num_generators(mm);
+}
+
+/// `h1_base` is a valid presentation: every K_M relator is valid (monotone lift
+/// from `g_m`'s `nk` generators) and every commutator is valid over `nk + 2n`.
+pub proof fn lemma_h1_base_valid(mm: ModMachine, n: nat)
+    ensures presentation_valid(h1_base(mm, n)),
+{
+    reveal(presentation_valid);
+    let nk = g_m(mm).num_generators;
+    let ng = h1_num_gens(nk, n);
+    let p = h1_base(mm, n);
+    let grels = g_m(mm).relators;
+    let crels = comm_relators(nk, n);
+
+    lemma_g_m_valid(mm);                 // presentation_valid(g_m(mm))
+    lemma_comm_relators_valid(nk, n, ng); // nk + 2n ≤ ng = nk + 2n + 1
+
+    assert(p.relators =~= grels + crels);
+    assert forall|i: int| 0 <= i < p.relators.len()
+        implies word_valid(#[trigger] p.relators[i], ng) by {
+        if i < grels.len() {
+            assert(p.relators[i] == grels[i]);
+            // K_M relator: valid over nk, lift monotonically to ng = nk + 2n + 1.
+            assert(word_valid(grels[i], nk));
+            lemma_word_valid_mono(grels[i], nk, ng);
+        } else {
+            assert(p.relators[i] == crels[i - grels.len()]);
         }
     }
 }
