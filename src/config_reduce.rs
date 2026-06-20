@@ -1195,4 +1195,55 @@ pub proof fn lemma_gsconfig_in_TM(mm: ModMachine, p: nat, q: nat, e: int)
     }
 }
 
+//  ============================================================
+//  E2.E — property (i):  in_TM(config(α,β)) ⟹ (α,β) ∈ H₀.
+//  ============================================================
+//  T-freeness "last mile".  Falls straight out of coordinate survival (lemma_tfree_coord_restrict —
+//  the config-basis injectivity already proven for property (v)): the reduced singleton config word
+//  [{α,β,1}] survives into any ≡_A H₀ factorization, so (α,β) must be one of the H₀ coordinates.
+pub proof fn lemma_in_TM_config_implies_H0(mm: ModMachine, alpha: nat, beta: nat)
+    requires
+        in_TM(mm, config_word(alpha, beta)),
+    ensures
+        mm_in_H0(mm, alpha, beta),
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    let g = config_word(alpha, beta);
+    let ai = alpha as int;
+    let bi = beta as int;
+    //  u = reduced singleton config word [{α,β,1}], canw_eval(u) =~= config(α,β)
+    let u = seq![CanonLetter { r: ai, s: bi, e: 1 }];
+    lemma_sconfig_nat(ai, bi);                         //  sconfig(α,β) =~= config_word(α,β)
+    lemma_sconfig_is_gsconfig1(ai, bi);               //  sconfig =~= gsconfig(·,1)
+    assert(u.drop_first() =~= Seq::<CanonLetter>::empty());
+    assert(canw_eval(u) =~= canl_eval(u[0]) + canw_eval(u.drop_first()));
+    assert(canw_eval(u.drop_first()) =~= empty_word());
+    assert(canl_eval(u[0]) =~= gsconfig(ai, bi, 1));
+    assert(canw_eval(u) =~= g);
+    //  u is already reduced ⟹ cw_reduce(u) =~= u ⟹ coord (α,β) is in cw_reduce(u)
+    assert(cw_reduce(u) =~= u) by {
+        reveal_with_fuel(cw_reduce_from, 2);
+        assert(u.drop_first() =~= Seq::<CanonLetter>::empty());
+        assert(cw_reduce_from(u.drop_first(), Seq::<CanonLetter>::empty()) =~= Seq::<CanonLetter>::empty());
+        assert(cw_reduce(u) == cw_cons(u[0], Seq::<CanonLetter>::empty()));
+        assert(u[0].e == 1);
+        assert(cw_cons(u[0], Seq::<CanonLetter>::empty()) =~= seq![u[0]]);
+    }
+    assert(coord_in(cw_reduce(u), ai, bi)) by {
+        assert(cw_reduce(u).len() == 1 && cw_reduce(u)[0].r == ai && cw_reduce(u)[0].s == bi);
+    }
+    //  H₀ canon form of g
+    let p_canon = lemma_in_TM_to_canon(mm, g);        //  canw_eval(p_canon) ≡_A g, coords ∈ H₀
+    lemma_canw_eval_valid(p_canon);
+    lemma_equiv_symmetric(a, canw_eval(p_canon), g);  //  g ≡ canw_eval(p_canon)
+    assert(equiv_in_presentation(a, canw_eval(u), canw_eval(p_canon)));   //  canw_eval(u) =~= g
+    //  coordinate survival ⟹ coord_in(p_canon, α, β); that coordinate is H₀
+    lemma_tfree_coord_restrict(u, p_canon, ai, bi);
+    let j = choose|j: int| 0 <= j < p_canon.len() && p_canon[j].r == ai && p_canon[j].s == bi;
+    assert(0 <= j < p_canon.len() && p_canon[j].r == ai && p_canon[j].s == bi);
+    assert(mm_in_H0(mm, p_canon[j].r as nat, p_canon[j].s as nat));
+    assert(p_canon[j].r as nat == alpha && p_canon[j].s as nat == beta);
+}
+
 } //  verus!
