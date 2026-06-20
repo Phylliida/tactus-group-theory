@@ -14,7 +14,7 @@ use crate::machine_group::*;
 use crate::hnn::*;
 use crate::ii_subset::{lemma_ii_subset, lemma_signed_power_inverse, lemma_exact_div};
 use crate::benign::{apply_embedding, apply_embedding_symbol, in_generated_subgroup,
-    lemma_apply_embedding_concat};
+    lemma_apply_embedding_concat, lemma_apply_embedding_valid};
 use crate::tower_peel::{quad_data, lemma_in_TM_gexp_zero};
 use crate::config_reduce::*;
 
@@ -450,7 +450,18 @@ pub proof fn lemma_emb_gsconfig(gens: Seq<Word>, a: nat, b: nat, px: nat, py: na
 //  B4/B5 — fold the reduced config word into one embedding word U, then run it through both sides.
 //  ============================================================
 
-//  Residue reconstruction:  for r ≡ a (mod m), 0≤a<m,  a + m·(r/m) == r.
+//  nat division/mod agree with int division/mod on nonnegatives.
+proof fn lemma_nat_div_int(x: int, m: int)
+    requires
+        x >= 0,
+        m > 0,
+    ensures
+        (x as nat) / (m as nat) == x / m,
+        (x as nat) % (m as nat) == x % m,
+{
+}
+
+//  Residue reconstruction:  for r ≡ a (mod m), 0≤a<m,  a + m·(r/m) == r  and  r%m == a.
 proof fn lemma_residue_recon(r: int, a: int, m: int)
     requires
         r >= 0,
@@ -458,12 +469,13 @@ proof fn lemma_residue_recon(r: int, a: int, m: int)
         (r - a) % m == 0,
     ensures
         a + m * (r / m) == r,
+        r % m == a,
 {
     lemma_exact_div(r - a, m);                                       //  r-a == ((r-a)/m)·m
     let q = (r - a) / m;
     assert(q * m == m * q) by (nonlinear_arith);
     assert(r == q * m + a);                                          //  from r-a == q·m
-    vstd::arithmetic::div_mod::lemma_fundamental_div_mod_converse(r, m, q, a);  //  q == r/m
+    vstd::arithmetic::div_mod::lemma_fundamental_div_mod_converse(r, m, q, a);  //  q == r/m, a == r%m
     assert(m * (r / m) == m * q);                                    //  congruence from q == r/m
     //  a + m·(r/m) == a + m·q == a + q·m == a + (r - a) == r
 }
@@ -564,6 +576,131 @@ pub proof fn lemma_emb_aside_eq(gens: Seq<Word>, red: Seq<CanonLetter>, a: nat, 
         lemma_equiv_refl(p, apply_embedding(gens, red_to_U(red, mi)));
         lemma_equiv_transitive(p, apply_embedding(gens, red_to_U(red, mi)), ae_head + ae_rest,
             canw_eval(red));
+    }
+}
+
+//  ── b-side per letter:  apply_embedding(b_gens, letter_to_U(c,m)) ∈ T(M). ──
+//  Each residue-(a,b) config letter maps to a config at the quad_step-relabelled coordinate, which is
+//  in H₀ (step_preserves_h0), hence in T(M).
+#[verifier::rlimit(300)]
+pub proof fn lemma_bside_letter_in_TM(mm: ModMachine, qi: nat, c: CanonLetter)
+    requires
+        mod_machine_wf(mm),
+        qi < mm.quads.len(),
+        c.r >= 0,
+        c.s >= 0,
+        mm_in_H0(mm, c.r as nat, c.s as nat),
+        (c.r - mm.quads[qi as int].a as int) % (mm.m as int) == 0,
+        (c.s - mm.quads[qi as int].b as int) % (mm.m as int) == 0,
+    ensures
+        in_TM(mm, apply_embedding(hnn_b_gens(quad_data(mm, qi)), letter_to_U(c, mm.m as int))),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let q = mm.quads[qi as int];
+    let m = mm.m;
+    let mi = m as int;
+    let bg = hnn_b_gens(quad_data(mm, qi));
+    let assoc = quad_associations(q, m);
+    assert(bg.len() == 3);
+    assert(bg[0] == assoc[0].1 && bg[1] == assoc[1].1 && bg[2] == assoc[2].1);
+    //  residue / quad_matches facts
+    assert(q.a < m && q.b < m) by { assert(quad_wf(q, m)); }
+    lemma_residue_recon(c.r, q.a as int, mi);                  //  c.r % mi == q.a
+    lemma_residue_recon(c.s, q.b as int, mi);                  //  c.s % mi == q.b
+    lemma_nat_div_int(c.r, mi);                                //  (c.r as nat)/m == c.r/mi (& mod)
+    lemma_nat_div_int(c.s, mi);
+    let R0 = c.r as nat;
+    let S0 = c.s as nat;
+    let kr = c.r / mi;
+    let ks = c.s / mi;
+    assert(kr >= 0 && ks >= 0);
+    assert(R0 % m == q.a && S0 % m == q.b);                    //  via nat/int mod bridge + recon
+    assert(R0 / m == kr && S0 / m == ks);                      //  via nat/int div bridge
+    let g0 = letter_to_U(c, mi);
+    assert(g0 == gsconfig(kr, ks, c.e));
+    //  validity of apply_embedding(bg, g0) over the 3 base generators
+    lemma_quad_associations_valid(q, m, 3);
+    lemma_gsconfig_valid(kr, ks, c.e);
+    assert(forall|i: int| 0 <= i < bg.len() ==> word_valid(#[trigger] bg[i], 3)) by {
+        assert forall|i: int| 0 <= i < bg.len() implies word_valid(#[trigger] bg[i], 3) by {
+            assert(bg[i] == assoc[i].1);
+        }
+    }
+    lemma_apply_embedding_valid(bg, g0, 3);
+    match q.dir {
+        Dir::R => {
+            assert(bg[0] =~= config_word(q.c, 0));
+            assert(bg[1] =~= signed_power(1, (m * m) as int)) by {
+                assert(bg[1] == symbol_power(Symbol::Gen(1), m * m));
+            }
+            assert(bg[2] =~= signed_power(2, 1)) by {
+                assert(bg[2] == symbol_power(Symbol::Gen(2), 1));
+            }
+            lemma_emb_gsconfig(bg, q.c, 0, m * m, 1, kr, ks, c.e);
+            //  per-letter coords:  P = q.c + (m·m)·kr,  Q = ks
+            let pp = q.c as int + (m * m) as int * kr;
+            let qq = 0 + 1 * ks;
+            assert(equiv_in_presentation(p, apply_embedding(bg, g0), gsconfig(pp, qq, c.e)));
+            //  quad_step(R) = ((R0/m)·m² + q.c, S0/m) = (kr·m² + q.c, ks)
+            let target = quad_step(q, m, R0, S0);
+            assert(target.0 == (R0 / m) * (m * m) + q.c && target.1 == S0 / m);
+            assert((m * m) as int * kr == kr * (m * m) as int) by (nonlinear_arith);
+            assert(target.0 as int == pp) by {
+                assert(target.0 == kr * (m * m) + q.c);
+                assert((kr * (m * m)) as int == kr * (m * m) as int);
+            }
+            assert(target.1 as int == qq);
+            assert(pp >= 0 && qq >= 0);
+            //  mm_yields(R0,S0 → target); step_preserves_h0 ⟹ target ∈ H₀
+            assert(mm_yields(mm, R0, S0, target.0, target.1)) by {
+                assert(quad_matches(q, m, R0, S0));
+                assert(quad_step(mm.quads[qi as int], m, R0, S0) == target);
+            }
+            lemma_step_preserves_h0(mm, R0, S0, target.0, target.1);
+            assert(mm_in_H0(mm, target.0, target.1));
+            lemma_gsconfig_in_TM(mm, target.0, target.1, c.e);
+            assert(gsconfig(target.0 as int, target.1 as int, c.e) == gsconfig(pp, qq, c.e));
+            lemma_equiv_symmetric(p, apply_embedding(bg, g0), gsconfig(pp, qq, c.e));
+            lemma_in_subgroup_pred_respects_equiv(p, tm_pred(mm), gsconfig(pp, qq, c.e),
+                apply_embedding(bg, g0));
+            return;
+        }
+        Dir::L => {
+            assert(bg[0] =~= config_word(0, q.c));
+            assert(bg[1] =~= signed_power(1, 1)) by {
+                assert(bg[1] == symbol_power(Symbol::Gen(1), 1));
+            }
+            assert(bg[2] =~= signed_power(2, (m * m) as int)) by {
+                assert(bg[2] == symbol_power(Symbol::Gen(2), m * m));
+            }
+            lemma_emb_gsconfig(bg, 0, q.c, 1, m * m, kr, ks, c.e);
+            //  per-letter coords:  P = kr,  Q = q.c + (m·m)·ks
+            let pp = 0 + 1 * kr;
+            let qq = q.c as int + (m * m) as int * ks;
+            assert(equiv_in_presentation(p, apply_embedding(bg, g0), gsconfig(pp, qq, c.e)));
+            let target = quad_step(q, m, R0, S0);
+            assert(target.0 == R0 / m && target.1 == (S0 / m) * (m * m) + q.c);
+            assert((m * m) as int * ks == ks * (m * m) as int) by (nonlinear_arith);
+            assert(target.0 as int == pp);
+            assert(target.1 as int == qq) by {
+                assert(target.1 == ks * (m * m) + q.c);
+                assert((ks * (m * m)) as int == ks * (m * m) as int);
+            }
+            assert(pp >= 0 && qq >= 0);
+            assert(mm_yields(mm, R0, S0, target.0, target.1)) by {
+                assert(quad_matches(q, m, R0, S0));
+                assert(quad_step(mm.quads[qi as int], m, R0, S0) == target);
+            }
+            lemma_step_preserves_h0(mm, R0, S0, target.0, target.1);
+            assert(mm_in_H0(mm, target.0, target.1));
+            lemma_gsconfig_in_TM(mm, target.0, target.1, c.e);
+            assert(gsconfig(target.0 as int, target.1 as int, c.e) == gsconfig(pp, qq, c.e));
+            lemma_equiv_symmetric(p, apply_embedding(bg, g0), gsconfig(pp, qq, c.e));
+            lemma_in_subgroup_pred_respects_equiv(p, tm_pred(mm), gsconfig(pp, qq, c.e),
+                apply_embedding(bg, g0));
+            return;
+        }
     }
 }
 
