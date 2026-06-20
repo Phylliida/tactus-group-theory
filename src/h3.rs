@@ -287,4 +287,114 @@ pub proof fn lemma_psi_assoc_valid(mm: ModMachine, n: nat, ng: nat)
     assert(psi_assoc(mm, n) =~= psi_ublock(mm) + dpair + psi_bcblock(nk, n) + ppair);
 }
 
+// ----------------------------------------------------------------------------
+// The iterated single-letter HNN tower:  H₂ → +a_1 → … → +a_{2n} → +k = H₃
+// ----------------------------------------------------------------------------
+
+/// `H₂` with `a_1,…,a_l` added — `l` levels of single-letter HNN (0 ≤ l ≤ 2n).
+/// Level `l` adds stable letter `a_l` carrying the `φ_l : A→A_l` associations.
+pub open spec fn h3_upto(mm: ModMachine, n: nat, m: nat, l: nat) -> Presentation
+    decreases l,
+{
+    if l == 0 {
+        h2_pres(mm, n)
+    } else {
+        hnn_presentation(HNNData {
+            base: h3_upto(mm, n, m, (l - 1) as nat),
+            associations: phi_assoc(g_m(mm).num_generators, n, m, l),
+        })
+    }
+}
+
+/// `H₃ = HNN(h3_upto(2n); k ∣ k: A₊↔A₋)` — the finitely presented group: the
+/// literal finite presentation of Cohen's set (I).
+pub open spec fn h3_pres(mm: ModMachine, n: nat, m: nat) -> Presentation {
+    hnn_presentation(HNNData {
+        base: h3_upto(mm, n, m, (2 * n) as nat),
+        associations: psi_assoc(mm, n),
+    })
+}
+
+/// `h3_upto(l)` has `h2_num_gens + l` generators (one per added `a_i`).
+pub proof fn lemma_h3_upto_num_generators(mm: ModMachine, n: nat, m: nat, l: nat)
+    ensures h3_upto(mm, n, m, l).num_generators
+        == h2_num_gens((4 + mm.quads.len()) as nat, n) + l,
+    decreases l,
+{
+    if l == 0 {
+        lemma_h2_num_generators(mm, n);
+    } else {
+        lemma_h3_upto_num_generators(mm, n, m, (l - 1) as nat);  // adds 1 per level
+    }
+}
+
+/// `H₃` has `h3_num_gens(4+|quads|, n) = nk + 4n + 3` generators.
+pub proof fn lemma_h3_num_generators(mm: ModMachine, n: nat, m: nat)
+    ensures h3_pres(mm, n, m).num_generators == h3_num_gens((4 + mm.quads.len()) as nat, n),
+{
+    lemma_h3_upto_num_generators(mm, n, m, (2 * n) as nat);
+}
+
+/// The level-`l` stable letter is exactly the layout's `a_l = Gen(a_idx(nk,n,l))`.
+pub proof fn lemma_h3_a_stable_letter(mm: ModMachine, n: nat, m: nat, l: nat)
+    requires 1 <= l <= 2 * n,
+    ensures stable_letter(HNNData {
+            base: h3_upto(mm, n, m, (l - 1) as nat),
+            associations: phi_assoc(g_m(mm).num_generators, n, m, l),
+        }) == Symbol::Gen(a_idx((4 + mm.quads.len()) as nat, n, l)),
+{
+    lemma_h3_upto_num_generators(mm, n, m, (l - 1) as nat);
+    lemma_g_m_num_generators(mm);
+}
+
+/// The top stable letter is exactly the layout's `k = Gen(k_top(nk,n))`.
+pub proof fn lemma_h3_k_stable_letter(mm: ModMachine, n: nat, m: nat)
+    ensures stable_letter(HNNData {
+            base: h3_upto(mm, n, m, (2 * n) as nat),
+            associations: psi_assoc(mm, n),
+        }) == Symbol::Gen(k_top((4 + mm.quads.len()) as nat, n)),
+{
+    lemma_h3_upto_num_generators(mm, n, m, (2 * n) as nat);
+    lemma_g_m_num_generators(mm);
+}
+
+/// `h3_upto(l)` is a valid presentation: each added `a_i` carries valid `φ_i`
+/// associations over the (strictly larger) running generator set.
+pub proof fn lemma_h3_upto_valid(mm: ModMachine, n: nat, m: nat, l: nat)
+    requires l <= 2 * n,
+    ensures presentation_valid(h3_upto(mm, n, m, l)),
+    decreases l,
+{
+    if l == 0 {
+        lemma_h2_pres_valid(mm, n);
+    } else {
+        let nk = g_m(mm).num_generators;
+        let base = h3_upto(mm, n, m, (l - 1) as nat);
+        let data = HNNData { base, associations: phi_assoc(nk, n, m, l) };
+        lemma_h3_upto_valid(mm, n, m, (l - 1) as nat);            // presentation_valid(base)
+        lemma_h3_upto_num_generators(mm, n, m, (l - 1) as nat);   // base.num = nk+2n+1+l
+        lemma_g_m_num_generators(mm);                            // nk = 4+|quads|
+        // ng := base.num_generators = nk + 2n + 1 + l ≥ nk + 2n + 2  (since l ≥ 1).
+        lemma_phi_assoc_valid(nk, n, m, l, base.num_generators);
+        lemma_hnn_data_valid_from(data, base.num_generators);
+        lemma_hnn_presentation_valid(data);
+    }
+}
+
+/// `H₃` is a valid presentation — the finite set (I) is well-formed.
+pub proof fn lemma_h3_pres_valid(mm: ModMachine, n: nat, m: nat)
+    ensures presentation_valid(h3_pres(mm, n, m)),
+{
+    let nk = g_m(mm).num_generators;
+    let base = h3_upto(mm, n, m, (2 * n) as nat);
+    let data = HNNData { base, associations: psi_assoc(mm, n) };
+    lemma_h3_upto_valid(mm, n, m, (2 * n) as nat);               // presentation_valid(base)
+    lemma_h3_upto_num_generators(mm, n, m, (2 * n) as nat);      // base.num = nk+4n+2
+    lemma_g_m_num_generators(mm);
+    // ng := base.num_generators = nk + 4n + 2 ≥ nk + 2n + 2.
+    lemma_psi_assoc_valid(mm, n, base.num_generators);
+    lemma_hnn_data_valid_from(data, base.num_generators);
+    lemma_hnn_presentation_valid(data);
+}
+
 } // verus!
