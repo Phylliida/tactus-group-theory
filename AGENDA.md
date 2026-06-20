@@ -70,7 +70,9 @@ Reference: `docs/aanderaa-cohen-construction.md` (Layer 1), `docs/higman-embeddi
   conjugation in the real tower.
 - **Theorem 1, the ⟸ direction — DONE** (`lemma_reaches_implies_k_commutes`, brick 19):
   `(α,β)∈H₀(M) ⟹ [k,t(α,β)]=1`. The whole forward simulation, machine→group.
-- **Faithfulness (Theorem 1 ⟹, "the crux E") — IN PROGRESS:**
+- **Theorem 1, the ⟹ direction (the crux E) — DONE.** Full chain machine-checked: E1 (property III)
+  → (vii) → (vi, unconditional) → E2.E. Assembled with ⟸ into the iff by `lemma_theorem1` (`prop_v.rs`
+  57/0). **LAYER 1 COMPLETE: `[k,t(α,β)]=1 ⟺ (α,β)∈H₀(M)`.** Sub-pieces:
   - **E1 (property III) DONE:** `[k,t(α,β)]=1 ⟹ t(α,β)∈⟨t,rᵢ,lⱼ⟩` (`lemma_k_commutes_implies_subgroup`).
   - **E2 (`t(α,β)∈⟨t,rᵢ,lⱼ⟩ ⟹ (α,β)∈H₀`) — under way** (`ii_subset.rs`, 31/0):
     - **(ii)⊆ DONE** — the structural decomposition + `lemma_ii_subset` (the hardest sub-brick so far).
@@ -89,8 +91,9 @@ Reference: `docs/aanderaa-cohen-construction.md` (Layer 1), `docs/higman-embeddi
 
 ## 3. The work remaining
 
-### 3.1 — Finish Layer 1 `G(M)`: the faithfulness crux (E) ⟹ Theorem 1
-*Critical path. Closes the headline `[k,t(α,β)]=1 ⟺ (α,β)∈H₀(M)`.*
+### 3.1 — Finish Layer 1 `G(M)`: the faithfulness crux (E) ⟹ Theorem 1  ✅ **COMPLETE**
+*Closed the headline `[k,t(α,β)]=1 ⟺ (α,β)∈H₀(M)` — `lemma_theorem1` (`prop_v.rs` 57/0). Critical
+path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 
 - [x] **E2.C — generic property-II (THE central engine) — ABSTRACT ENGINE COMPLETE (`kp_pinch` 21/0).**
         `docs/e2c-property-ii-design.md`. Engine lives in `kp_pinch.rs` (abstract over `in_k: spec_fn`),
@@ -159,11 +162,16 @@ Reference: `docs/aanderaa-cohen-construction.md` (Layer 1), `docs/higman-embeddi
       `quad_step` PRE-image, in H₀ via the reverse of `step_preserves_h0` (it is an iff).
 - [x] **(iv)** — the index-shift isomorphism: subsumed by the lockstep accumulator / `quad_step`
       relabel inside E2.B (no separate conjugation telescope needed).
-- [ ] **E2.E — T-freeness (property i) + free-factor membership** (the "last mile"): `T=⟨t⟩^A` is
-      free on `{t(r,s)}`; `t(α,β)∈T(M)` ⟹ `(α,β)∈H₀`. Uses `free_product.rs`.
-- [ ] **E2.glue** — `t(α,β)∈A ∧ ∈⟨t,rᵢ,lⱼ⟩` →(vii)→ `∈A∩⟨T(M),rᵢ,lⱼ⟩` →(vi)→ `∈T(M)` →(E2.E)→ `∈H₀`.
-- [ ] **F — Theorem 1 (the iff):** assemble ⟸ (done) + ⟹ (E1∘E2) into
-      `[k,t(α,β)]=1 ⟺ (α,β)∈H₀(M)`. **Layer 1 complete.**
+- [x] **E2.E — T-freeness (property i) — DONE** (`config_reduce.rs` 36/0, `lemma_in_TM_config_implies_H0`):
+      `in_TM(config(α,β)) ⟹ (α,β)∈H₀`. NOT the 8-12-brick free_product route `docs/t-freeness-scope.md`
+      anticipated — the config-basis injectivity it needed is already proven (coordinate survival,
+      `lemma_tfree_coord_restrict`), so this collapses to a ~30-line application: the reduced singleton
+      `[{α,β,1}]` survives into any ≡_A H₀ factorization ⟹ `(α,β)` is one of the H₀ coords.
+- [x] **E2.glue** — folded into F. `g_m_associations` are diagonal `(g,g)`, so E1's output
+      `∈⟨g_subgens⟩` (.1 column) IS `∈⟨hnn_a_gens⟩` (.0 column), feeding `lemma_vii_subset` directly.
+- [x] **F — THEOREM 1 (the iff) — DONE** (`prop_v.rs` 57/0, `lemma_theorem1`):
+      `[k,t(α,β)]=1 ⟺ (α,β)∈H₀(M)`. ⟸ = `lemma_reaches_implies_k_commutes`; ⟹ = E1 → (vii) → (vi) →
+      E2.E. **LAYER 1 COMPLETE** — the whole machine→group faithfulness crux is machine-checked.
 
 ### 3.2 — Layer 2: the Higman embedding `C ↪ H₃`
 *`docs/higman-embedding-blueprint.md` (Cohen §9.6). Build on the finished `G(M)=K_M`.*
@@ -208,9 +216,9 @@ Reference: `docs/aanderaa-cohen-construction.md` (Layer 1), `docs/higman-embeddi
 - **E2.B (property (v) = `prop_v_holds`) is DONE** (`prop_v` 56/0, `lemma_prop_v_holds`). Both
   directions; the asymmetric b-side `(m²,1)` reduction was handled via `lemma_accumulator_inv` +
   a generic reduction core, NOT a single-modulus ii_subset rebuild. `lemma_vi` is now unconditional.
-- **Critical path now: E2.E (T-freeness, in_TM→H₀) → E2.glue → F.** Build order:
-  **(vii)⊆ [done] chain → E2.E (in_TM→H₀) → E2.glue → F**. `(ii)` both directions DONE;
-  `lemma_vii_subset` DONE; `(vi)`/`(v)`/`(iv)` DONE.
+- **LAYER 1 COMPLETE** (`lemma_theorem1`, `prop_v` 57/0). E2.E was a ~30-line application of the
+  config-basis injectivity (NOT the free_product route the old scope doc guessed); E2.glue folded into
+  F via the diagonal `g_m_associations`. **Critical path now: §3.2 Layer 2 (Higman embedding `C ↪ H₃`).**
 - **Fallback** (now only relevant if the *instantiation* snags, not the engine): the *direct
   pinch-decoding* route (each pinch = one machine step), noted in `docs/e2-faithfulness-scope.md`.
 - Layer 1 (§3.1) is the bulk of the *novel* proof work. Layer 2 (§3.2) is intricate but follows a
