@@ -123,7 +123,13 @@ Reference: `docs/aanderaa-cohen-construction.md` (Layer 1), `docs/higman-embeddi
           - **steps 2–5** = `lemma_kp_property_ii_core` — L2 reduce → 3c+junction raw-pinch-free →
             `britton_lemma_full` (no pinch ⟹ no stable letter) → `tail` empty ⟹ `W = head ∈ K`, then
             `britton_lemma_unconditional` descends `W·g⁻¹ ≡ ε` to base ⟹ `W ≡_base g` ⟹ `in_k(g)`.
-- [ ] **(ii)⊇** — residue configs ⊆ `T∩⟨t(i,j),xᵐ,yᵐ⟩` (inverts the move lemmas; completes (ii)).
+- [x] **(ii)⊇ DONE** (`ii_subset` 46/0) — `lemma_ii_superset`: the residue class
+      `⟨t(r,s):r≡i,s≡j (mod m)⟩ ⊆ ⟨t(i,j),xᵐ,yᵐ⟩` (inverts (ii)⊆). Each residue gen `t(r,s)` is built
+      as `x^{-(r-i)}·y^{-(s-j)}·t(i,j)·y^{s-j}·x^{r-i}` (`lemma_config_signed_in_G`, via the
+      `conj_config_signed_by_x/y` lemmas), with the m-multiple conjugators placed by new generic power
+      infra (`lemma_spow_{pos,neg,int}_mult_in_G`) and fed through a new generic closure
+      (`lemma_pred_subgroup_in_generated`: a pred-subgroup ⊆ ⟨gens⟩ when each pred-elt is). Both
+      directions of (ii) now hold. *(The "T∩" framing: residue ⊆ T(M) is separate, part of E2.glue.)*
 - [ ] **(iv)** — the index-shift isomorphism of associated subgroups (HNN-validity backbone).
 - [ ] **E2.B — property (v)** — the φ-compatibility: `rᵢ` maps `T(M)∩A₊ ↔ T(M)∩A₋`, because
       H₀-membership is **step-invariant** (machine determinism). This supplies L1's compatibility
@@ -182,7 +188,8 @@ Reference: `docs/aanderaa-cohen-construction.md` (Layer 1), `docs/higman-embeddi
   (b) **E2.D — property (vi)/tower peel** supplies the `in_kp_subgroup` membership form from (vii).
   The other `in_k` hypotheses (`in_k(ε)`, H_mul, H_resp) for `T(M)` reduce to T(M)'s subgroup closure
   (`lemma_h0_config_in_T`/`lemma_in_T_product` + base-equiv respect — mostly already in `machine_group`).
-  Recommended order: **E2.B (v) → (iv) → E2.D (vi) → E2.E → E2.glue → F**. `(ii)⊇` is independent.
+  Recommended order: **E2.B (v) → (iv) → E2.D (vi) → E2.E → E2.glue → F**. `(ii)⊇` is DONE
+  (`lemma_ii_superset`, 46/0).
 - **Fallback** (now only relevant if the *instantiation* snags, not the engine): the *direct
   pinch-decoding* route (each pinch = one machine step), noted in `docs/e2-faithfulness-scope.md`.
 - Layer 1 (§3.1) is the bulk of the *novel* proof work. Layer 2 (§3.2) is intricate but follows a
