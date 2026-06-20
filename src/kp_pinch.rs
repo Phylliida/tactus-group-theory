@@ -26,6 +26,7 @@ use crate::machine_group::{hnn_a_gens, hnn_b_gens, lemma_stable_conj_factorizati
     lemma_word_valid_mono};
 use crate::benign::{in_generated_subgroup, apply_embedding, lemma_apply_embedding_valid};
 use crate::ii_subset::{KPWord, kp_value, kp_pcount, is_kp_word, lemma_kp_value_cons};
+use crate::britton_via_tower::{is_stable, has_stable_letter};
 
 verus! {
 
@@ -416,6 +417,22 @@ pub proof fn lemma_kp_value_word_valid(data: HNNData, kp: KPWord)
         lemma_concat_word_valid(kp.head + psw, kp_value(st, rest), png);
         assert(concat(kp.head + psw, kp_value(st, rest)) == (kp.head + psw) + kp_value(st, rest));
         assert(kp_value(st, kp) =~= (kp.head + psw) + kp_value(st, rest));
+    }
+}
+
+//  A word over the base generators contains no stable letter:  t = Gen(ng) and t⁻¹ = Inv(ng) both
+//  have generator_index ng, which a base symbol's index never reaches.  Reused by 3c (syllables
+//  contribute no stable letters) and by the junction (appending a base word adds no stable letters).
+pub proof fn lemma_base_word_no_stable(data: HNNData, w: Word)
+    requires
+        word_valid(w, data.base.num_generators),
+    ensures
+        !has_stable_letter(data, w),
+{
+    let ng = data.base.num_generators;
+    assert(generator_index(Symbol::Gen(ng)) == ng && generator_index(Symbol::Inv(ng)) == ng);
+    assert forall|i: int| 0 <= i < w.len() implies !is_stable(data, #[trigger] w[i]) by {
+        assert(symbol_valid(w[i], ng));   //  generator_index(w[i]) < ng ⟹ w[i] ∉ {Gen(ng), Inv(ng)}
     }
 }
 
