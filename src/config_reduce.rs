@@ -1120,4 +1120,79 @@ pub proof fn lemma_in_TM_residue_reduced(mm: ModMachine, aa: int, bb: int, m: in
         }));
 }
 
+//  ============================================================
+//  B5 core — a config power at an H₀ coordinate is in T(M).
+//  ============================================================
+
+//  in_TM(ε) — the empty product.
+pub proof fn lemma_empty_in_TM(mm: ModMachine)
+    ensures
+        in_TM(mm, empty_word()),
+{
+    let f = Seq::<Word>::empty();
+    lemma_base_A_valid();
+    lemma_concat_all_empty();
+    lemma_equiv_refl(base_A(), empty_word());
+    assert(factors_from_pred(tm_pred(mm), f));
+    assert(in_TM(mm, empty_word())) by {
+        assert(factors_from_pred(tm_pred(mm), f)
+            && equiv_in_presentation(base_A(), concat_all(f), empty_word()));
+    }
+}
+
+//  gsconfig(p,q,e) (a config raised to integer power e, at an H₀ coordinate) is in T(M).
+pub proof fn lemma_gsconfig_in_TM(mm: ModMachine, p: nat, q: nat, e: int)
+    requires
+        mm_in_H0(mm, p, q),
+    ensures
+        in_TM(mm, gsconfig(p as int, q as int, e)),
+    decreases (if e >= 0 { e } else { -e }),
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    let pi = p as int;
+    let qi = q as int;
+    if e == 0 {
+        lemma_gsconfig_zero(pi, qi);                       //  gsconfig(p,q,0) ≡ ε
+        lemma_empty_in_TM(mm);
+        lemma_canl_eval_valid(CanonLetter { r: pi, s: qi, e: 0 });   //  word_valid(gsconfig(p,q,0),3)
+        lemma_equiv_symmetric(a, gsconfig(pi, qi, 0), empty_word());
+        lemma_in_subgroup_pred_respects_equiv(a, tm_pred(mm), empty_word(), gsconfig(pi, qi, 0));
+    } else if e == 1 {
+        lemma_sconfig_is_gsconfig1(pi, qi);                //  gsconfig(p,q,1) =~= sconfig(p,q)
+        lemma_sconfig_nat(pi, qi);                         //  sconfig(p,q) =~= config_word(p,q)
+        lemma_config_in_TM(mm, p, q);                      //  in_TM(config_word(p,q))
+        assert(gsconfig(pi, qi, 1) =~= config_word(p, q));
+    } else if e == -1 {
+        //  gsconfig(p,q,-1) =~= inverse_word(config_word(p,q)) — a T(M)-gen.
+        lemma_sconfig_is_gsconfig1(pi, qi);
+        lemma_sconfig_nat(pi, qi);
+        lemma_gsconfig_inverse(pi, qi, 1);
+        assert(gsconfig(pi, qi, -1) =~= inverse_word(config_word(p, q)));
+        assert(is_tm_gen(mm, gsconfig(pi, qi, -1))) by {
+            assert(mm_in_H0(mm, p, q) && gsconfig(pi, qi, -1) =~= inverse_word(config_word(p, q)));
+        }
+        assert(tm_pred(mm)(gsconfig(pi, qi, -1)) == is_tm_gen(mm, gsconfig(pi, qi, -1)));
+        lemma_gen_in_subgroup_pred(a, tm_pred(mm), gsconfig(pi, qi, -1));
+    } else if e > 1 {
+        //  gsconfig(p,q,e) ≡ gsconfig(p,q,1) · gsconfig(p,q,e-1)
+        lemma_gsconfig_merge(pi, qi, 1, e - 1);
+        lemma_gsconfig_in_TM(mm, p, q, 1);
+        lemma_gsconfig_in_TM(mm, p, q, e - 1);
+        lemma_product_in_subgroup_pred(a, tm_pred(mm), gsconfig(pi, qi, 1), gsconfig(pi, qi, e - 1));
+        assert(1 + (e - 1) == e);
+        lemma_in_subgroup_pred_respects_equiv(a, tm_pred(mm),
+            gsconfig(pi, qi, 1) + gsconfig(pi, qi, e - 1), gsconfig(pi, qi, e));
+    } else {
+        //  e < -1:  gsconfig(p,q,e) ≡ gsconfig(p,q,-1) · gsconfig(p,q,e+1)
+        lemma_gsconfig_merge(pi, qi, -1, e + 1);
+        lemma_gsconfig_in_TM(mm, p, q, -1);
+        lemma_gsconfig_in_TM(mm, p, q, e + 1);
+        lemma_product_in_subgroup_pred(a, tm_pred(mm), gsconfig(pi, qi, -1), gsconfig(pi, qi, e + 1));
+        assert(-1 + (e + 1) == e);
+        lemma_in_subgroup_pred_respects_equiv(a, tm_pred(mm),
+            gsconfig(pi, qi, -1) + gsconfig(pi, qi, e + 1), gsconfig(pi, qi, e));
+    }
+}
+
 } //  verus!
