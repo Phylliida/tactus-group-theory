@@ -21,6 +21,7 @@ use crate::h1::*;
 use crate::benign::*;
 use crate::higman_operations::*;
 use crate::hnn::*;
+use crate::config_reduce::*;
 
 verus! {
 
@@ -538,6 +539,103 @@ pub proof fn lemma_g_m_base_faithful(mm: ModMachine, w: Word)
     // descend the b_m tower: equiv at b_m ⟹ equiv at base_A.
     assert(word_valid(empty_word(), 3));
     lemma_b_m_equiv_faithful(mm, w, empty_word());
+}
+
+// ============================================================================
+// F2b — The config-word product is a CanonLetter evaluation.
+//
+// `config_emb(alphas)[i] = t_{α_i} = config_word(alphas[i], 0)`. The word
+// `apply_embedding(config_emb, w)` (a product of `t_α^{±1}` spelled by `w`) equals
+// `canw_eval(canon)` where `canon` reads each `w`-symbol as a CanonLetter at
+// coordinate `(α_i, 0)` with exponent `±1`. This routes the config-word algebra
+// into the CanonLetter normal-form machinery (`cw_reduce`, the nontriviality of
+// reduced sequences) that Layer 1 already developed.
+// ============================================================================
+
+/// The config-word embedding: index `i ↦ t_{α_i} = config_word(alphas[i], 0)`.
+pub open spec fn config_emb(alphas: Seq<nat>) -> Seq<Word> {
+    Seq::new(alphas.len(), |i: int| config_word(alphas[i], 0))
+}
+
+/// The CanonLetter for one source symbol: `Gen(i) ↦ {α_i, 0, +1}`, `Inv(i) ↦ {α_i, 0, -1}`.
+pub open spec fn sym_to_canl(alphas: Seq<nat>, s: Symbol) -> CanonLetter {
+    match s {
+        Symbol::Gen(i) => CanonLetter { r: alphas[i as int] as int, s: 0, e: 1 },
+        Symbol::Inv(i) => CanonLetter { r: alphas[i as int] as int, s: 0, e: -1 },
+    }
+}
+
+/// The CanonLetter sequence reading each `w`-symbol via `sym_to_canl`.
+pub open spec fn w_to_canon(alphas: Seq<nat>, w: Word) -> Seq<CanonLetter> {
+    Seq::new(w.len(), |j: int| sym_to_canl(alphas, w[j]))
+}
+
+/// One symbol: `φ_config(s) = canl_eval(sym_to_canl(s))`.
+pub proof fn lemma_config_symbol_to_canl(alphas: Seq<nat>, s: Symbol)
+    requires symbol_valid(s, alphas.len()),
+    ensures
+        apply_embedding_symbol(config_emb(alphas), s) =~= canl_eval(sym_to_canl(alphas, s)),
+{
+    let emb = config_emb(alphas);
+    match s {
+        Symbol::Gen(i) => {
+            assert(i < alphas.len());
+            let a = alphas[i as int] as int;
+            lemma_sconfig_nat(a, 0);             // sconfig(a,0) =~= config_word(a as nat, 0)
+            lemma_sconfig_is_gsconfig1(a, 0);    // sconfig(a,0) =~= gsconfig(a,0,1)
+            assert(apply_embedding_symbol(emb, s) == emb[i as int]);
+            assert(emb[i as int] == config_word(alphas[i as int], 0));
+            // config_word(a,0) =~= sconfig(a,0) =~= gsconfig(a,0,1) = canl_eval({a,0,1})
+        },
+        Symbol::Inv(i) => {
+            assert(i < alphas.len());
+            let a = alphas[i as int] as int;
+            lemma_sconfig_nat(a, 0);
+            lemma_sconfig_is_gsconfig1(a, 0);
+            lemma_gsconfig_inverse(a, 0, 1);     // inverse_word(gsconfig(a,0,1)) =~= gsconfig(a,0,-1)
+            assert(apply_embedding_symbol(emb, s) == inverse_word(emb[i as int]));
+            assert(emb[i as int] == config_word(alphas[i as int], 0));
+            // inverse_word(config_word(a,0)) =~= inverse_word(gsconfig(a,0,1)) =~= gsconfig(a,0,-1)
+        },
+    }
+}
+
+/// **F2b.** `apply_embedding(config_emb, w) = canw_eval(w_to_canon(alphas, w))`.
+pub proof fn lemma_config_emb_eq_canw(alphas: Seq<nat>, w: Word)
+    requires word_valid(w, alphas.len()),
+    ensures
+        apply_embedding(config_emb(alphas), w) =~= canw_eval(w_to_canon(alphas, w)),
+    decreases w.len(),
+{
+    let emb = config_emb(alphas);
+    let canon = w_to_canon(alphas, w);
+    if w.len() == 0 {
+        // both empty
+    } else {
+        let s = w.first();
+        let rest = w.drop_first();
+        assert(symbol_valid(s, alphas.len())) by { assert(w[0] == s); }
+        assert(word_valid(rest, alphas.len())) by {
+            assert forall|k: int| 0 <= k < rest.len() implies symbol_valid(#[trigger] rest[k], alphas.len()) by {
+                assert(rest[k] == w[k + 1]);
+            }
+        }
+        assert(canon[0] == sym_to_canl(alphas, s)) by { assert(w[0] == s); }
+        assert(canon.drop_first() =~= w_to_canon(alphas, rest)) by {
+            assert forall|j: int| 0 <= j < rest.len() implies
+                canon.drop_first()[j] == w_to_canon(alphas, rest)[j] by {
+                assert(canon.drop_first()[j] == canon[j + 1]);
+                assert(rest[j] == w[j + 1]);
+            }
+        }
+        lemma_config_symbol_to_canl(alphas, s);
+        lemma_config_emb_eq_canw(alphas, rest);
+        // apply_embedding(emb,w) = φ(s) ++ apply_embedding(emb,rest)
+        //                       =~= canl_eval(canon[0]) ++ canw_eval(canon.drop_first()) = canw_eval(canon)
+        assert(apply_embedding(emb, w)
+            =~= concat(apply_embedding_symbol(emb, s), apply_embedding(emb, rest)));
+        assert(canw_eval(canon) =~= canl_eval(canon[0]) + canw_eval(canon.drop_first()));
+    }
 }
 
 } // verus!
