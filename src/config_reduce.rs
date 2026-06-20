@@ -888,4 +888,87 @@ pub proof fn lemma_canon_represents_eval(factors: Seq<Word>, canon: Seq<CanonLet
     }
 }
 
+//  ============================================================
+//  B2 — in_TM(g) ⟹ a CanonLetter list with H₀ coordinates evaluating to g.
+//  ============================================================
+
+//  Convert a T(M)-generator word to its CanonLetter (coordinate from the H₀ witness).
+pub open spec fn tm_factor_to_canl(mm: ModMachine, f: Word) -> CanonLetter {
+    let w = choose|p: nat, q: nat| #![trigger config_word(p, q)]
+        mm_in_H0(mm, p, q) && (f == config_word(p, q) || f == inverse_word(config_word(p, q)));
+    if f == config_word(w.0, w.1) {
+        CanonLetter { r: w.0 as int, s: w.1 as int, e: 1 }
+    } else {
+        CanonLetter { r: w.0 as int, s: w.1 as int, e: -1 }
+    }
+}
+
+pub proof fn lemma_tm_factor_to_canl(mm: ModMachine, f: Word)
+    requires
+        is_tm_gen(mm, f),
+    ensures
+        is_canl_word(f, tm_factor_to_canl(mm, f)),
+        tm_factor_to_canl(mm, f).r >= 0,
+        tm_factor_to_canl(mm, f).s >= 0,
+        mm_in_H0(mm, tm_factor_to_canl(mm, f).r as nat, tm_factor_to_canl(mm, f).s as nat),
+{
+    let w = choose|p: nat, q: nat| #![trigger config_word(p, q)]
+        mm_in_H0(mm, p, q) && (f == config_word(p, q) || f == inverse_word(config_word(p, q)));
+    //  is_tm_gen gives a witness, so the choose's predicate is satisfied.
+    assert(mm_in_H0(mm, w.0, w.1) && (f == config_word(w.0, w.1) || f == inverse_word(config_word(w.0, w.1))));
+    let c = tm_factor_to_canl(mm, f);
+    lemma_sconfig_nat(w.0 as int, w.1 as int);     //  config_word(w.0,w.1) =~= sconfig(w.0,w.1)
+    assert(config_word(w.0, w.1) =~= sconfig(w.0 as int, w.1 as int));
+    if f == config_word(w.0, w.1) {
+        assert(c == CanonLetter { r: w.0 as int, s: w.1 as int, e: 1 });
+        assert(f =~= sconfig(c.r, c.s));
+    } else {
+        assert(c == CanonLetter { r: w.0 as int, s: w.1 as int, e: -1 });
+        assert(f =~= inverse_word(sconfig(c.r, c.s)));
+    }
+}
+
+//  The builder: in_TM(g) ⟹ a CanonLetter list, H₀ coordinates, evaluating to g.
+pub proof fn lemma_in_TM_to_canon(mm: ModMachine, g: Word) -> (canon: Seq<CanonLetter>)
+    requires
+        in_TM(mm, g),
+    ensures
+        equiv_in_presentation(base_A(), canw_eval(canon), g),
+        forall|i: int| 0 <= i < canon.len() ==> {
+            &&& (#[trigger] canon[i]).r >= 0
+            &&& canon[i].s >= 0
+            &&& mm_in_H0(mm, canon[i].r as nat, canon[i].s as nat)
+        },
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    let factors = choose|factors: Seq<Word>| #[trigger] factors_from_pred(tm_pred(mm), factors)
+        && equiv_in_presentation(a, concat_all(factors), g);
+    assert(factors_from_pred(tm_pred(mm), factors) && equiv_in_presentation(a, concat_all(factors), g));
+    let canon = Seq::new(factors.len(), |i: int| tm_factor_to_canl(mm, factors[i]));
+    assert(canon.len() == factors.len());
+    assert forall|i: int| 0 <= i < canon.len() implies {
+        &&& (#[trigger] canon[i]).r >= 0
+        &&& canon[i].s >= 0
+        &&& mm_in_H0(mm, canon[i].r as nat, canon[i].s as nat)
+    } by {
+        assert(canon[i] == tm_factor_to_canl(mm, factors[i]));
+        assert(tm_pred(mm)(factors[i]));
+        assert(is_tm_gen(mm, factors[i]));
+        lemma_tm_factor_to_canl(mm, factors[i]);
+    }
+    //  canon_represents(factors, canon)
+    assert(canon_represents(factors, canon)) by {
+        assert forall|i: int| 0 <= i < factors.len()
+            implies is_canl_word(#[trigger] factors[i], canon[i]) by {
+            assert(canon[i] == tm_factor_to_canl(mm, factors[i]));
+            assert(is_tm_gen(mm, factors[i]));
+            lemma_tm_factor_to_canl(mm, factors[i]);
+        }
+    }
+    lemma_canon_represents_eval(factors, canon);   //  concat_all(factors) =~= canw_eval(canon)
+    assert(canw_eval(canon) =~= concat_all(factors));
+    canon
+}
+
 } //  verus!
