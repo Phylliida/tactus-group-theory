@@ -27,7 +27,7 @@ use crate::machine_group::{hnn_a_gens, hnn_b_gens, lemma_stable_conj_factorizati
 use crate::benign::{in_generated_subgroup, apply_embedding, lemma_apply_embedding_valid};
 use crate::ii_subset::{KPWord, kp_value, kp_pcount, is_kp_word, lemma_kp_value_cons};
 use crate::britton_via_tower::{is_stable, has_stable_letter, has_pinch_at, has_pinch,
-    has_adjacent_opposite_at};
+    has_adjacent_opposite_at, britton_lemma_full, britton_lemma_unconditional};
 
 verus! {
 
@@ -43,6 +43,7 @@ pub proof fn lemma_kp_phi_fwd(data: HNNData, in_k: spec_fn(Word) -> bool, mid: W
         in_generated_subgroup(data.base, hnn_a_gens(data), mid),
     ensures
         in_k(phi),
+        word_valid(phi, data.base.num_generators),
         equiv_in_presentation(hnn_presentation(data),
             seq![stable_letter_inv(data)] + mid + seq![stable_letter(data)], phi),
 {
@@ -67,6 +68,11 @@ pub proof fn lemma_kp_phi_fwd(data: HNNData, in_k: spec_fn(Word) -> bool, mid: W
         by { assert(ag[t] == data.associations[t].0); }
     lemma_apply_embedding_valid(ag, uw, data.base.num_generators);
     lemma_word_valid_mono(g, data.base.num_generators, pres.num_generators);
+    //  phi = emb(bg, uw) is a base word (each bg[t] = associations[t].1 is a base word)
+    assert(bg.len() == k);
+    assert forall|t: int| 0 <= t < bg.len() implies word_valid(#[trigger] bg[t], data.base.num_generators)
+        by { assert(bg[t] == data.associations[t].1); }
+    lemma_apply_embedding_valid(bg, uw, data.base.num_generators);
     //  conjugation:  [si] + g + [st] ≡ phi
     lemma_stable_conj_factorization(data, uw);
     //  bridge  mid ≡_pres g, flip to  mid ≡_pres g  (only g must be valid)
@@ -95,6 +101,7 @@ pub proof fn lemma_kp_phi_rev(data: HNNData, in_k: spec_fn(Word) -> bool, mid: W
         in_generated_subgroup(data.base, hnn_b_gens(data), mid),
     ensures
         in_k(phi),
+        word_valid(phi, data.base.num_generators),
         equiv_in_presentation(hnn_presentation(data),
             seq![stable_letter(data)] + mid + seq![stable_letter_inv(data)], phi),
 {
@@ -119,6 +126,11 @@ pub proof fn lemma_kp_phi_rev(data: HNNData, in_k: spec_fn(Word) -> bool, mid: W
         by { assert(bg[t] == data.associations[t].1); }
     lemma_apply_embedding_valid(bg, uw, data.base.num_generators);
     lemma_word_valid_mono(g, data.base.num_generators, pres.num_generators);
+    //  phi = emb(ag, uw) is a base word (each ag[t] = associations[t].0 is a base word)
+    assert(ag.len() == k);
+    assert forall|t: int| 0 <= t < ag.len() implies word_valid(#[trigger] ag[t], data.base.num_generators)
+        by { assert(ag[t] == data.associations[t].0); }
+    lemma_apply_embedding_valid(ag, uw, data.base.num_generators);
     //  reverse conjugation:  [st] + g + [si] ≡ phi
     lemma_stable_conj_factorization_rev(data, uw);
     //  bridge  mid ≡_pres g, flip to  mid ≡_pres g  (only g must be valid)
@@ -183,10 +195,12 @@ pub proof fn lemma_kp_eliminate_pinch(
             && in_k(apply_embedding(hnn_b_gens(data), uw))
             ==> in_k(#[trigger] apply_embedding(hnn_a_gens(data), uw)),
         is_kp_word(in_k, kp),
+        kp_syllables_valid(data, kp),
         kp_has_pinch_at(data, kp, i),
     ensures
         kp_pcount(kp_prime) == kp_pcount(kp) - 2,
         is_kp_word(in_k, kp_prime),
+        kp_syllables_valid(data, kp_prime),
         equiv_in_presentation(hnn_presentation(data),
             kp_value(stable_letter(data), kp), kp_value(stable_letter(data), kp_prime)),
     decreases i,
@@ -253,6 +267,20 @@ pub proof fn lemma_kp_eliminate_pinch(
                 assert(kp_prime.tail[j] == tail[j + 2]);
             }
         }
+        //  --- kp_syllables_valid(kp_prime):  head = kp.head·φ(mid)·m1 (all base words), tail = t2 ---
+        let ng = data.base.num_generators;
+        assert(word_valid(kp.head, ng));                          //  kp_syllables_valid(kp).head
+        assert(1 < tail.len());                                   //  pinch at 0 ⟹ tail.len() ≥ 2
+        assert(word_valid(m1, ng)) by { assert(tail[1].1 == m1); }  //  syllable index 1
+        lemma_concat_word_valid(kp.head, phi, ng);               //  φ base-valid (helper ensures)
+        lemma_concat_word_valid(kp.head + phi, m1, ng);
+        assert(word_valid(kp_prime.head, ng));
+        assert(kp_syllables_valid(data, kp_prime)) by {
+            assert forall|j: int| 0 <= j < kp_prime.tail.len()
+                implies word_valid(#[trigger] kp_prime.tail[j].1, ng) by {
+                assert(kp_prime.tail[j] == tail[j + 2]);
+            }
+        }
         assert(kp_pcount(kp_prime) == kp_pcount(kp) - 2);
         kp_prime
     } else {
@@ -269,6 +297,15 @@ pub proof fn lemma_kp_eliminate_pinch(
         assert(kp_has_pinch_at(data, rest, i - 1)) by {
             assert(rest.tail[i - 1] == tail[i]);
             assert(rest.tail[i] == tail[i + 1]);
+        }
+        assert(kp_syllables_valid(data, rest)) by {
+            let ng = data.base.num_generators;
+            assert(tail[0] == tail.first());
+            assert(word_valid(rest.head, ng));                   //  rest.head = tail[0].1
+            assert forall|j: int| 0 <= j < rest.tail.len()
+                implies word_valid(#[trigger] rest.tail[j].1, ng) by {
+                assert(rest.tail[j] == tail[j + 1]);
+            }
         }
         let rest_prime = lemma_kp_eliminate_pinch(data, in_k, rest, i - 1);
         let kp_prime = KPWord {
@@ -292,6 +329,20 @@ pub proof fn lemma_kp_eliminate_pinch(
                 if j == 0 {
                     assert(kp_prime.tail[0] == (tail.first().0, rest_prime.head));
                     assert(in_k(rest_prime.head));
+                } else {
+                    assert(kp_prime.tail[j] == rest_prime.tail[j - 1]);
+                }
+            }
+        }
+        //  --- kp_syllables_valid(kp_prime): head = kp.head; tail[0] = rest_prime.head, rest = IH tail ---
+        assert(kp_syllables_valid(data, kp_prime)) by {
+            let ng = data.base.num_generators;
+            assert(word_valid(kp_prime.head, ng));               //  kp_prime.head = kp.head
+            assert forall|j: int| 0 <= j < kp_prime.tail.len()
+                implies word_valid(#[trigger] kp_prime.tail[j].1, ng) by {
+                if j == 0 {
+                    assert(kp_prime.tail[0] == (tail.first().0, rest_prime.head));
+                    assert(word_valid(rest_prime.head, ng));     //  IH: kp_syllables_valid(rest_prime)
                 } else {
                     assert(kp_prime.tail[j] == rest_prime.tail[j - 1]);
                 }
@@ -327,8 +378,10 @@ pub proof fn lemma_kp_reduce_pinch_free(
             && in_k(apply_embedding(hnn_b_gens(data), uw))
             ==> in_k(#[trigger] apply_embedding(hnn_a_gens(data), uw)),
         is_kp_word(in_k, kp),
+        kp_syllables_valid(data, kp),
     ensures
         is_kp_word(in_k, kp_prime),
+        kp_syllables_valid(data, kp_prime),
         kp_pinch_free(data, kp_prime),
         equiv_in_presentation(hnn_presentation(data),
             kp_value(stable_letter(data), kp), kp_value(stable_letter(data), kp_prime)),
@@ -893,6 +946,143 @@ pub proof fn lemma_kp_junction(data: HNNData, w: Word, u: Word)
         assert(has_pinch(data, w));
         assert(false);
     }
+}
+
+//  ============================================================
+//  Assembly — the generic property-II Britton core (steps 2–5 of the design's assembly).
+//  ============================================================
+//  Given a KP-word `kp` (every syllable ∈ K and a base word) whose value is HNN-equivalent to a
+//  stable-free base word `g`, conclude `g ∈ K`.  This is the heart of "g over H ∧ g ∈ ⟨K,p⟩ ⟹ g ∈ K":
+//    (2) reduce kp to a pinch-free KP-word kp₁ (L2);
+//    (3) W := kp_value(kp₁) is raw-pinch-free (3c) and W·g⁻¹ is too (junction, g⁻¹ stable-free);
+//    (4) W·g⁻¹ ≡ ε with no pinch ⟹ no stable letter (britton_lemma_full, contrapositive);
+//    (5) ⟹ kp₁.tail empty ⟹ W = head ∈ K, and W·g⁻¹ a base word ≡ ε ⟹ W ≡_base g (britton
+//        unconditional) ⟹ g ∈ K (H_resp).
+//  The "g ∈ ⟨K,p⟩ ⟹ ∃ KPWord" conversion (assembly step 1) is supplied separately.
+pub proof fn lemma_kp_property_ii_core(
+    data: HNNData, in_k: spec_fn(Word) -> bool, kp: KPWord, g: Word,
+)
+    requires
+        hnn_data_valid(data),
+        hnn_associations_isomorphic(data),
+        forall|a: Word, b: Word| in_k(a) && #[trigger] equiv_in_presentation(data.base, a, b) ==> in_k(b),
+        forall|a: Word, b: Word| in_k(a) && in_k(b) ==> in_k(#[trigger] (a + b)),
+        forall|uw: Word| word_valid(uw, data.associations.len() as nat)
+            && in_k(apply_embedding(hnn_a_gens(data), uw))
+            ==> in_k(#[trigger] apply_embedding(hnn_b_gens(data), uw)),
+        forall|uw: Word| word_valid(uw, data.associations.len() as nat)
+            && in_k(apply_embedding(hnn_b_gens(data), uw))
+            ==> in_k(#[trigger] apply_embedding(hnn_a_gens(data), uw)),
+        is_kp_word(in_k, kp),
+        kp_syllables_valid(data, kp),
+        word_valid(g, data.base.num_generators),
+        equiv_in_presentation(hnn_presentation(data), kp_value(stable_letter(data), kp), g),
+    ensures
+        in_k(g),
+{
+    let st = stable_letter(data);
+    let pres = hnn_presentation(data);
+    let base = data.base;
+    let ng = base.num_generators;
+    lemma_hnn_presentation_valid(data);
+    assert(pres.num_generators == ng + 1);
+
+    //  --- Step 2: reduce to pinch-free kp₁ (still a KP-word, still base-syllabled) ---
+    let kp1 = lemma_kp_reduce_pinch_free(data, in_k, kp);
+    let w = kp_value(st, kp1);
+    //  W ≡ g  (kp_value(kp) ≡ W from L2,  kp_value(kp) ≡ g given)
+    lemma_kp_value_word_valid(data, kp);                     //  word_valid(kp_value(kp), pres) for symmetric
+    lemma_equiv_symmetric(pres, kp_value(st, kp), w);
+    lemma_equiv_transitive(pres, w, kp_value(st, kp), g);
+    assert(equiv_in_presentation(pres, w, g));
+
+    //  --- W word-valid (over pres) and raw-pinch-free ---
+    lemma_kp_value_word_valid(data, kp1);
+    assert(word_valid(w, pres.num_generators));
+    lemma_kp_no_raw_pinch(data, kp1);
+    assert(!has_pinch(data, w));
+
+    //  --- g, g⁻¹ are stable-free base words ---
+    let gi = inverse_word(g);
+    crate::word::lemma_inverse_word_valid(g, ng);
+    assert(word_valid(gi, ng));
+    lemma_base_word_no_stable(data, gi);                     //  !has_stable_letter(data, gi)
+
+    //  --- W·g⁻¹ ≡ ε in pres ---
+    let wgi = w + gi;
+    lemma_word_valid_mono(g, ng, pres.num_generators);
+    lemma_word_valid_mono(gi, ng, pres.num_generators);
+    lemma_concat_word_valid(w, gi, pres.num_generators);
+    assert(word_valid(wgi, pres.num_generators));
+    lemma_equiv_concat_left(pres, w, g, gi);                 //  W ≡ g ⟹ W·gi ≡ g·gi
+    assert(concat(w, gi) == wgi);
+    assert(concat(g, gi) == g + gi);
+    lemma_word_inverse_right(pres, g);                       //  g·gi ≡ ε  (gi = inverse_word(g))
+    assert(concat(g, inverse_word(g)) == g + gi);
+    lemma_equiv_transitive(pres, wgi, g + gi, empty_word());
+    assert(equiv_in_presentation(pres, wgi, empty_word()));
+
+    //  --- W·g⁻¹ raw-pinch-free (junction) ⟹ via britton: no stable letter ---
+    lemma_kp_junction(data, w, gi);
+    assert(!has_pinch(data, wgi));
+    if has_stable_letter(data, wgi) {
+        britton_lemma_full(data, wgi);
+        assert(has_pinch(data, wgi));
+        assert(false);
+    }
+    assert(!has_stable_letter(data, wgi));
+
+    //  --- W stable-free (it is a prefix of W·g⁻¹) ---
+    assert(!has_stable_letter(data, w)) by {
+        if has_stable_letter(data, w) {
+            let s = choose|s: int| 0 <= s < w.len() && is_stable(data, w[s]);
+            assert(0 <= s < w.len() && is_stable(data, w[s]));
+            assert(wgi[s] == w[s]);                          //  s < |W| ⟹ prefix index
+            assert(0 <= s < wgi.len() && is_stable(data, #[trigger] wgi[s]));
+            assert(false);
+        }
+    }
+
+    //  --- Step 5: stable-free W ⟹ kp₁.tail empty ⟹ W = head ∈ K ---
+    assert(kp1.tail.len() == 0) by {
+        if kp1.tail.len() >= 1 {
+            lemma_kp_first_stable(data, kp1);                //  W[|head|] is stable, |W| > |head|
+            assert(0 <= kp1.head.len() < w.len());
+            assert(is_stable(data, #[trigger] w[kp1.head.len() as int]));
+            assert(false);                                   //  contradicts !has_stable_letter(W)
+        }
+    }
+    assert(w =~= kp1.head);                                  //  kp_value empty-tail branch
+    assert(in_k(kp1.head));                                  //  is_kp_word head clause
+    assert(in_k(w));
+
+    //  --- descend to base:  W·g⁻¹ a base word ≡ ε in HNN ⟹ ≡ ε in base ---
+    assert(word_valid(w, ng));                               //  W = head, kp_syllables_valid(kp₁)
+    lemma_concat_word_valid(w, gi, ng);
+    assert(word_valid(wgi, ng));
+    britton_lemma_unconditional(data, wgi);
+    assert(equiv_in_presentation(base, wgi, empty_word()));
+
+    //  --- cancellation:  W·g⁻¹ ≡ ε ⟹ W ≡ g in base ---
+    let m = wgi + g;
+    lemma_equiv_concat_left(base, wgi, empty_word(), g);     //  W·gi ≡ ε ⟹ (W·gi)·g ≡ ε·g
+    assert(concat(wgi, g) == m);
+    assert(concat(empty_word(), g) =~= g);
+    assert(equiv_in_presentation(base, m, g));               //  (a)
+    lemma_word_inverse_left(base, g);                        //  gi·g ≡ ε
+    assert(concat(gi, g) == gi + g);
+    lemma_equiv_concat_right(base, w, gi + g, empty_word()); //  W·(gi·g) ≡ W·ε
+    assert(concat(w, gi + g) == w + (gi + g));
+    assert(concat(w, empty_word()) =~= w);
+    assert(equiv_in_presentation(base, w + (gi + g), w));    //  (b)
+    assert(m =~= w + (gi + g));                              //  (c) associativity
+    assert(equiv_in_presentation(base, m, w));              //  (b)+(c)
+    lemma_equiv_symmetric(base, m, w);
+    lemma_equiv_transitive(base, w, m, g);
+    assert(equiv_in_presentation(base, w, g));
+
+    //  --- conclude in_k(g) via H_resp (in_k(W), W ≡_base g) ---
+    assert(in_k(g));
 }
 
 } //  verus!
