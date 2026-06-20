@@ -370,6 +370,90 @@ pub proof fn lemma_bc_letter_split(mm: ModMachine, n: nat, d: nat)
     }
 }
 
+/// **The `w_bc` split.** `h1_base ⊢ w_α(bc) ≡ w_α(b)·w_α(c)`: the interleaved bc-word collapses
+/// to the b-word times the c-word (each `c` commutes past the following `b`'s). Induction on α's
+/// base-m digits.
+pub proof fn lemma_w_bc_split(mm: ModMachine, n: nat, m: nat, alpha: nat)
+    requires numbers_word(n, m, alpha), 2 * n < m,
+    ensures
+        equiv_in_presentation(h1_base(mm, n),
+            w_bc(b_base(g_m(mm).num_generators, n), c_base(g_m(mm).num_generators), n, m, alpha),
+            w_b(b_base(g_m(mm).num_generators, n), n, m, alpha)
+                + w_c(c_base(g_m(mm).num_generators), n, m, alpha)),
+    decreases alpha,
+{
+    let nk = g_m(mm).num_generators;
+    let p = h1_base(mm, n);
+    let ng = h1_num_gens(nk, n);
+    lemma_h1_base_valid(mm, n);
+    let bb = b_base(nk, n);
+    let cb = c_base(nk);
+    if alpha == 0 || m <= 1 {
+        assert(w_bc(bb, cb, n, m, alpha) =~= empty_word());
+        assert(w_b(bb, n, m, alpha) =~= empty_word());     // w_c(bb,..) = ε
+        assert(w_c(cb, n, m, alpha) =~= empty_word());
+        assert(w_b(bb, n, m, alpha) + w_c(cb, n, m, alpha) =~= empty_word());
+        lemma_equiv_refl(p, w_bc(bb, cb, n, m, alpha));
+    } else {
+        let ap = alpha / m;
+        let d = alpha % m;
+        // numbers_word(alpha), alpha≠0, m>1  ⟹  1 ≤ d ≤ 2n ∧ numbers_word(ap)
+        assert(1 <= d <= 2 * n && numbers_word(n, m, ap));
+        vstd::arithmetic::div_mod::lemma_div_decreases(alpha as int, m as int);  // ap < alpha
+
+        let bl_w: Word = seq![alphabet_letter(bb, n, d)];
+        let cl_w: Word = seq![alphabet_letter(cb, n, d)];
+        let bcL = bc_letter(bb, cb, n, d);
+        let bigP = w_b(bb, n, m, ap);          // = w_c(bb,..,ap)
+        let bigQ = w_c(cb, n, m, ap);
+        let WBC = w_bc(bb, cb, n, m, ap);
+
+        // unfoldings (bridge Seq::new(1,·) to seq![·])
+        assert(w_bc(bb, cb, n, m, alpha) =~= WBC + bcL);
+        assert(w_b(bb, n, m, alpha) =~= bigP + bl_w);
+        assert(w_c(cb, n, m, alpha) =~= bigQ + cl_w);
+
+        // validities
+        lemma_w_c_valid(bb, n, m, ap, ng);     // bigP valid (bb+n = nk+2n ≤ ng)
+        lemma_w_c_valid(cb, n, m, ap, ng);     // bigQ valid (cb+n = nk+n ≤ ng)
+        lemma_alphabet_letter_valid(bb, n, d, ng);
+        lemma_alphabet_letter_valid(cb, n, d, ng);
+        assert(word_valid(bl_w, ng)) by { assert(bl_w[0] == alphabet_letter(bb, n, d)); }
+        assert(word_valid(cl_w, ng)) by { assert(cl_w[0] == alphabet_letter(cb, n, d)); }
+
+        // IH
+        lemma_w_bc_split(mm, n, m, ap);        // equiv(WBC, bigP + bigQ)
+
+        // E1: WBC·bcL ≡ (P·Q)·bcL
+        lemma_equiv_concat_left(p, WBC, bigP + bigQ, bcL);
+        // E2/E3: bcL ≡ bl·cl,  (P·Q)·bcL ≡ (P·Q)·(bl·cl)
+        lemma_bc_letter_split(mm, n, d);       // equiv(bcL, bl_w + cl_w)
+        lemma_equiv_concat_right(p, bigP + bigQ, bcL, bl_w + cl_w);
+
+        // commute: bl_w past bigQ  ⟹  Q·bl ≡ bl·Q
+        lemma_w_c_gens_in_block(cb, n, m, ap); // bigQ letters in c-block
+        lemma_b_alpha_commutes_c_word(mm, n, d, bigQ);   // commutes(bl_w, bigQ)
+        lemma_concat_word_valid(bl_w, bigQ, ng);
+        lemma_commutes_sym(p, bl_w, bigQ);     // equiv(bigQ + bl_w, bl_w + bigQ)
+
+        // E5: (P·Q)·(bl·cl) ≡ (P·bl)·(Q·cl)  via the middle commute
+        let m1 = (bigQ + bl_w) + cl_w;
+        let m2 = (bl_w + bigQ) + cl_w;
+        lemma_equiv_concat_left(p, bigQ + bl_w, bl_w + bigQ, cl_w);   // m1 ≡ m2
+        lemma_equiv_concat_right(p, bigP, m1, m2);                    // P·m1 ≡ P·m2
+        assert((bigP + bigQ) + (bl_w + cl_w) =~= bigP + m1);
+        assert((bigP + bl_w) + (bigQ + cl_w) =~= bigP + m2);
+
+        // chain:  WBC·bcL ≡ (P·Q)·bcL ≡ (P·Q)·(bl·cl) ≡ (P·bl)·(Q·cl)
+        lemma_equiv_transitive(p, WBC + bcL, (bigP + bigQ) + bcL, (bigP + bigQ) + (bl_w + cl_w));
+        lemma_equiv_transitive(p, WBC + bcL, (bigP + bigQ) + (bl_w + cl_w),
+            (bigP + bl_w) + (bigQ + cl_w));
+        // connect to the goal forms
+        assert(w_bc(bb, cb, n, m, alpha) =~= WBC + bcL);
+        assert(w_b(bb, n, m, alpha) + w_c(cb, n, m, alpha) =~= (bigP + bl_w) + (bigQ + cl_w));
+    }
+}
+
 /// One rung: an equivalence in `h3_upto(l)` lifts to `h3_upto(l+1)` (the `a_{l+1}` HNN whose
 /// base is exactly `h3_upto(l)`).
 pub proof fn lemma_h3_upto_step_embeds(mm: ModMachine, n: nat, m: nat, l: nat, w1: Word, w2: Word)
