@@ -971,4 +971,153 @@ pub proof fn lemma_in_TM_to_canon(mm: ModMachine, g: Word) -> (canon: Seq<CanonL
     canon
 }
 
+//  ============================================================
+//  B1 — in_residue_class(aa,bb,m,g) ⟹ a CanonLetter list with residue coordinates.
+//  ============================================================
+
+//  Convert a residue-class generator word to its CanonLetter (coordinate from the residue witness).
+pub open spec fn res_factor_to_canl(aa: int, bb: int, m: int, f: Word) -> CanonLetter {
+    let rs = choose|r: int, s: int| #![trigger config_word_signed(r, s)]
+        (r - aa) % m == 0 && (s - bb) % m == 0
+        && (f == config_word_signed(r, s) || f == inverse_word(config_word_signed(r, s)));
+    if f == config_word_signed(rs.0, rs.1) {
+        CanonLetter { r: rs.0, s: rs.1, e: 1 }
+    } else {
+        CanonLetter { r: rs.0, s: rs.1, e: -1 }
+    }
+}
+
+pub proof fn lemma_res_factor_to_canl(aa: int, bb: int, m: int, f: Word)
+    requires
+        is_residue_gen(aa, bb, m, f),
+    ensures
+        is_canl_word(f, res_factor_to_canl(aa, bb, m, f)),
+        (res_factor_to_canl(aa, bb, m, f).r - aa) % m == 0,
+        (res_factor_to_canl(aa, bb, m, f).s - bb) % m == 0,
+{
+    let rs = choose|r: int, s: int| #![trigger config_word_signed(r, s)]
+        (r - aa) % m == 0 && (s - bb) % m == 0
+        && (f == config_word_signed(r, s) || f == inverse_word(config_word_signed(r, s)));
+    assert((rs.0 - aa) % m == 0 && (rs.1 - bb) % m == 0
+        && (f == config_word_signed(rs.0, rs.1) || f == inverse_word(config_word_signed(rs.0, rs.1))));
+    let c = res_factor_to_canl(aa, bb, m, f);
+    //  config_word_signed == sconfig (same definition).
+    assert(config_word_signed(rs.0, rs.1) =~= sconfig(rs.0, rs.1));
+    if f == config_word_signed(rs.0, rs.1) {
+        assert(c == CanonLetter { r: rs.0, s: rs.1, e: 1 });
+        assert(f =~= sconfig(c.r, c.s));
+    } else {
+        assert(c == CanonLetter { r: rs.0, s: rs.1, e: -1 });
+        assert(f =~= inverse_word(sconfig(c.r, c.s)));
+    }
+}
+
+//  The builder: in_residue_class(aa,bb,m,g) ⟹ a CanonLetter list, residue coordinates, eval = g.
+pub proof fn lemma_residue_to_canon(aa: int, bb: int, m: int, g: Word) -> (canon: Seq<CanonLetter>)
+    requires
+        in_residue_class(aa, bb, m, g),
+    ensures
+        equiv_in_presentation(base_A(), canw_eval(canon), g),
+        forall|i: int| 0 <= i < canon.len() ==> {
+            &&& ((#[trigger] canon[i]).r - aa) % m == 0
+            &&& (canon[i].s - bb) % m == 0
+        },
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    let factors = choose|factors: Seq<Word>| #[trigger] factors_from_pred(residue_pred(aa, bb, m), factors)
+        && equiv_in_presentation(a, concat_all(factors), g);
+    assert(factors_from_pred(residue_pred(aa, bb, m), factors)
+        && equiv_in_presentation(a, concat_all(factors), g));
+    let canon = Seq::new(factors.len(), |i: int| res_factor_to_canl(aa, bb, m, factors[i]));
+    assert(canon.len() == factors.len());
+    assert forall|i: int| 0 <= i < canon.len() implies {
+        &&& ((#[trigger] canon[i]).r - aa) % m == 0
+        &&& (canon[i].s - bb) % m == 0
+    } by {
+        assert(canon[i] == res_factor_to_canl(aa, bb, m, factors[i]));
+        assert(residue_pred(aa, bb, m)(factors[i]));
+        assert(is_residue_gen(aa, bb, m, factors[i]));
+        lemma_res_factor_to_canl(aa, bb, m, factors[i]);
+    }
+    assert(canon_represents(factors, canon)) by {
+        assert forall|i: int| 0 <= i < factors.len()
+            implies is_canl_word(#[trigger] factors[i], canon[i]) by {
+            assert(canon[i] == res_factor_to_canl(aa, bb, m, factors[i]));
+            assert(is_residue_gen(aa, bb, m, factors[i]));
+            lemma_res_factor_to_canl(aa, bb, m, factors[i]);
+        }
+    }
+    lemma_canon_represents_eval(factors, canon);
+    assert(canw_eval(canon) =~= concat_all(factors));
+    canon
+}
+
+//  ============================================================
+//  B3 — the intermediate:  in_TM ∩ residue-class ⟹ a reduced form with H₀∩residue coordinates.
+//  ============================================================
+//  Consumes the Part-A crux:  g ∈ T(M) and g ∈ ⟨residue⟩ ⟹ g ≡_A a canw_reduced word whose every
+//  coordinate is BOTH an H₀ configuration AND in the residue class (aa,bb mod m).
+pub proof fn lemma_in_TM_residue_reduced(mm: ModMachine, aa: int, bb: int, m: int, g: Word)
+    requires
+        in_TM(mm, g),
+        in_residue_class(aa, bb, m, g),
+    ensures
+        exists|red: Seq<CanonLetter>| {
+            &&& canw_reduced(red)
+            &&& equiv_in_presentation(base_A(), canw_eval(red), g)
+            &&& (forall|i: int| 0 <= i < red.len() ==> {
+                    &&& (#[trigger] red[i]).r >= 0
+                    &&& red[i].s >= 0
+                    &&& mm_in_H0(mm, red[i].r as nat, red[i].s as nat)
+                    &&& (red[i].r - aa) % m == 0
+                    &&& (red[i].s - bb) % m == 0
+                })
+        },
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    let p_canon = lemma_in_TM_to_canon(mm, g);            //  canw_eval(p) ≡ g, coords ∈ H₀
+    let qa = lemma_residue_to_canon(aa, bb, m, g);        //  canw_eval(qa) ≡ g, coords residue
+    //  canw_eval(qa) ≡ canw_eval(p_canon)  (both ≡ g)
+    lemma_canw_eval_valid(p_canon);
+    lemma_equiv_symmetric(a, canw_eval(p_canon), g);
+    lemma_equiv_transitive(a, canw_eval(qa), g, canw_eval(p_canon));
+    let red = cw_reduce(qa);
+    lemma_cw_reduce_reduced(qa);                          //  canw_reduced(red)
+    lemma_cw_reduce_eval(qa);                             //  canw_eval(red) ≡ canw_eval(qa) ≡ g
+    lemma_equiv_transitive(a, canw_eval(red), canw_eval(qa), g);
+    //  coordinate facts for red
+    lemma_cw_reduce_coords(qa);                           //  coord_in(red) ⟹ coord_in(qa)
+    assert forall|i: int| 0 <= i < red.len() implies {
+        &&& (#[trigger] red[i]).r >= 0
+        &&& red[i].s >= 0
+        &&& mm_in_H0(mm, red[i].r as nat, red[i].s as nat)
+        &&& (red[i].r - aa) % m == 0
+        &&& (red[i].s - bb) % m == 0
+    } by {
+        let r = red[i].r;
+        let s = red[i].s;
+        assert(coord_in(red, r, s)) by { assert(red[i].r == r && red[i].s == s); }
+        //  residue:  coord_in(red) ⟹ coord_in(qa) ⟹ residue
+        let jq = choose|j: int| 0 <= j < qa.len() && qa[j].r == r && qa[j].s == s;
+        assert(0 <= jq < qa.len() && qa[jq].r == r && qa[jq].s == s);
+        assert((qa[jq].r - aa) % m == 0 && (qa[jq].s - bb) % m == 0);
+        //  H₀:  crux ⟹ coord_in(p_canon) ⟹ H₀
+        lemma_tfree_coord_restrict(qa, p_canon, r, s);
+        let jp = choose|j: int| 0 <= j < p_canon.len() && p_canon[j].r == r && p_canon[j].s == s;
+        assert(0 <= jp < p_canon.len() && p_canon[jp].r == r && p_canon[jp].s == s);
+        assert(p_canon[jp].r >= 0 && p_canon[jp].s >= 0
+            && mm_in_H0(mm, p_canon[jp].r as nat, p_canon[jp].s as nat));
+    }
+    assert(canw_reduced(red) && equiv_in_presentation(a, canw_eval(red), g)
+        && (forall|i: int| 0 <= i < red.len() ==> {
+            &&& (#[trigger] red[i]).r >= 0
+            &&& red[i].s >= 0
+            &&& mm_in_H0(mm, red[i].r as nat, red[i].s as nat)
+            &&& (red[i].r - aa) % m == 0
+            &&& (red[i].s - bb) % m == 0
+        }));
+}
+
 } //  verus!
