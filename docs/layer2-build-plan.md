@@ -184,9 +184,15 @@ intended Higman trick (forces (III) as a derived consequence of finite (I)).
 
 ### NEXT — the deep tail
 1. **Free-basis lemma** (Brick 2's hard half): `{ t_α w_α(b) d : α∈I }` is a free basis of the
-   subgroup it generates. Route: map `H₃ → K_M` killing `c/b/d` (and `p, a_i, k`); image `{t_α}` is
-   free by Layer-1 property (i) (`config`-basis injectivity, `lemma_tfree_coord_restrict` /
-   `config_reduce`); pull back (Cohen's Prop-1.8-Cor-1 analogue).
+   subgroup it generates. Route: the kill map is **`φ: H₁ → K_M`** (NOT `H₃ → K_M`!) — identity on the
+   K_M block `0..nk`, killing `c/b/d`. **Why H₁, not H₃:** `H₁`'s only relators are K_M-relators +
+   commutators, both ≡ε under `φ`, so `φ` is a valid homomorphism (`is_valid_homomorphism`); but the
+   `H₃` kill map is INVALID — the `φ_i` relator `a_i⁻¹ t a_i t_i⁻¹` would map to `t·config(i,0)⁻¹`,
+   and `t ≢ config(i,0)` in K_M for `i≠0`. So establish the free basis in `H₁` (image `{t_α}` free by
+   Layer-1 property (i) — `config`-basis injectivity, `lemma_tfree_coord_restrict`/`config_reduce`;
+   pull back via Cohen Prop-1.8-Cor-1), then carry it up the HNN tower (HNN base-injectivity / Britton).
+   Tools: `homomorphism.rs` (`apply_hom`, `is_valid_homomorphism`, `lemma_hom_preserves_equiv`,
+   `compose_hom`). NB: "free basis" has no predicate yet — define it (or the independence needed) first.
 2. **Brick 5 — faithfulness `C ↪ H₃`** (the deep part): soundness `relator_pred(w) ⟹ H₃ ⊢ φ(w)=1`
    (from (III)=consequence-of-(I): the `lemma_h2_p_conjugates_t`-style HNN-conjugation chain + Layer-1
    `in_TM`/Theorem 1 faithfulness, conjugate (II) by `k`, use `k:b_j↦b_j c_j` + the `w_α(bc)=w_α(b)
