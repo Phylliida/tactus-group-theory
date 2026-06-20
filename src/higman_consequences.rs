@@ -122,8 +122,148 @@ pub proof fn lemma_commutes_inv_right(p: Presentation, a: Word, b: Word)
 }
 
 // ----------------------------------------------------------------------------
-// Sub-brick 0 — lifting equivalences up the iterated HNN tower to h3_pres.
+// Sub-brick 1 — the `w_bc` split:  h1_base ⊢ w_α(bc) ≡ w_α(b)·w_α(c).
+// The c-generators commute with the b-generators (commutator relators of set (I)),
+// so the interleaved `w_α(bc)` collapses to the b-word times the c-word.
 // ----------------------------------------------------------------------------
+
+/// From a Gen–Gen commutation derive all four sign combinations.
+pub proof fn lemma_gen_commute_to_combos(p: Presentation, b_g: nat, c_g: nat)
+    requires
+        presentation_valid(p),
+        b_g < p.num_generators,
+        c_g < p.num_generators,
+        commutes(p, seq![Symbol::Gen(b_g)], seq![Symbol::Gen(c_g)]),
+    ensures
+        commutes(p, seq![Symbol::Gen(b_g)], seq![Symbol::Gen(c_g)]),
+        commutes(p, seq![Symbol::Gen(b_g)], seq![Symbol::Inv(c_g)]),
+        commutes(p, seq![Symbol::Inv(b_g)], seq![Symbol::Gen(c_g)]),
+        commutes(p, seq![Symbol::Inv(b_g)], seq![Symbol::Inv(c_g)]),
+{
+    let ng = p.num_generators;
+    let gB: Word = seq![Symbol::Gen(b_g)];
+    let gC: Word = seq![Symbol::Gen(c_g)];
+    let iB: Word = seq![Symbol::Inv(b_g)];
+    let iC: Word = seq![Symbol::Inv(c_g)];
+    // validities
+    assert(word_valid(gB, ng)) by { assert(gB[0] == Symbol::Gen(b_g)); }
+    assert(word_valid(gC, ng)) by { assert(gC[0] == Symbol::Gen(c_g)); }
+    assert(word_valid(iB, ng)) by { assert(iB[0] == Symbol::Inv(b_g)); }
+    assert(word_valid(iC, ng)) by { assert(iC[0] == Symbol::Inv(c_g)); }
+    // inverse_word(gC) =~= iC, inverse_word(gB) =~= iB
+    lemma_inverse_singleton(Symbol::Gen(c_g));
+    assert(gC =~= Seq::new(1, |_i: int| Symbol::Gen(c_g)));
+    assert(Seq::new(1, |_i: int| inverse_symbol(Symbol::Gen(c_g))) =~= iC);
+    assert(inverse_word(gC) =~= iC);
+    lemma_inverse_singleton(Symbol::Gen(b_g));
+    assert(gB =~= Seq::new(1, |_i: int| Symbol::Gen(b_g)));
+    assert(Seq::new(1, |_i: int| inverse_symbol(Symbol::Gen(b_g))) =~= iB);
+    assert(inverse_word(gB) =~= iB);
+
+    // (GenB, InvC)
+    lemma_commutes_inv_right(p, gB, gC);                  // commutes(gB, iC)
+    // (InvB, GenC)
+    lemma_commutes_sym(p, gB, gC);                        // commutes(gC, gB)
+    lemma_commutes_inv_right(p, gC, gB);                  // commutes(gC, iB)
+    lemma_commutes_sym(p, gC, iB);                        // commutes(iB, gC)
+    // (InvB, InvC)  — from commutes(gB, iC)
+    lemma_commutes_sym(p, gB, iC);                        // commutes(iC, gB)
+    lemma_commutes_inv_right(p, iC, gB);                  // commutes(iC, iB)
+    lemma_commutes_sym(p, iC, iB);                        // commutes(iB, iC)
+}
+
+/// The commutator `b_i c_j b_i⁻¹ c_j⁻¹` is a relator of `h1_base`, hence `≡ ε`.
+pub proof fn lemma_h1_comm_relator_identity(mm: ModMachine, n: nat, i: nat, j: nat)
+    requires 1 <= i <= n, 1 <= j <= n,
+    ensures
+        equiv_in_presentation(h1_base(mm, n),
+            comm_relator(g_m(mm).num_generators, n, i, j), empty_word()),
+{
+    let nk = g_m(mm).num_generators;
+    let grels = g_m(mm).relators;
+    let idx: int = (i - 1) * (n as int) + (j - 1);
+    // 0 ≤ idx < n²
+    assert(0 <= idx) by { assert((i - 1) >= 0 && (j - 1) >= 0); }
+    assert(idx < n * n) by {
+        assert((i - 1) <= (n - 1));
+        assert((i - 1) * (n as int) <= (n - 1) * (n as int)) by (nonlinear_arith)
+            requires 0 <= (i - 1) <= (n - 1), n >= 1;
+        assert((n - 1) * (n as int) + (j - 1) < n * n) by (nonlinear_arith)
+            requires (j - 1) < n, n >= 1;
+    }
+    // idx / n = i-1, idx % n = j-1
+    vstd::arithmetic::div_mod::lemma_fundamental_div_mod_converse(
+        idx, n as int, (i - 1) as int, (j - 1) as int);
+    assert(idx / (n as int) == (i - 1));
+    assert(idx % (n as int) == (j - 1));
+    let crels = comm_relators(nk, n);
+    assert(crels[idx] == comm_relator(nk, n, (idx / (n as int) + 1) as nat, (idx % (n as int) + 1) as nat));
+    assert(crels[idx] == comm_relator(nk, n, i, j));
+    // locate in h1_base.relators = grels + crels
+    let p = h1_base(mm, n);
+    assert(p.relators =~= grels + crels);
+    let ri = grels.len() + idx;
+    assert(0 <= ri < p.relators.len());
+    assert(p.relators[ri] == crels[idx]);
+    lemma_relator_is_identity(p, ri);
+}
+
+/// `b_i` and `c_j` commute in `h1_base` (1 ≤ i,j ≤ n): from `b_i c_j b_i⁻¹ c_j⁻¹ ≡ ε`.
+pub proof fn lemma_bc_gen_commute(mm: ModMachine, n: nat, i: nat, j: nat)
+    requires 1 <= i <= n, 1 <= j <= n,
+    ensures
+        commutes(h1_base(mm, n),
+            seq![Symbol::Gen(b_idx(g_m(mm).num_generators, n, i))],
+            seq![Symbol::Gen(c_idx(g_m(mm).num_generators, j))]),
+{
+    let nk = g_m(mm).num_generators;
+    let p = h1_base(mm, n);
+    let ng = h1_num_gens(nk, n);
+    lemma_h1_base_valid(mm, n);
+    let bb = b_idx(nk, n, i);
+    let cc = c_idx(nk, j);
+    let gB: Word = seq![Symbol::Gen(bb)];
+    let gC: Word = seq![Symbol::Gen(cc)];
+    let x: Word = gB + gC;            // u  = b_i c_j
+    let y: Word = gC + gB;            // v  = c_j b_i
+    let yi = inverse_word(y);
+    // index bounds and validities
+    assert(bb < ng && cc < ng);
+    assert(word_valid(gB, ng)) by { assert(gB[0] == Symbol::Gen(bb)); }
+    assert(word_valid(gC, ng)) by { assert(gC[0] == Symbol::Gen(cc)); }
+    lemma_concat_word_valid(gB, gC, ng);
+    lemma_concat_word_valid(gC, gB, ng);
+    // inverse_word(y) = inverse_word(gC·gB) = inverse_word(gB)·inverse_word(gC) = [Inv bb, Inv cc]
+    lemma_inverse_singleton(Symbol::Gen(bb));
+    lemma_inverse_singleton(Symbol::Gen(cc));
+    assert(gB =~= Seq::new(1, |_i: int| Symbol::Gen(bb)));
+    assert(gC =~= Seq::new(1, |_i: int| Symbol::Gen(cc)));
+    assert(inverse_word(gB) =~= seq![Symbol::Inv(bb)]);
+    assert(inverse_word(gC) =~= seq![Symbol::Inv(cc)]);
+    lemma_inverse_concat(gC, gB);                         // (gC·gB)⁻¹ = gB⁻¹·gC⁻¹
+    assert(concat(gC, gB) =~= y);
+    assert(yi =~= seq![Symbol::Inv(bb), Symbol::Inv(cc)]);
+    // the relator  r = b_i c_j b_i⁻¹ c_j⁻¹  =  x + yi
+    let r = comm_relator(nk, n, i, j);
+    assert(r =~= x + yi) by {
+        assert(r == seq![Symbol::Gen(bb), Symbol::Gen(cc), Symbol::Inv(bb), Symbol::Inv(cc)]);
+    }
+    lemma_h1_comm_relator_identity(mm, n, i, j);          // r ≡ ε
+    // r·y ≡ ε·y = y ; r·y = x·(yi·y) ≡ x·ε = x  ⟹  x ≡ y.
+    lemma_equiv_concat_left(p, r, empty_word(), y);       // r·y ≡ ε·y
+    assert(empty_word() + y =~= y);
+    assert(equiv_in_presentation(p, r + y, y));           // r·y ≡ y
+    lemma_word_inverse_left(p, y);                        // yi·y ≡ ε
+    lemma_equiv_concat_right(p, x, yi + y, empty_word()); // x·(yi·y) ≡ x·ε
+    assert((r + y) =~= x + (yi + y));
+    assert(x + empty_word() =~= x);
+    assert(equiv_in_presentation(p, r + y, x));           // r·y ≡ x
+    // x ≡ r·y ≡ y  (need word_valid(r·y) for the symmetry)
+    lemma_comm_relator_valid(nk, n, i, j, ng);            // word_valid(r, ng)
+    lemma_concat_word_valid(r, y, ng);
+    lemma_equiv_symmetric(p, r + y, x);                   // x ≡ r·y
+    lemma_equiv_transitive(p, x, r + y, y);               // x ≡ y  = commutes(gB, gC)
+}
 
 /// One rung: an equivalence in `h3_upto(l)` lifts to `h3_upto(l+1)` (the `a_{l+1}` HNN whose
 /// base is exactly `h3_upto(l)`).
