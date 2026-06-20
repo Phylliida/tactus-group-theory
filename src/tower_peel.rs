@@ -17,7 +17,7 @@ use crate::symbol::*;
 use crate::word::*;
 use crate::presentation::*;
 use crate::hnn::*;
-use crate::benign::{apply_embedding, concat_all, lemma_concat_all_empty};
+use crate::benign::{apply_embedding, concat_all, lemma_concat_all_empty, lemma_apply_embedding_valid};
 use crate::machine_group::*;
 use crate::kp_pinch::{in_kp_subgroup, is_kp_factor, all_kp_factors, lemma_property_ii};
 
@@ -358,6 +358,188 @@ pub proof fn lemma_TMstable_upto_to_kp(mm: ModMachine, l: nat, w: Word)
         assert(all_kp_factors(d, in_k, factors)
             && equiv_in_presentation(hnn_presentation(d), concat_all(factors), w));
     }
+}
+
+//  ============================================================
+//  φ-compatibility plumbing (the engine's H_ab / H_ba), reduced to prop_v + IH
+//  ============================================================
+
+//  hnn_a/b_gens depend only on the (level-independent) associations.
+pub proof fn lemma_step_gens_eq(mm: ModMachine, l: nat)
+    requires
+        1 <= l <= mm.quads.len(),
+    ensures
+        hnn_a_gens(step_data(mm, l)) == hnn_a_gens(quad_data(mm, (l - 1) as nat)),
+        hnn_b_gens(step_data(mm, l)) == hnn_b_gens(quad_data(mm, (l - 1) as nat)),
+{
+    let d = step_data(mm, l);
+    let qd = quad_data(mm, (l - 1) as nat);
+    assert(((l - 1) as nat) as int == l - 1);
+    assert(d.associations == qd.associations);
+    assert(hnn_a_gens(d) =~= hnn_a_gens(qd));
+    assert(hnn_b_gens(d) =~= hnn_b_gens(qd));
+}
+
+//  The a-side embedding is a base-A word (associations live in A).
+pub proof fn lemma_step_a_emb_valid(mm: ModMachine, l: nat, uw: Word)
+    requires
+        1 <= l <= mm.quads.len(),
+        word_valid(uw, 3),
+    ensures
+        word_valid(apply_embedding(hnn_a_gens(step_data(mm, l)), uw), 3),
+{
+    let d = step_data(mm, l);
+    let ag = hnn_a_gens(d);
+    lemma_quad_associations_valid(mm.quads[(l - 1) as int], mm.m, 3);
+    assert(d.associations.len() == 3);
+    assert(ag.len() == 3);
+    assert forall|i: int| 0 <= i < ag.len() implies word_valid(#[trigger] ag[i], 3) by {
+        assert(ag[i] == d.associations[i].0);
+    }
+    lemma_apply_embedding_valid(ag, uw, 3);
+}
+
+pub proof fn lemma_step_b_emb_valid(mm: ModMachine, l: nat, uw: Word)
+    requires
+        1 <= l <= mm.quads.len(),
+        word_valid(uw, 3),
+    ensures
+        word_valid(apply_embedding(hnn_b_gens(step_data(mm, l)), uw), 3),
+{
+    let d = step_data(mm, l);
+    let bg = hnn_b_gens(d);
+    lemma_quad_associations_valid(mm.quads[(l - 1) as int], mm.m, 3);
+    assert(d.associations.len() == 3);
+    assert(bg.len() == 3);
+    assert forall|i: int| 0 <= i < bg.len() implies word_valid(#[trigger] bg[i], 3) by {
+        assert(bg[i] == d.associations[i].1);
+    }
+    lemma_apply_embedding_valid(bg, uw, 3);
+}
+
+//  prop_v instantiation, A→B side (no IH inside — takes in_TM(aw) as hypothesis).
+pub proof fn lemma_phi_ab_step(mm: ModMachine, l: nat, uw: Word)
+    requires
+        mod_machine_wf(mm),
+        prop_v_holds(mm),
+        1 <= l <= mm.quads.len(),
+        word_valid(uw, 3),
+        in_TM(mm, apply_embedding(hnn_a_gens(step_data(mm, l)), uw)),
+    ensures
+        in_TMstable_upto(mm, (l - 1) as nat, apply_embedding(hnn_b_gens(step_data(mm, l)), uw)),
+{
+    let qi = (l - 1) as nat;
+    lemma_step_gens_eq(mm, l);
+    //  aw == quad_data a-embedding; trigger prop_v at qi.
+    assert(qi < mm.quads.len());
+    assert(in_TM(mm, apply_embedding(hnn_a_gens(quad_data(mm, qi)), uw)));
+    assert(in_TM(mm, apply_embedding(hnn_b_gens(quad_data(mm, qi)), uw)));   //  prop_v_holds fires
+    assert(in_TM(mm, apply_embedding(hnn_b_gens(step_data(mm, l)), uw)));
+    lemma_in_TM_implies_TMstable_upto(mm, qi, apply_embedding(hnn_b_gens(step_data(mm, l)), uw));
+}
+
+//  prop_v instantiation, B→A side.
+pub proof fn lemma_phi_ba_step(mm: ModMachine, l: nat, uw: Word)
+    requires
+        mod_machine_wf(mm),
+        prop_v_holds(mm),
+        1 <= l <= mm.quads.len(),
+        word_valid(uw, 3),
+        in_TM(mm, apply_embedding(hnn_b_gens(step_data(mm, l)), uw)),
+    ensures
+        in_TMstable_upto(mm, (l - 1) as nat, apply_embedding(hnn_a_gens(step_data(mm, l)), uw)),
+{
+    let qi = (l - 1) as nat;
+    lemma_step_gens_eq(mm, l);
+    assert(qi < mm.quads.len());
+    assert(in_TM(mm, apply_embedding(hnn_b_gens(quad_data(mm, qi)), uw)));
+    assert(in_TM(mm, apply_embedding(hnn_a_gens(quad_data(mm, qi)), uw)));   //  prop_v_holds fires
+    assert(in_TM(mm, apply_embedding(hnn_a_gens(step_data(mm, l)), uw)));
+    lemma_in_TM_implies_TMstable_upto(mm, qi, apply_embedding(hnn_a_gens(step_data(mm, l)), uw));
+}
+
+//  ============================================================
+//  THE INDUCTION — property (vi), top-down tower peel.
+//  ============================================================
+pub proof fn lemma_vi_upto(mm: ModMachine, l: nat, w: Word)
+    requires
+        mod_machine_wf(mm),
+        mm_terminal(mm, 0, 0),
+        prop_v_holds(mm),
+        l <= mm.quads.len(),
+        in_TMstable_upto(mm, l, w),
+        word_valid(w, 3),
+    ensures
+        in_TM(mm, w),
+    decreases l,
+{
+    if l == 0 {
+        lemma_in_TMstable_upto_zero(mm, w);
+    } else {
+        let d = step_data(mm, l);
+        let in_k = in_TMstable_upto_pred(mm, (l - 1) as nat);
+        lemma_quad_step_data_valid(mm, l);
+        assert(d.associations.len() == 3);
+
+        //  in_k(ε)
+        lemma_TMstable_upto_empty(mm, (l - 1) as nat);
+        assert(in_k(empty_word()));
+        //  H_resp
+        assert forall|a: Word, b: Word| in_k(a) && #[trigger] equiv_in_presentation(d.base, a, b)
+            implies in_k(b) by {
+            lemma_TMstable_upto_respects(mm, (l - 1) as nat, a, b);
+        }
+        //  H_mul
+        assert forall|a: Word, b: Word| in_k(a) && in_k(b) implies in_k(#[trigger] (a + b)) by {
+            lemma_TMstable_upto_product(mm, (l - 1) as nat, a, b);
+        }
+        //  H_ab :  IH(aw) → in_TM(aw) → prop_v → in_k(bw)
+        assert forall|uw: Word| word_valid(uw, d.associations.len() as nat)
+            && in_k(apply_embedding(hnn_a_gens(d), uw))
+            implies in_k(#[trigger] apply_embedding(hnn_b_gens(d), uw)) by {
+            let aw = apply_embedding(hnn_a_gens(d), uw);
+            assert(word_valid(uw, 3));
+            assert(in_TMstable_upto(mm, (l - 1) as nat, aw));   //  = in_k(aw)
+            lemma_step_a_emb_valid(mm, l, uw);                  //  word_valid(aw, 3)
+            lemma_vi_upto(mm, (l - 1) as nat, aw);              //  IH: in_TM(aw)
+            lemma_phi_ab_step(mm, l, uw);                       //  in_k(bw)
+        }
+        //  H_ba :  symmetric
+        assert forall|uw: Word| word_valid(uw, d.associations.len() as nat)
+            && in_k(apply_embedding(hnn_b_gens(d), uw))
+            implies in_k(#[trigger] apply_embedding(hnn_a_gens(d), uw)) by {
+            let bw = apply_embedding(hnn_b_gens(d), uw);
+            assert(word_valid(uw, 3));
+            assert(in_TMstable_upto(mm, (l - 1) as nat, bw));   //  = in_k(bw)
+            lemma_step_b_emb_valid(mm, l, uw);                  //  word_valid(bw, 3)
+            lemma_vi_upto(mm, (l - 1) as nat, bw);              //  IH: in_TM(bw)
+            lemma_phi_ba_step(mm, l, uw);                       //  in_k(aw)
+        }
+        //  word_valid(w, d.base.num_generators) and in_kp_subgroup(d, in_k, w)
+        lemma_word_valid_mono(w, 3, d.base.num_generators);
+        lemma_TMstable_upto_to_kp(mm, l, w);
+        //  run the engine ⟹ in_k(w) = in_TMstable_upto(l-1, w)
+        lemma_property_ii(d, in_k, w);
+        assert(in_TMstable_upto(mm, (l - 1) as nat, w));
+        //  recurse one level down
+        lemma_vi_upto(mm, (l - 1) as nat, w);
+    }
+}
+
+//  Property (vi):  A ∩ ⟨T(M), rᵢ, lⱼ⟩ = T(M).
+pub proof fn lemma_vi(mm: ModMachine, w: Word)
+    requires
+        mod_machine_wf(mm),
+        mm_terminal(mm, 0, 0),
+        prop_v_holds(mm),
+        in_TMstable(mm, w),
+        word_valid(w, 3),
+    ensures
+        in_TM(mm, w),
+{
+    lemma_in_TMstable_upto_full(mm, w);
+    assert(in_TMstable_upto(mm, mm.quads.len(), w));
+    lemma_vi_upto(mm, mm.quads.len(), w);
 }
 
 } //  verus!
