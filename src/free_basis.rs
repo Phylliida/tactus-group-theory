@@ -20,6 +20,7 @@ use crate::layout::*;
 use crate::h1::*;
 use crate::benign::*;
 use crate::higman_operations::*;
+use crate::hnn::*;
 
 verus! {
 
@@ -449,6 +450,94 @@ pub proof fn lemma_pullback_free(h: HomomorphismData, emb: Seq<Word>, w: Word)
     assert(apply_hom(h, empty_word()) =~= empty_word());
     // φ(big) = apply_embedding(comp_images, w).
     lemma_apply_hom_embedding_compose(h, emb, w);
+}
+
+// ============================================================================
+// F2a — Base faithfulness `base_A ↪ K_M = g_m`.
+//
+// The kill homomorphism legitimately targets `g_m` (it is the identity on the
+// K_M block), so the config-word relations produced by the pullback engine land
+// at `g_m` level. Config words live in `base_A` (gens {t,x,y}), at the bottom of
+// the `g_m` HNN tower. The reduced-CanonLetter nontriviality result
+// (`lemma_canw_eval_nontrivial`) is stated at `base_A` level. So we need: a base
+// word `≡ ε` in `g_m` is already `≡ ε` in `base_A`.
+//
+// `lemma_b_m_equiv_faithful` already gives `b_m → base_A`. We add the single top
+// HNN layer `g_m = HNN(b_m, k)`, whose associations `g_m_associations` are all
+// DIAGONAL `(w,w)` (k commutes with `t` and each stable letter), making its
+// association-isomorphism trivial. Peel it with `lemma_single_hnn_base_faithful`.
+// ============================================================================
+
+/// `g_m`'s top HNN layer (`k`) has DIAGONAL associations: `assoc[i].0 == assoc[i].1`.
+pub proof fn lemma_g_m_assoc_diagonal(mm: ModMachine)
+    ensures
+        forall|i: int| 0 <= i < g_m_associations(mm).len()
+            ==> #[trigger] g_m_associations(mm)[i].0 == g_m_associations(mm)[i].1,
+{
+    let assocs = g_m_associations(mm);
+    assert forall|i: int| 0 <= i < assocs.len() implies
+        #[trigger] assocs[i].0 == assocs[i].1 by {
+        if i == 0 {
+            // (seq![Gen 0], seq![Gen 0])
+        } else {
+            let g = Symbol::Gen((3 + (i - 1)) as nat);
+            assert(assocs[i].0 == seq![g] && assocs[i].1 == seq![g]);
+        }
+    }
+}
+
+/// `g_m`'s top HNN datum has isomorphic associated subgroups — trivially, since the
+/// associations are diagonal (`a_words == b_words`).
+pub proof fn lemma_g_m_data_isomorphic(mm: ModMachine)
+    ensures
+        hnn_associations_isomorphic(HNNData { base: b_m(mm), associations: g_m_associations(mm) }),
+{
+    let data = HNNData { base: b_m(mm), associations: g_m_associations(mm) };
+    let k = data.associations.len();
+    let a_words = Seq::new(k, |i: int| data.associations[i].0);
+    let b_words = Seq::new(k, |i: int| data.associations[i].1);
+    lemma_g_m_assoc_diagonal(mm);
+    assert(a_words =~= b_words) by {
+        assert forall|i: int| 0 <= i < k implies a_words[i] == b_words[i] by {
+            // a_words[i] = assoc[i].0 == assoc[i].1 = b_words[i] by diagonal
+        }
+    }
+    assert forall|w: Word| word_valid(w, k as nat) implies (
+        equiv_in_presentation(data.base, apply_embedding(a_words, w), empty_word())
+        <==> equiv_in_presentation(data.base, apply_embedding(b_words, w), empty_word())
+    ) by {
+        assert(apply_embedding(a_words, w) =~= apply_embedding(b_words, w));
+    }
+}
+
+/// **Base faithfulness `base_A ↪ g_m`.** A `base_A` word (`word_valid(·, 3)`) that is
+/// `≡ ε` in `K_M = g_m` is already `≡ ε` in `base_A`. (Peel the top `k`-layer, then
+/// descend the `b_m` tower with `lemma_b_m_equiv_faithful`.)
+pub proof fn lemma_g_m_base_faithful(mm: ModMachine, w: Word)
+    requires
+        mod_machine_wf(mm),
+        word_valid(w, 3),
+        equiv_in_presentation(g_m(mm), w, empty_word()),
+    ensures
+        equiv_in_presentation(base_A(), w, empty_word()),
+{
+    let data = HNNData { base: b_m(mm), associations: g_m_associations(mm) };
+    assert(g_m(mm) == hnn_presentation(data));
+
+    lemma_b_m_valid(mm);
+    lemma_b_m_upto_num_generators(mm, mm.quads.len());
+    assert(b_m(mm) == b_m_upto(mm, mm.quads.len()));
+    assert(data.base.num_generators == (3 + mm.quads.len()) as nat);
+    lemma_g_m_associations_valid(mm);
+    assert(hnn_data_valid(data));
+    lemma_g_m_data_isomorphic(mm);
+
+    lemma_word_valid_mono(w, 3, data.base.num_generators);
+    // peel the k-layer: equiv at g_m ⟹ equiv at b_m.
+    lemma_single_hnn_base_faithful(data, w);
+    // descend the b_m tower: equiv at b_m ⟹ equiv at base_A.
+    assert(word_valid(empty_word(), 3));
+    lemma_b_m_equiv_faithful(mm, w, empty_word());
 }
 
 } // verus!
