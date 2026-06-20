@@ -20,6 +20,7 @@ use crate::hnn::*;
 use crate::benign::{apply_embedding, concat_all, lemma_concat_all_empty, lemma_apply_embedding_valid};
 use crate::machine_group::*;
 use crate::kp_pinch::{in_kp_subgroup, is_kp_factor, all_kp_factors, lemma_property_ii};
+use crate::ii_subset::lemma_gexp_config_signed_zero;
 
 verus! {
 
@@ -540,6 +541,72 @@ pub proof fn lemma_vi(mm: ModMachine, w: Word)
     lemma_in_TMstable_upto_full(mm, w);
     assert(in_TMstable_upto(mm, mm.quads.len(), w));
     lemma_vi_upto(mm, mm.quads.len(), w);
+}
+
+//  ============================================================
+//  Property (v), step 1 (E2.B groundwork):  in_TM ⟹ trivial ⟨x,y⟩-image.
+//  This is the precondition (ii)⊆ (`lemma_ii_subset`) needs:  gexp(1)=gexp(2)=0.
+//  ============================================================
+
+//  A T(M)-generator (config word or its inverse) has zero x- and y-exponent sum.
+pub proof fn lemma_gexp_tm_gen_zero(mm: ModMachine, g: Word, i: nat)
+    requires
+        i == 1 || i == 2,
+        is_tm_gen(mm, g),
+    ensures
+        gexp(i, g) == 0,
+{
+    let ab = choose|a: nat, b: nat| #![trigger config_word(a, b)]
+        mm_in_H0(mm, a, b) && (g == config_word(a, b) || g == inverse_word(config_word(a, b)));
+    assert(g == config_word(ab.0, ab.1) || g == inverse_word(config_word(ab.0, ab.1)));
+    lemma_config_signed_matches_nat(ab.0, ab.1);
+    lemma_gexp_config_signed_zero(i, ab.0 as int, ab.1 as int);
+    assert(gexp(i, config_word(ab.0, ab.1)) == 0);
+    if g == inverse_word(config_word(ab.0, ab.1)) {
+        lemma_gexp_inverse(i, config_word(ab.0, ab.1));
+    }
+}
+
+//  A product of T(M)-generators has zero x- and y-exponent sum.
+pub proof fn lemma_gexp_tm_factors_zero(mm: ModMachine, f: Seq<Word>, i: nat)
+    requires
+        i == 1 || i == 2,
+        factors_from_pred(tm_pred(mm), f),
+    ensures
+        gexp(i, concat_all(f)) == 0,
+    decreases f.len(),
+{
+    if f.len() == 0 {
+        lemma_concat_all_empty();
+    } else {
+        reveal_with_fuel(concat_all, 1);
+        assert(concat_all(f) == f.first() + concat_all(f.drop_first()));
+        assert(tm_pred(mm)(f[0]));
+        lemma_gexp_tm_gen_zero(mm, f[0], i);
+        assert(factors_from_pred(tm_pred(mm), f.drop_first())) by {
+            assert forall|k: int| 0 <= k < f.drop_first().len()
+                implies tm_pred(mm)(#[trigger] f.drop_first()[k]) by {
+                assert(f.drop_first()[k] == f[k + 1]);
+            }
+        }
+        lemma_gexp_tm_factors_zero(mm, f.drop_first(), i);
+        lemma_gexp_concat(i, f.first(), concat_all(f.drop_first()));
+    }
+}
+
+//  in_TM(w) ⟹ gexp(1,w) = gexp(2,w) = 0.  Feeds (ii)⊆ in the property-(v) reduction.
+pub proof fn lemma_in_TM_gexp_zero(mm: ModMachine, w: Word, i: nat)
+    requires
+        i == 1 || i == 2,
+        in_TM(mm, w),
+    ensures
+        gexp(i, w) == 0,
+{
+    let f = choose|f: Seq<Word>| #[trigger] factors_from_pred(tm_pred(mm), f)
+        && equiv_in_presentation(base_A(), concat_all(f), w);
+    assert(factors_from_pred(tm_pred(mm), f) && equiv_in_presentation(base_A(), concat_all(f), w));
+    lemma_gexp_tm_factors_zero(mm, f, i);
+    lemma_equiv_in_A_preserves_gexp(i, concat_all(f), w);
 }
 
 } //  verus!
