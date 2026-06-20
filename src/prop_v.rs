@@ -767,4 +767,269 @@ pub proof fn lemma_emb_bside_in_TM(mm: ModMachine, qi: nat, red: Seq<CanonLetter
     }
 }
 
+//  ============================================================
+//  B4b — the quad HNN: validity, associated-subgroup isomorphism, base-faithfulness.
+//  ============================================================
+
+pub proof fn lemma_quad_data_valid(mm: ModMachine, qi: nat)
+    requires
+        qi < mm.quads.len(),
+    ensures
+        hnn_data_valid(quad_data(mm, qi)),
+{
+    let data = quad_data(mm, qi);
+    lemma_base_A_valid();
+    assert(data.base == base_A());
+    assert(data.base.num_generators == 3);
+    lemma_quad_associations_valid(mm.quads[qi as int], mm.m, 3);
+}
+
+//  The quad's associated subgroups are isomorphic (property iii), over the base A directly.
+pub proof fn lemma_quad_data_iso(mm: ModMachine, qi: nat)
+    requires
+        mod_machine_wf(mm),
+        qi < mm.quads.len(),
+    ensures
+        hnn_associations_isomorphic(quad_data(mm, qi)),
+{
+    let data = quad_data(mm, qi);
+    let q = mm.quads[qi as int];
+    let m = mm.m;
+    let k = data.associations.len();
+    assert(k == 3);
+    assert(m >= 1);
+    let a_words = Seq::new(k, |i: int| data.associations[i].0);
+    let b_words = Seq::new(k, |i: int| data.associations[i].1);
+    assert(a_words =~= seq![config_word(q.a, q.b), symbol_power(Symbol::Gen(1), m),
+        symbol_power(Symbol::Gen(2), m)]);
+    assert forall|w: Word| word_valid(w, k as nat) implies (
+        equiv_in_presentation(data.base, apply_embedding(a_words, w), empty_word())
+        <==> equiv_in_presentation(data.base, apply_embedding(b_words, w), empty_word())
+    ) by {
+        assert(word_valid(w, 3));
+        assert(m * m >= 1) by (nonlinear_arith) requires m >= 1;
+        assert(apply_embedding(seq![config_word(q.a, q.b), symbol_power(Symbol::Gen(1), m),
+            symbol_power(Symbol::Gen(2), m)], w) =~= apply_embedding(a_words, w));
+        lemma_conj_scaling_trivial_iff(q.a, q.b, m, m, w);
+        match q.dir {
+            Dir::R => {
+                assert(b_words =~= seq![config_word(q.c, 0), symbol_power(Symbol::Gen(1), m * m),
+                    symbol_power(Symbol::Gen(2), 1)]);
+                lemma_conj_scaling_trivial_iff(q.c, 0, m * m, 1, w);
+            }
+            Dir::L => {
+                assert(b_words =~= seq![config_word(0, q.c), symbol_power(Symbol::Gen(1), 1),
+                    symbol_power(Symbol::Gen(2), m * m)]);
+                lemma_conj_scaling_trivial_iff(0, q.c, 1, m * m, w);
+            }
+        }
+    }
+}
+
+//  Generic base cancellation:  w1·w2⁻¹ ≡ ε  ⟹  w1 ≡ w2  (in any valid presentation).
+//  Pure word algebra; split out of lemma_quad_base_faithful to keep the HNN derivation reasoning
+//  (lemma_single_hnn_base_faithful) in its own function context (rlimit).
+pub proof fn lemma_equiv_from_concat_inv_trivial(p: Presentation, w1: Word, w2: Word)
+    requires
+        presentation_valid(p),
+        word_valid(w1, p.num_generators),
+        word_valid(w2, p.num_generators),
+        equiv_in_presentation(p, w1 + inverse_word(w2), empty_word()),
+    ensures
+        equiv_in_presentation(p, w1, w2),
+{
+    let iw2 = inverse_word(w2);
+    let n = p.num_generators;
+    lemma_inverse_word_valid(w2, n);
+    lemma_concat_word_valid(iw2, w2, n);                  //  word_valid(iw2·w2)
+    lemma_concat_word_valid(w1, iw2 + w2, n);             //  word_valid(w1·(iw2·w2))
+    let x = w1 + iw2;
+    //  x·w2 ≡ w2:  from x ≡ ε,  x·w2 ≡ ε·w2 =~= w2
+    lemma_equiv_concat_left(p, x, empty_word(), w2);      //  x·w2 ≡ ε·w2
+    lemma_concat_empty_left(w2);                          //  ε·w2 =~= w2
+    //  w1 ≡ x·w2:  w1·(w2⁻¹·w2) ≡ w1·ε =~= w1, and x·w2 =~= w1·(w2⁻¹·w2)
+    lemma_concat_assoc(w1, iw2, w2);                      //  (w1·w2⁻¹)·w2 =~= w1·(w2⁻¹·w2)
+    lemma_word_inverse_left(p, w2);                       //  w2⁻¹·w2 ≡ ε
+    lemma_equiv_concat_right(p, w1, iw2 + w2, empty_word());  //  w1·(w2⁻¹·w2) ≡ w1·ε
+    lemma_concat_empty_right(w1);                         //  w1·ε =~= w1
+    assert(x + w2 =~= w1 + (iw2 + w2));
+    //  w1·(w2⁻¹·w2) ≡ w1, symmetric ⟹ w1 ≡ w1·(w2⁻¹·w2) =~= x·w2
+    lemma_equiv_symmetric(p, w1 + (iw2 + w2), w1);        //  w1 ≡ x·w2
+    //  combine:  w1 ≡ x·w2 ≡ w2
+    lemma_equiv_transitive(p, w1, x + w2, w2);
+}
+
+//  Two-word base-faithfulness:  w1 ≡ w2 in the quad HNN ⟹ w1 ≡ w2 in base A (both base words).
+pub proof fn lemma_quad_base_faithful(mm: ModMachine, qi: nat, w1: Word, w2: Word)
+    requires
+        mod_machine_wf(mm),
+        qi < mm.quads.len(),
+        word_valid(w1, 3),
+        word_valid(w2, 3),
+        equiv_in_presentation(hnn_presentation(quad_data(mm, qi)), w1, w2),
+    ensures
+        equiv_in_presentation(base_A(), w1, w2),
+{
+    let data = quad_data(mm, qi);
+    let hp = hnn_presentation(data);
+    let p = base_A();
+    lemma_base_A_valid();
+    lemma_quad_data_valid(mm, qi);
+    lemma_quad_data_iso(mm, qi);
+    assert(data.base == p && data.base.num_generators == 3);
+    let iw2 = inverse_word(w2);
+    lemma_inverse_word_valid(w2, 3);
+    lemma_concat_word_valid(w1, iw2, 3);
+    //  (a)  w1 ≡_hp w2  ⟹  w1·w2⁻¹ ≡_hp ε
+    lemma_equiv_concat_left(hp, w1, w2, iw2);             //  w1·w2⁻¹ ≡ w2·w2⁻¹
+    lemma_word_inverse_right(hp, w2);                     //  w2·w2⁻¹ ≡ ε
+    lemma_equiv_transitive(hp, w1 + iw2, w2 + iw2, empty_word());
+    //  base-faithful (single):  w1·w2⁻¹ ≡_A ε
+    lemma_single_hnn_base_faithful(data, w1 + iw2);
+    //  (b)  w1·w2⁻¹ ≡_A ε  ⟹  w1 ≡_A w2  (generic helper)
+    lemma_equiv_from_concat_inv_trivial(p, w1, w2);
+}
+
+//  ============================================================
+//  B6 — the forward direction (A→B) and prop_v assembly.
+//  ============================================================
+
+//  red_to_U is a valid word over the 3 base generators.
+pub proof fn lemma_red_to_U_valid(red: Seq<CanonLetter>, m: int)
+    ensures
+        word_valid(red_to_U(red, m), 3),
+    decreases red.len(),
+{
+    if red.len() == 0 {
+        assert(red_to_U(red, m) =~= empty_word());
+        assert(word_valid(empty_word(), 3));
+    } else {
+        let c = red[0];
+        lemma_gsconfig_valid(c.r / m, c.s / m, c.e);
+        assert(letter_to_U(c, m) == gsconfig(c.r / m, c.s / m, c.e));
+        lemma_red_to_U_valid(red.drop_first(), m);
+        lemma_concat_word_valid(letter_to_U(c, m), red_to_U(red.drop_first(), m), 3);
+        assert(red_to_U(red, m) == letter_to_U(c, m) + red_to_U(red.drop_first(), m));
+    }
+}
+
+//  Forward direction of property (v):  in_TM(emb(a_gens,uw)) ⟹ in_TM(emb(b_gens,uw)).
+#[verifier::rlimit(400)]
+pub proof fn lemma_prop_v_AtoB(mm: ModMachine, qi: nat, uw: Word)
+    requires
+        mod_machine_wf(mm),
+        qi < mm.quads.len(),
+        word_valid(uw, 3),
+        in_TM(mm, apply_embedding(hnn_a_gens(quad_data(mm, qi)), uw)),
+    ensures
+        in_TM(mm, apply_embedding(hnn_b_gens(quad_data(mm, qi)), uw)),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let data = quad_data(mm, qi);
+    let hp = hnn_presentation(data);
+    let q = mm.quads[qi as int];
+    let m = mm.m;
+    let mi = m as int;
+    let ag = hnn_a_gens(data);
+    let bg = hnn_b_gens(data);
+    let g_a = apply_embedding(ag, uw);
+    let g_b = apply_embedding(bg, uw);
+    lemma_quad_data_valid(mm, qi);
+    lemma_hnn_presentation_valid(data);              //  presentation_valid(hp)
+    lemma_quad_a_gens_form(mm, qi);                  //  ag =~= [config(q.a,q.b), x^m, y^m] (signed)
+    assert(q.a < m && q.b < m) by { assert(quad_wf(q, m)); }
+    assert(ag.len() == 3 && bg.len() == 3);
+    lemma_quad_associations_valid(q, m, 3);
+    assert(forall|i: int| 0 <= i < ag.len() ==> word_valid(#[trigger] ag[i], 3)) by {
+        assert forall|i: int| 0 <= i < ag.len() implies word_valid(#[trigger] ag[i], 3) by {
+            assert(ag[i] == quad_associations(q, m)[i].0);
+        }
+    }
+    assert(forall|i: int| 0 <= i < bg.len() ==> word_valid(#[trigger] bg[i], 3)) by {
+        assert forall|i: int| 0 <= i < bg.len() implies word_valid(#[trigger] bg[i], 3) by {
+            assert(bg[i] == quad_associations(q, m)[i].1);
+        }
+    }
+    lemma_apply_embedding_valid(ag, uw, 3);          //  word_valid(g_a, 3)
+    lemma_apply_embedding_valid(bg, uw, 3);          //  word_valid(g_b, 3)
+
+    //  Step 1: reduced config form red (coords in H₀ ∩ residue).
+    lemma_emb_a_reduced(mm, qi, uw);
+    let red = choose|red: Seq<CanonLetter>| {
+        &&& canw_reduced(red)
+        &&& equiv_in_presentation(p, canw_eval(red), g_a)
+        &&& (forall|i: int| 0 <= i < red.len() ==> {
+                &&& (#[trigger] red[i]).r >= 0
+                &&& red[i].s >= 0
+                &&& mm_in_H0(mm, red[i].r as nat, red[i].s as nat)
+                &&& (red[i].r - q.a as int) % mi == 0
+                &&& (red[i].s - q.b as int) % mi == 0
+            })
+    };
+    assert(canw_reduced(red) && equiv_in_presentation(p, canw_eval(red), g_a)
+        && (forall|i: int| 0 <= i < red.len() ==> {
+                &&& (#[trigger] red[i]).r >= 0
+                &&& red[i].s >= 0
+                &&& mm_in_H0(mm, red[i].r as nat, red[i].s as nat)
+                &&& (red[i].r - q.a as int) % mi == 0
+                &&& (red[i].s - q.b as int) % mi == 0
+            }));
+
+    let big_u = red_to_U(red, mi);
+    lemma_red_to_U_valid(red, mi);                   //  word_valid(big_u, 3)
+    //  a-side equality: apply_embedding(ag, big_u) ≡_A canw_eval(red)
+    assert(ag[0] =~= config_word(q.a, q.b));
+    assert(ag[1] =~= signed_power(1, mi));
+    assert(ag[2] =~= signed_power(2, mi));
+    lemma_emb_aside_eq(ag, red, q.a, q.b, m);
+    let a_u = apply_embedding(ag, big_u);
+    lemma_apply_embedding_valid(ag, big_u, 3);       //  word_valid(a_u, 3)
+    //  g_a ≡_A a_u   (a_u ≡ canw_eval(red) ≡ g_a, then symm)
+    lemma_equiv_transitive(p, a_u, canw_eval(red), g_a);
+    lemma_equiv_symmetric(p, a_u, g_a);
+    //  base embeds: g_a ≡_hp a_u
+    lemma_base_embeds_in_hnn(data, g_a, a_u);
+
+    //  Conjugation in the HNN presentation.
+    let st = stable_letter(data);
+    let si = stable_letter_inv(data);
+    let png = hp.num_generators;
+    assert(png == 4);
+    assert(st == Symbol::Gen(3) && si == Symbol::Inv(3));
+    lemma_stable_conj_factorization(data, uw);       //  [si]+g_a+[st] ≡_hp g_b
+    lemma_stable_conj_factorization(data, big_u);    //  [si]+a_u+[st] ≡_hp b_u
+    let b_u = apply_embedding(bg, big_u);
+    let lhs_uw = seq![si] + g_a + seq![st];
+    let lhs_u = seq![si] + a_u + seq![st];
+    //  validity of lhs_uw over the HNN generators (for symmetry)
+    lemma_word_valid_mono(g_a, 3, png);
+    assert(word_valid(seq![si], png)) by {
+        assert forall|t: int| 0 <= t < 1 implies symbol_valid(#[trigger] seq![si][t], png) by { }
+    }
+    assert(word_valid(seq![st], png)) by {
+        assert forall|t: int| 0 <= t < 1 implies symbol_valid(#[trigger] seq![st][t], png) by { }
+    }
+    lemma_concat_word_valid(seq![si], g_a, png);
+    lemma_concat_word_valid(seq![si] + g_a, seq![st], png);
+    assert(lhs_uw =~= (seq![si] + g_a) + seq![st]);
+    assert(word_valid(lhs_uw, png));
+    //  congruence:  lhs_uw ≡_hp lhs_u   (from g_a ≡_hp a_u)
+    lemma_equiv_concat_right(hp, seq![si], g_a, a_u);
+    lemma_equiv_concat_left(hp, seq![si] + g_a, seq![si] + a_u, seq![st]);
+    assert(lhs_uw =~= (seq![si] + g_a) + seq![st]);
+    assert(lhs_u =~= (seq![si] + a_u) + seq![st]);
+    //  chain:  g_b ≡ lhs_uw ≡ lhs_u ≡ b_u
+    lemma_equiv_transitive(hp, lhs_uw, lhs_u, b_u);  //  lhs_uw ≡ b_u
+    lemma_equiv_symmetric(hp, lhs_uw, g_b);          //  g_b ≡ lhs_uw
+    lemma_equiv_transitive(hp, g_b, lhs_uw, b_u);    //  g_b ≡ b_u
+    //  base-faithful: g_b ≡_A b_u
+    lemma_apply_embedding_valid(bg, big_u, 3);       //  word_valid(b_u, 3)
+    lemma_quad_base_faithful(mm, qi, g_b, b_u);
+    //  b_u ∈ T(M); respects_equiv ⟹ g_b ∈ T(M)
+    lemma_emb_bside_in_TM(mm, qi, red);
+    lemma_equiv_symmetric(p, g_b, b_u);              //  b_u ≡_A g_b
+    lemma_in_subgroup_pred_respects_equiv(p, tm_pred(mm), b_u, g_b);
+}
+
 } //  verus!
