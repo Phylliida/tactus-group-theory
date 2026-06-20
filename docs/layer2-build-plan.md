@@ -140,3 +140,57 @@ Finite, unambiguous-under-Approach-(b) pieces first — instantiate `word_number
 layout bases (`h_w_c`/`h_w_b`/`h_w_bc`) + the `n²` commutator relators `b_i c_j = c_j b_i` (a member
 of set (I)) with validity. Then the K_M-relator embed + `p⁻¹tp=td` + the a_i/k HNN associations to
 assemble set (I); the free-basis lemma + faithfulness are the deep tail (brick 5).
+
+---
+
+## STATUS (2026-06-20, session 2) — set (I) CONSTRUCTION TAIL DONE: H₃ is built & valid
+
+The literal finite presentation `H₃` of set (I) is fully assembled as an **iterated
+single-letter HNN tower** over `g_m(mm)` (= K_M), every level landing exactly at its layout slot.
+All modules verify in isolation under `./check.sh --verify-module` (Lean backend).
+
+- **`h1.rs` (Brick 2, complete) — 6/0** (097c2cc): `comm_relators(nk,n)` = the `n²` commutators
+  flattened row-major (validity via `lemma_multiply_divide_lt`); **`h1_base(mm,n)`** = the
+  H₁-literal base `Presentation` = `g_m(mm).relators` (K_M, at offset 0, indices unchanged) `+`
+  the commutators, over `h1_num_gens` generators. **NO `S`** (Approach (b)); `+ lemma_h1_base_valid`
+  (presentation_valid) `+ lemma_h1_base_num_generators`.
+- **`h2.rs` (Brick 3, complete) — 5/0** (18ca94d): `p_assoc = [(t, t·d)]`, `h2_data` over `h1_base`,
+  **`h2_pres = HNN(H₁, p ∣ p⁻¹ t p = t d)`** (the single schematic p-relation of set (I); the
+  infinite (II) is derived). `+ lemma_h2_pres_valid`, `lemma_h2_num_generators`,
+  `lemma_h2_stable_letter` (= `Gen(p_idx)`), and **`lemma_h2_p_conjugates_t`** (the relation as a
+  derived theorem, via `lemma_hnn_conjugation`).
+- **`h3.rs` (Brick 4, construction complete) — 16/0** (6d35482 + f8d8613):
+  - **`phi_assoc(nk,n,m,i)`** = `φ_i:A→A_i` association list `[t↦config(i,0), x↦xᵐ, d↦b_i·d, b_j↦b_j
+    (literal, 1≤j≤n), p↦p]`. **Subtlety:** in `b_i·d` the `b_i` uses the 2n-letter alphabet
+    (`alphabet_letter(b_base,n,i)`, `b_{n+i}=b_i⁻¹`), NOT a raw generator — distinct from the literal
+    `b_j↦b_j` block.
+  - **`psi_assoc(mm,n)`** = `ψ:A₊→A₋` association list `[u↦u for u∈U=g_subgens, d↦d, b_j↦b_j·c_j
+    (1≤j≤n), p↦p]`.
+  - infra: `assocs_valid` predicate + `lemma_assocs_valid_concat` (list-concat closure) +
+    `lemma_hnn_data_valid_from` (bridge to `hnn_data_valid`) + `lemma_single_gen_valid` /
+    `lemma_pair_word_valid`. Per-family validity: `lemma_phi_assoc_valid` / `lemma_psi_assoc_valid`
+    (over any `ng ≥ nk+2n+2`).
+  - **tower:** `h3_upto(mm,n,m,l)` (H₂ with `a_1..a_l`), **`h3_pres(mm,n,m)`** (add `k` on top) =
+    the finite set (I). `+ lemma_h3_num_generators` (= `nk+4n+3 = h3_num_gens`), `lemma_h3_pres_valid`,
+    and **layout-anchor lemmas** `lemma_h3_a_stable_letter` (`a_l = Gen(a_idx(nk,n,l))`) /
+    `lemma_h3_k_stable_letter` (`k = Gen(k_top(nk,n))`) — confirming the iterated HNN exactly
+    realizes the global layout table.
+
+**Companion cross-check (2026-06-20):** Danielle's local model confirmed the structure — iterated vs
+multi-stable-letter HNN are equal here (all associated subgroups `A,A_i,A₊,A₋ ⊆ H₂`, below all new
+stable letters); iso-validity (`hnn_associations_isomorphic`) is NOT needed for the literal
+presentation + validity (only for Britton/faithfulness in brick 5); omitting `S` from the base is the
+intended Higman trick (forces (III) as a derived consequence of finite (I)).
+
+### NEXT — the deep tail
+1. **Free-basis lemma** (Brick 2's hard half): `{ t_α w_α(b) d : α∈I }` is a free basis of the
+   subgroup it generates. Route: map `H₃ → K_M` killing `c/b/d` (and `p, a_i, k`); image `{t_α}` is
+   free by Layer-1 property (i) (`config`-basis injectivity, `lemma_tfree_coord_restrict` /
+   `config_reduce`); pull back (Cohen's Prop-1.8-Cor-1 analogue).
+2. **Brick 5 — faithfulness `C ↪ H₃`** (the deep part): soundness `relator_pred(w) ⟹ H₃ ⊢ φ(w)=1`
+   (from (III)=consequence-of-(I): the `lemma_h2_p_conjugates_t`-style HNN-conjugation chain + Layer-1
+   `in_TM`/Theorem 1 faithfulness, conjugate (II) by `k`, use `k:b_j↦b_j c_j` + the `w_α(bc)=w_α(b)
+   w_α(c)` split) `+` completeness `H₃ ⊢ φ(w)=1 ⟹ relator_pred(w)` (via `benign.rs` G∩L + the
+   `kp_pinch` predicate-subgroup HNN-faithfulness engine).
+3. **(II)/(III)-from-(I)** = the Cohen argument body (blueprint p.281): induction on word length giving
+   `w_α(a)⁻¹ t w_α(a) = t_α`, `w_α(a)⁻¹ d w_α(a) = w_α(b)d`, then `p⁻¹ t_α p = t_α w_α(b) d`.
