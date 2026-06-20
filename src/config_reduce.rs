@@ -16,6 +16,7 @@ use crate::presentation::*;
 use crate::presentation_lemmas::*;
 use crate::machine_group::*;
 use crate::britton_via_tower::lemma_delete_equiv_empty;
+use crate::ii_subset::lemma_signed_power_inverse;
 
 verus! {
 
@@ -540,6 +541,76 @@ pub proof fn lemma_cw_reduce_trivial_empty(w: Seq<CanonLetter>)
         lemma_equiv_transitive(a, canw_eval(r), canw_eval(w), empty_word());
         assert(false);
     }
+}
+
+//  ============================================================
+//  A6 — coordinate restriction (the crux, via coordinate survival).
+//  ============================================================
+//  Rather than full normal-form uniqueness, we track coordinate SETS: if revinv(V)·U reduces to ε,
+//  every coordinate of cw_reduce(U) must appear in V (a foreign coordinate would survive the fold).
+
+//  canw_eval distributes over concatenation.
+pub proof fn lemma_canw_eval_concat(x: Seq<CanonLetter>, y: Seq<CanonLetter>)
+    ensures
+        canw_eval(x + y) =~= canw_eval(x) + canw_eval(y),
+    decreases x.len(),
+{
+    if x.len() == 0 {
+        assert(x + y =~= y);
+        assert(canw_eval(x) =~= empty_word());
+    } else {
+        assert((x + y)[0] == x[0]);
+        assert((x + y).drop_first() =~= x.drop_first() + y);
+        lemma_canw_eval_concat(x.drop_first(), y);
+        assert(canw_eval(x + y) =~= canl_eval(x[0]) + canw_eval(x.drop_first() + y));
+        assert(canw_eval(x) =~= canl_eval(x[0]) + canw_eval(x.drop_first()));
+    }
+}
+
+//  cw_reduce_from distributes over concatenation (no barrier — fold A onto the fold of B).
+pub proof fn lemma_cw_reduce_from_concat(x: Seq<CanonLetter>, y: Seq<CanonLetter>, acc: Seq<CanonLetter>)
+    ensures
+        cw_reduce_from(x + y, acc) == cw_reduce_from(x, cw_reduce_from(y, acc)),
+    decreases x.len(),
+{
+    if x.len() == 0 {
+        assert(x + y =~= y);
+    } else {
+        assert((x + y)[0] == x[0]);
+        assert((x + y).drop_first() =~= x.drop_first() + y);
+        lemma_cw_reduce_from_concat(x.drop_first(), y, acc);
+        assert(cw_reduce_from(x + y, acc)
+            == cw_cons((x + y)[0], cw_reduce_from((x + y).drop_first(), acc)));
+        assert(cw_reduce_from(x, cw_reduce_from(y, acc))
+            == cw_cons(x[0], cw_reduce_from(x.drop_first(), cw_reduce_from(y, acc))));
+    }
+}
+
+//  inverse_word of a config power is the negated config power.
+pub proof fn lemma_gsconfig_inverse(r: int, s: int, e: int)
+    ensures
+        inverse_word(gsconfig(r, s, e)) =~= gsconfig(r, s, -e),
+{
+    let av = signed_power(2, -s);
+    let bv = signed_power(1, -r);
+    let cv = signed_power(0, e);
+    let dv = signed_power(1, r);
+    let fv = signed_power(2, s);
+    assert(gsconfig(r, s, e) =~= av + bv + cv + dv + fv);
+    //  peel the inverse off the 5-fold concat
+    lemma_inverse_word_concat(av + bv + cv + dv, fv);
+    lemma_inverse_word_concat(av + bv + cv, dv);
+    lemma_inverse_word_concat(av + bv, cv);
+    lemma_inverse_word_concat(av, bv);
+    //  per-factor inverses
+    lemma_signed_power_inverse(2, -s);   //  inv(av) = signed_power(2, s) = fv
+    lemma_signed_power_inverse(1, -r);   //  inv(bv) = signed_power(1, r) = dv
+    lemma_signed_power_inverse(0, e);    //  inv(cv) = signed_power(0, -e)
+    lemma_signed_power_inverse(1, r);    //  inv(dv) = signed_power(1, -r) = bv
+    lemma_signed_power_inverse(2, s);    //  inv(fv) = signed_power(2, -s) = av
+    assert(inverse_word(gsconfig(r, s, e))
+        =~= av + (bv + (signed_power(0, -e) + (dv + fv))));
+    assert(gsconfig(r, s, -e) =~= av + (bv + (signed_power(0, -e) + (dv + fv))));
 }
 
 } //  verus!
