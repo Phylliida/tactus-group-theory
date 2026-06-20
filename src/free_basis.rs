@@ -18,6 +18,8 @@ use crate::machine_group::*;
 use crate::word_numbering::*;
 use crate::layout::*;
 use crate::h1::*;
+use crate::benign::*;
+use crate::higman_operations::*;
 
 verus! {
 
@@ -299,6 +301,154 @@ pub proof fn lemma_kill_on_basis_elt(mm: ModMachine, n: nat, m: nat, alpha: nat)
     assert(basis_elt(mm, n, m, alpha) == tw + wb + dw);
     assert(apply_hom(h, tw + wb) =~= tw);
     assert(apply_hom(h, basis_elt(mm, n, m, alpha)) =~= tw);
+}
+
+// ============================================================================
+// PHASE 1 — The abstract free-basis pullback engine (Cohen, Cor 1 to Prop 1.8).
+//
+// φ: G → H a homomorphism; a family `{y_i} ⊆ G` whose images `{φ(y_i)}` form a
+// FREE family in H ⟹ `{y_i}` is a free family in G, and φ restricts to an
+// isomorphism of the generated subgroups. We work in the established
+// `apply_embedding` / `free_group` vocabulary (benign.rs / higman_operations.rs)
+// so the result feeds `hnn_associations_isomorphic` (hnn.rs) and the brick-5
+// Britton argument directly.
+//
+// The engine is parameterised over a `HomomorphismData` h and an embedding
+// `emb: Seq<Word>` of "basis" words into `h.source`. Its composite into the
+// target is `comp_images(h, emb)` (index i ↦ φ(emb[i])). NONE of the engine
+// depends on the deep Layer-1 freeness of the config words — that input (F2) is
+// supplied separately and combined downstream.
+// ============================================================================
+
+/// The φ-images of an embedding: `comp_images(h, emb)[i] = φ(emb[i])`.
+pub open spec fn comp_images(h: HomomorphismData, emb: Seq<Word>) -> Seq<Word> {
+    Seq::new(emb.len(), |i: int| apply_hom(h, emb[i]))
+}
+
+/// `apply_hom` and `apply_embedding` are the same index-wise substitution: applying
+/// the homomorphism `h` equals applying its `generator_images` as an embedding.
+pub proof fn lemma_apply_hom_eq_embedding(h: HomomorphismData, w: Word)
+    ensures apply_hom(h, w) =~= apply_embedding(h.generator_images, w),
+    decreases w.len(),
+{
+    if w.len() == 0 {
+    } else {
+        let s = w.first();
+        let rest = w.drop_first();
+        lemma_apply_hom_eq_embedding(h, rest);
+        // apply_hom_symbol(h, s) == apply_embedding_symbol(h.generator_images, s) by the
+        // identical match arms (Gen ↦ images[i], Inv ↦ inverse_word(images[i])).
+        match s {
+            Symbol::Gen(_i) => { },
+            Symbol::Inv(_i) => { },
+        }
+        assert(apply_hom(h, w)
+            =~= concat(apply_hom_symbol(h, s), apply_hom(h, rest)));
+        assert(apply_embedding(h.generator_images, w)
+            =~= concat(apply_embedding_symbol(h.generator_images, s),
+                       apply_embedding(h.generator_images, rest)));
+    }
+}
+
+/// φ commutes with `apply_embedding`: `φ(apply_embedding(emb, w)) = apply_embedding(φ∘emb, w)`.
+/// (Composition of the homomorphism with an embedding is the embedding by the images.)
+pub proof fn lemma_apply_hom_embedding_compose(h: HomomorphismData, emb: Seq<Word>, w: Word)
+    requires word_valid(w, emb.len()),
+    ensures
+        apply_hom(h, apply_embedding(emb, w)) =~= apply_embedding(comp_images(h, emb), w),
+    decreases w.len(),
+{
+    let comp = comp_images(h, emb);
+    assert(comp.len() == emb.len());
+    if w.len() == 0 {
+        // both sides ε
+    } else {
+        let s = w.first();
+        let rest = w.drop_first();
+        assert(symbol_valid(s, emb.len())) by { assert(w[0] == s); }
+        assert(word_valid(rest, emb.len())) by {
+            assert forall|k: int| 0 <= k < rest.len() implies symbol_valid(#[trigger] rest[k], emb.len()) by {
+                assert(rest[k] == w[k + 1]);
+            }
+        }
+        lemma_apply_hom_embedding_compose(h, emb, rest);
+
+        // head symbol: φ(apply_embedding_symbol(emb, s)) = apply_embedding_symbol(comp, s).
+        match s {
+            Symbol::Gen(i) => {
+                assert(i < emb.len());
+                // apply_embedding_symbol(emb, Gen(i)) = emb[i]; φ(emb[i]) = comp[i].
+                assert(apply_embedding_symbol(emb, s) == emb[i as int]);
+                assert(comp[i as int] == apply_hom(h, emb[i as int]));
+                assert(apply_embedding_symbol(comp, s) == comp[i as int]);
+            },
+            Symbol::Inv(i) => {
+                assert(i < emb.len());
+                // apply_embedding_symbol(emb, Inv(i)) = inverse_word(emb[i]);
+                // φ(inverse_word(emb[i])) = inverse_word(φ(emb[i])) = inverse_word(comp[i]).
+                assert(apply_embedding_symbol(emb, s) == inverse_word(emb[i as int]));
+                lemma_hom_respects_inverse(h, emb[i as int]);
+                assert(comp[i as int] == apply_hom(h, emb[i as int]));
+                assert(apply_embedding_symbol(comp, s) == inverse_word(comp[i as int]));
+            },
+        }
+        // splice: φ(emb·w) = φ(headImg) · φ(emb·rest) = comp(headImg) · comp(rest).
+        assert(apply_embedding(emb, w)
+            =~= concat(apply_embedding_symbol(emb, s), apply_embedding(emb, rest)));
+        lemma_hom_respects_concat(h, apply_embedding_symbol(emb, s), apply_embedding(emb, rest));
+        assert(apply_embedding(comp, w)
+            =~= concat(apply_embedding_symbol(comp, s), apply_embedding(comp, rest)));
+    }
+}
+
+/// **F3 — free words map trivially.** A word `w` that is trivial in the free group on
+/// `emb.len()` letters maps under ANY valid embedding to a word `≡ ε`. (The free group
+/// has no relators, so any assignment of generators to valid target words is a valid
+/// homomorphism; equivalence is then preserved.)
+pub proof fn lemma_free_to_embedding(emb: Seq<Word>, target: Presentation, w: Word)
+    requires
+        presentation_valid(target),
+        forall|i: int| 0 <= i < emb.len() ==> word_valid(#[trigger] emb[i], target.num_generators),
+        word_valid(w, emb.len()),
+        equiv_in_presentation(free_group(emb.len()), w, empty_word()),
+    ensures
+        equiv_in_presentation(target, apply_embedding(emb, w), empty_word()),
+{
+    let k = emb.len();
+    let h = HomomorphismData { source: free_group(k), target, generator_images: emb };
+    lemma_free_group_valid(k);
+    // is_valid_homomorphism(h): images valid, both presentations valid, NO source relators.
+    assert(is_valid_homomorphism(h)) by {
+        reveal(presentation_valid);
+        assert(h.generator_images.len() == h.source.num_generators);
+        assert(h.source.relators.len() == 0);   // free_group has empty relators
+    }
+    lemma_hom_preserves_equiv(h, w, empty_word());
+    // apply_hom(h, w) = apply_embedding(emb, w);  apply_hom(h, ε) = ε.
+    lemma_apply_hom_eq_embedding(h, w);
+    assert(apply_hom(h, empty_word()) =~= empty_word());
+}
+
+/// **The pullback engine (Cohen Cor 1 to Prop 1.8).** If a basis embedding `emb` of words
+/// into `h.source` satisfies a relation `apply_embedding(emb, w) ≡ ε` in the source, then the
+/// φ-image relation `apply_embedding(φ∘emb, w) ≡ ε` holds in the target. (Just: φ preserves
+/// equivalence, and φ commutes with `apply_embedding`.) Combined with target-side FREENESS of
+/// `φ∘emb` this yields `w ≡_free ε`, i.e. `emb` is itself a free family.
+pub proof fn lemma_pullback_free(h: HomomorphismData, emb: Seq<Word>, w: Word)
+    requires
+        is_valid_homomorphism(h),
+        forall|i: int| 0 <= i < emb.len() ==> word_valid(#[trigger] emb[i], h.source.num_generators),
+        word_valid(w, emb.len()),
+        equiv_in_presentation(h.source, apply_embedding(emb, w), empty_word()),
+    ensures
+        equiv_in_presentation(h.target, apply_embedding(comp_images(h, emb), w), empty_word()),
+{
+    let big = apply_embedding(emb, w);
+    lemma_hom_preserves_equiv(h, big, empty_word());
+    // φ(big) ≡_target φ(ε) = ε.
+    assert(apply_hom(h, empty_word()) =~= empty_word());
+    // φ(big) = apply_embedding(comp_images, w).
+    lemma_apply_hom_embedding_compose(h, emb, w);
 }
 
 } // verus!
