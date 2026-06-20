@@ -98,3 +98,8 @@ pub mod ii_subset;
 // Its own module to avoid trigger pollution / concurrent-edit churn with ii_subset.
 #[cfg(verus_keep_ghost)]
 pub mod kp_pinch;
+
+// tower_peel: E2.D — property (vi) A ∩ ⟨T(M),rᵢ,lⱼ⟩ = T(M) via the top-down tower peel,
+// reusing the single-letter engine in kp_pinch.  See docs/e2d-tower-peel-plan.md.
+#[cfg(verus_keep_ghost)]
+pub mod tower_peel;
