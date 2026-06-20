@@ -24,6 +24,8 @@ use crate::hnn::*;
 use crate::machine_group::*;
 use crate::word_numbering::*;
 use crate::layout::*;
+use crate::benign::{apply_embedding, lemma_apply_embedding_concat};
+use crate::prop_v::lemma_emb_signed_scaled;
 use crate::h1::*;
 use crate::h2::*;
 use crate::h3::*;
@@ -620,6 +622,136 @@ pub proof fn lemma_base_A_in_h3(mm: ModMachine, n: nat, m: nat, w1: Word, w2: Wo
     lemma_lift_to_gm(mm, w1, w2);
     lemma_gm_in_h1(mm, n, w1, w2);
     lemma_h1_in_h3(mm, n, m, w1, w2);
+}
+
+// ----------------------------------------------------------------------------
+// Sub-brick 2 — the a_l config conjugation:  a_l⁻¹ · t_α · a_l ≡ t_{α·m+l}  in H₃.
+// The φ_l HNN relations (t↦t_l, x↦xᵐ) conjugate the config word `t_α = x⁻ᵅ t xᵅ` to
+// `x⁻ᵐᵅ · t_l · xᵐᵅ = config(mα+l, 0)`.  Via the conjugation telescope at level l + the
+// base_A config-move lemma, lifted to H₃.  This is the per-digit step of (IIa).
+// ----------------------------------------------------------------------------
+
+/// The spelling of `config(α,0) = x⁻ᵅ t xᵅ` over an HNN association alphabet (gen 0 = t, gen 1 = x).
+pub open spec fn conj_u(alpha: nat) -> Word {
+    signed_power(1, -(alpha as int)) + seq![Symbol::Gen(0)] + signed_power(1, alpha as int)
+}
+
+/// `apply_embedding(gens, conj_u(α)) = x^{-pp·α} · gens[0] · x^{pp·α}` when `gens[1] = xᵖᵖ`.
+pub proof fn lemma_emb_conj_u(gens: Seq<Word>, pp: nat, alpha: nat)
+    requires
+        1 < gens.len(),
+        gens[1] =~= signed_power(1, pp as int),
+    ensures
+        apply_embedding(gens, conj_u(alpha)) =~=
+            signed_power(1, -((pp as int) * (alpha as int))) + gens[0]
+                + signed_power(1, (pp as int) * (alpha as int)),
+{
+    let un = signed_power(1, -(alpha as int));
+    let umid: Word = seq![Symbol::Gen(0)];
+    let up = signed_power(1, alpha as int);
+    assert(conj_u(alpha) =~= (un + umid) + up);
+    lemma_apply_embedding_concat(gens, un + umid, up);
+    lemma_apply_embedding_concat(gens, un, umid);
+    lemma_emb_signed_scaled(gens, 1, pp, -(alpha as int));      // emb(un) = sp(1, pp·(-α))
+    lemma_emb_signed_scaled(gens, 1, pp, alpha as int);         // emb(up) = sp(1, pp·α)
+    assert((pp as int) * (-(alpha as int)) == -((pp as int) * (alpha as int))) by (nonlinear_arith);
+    assert(apply_embedding(gens, umid) =~= gens[0]) by { reveal_with_fuel(apply_embedding, 2); }
+    assert(apply_embedding(gens, conj_u(alpha)) =~=
+        (apply_embedding(gens, un) + apply_embedding(gens, umid)) + apply_embedding(gens, up));
+}
+
+/// **Sub-brick 2 keystone.** `a_l⁻¹ · config(α,0) · a_l ≡ config(α·m+l, 0)` in `h3_pres`
+/// (1 ≤ l ≤ 2n). The per-digit conjugation step of (IIa).
+pub proof fn lemma_a_conj_config(mm: ModMachine, n: nat, m: nat, l: nat, alpha: nat)
+    requires 1 <= l <= 2 * n, 2 * n < m,
+    ensures
+        equiv_in_presentation(h3_pres(mm, n, m),
+            seq![Symbol::Inv(a_idx(g_m(mm).num_generators, n, l))]
+                + config_word(alpha, 0)
+                + seq![Symbol::Gen(a_idx(g_m(mm).num_generators, n, l))],
+            config_word((alpha * m + l) as nat, 0)),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let base = h3_upto(mm, n, m, (l - 1) as nat);
+    let data = HNNData { base, associations: phi_assoc(nk, n, m, l) };
+    // h3_upto(l) = hnn_presentation(data)
+    assert(h3_upto(mm, n, m, l) == hnn_presentation(data));
+    // hnn_data_valid(data)
+    lemma_h3_upto_valid(mm, n, m, (l - 1) as nat);
+    lemma_h3_upto_num_generators(mm, n, m, (l - 1) as nat);     // base.num = nk+2n+1+l
+    assert(base.num_generators == h2_num_gens(nk, n) + (l - 1));
+    assert(base.num_generators >= nk + 2 * n + 2);
+    lemma_phi_assoc_valid(nk, n, m, l, base.num_generators);
+    lemma_hnn_data_valid_from(data, base.num_generators);
+
+    let ag = hnn_a_gens(data);
+    let bg = hnn_b_gens(data);
+    let kk = data.associations.len();                          // = n + 4
+    assert(kk == phi_assoc(nk, n, m, l).len());
+    assert(1 < kk);
+    // u = conj_u(alpha), valid over the association alphabet
+    let u = conj_u(alpha);
+    assert(word_valid(u, kk)) by {
+        lemma_signed_power_valid(1, -(alpha as int), kk);
+        lemma_signed_power_valid(1, alpha as int, kk);
+        crate::word::lemma_concat_word_valid(signed_power(1, -(alpha as int)), seq![Symbol::Gen(0)], kk);
+        crate::word::lemma_concat_word_valid(
+            signed_power(1, -(alpha as int)) + seq![Symbol::Gen(0)], signed_power(1, alpha as int), kk);
+        assert(seq![Symbol::Gen(0)][0] == Symbol::Gen(0));
+    }
+    // the conjugation telescope at level l
+    lemma_stable_conj_factorization(data, u);
+    // a_gens / b_gens generator-0/1 identification
+    assert(ag[0] =~= seq![Symbol::Gen(0)]);                    // phi_assoc[0].0 = [t]
+    assert(ag[1] =~= signed_power(1, 1));                      // phi_assoc[1].0 = [x] = x¹
+    assert(bg[0] =~= config_word(l, 0));                       // phi_assoc[0].1 = t_l
+    assert(bg[1] =~= signed_power(1, m as int));               // phi_assoc[1].1 = xᵐ
+
+    // emb(ag, u) = config(α,0)
+    lemma_emb_conj_u(ag, 1, alpha);
+    lemma_config_signed_matches_nat(alpha, 0);
+    assert(apply_embedding(ag, u) =~= config_word(alpha, 0)) by {
+        assert((1 as int) * (alpha as int) == alpha as int) by (nonlinear_arith);
+        assert(config_word_signed(alpha as int, 0) =~=
+            signed_power(1, -(alpha as int)) + seq![Symbol::Gen(0)] + signed_power(1, alpha as int));
+    }
+
+    // emb(bg, u) = x^{-mα}·t_l·x^{mα}
+    lemma_emb_conj_u(bg, m, alpha);
+    let mam: int = (m as int) * (alpha as int);
+    assert(apply_embedding(bg, u) =~=
+        signed_power(1, -mam) + config_word(l, 0) + signed_power(1, mam));
+
+    // base_A: x^{-mα}·t_l·x^{mα} ≡ config(mα+l, 0)
+    lemma_conj_config_signed_by_x(l as int, 0, mam);          // ≡ config_signed(l+mα, 0)
+    lemma_config_signed_matches_nat(l, 0);                    // config_signed(l,0) = config(l,0)
+    // index arithmetic: l + m·α == α·m + l (with nat→int casts); mam == (m as int)*(alpha as int)
+    assert((l as int) + (m as int) * (alpha as int) == (alpha * m + l) as int) by (nonlinear_arith);
+    assert((l as int) + mam == (alpha * m + l) as int);
+    lemma_config_signed_matches_nat((alpha * m + l) as nat, 0);
+    let blob = signed_power(1, -mam) + config_word(l, 0) + signed_power(1, mam);
+    assert(blob =~= signed_power(1, -mam) + config_word_signed(l as int, 0) + signed_power(1, mam));
+    assert(equiv_in_presentation(base_A(), blob, config_word((alpha * m + l) as nat, 0)));
+
+    // assemble: telescope (h3_upto(l)) + emb identifications, lift to h3_pres, then base_A blob.
+    let st = stable_letter(data);
+    let si = stable_letter_inv(data);
+    lemma_h3_a_stable_letter(mm, n, m, l);                    // st = Gen(a_idx(nk,n,l))
+    assert(st == Symbol::Gen(a_idx(nk, n, l)));
+    assert(si == Symbol::Inv(a_idx(nk, n, l)));
+    let conj_lhs = seq![si] + apply_embedding(ag, u) + seq![st];
+    // telescope: equiv(h3_upto(l), conj_lhs, emb(bg,u))
+    assert(equiv_in_presentation(h3_upto(mm, n, m, l), conj_lhs, apply_embedding(bg, u)));
+    lemma_h3_upto_in_h3(mm, n, m, l, conj_lhs, apply_embedding(bg, u));
+    // emb(bg,u) ≡ config(mα+l,0) lifted from base_A
+    lemma_base_A_in_h3(mm, n, m, blob, config_word((alpha * m + l) as nat, 0));
+    assert(apply_embedding(bg, u) =~= blob);
+    lemma_equiv_transitive(h3_pres(mm, n, m), conj_lhs, apply_embedding(bg, u),
+        config_word((alpha * m + l) as nat, 0));
+    // conj_lhs == goal LHS (emb(ag,u) = config(α,0), si/st = a_l⁻¹/a_l)
+    assert(conj_lhs =~= seq![Symbol::Inv(a_idx(nk, n, l))] + config_word(alpha, 0)
+        + seq![Symbol::Gen(a_idx(nk, n, l))]);
 }
 
 } // verus!
