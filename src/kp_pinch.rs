@@ -301,4 +301,53 @@ pub proof fn lemma_kp_eliminate_pinch(
     }
 }
 
+//  ============================================================
+//  L2 — reduce a KP-word to pinch-free form (induction on kp_pcount via L1).
+//  ============================================================
+
+//  A KP-word is pinch-free if it has no KP-pinch at any index.
+pub open spec fn kp_pinch_free(data: HNNData, kp: KPWord) -> bool {
+    forall|i: int| !kp_has_pinch_at(data, kp, i)
+}
+
+//  Every KP-word reduces to a pinch-free KP-word with equivalent value.
+pub proof fn lemma_kp_reduce_pinch_free(
+    data: HNNData, in_k: spec_fn(Word) -> bool, kp: KPWord,
+) -> (kp_prime: KPWord)
+    requires
+        hnn_data_valid(data),
+        forall|a: Word, b: Word| in_k(a) && #[trigger] equiv_in_presentation(data.base, a, b) ==> in_k(b),
+        forall|a: Word, b: Word| in_k(a) && in_k(b) ==> in_k(#[trigger] (a + b)),
+        forall|uw: Word| word_valid(uw, data.associations.len() as nat)
+            && in_k(apply_embedding(hnn_a_gens(data), uw))
+            ==> in_k(#[trigger] apply_embedding(hnn_b_gens(data), uw)),
+        forall|uw: Word| word_valid(uw, data.associations.len() as nat)
+            && in_k(apply_embedding(hnn_b_gens(data), uw))
+            ==> in_k(#[trigger] apply_embedding(hnn_a_gens(data), uw)),
+        is_kp_word(in_k, kp),
+    ensures
+        is_kp_word(in_k, kp_prime),
+        kp_pinch_free(data, kp_prime),
+        equiv_in_presentation(hnn_presentation(data),
+            kp_value(stable_letter(data), kp), kp_value(stable_letter(data), kp_prime)),
+    decreases kp_pcount(kp),
+{
+    let pres = hnn_presentation(data);
+    let st = stable_letter(data);
+    if exists|i: int| kp_has_pinch_at(data, kp, i) {
+        let i = choose|i: int| kp_has_pinch_at(data, kp, i);
+        assert(kp_has_pinch_at(data, kp, i));
+        let kp1 = lemma_kp_eliminate_pinch(data, in_k, kp, i);
+        assert(kp_pcount(kp1) < kp_pcount(kp));         //  L1 dropped pcount by 2 (≥ 2 before)
+        let kp_prime = lemma_kp_reduce_pinch_free(data, in_k, kp1);
+        lemma_equiv_transitive(pres,
+            kp_value(st, kp), kp_value(st, kp1), kp_value(st, kp_prime));
+        kp_prime
+    } else {
+        assert(kp_pinch_free(data, kp));
+        lemma_equiv_refl(pres, kp_value(st, kp));
+        kp
+    }
+}
+
 } //  verus!
