@@ -5,7 +5,7 @@ use crate::presentation::*;
 use crate::presentation_lemmas::*;
 use crate::machine_group::*;
 use crate::benign::{in_generated_subgroup, factors_from_generators, is_generator_or_inverse, concat_all};
-use crate::benign::{apply_embedding, lemma_apply_embedding_concat};
+use crate::benign::{apply_embedding, lemma_apply_embedding_concat, lemma_identity_in_generated_subgroup};
 
 verus! {
 
@@ -276,6 +276,61 @@ pub proof fn lemma_ii_subset(i: nat, j: nat, m: nat, w: Word)
     lemma_equiv_symmetric(p, cf, u);                            // u ≡ cf
     lemma_equiv_transitive(p, u, cf, w);                        // u ≡ w
     lemma_in_subgroup_pred_respects_equiv(p, residue_pred(i as int, j as int, m as int), u, w);
+}
+
+//  ============================================================
+//  Generic closure:  a predicate-subgroup contained in a generated subgroup.
+//  ============================================================
+//  If every pred-element lies in ⟨gens⟩, then so does every element of the pred-subgroup.  This is
+//  the closure half of property (ii)⊇ (the residue subgroup ⊆ ⟨t(i,j),xᵐ,yᵐ⟩); the remaining half
+//  is showing each residue gen t(r,s) (r≡i, s≡j mod m) lies in ⟨t(i,j),xᵐ,yᵐ⟩ (the move-lemma 2D
+//  conjugation induction).
+
+//  concat_all of a factor list, each factor in ⟨gens⟩, is in ⟨gens⟩ (fold via product closure).
+pub proof fn lemma_concat_all_in_generated(p: Presentation, gens: Seq<Word>, factors: Seq<Word>)
+    requires
+        forall|k: int| 0 <= k < factors.len() ==> in_generated_subgroup(p, gens, #[trigger] factors[k]),
+    ensures
+        in_generated_subgroup(p, gens, concat_all(factors)),
+    decreases factors.len(),
+{
+    if factors.len() == 0 {
+        lemma_identity_in_generated_subgroup(p, gens);
+        assert(concat_all(factors) =~= empty_word());
+    } else {
+        let rest = factors.drop_first();
+        assert(concat_all(factors) =~= factors.first() + concat_all(rest));
+        assert(in_generated_subgroup(p, gens, factors.first())) by {
+            assert(factors[0] == factors.first());
+        }
+        assert forall|k: int| 0 <= k < rest.len()
+            implies in_generated_subgroup(p, gens, #[trigger] rest[k]) by {
+            assert(rest[k] == factors[k + 1]);
+        }
+        lemma_concat_all_in_generated(p, gens, rest);
+        lemma_product_in_subgroup(p, gens, factors.first(), concat_all(rest));
+    }
+}
+
+//  pred-subgroup ⊆ ⟨gens⟩ when each pred-element is in ⟨gens⟩.
+pub proof fn lemma_pred_subgroup_in_generated(
+    p: Presentation, pred: spec_fn(Word) -> bool, gens: Seq<Word>, w: Word,
+)
+    requires
+        in_subgroup_pred(p, pred, w),
+        forall|g: Word| pred(g) ==> in_generated_subgroup(p, gens, g),
+    ensures
+        in_generated_subgroup(p, gens, w),
+{
+    let factors = choose|factors: Seq<Word>| #[trigger] factors_from_pred(pred, factors)
+        && equiv_in_presentation(p, concat_all(factors), w);
+    assert(factors_from_pred(pred, factors) && equiv_in_presentation(p, concat_all(factors), w));
+    assert forall|k: int| 0 <= k < factors.len()
+        implies in_generated_subgroup(p, gens, #[trigger] factors[k]) by {
+        assert(pred(factors[k]));                            //  factors_from_pred
+    }
+    lemma_concat_all_in_generated(p, gens, factors);
+    lemma_in_subgroup_respects_equiv(p, gens, concat_all(factors), w);
 }
 
 //  ============================================================
