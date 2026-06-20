@@ -181,8 +181,23 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       Theorem", p.278.)
 - [ ] **word-numbering bridge** — `wα(c)`, with `wα(c)∈S ⟺ (α,0)∈H₀(M)` (ties the relator set `S`
       to the machine, built from the reduction in §3.3).
-- [ ] **H₁ = K_M × ⟨b_j⟩ × ⟨d⟩** (direct product; `{tα wα(b) d}` a free basis).
-- [ ] **H₂ = HNN(H₁, p | p⁻¹ tα p = tα wα(b) d)** — contains `C`.
+- [x] **H₁ = K_M ∗ (C × ⟨b_j⟩) ∗ ⟨d⟩** — literal finite `h1_base` built (`h1.rs`), and
+      **`{ tα wα(b) d : α∈I }` is a FREE BASIS — VERIFIED** (`free_basis.rs` 29/0,
+      `lemma_basis_elt_free` + reconstruction `lemma_free_to_basis_elt`). This is Cohen
+      p.279's "Mapping H₁ → K_M … Cor 1 to Prop 1.8". Structure:
+  - **Abstract pullback engine** (Cohen Cor-1-to-Prop-1.8): `lemma_pullback_free`
+    (φ-image of an `emb`-relation is a `φ∘emb`-relation) + `lemma_free_to_embedding` (F3:
+    a freely-trivial word vanishes under any embedding) + composition/bridge helpers.
+  - **F2 — config words `{t_α}` are a free family in `K_M`** (`lemma_config_emb_free`):
+    descend `g_m → base_A` (`lemma_g_m_base_faithful`, peel diagonal k-layer + existing
+    `lemma_b_m_equiv_faithful`) → identify the product with `canw_eval` of a CanonLetter
+    sequence (`lemma_config_emb_eq_canw`) → Layer-1 `lemma_cw_reduce_trivial_empty` ⟹
+    `cw_reduce = []` → the cons-step simulation `lemma_w_canon_free` (cw_cons exponent-merge
+    ↔ `lemma_signed_power_add`; zero-cancellation ↔ free reduction) ⟹ `w ≡_free ε`.
+  - **Assembly**: instantiate the engine at φ=`kill_hom`, whose image of `basis_elt` IS the
+    config family (`lemma_comp_is_config_emb`, from `lemma_kill_on_basis_elt`), then F2.
+- [ ] **H₂ = HNN(H₁, p | p⁻¹ tα p = tα wα(b) d)** — contains `C`. (Literal single-relation
+      `h2.rs` built; the free basis above is the prerequisite for its HNN faithfulness.)
 - [ ] **H₃ = HNN(H₂, aᵢ (1≤i≤2n), k | aᵢ:A↔Aᵢ, k:A₊↔A₋)** — **finitely presented, ⊇ C.**
 - [ ] **finiteness of relations (I)** — show the infinite families (II)(III) are consequences of the
       finite set (the payoff: `H₃` really is finitely presented).

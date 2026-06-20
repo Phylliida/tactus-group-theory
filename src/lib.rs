@@ -140,7 +140,9 @@ pub mod h2;
 #[cfg(verus_keep_ghost)]
 pub mod h3;
 
-// free_basis: Layer 2 / Brick 2 (deep half) — the kill homomorphism φ:H₁→K_M (identity on K_M,
-// kill c/b/d) + validity, toward "{t_α w_α(b) d} is a free basis" (blueprint p.279).
+// free_basis: Layer 2 / Brick 2 (deep half) — the FREE-BASIS LEMMA (blueprint p.279,
+// Cohen Cor-1-to-Prop-1.8). The kill homomorphism φ:H₁→K_M + the abstract pullback engine
+// (lemma_pullback_free) + F2 (config words {t_α} free in K_M, lemma_config_emb_free) ⟹
+// "{t_α w_α(b) d} is a free basis of H₁" (lemma_basis_elt_free + lemma_free_to_basis_elt).
 #[cfg(verus_keep_ghost)]
 pub mod free_basis;
