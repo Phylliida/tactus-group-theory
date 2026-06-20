@@ -113,8 +113,30 @@ witness, index `N_K-1`) is DISTINCT from Layer-2's top stable letter `k` (index 
 them separate (`k_machine`/`k_gen` vs `k_top`). Word-numbering instantiation: `w_α(c)` at `c_base=N_K`,
 `w_α(b)` at `b_base=N_K+n`. H₁ only uses blocks K_M..d (`0 .. N_K+2n`); p/a/k enter at H₂/H₃.
 
-### Recommended Brick 2 first step (verifiable, self-contained)
-A small `layout.rs` (or the head of `h1.rs`): spec fns `c_base(mm,n)`, `b_base(mm,n)`, `d_idx`,
-`p_idx`, `a_base`, `k_top`, `h3_num_gens` + disjointness/coverage lemmas (blocks partition
-`0..total`). Pure index bookkeeping, no hard proofs — locks the convention before the H₁ presentation
-and the free-basis lemma (the genuine Brick-2 obligation).
+### Recommended Brick 2 first step (verifiable, self-contained) — DONE
+`layout.rs` landed (commit 49860ee, 1/0): spec fns `c_base`/`b_base`/`d_idx`/`p_idx`/`a_base`/
+`k_top`/`h{1,2,3}_num_gens` (parameterized by `nk` = K_M gen count, `n`) + `lemma_layout_consistent`
+(blocks strictly ordered, tile `0..h3_num_gens`). Convention locked.
+
+### DESIGN DECISION (2026-06-20): represent C as predicate, keep all Presentations finite (Approach b)
+The recursively-presented C = ⟨c;S⟩ is NOT stored as a `Presentation` (S is r.e./infinite). Instead:
+keep `Presentation` **strictly finite** (so "finitely presented" stays a type-level guarantee, no
+predicate-pollution of word-reduction / Tietze machinery), and represent C as a spec pair
+`(gens, relator_pred: spec_fn(Word)->bool)`. Build **`H₃` as the literal finite `Presentation` of
+set (I)**; the embedding `C ↪ H₃` is then two lemmas on the map `φ: C → H₃`:
+- **soundness** `relator_pred(w) ⟹ H₃ ⊢ φ(w)=1` — from (III)-as-consequence-of-(I);
+- **completeness / faithfulness** `H₃ ⊢ φ(w)=1 ⟹ relator_pred(w)` — via `benign.rs`'s G∩L framing
+  + the `spec_fn(Word)->bool` predicate-subgroup machinery (the `kp_pinch` HNN-faithfulness engine).
+
+Consequence for brick order: the intermediate H₁/H₂ are **not** materialized as infinite
+Presentations; they are recovered as subgroups of the finite H₃, with their defining relations
+[(II) `p⁻¹t_α p = t_α w_α(b)d`, and S] holding as *derived theorems* in H₃. The h1/h2/h3 bricks
+still organize the GENERATOR/RELATOR definitions (commutators, `p⁻¹tp=td`, the finite a_i/k HNN
+associations — all of which ARE in finite set (I)); the faithfulness is brick 5. (Cross-checked with
+Danielle's local model, 2026-06-20.)
+
+### Brick 2 next (in progress): `h1.rs`
+Finite, unambiguous-under-Approach-(b) pieces first — instantiate `word_numbering` maps at the
+layout bases (`h_w_c`/`h_w_b`/`h_w_bc`) + the `n²` commutator relators `b_i c_j = c_j b_i` (a member
+of set (I)) with validity. Then the K_M-relator embed + `p⁻¹tp=td` + the a_i/k HNN associations to
+assemble set (I); the free-basis lemma + faithfulness are the deep tail (brick 5).
