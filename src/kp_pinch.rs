@@ -350,4 +350,73 @@ pub proof fn lemma_kp_reduce_pinch_free(
     }
 }
 
+//  ============================================================
+//  Assembly support — no-KP-pinch ⟹ no-raw-pinch (the design's flagged subtlety).
+//  ============================================================
+//  For the Britton assembly we feed W := kp_value(t, kp) into britton_lemma_full, which needs the
+//  raw word to be (a) word_valid over the HNN presentation and (b) RAW-pinch-free.  The structural
+//  fact behind (b): every syllable (head, kᵢ) is a BASE word — so the only stable letters in W are
+//  the p^{sᵢ} separators, hence a raw pinch's two p's are consecutive separators whose middle is the
+//  syllable kₘ, and the pinch condition on it is exactly a KP-pinch at m.  Foundation first (3a/3b):
+//  the syllable-validity predicate and W's word-validity.
+
+//  Every syllable (head and each kᵢ) is a word over the BASE generators — i.e. stable-free, since
+//  the stable letter is generator index base.num_generators (so a base word can never contain it).
+pub open spec fn kp_syllables_valid(data: HNNData, kp: KPWord) -> bool {
+    &&& word_valid(kp.head, data.base.num_generators)
+    &&& forall|i: int| 0 <= i < kp.tail.len()
+            ==> word_valid(#[trigger] kp.tail[i].1, data.base.num_generators)
+}
+
+//  3b — W = kp_value(t, kp) is word_valid over the HNN presentation.  Induction on the tail via
+//  lemma_kp_value_cons:  head (base, lift by mono) · [p^{s}] (the stable letter, index ng < ng+1) ·
+//  kp_value(rest) (IH).
+pub proof fn lemma_kp_value_word_valid(data: HNNData, kp: KPWord)
+    requires
+        hnn_data_valid(data),
+        kp_syllables_valid(data, kp),
+    ensures
+        word_valid(kp_value(stable_letter(data), kp), hnn_presentation(data).num_generators),
+    decreases kp.tail.len(),
+{
+    let ng = data.base.num_generators;
+    let st = stable_letter(data);
+    let png = hnn_presentation(data).num_generators;
+    lemma_hnn_presentation_valid(data);
+    assert(png == ng + 1);
+    assert(word_valid(kp.head, ng));                 //  from kp_syllables_valid
+    lemma_word_valid_mono(kp.head, ng, png);
+    if kp.tail.len() == 0 {
+        assert(kp_value(st, kp) == kp.head);         //  empty-tail branch of kp_value
+    } else {
+        let b = kp.tail.first().0;
+        let p_sym = if b { st } else { inverse_symbol(st) };
+        let rest = KPWord { head: kp.tail.first().1, tail: kp.tail.drop_first() };
+        lemma_kp_value_cons(st, kp);
+        //  kp_value(st, kp) =~= kp.head + [p_sym] + kp_value(st, rest)
+        assert(kp_syllables_valid(data, rest)) by {
+            assert(kp.tail[0] == kp.tail.first());
+            assert(word_valid(rest.head, ng));       //  rest.head = kp.tail[0].1
+            assert forall|i: int| 0 <= i < rest.tail.len()
+                implies word_valid(#[trigger] rest.tail[i].1, ng)
+            by { assert(rest.tail[i] == kp.tail[i + 1]); }
+        }
+        lemma_kp_value_word_valid(data, rest);       //  IH: word_valid(kp_value(st, rest), png)
+        //  p_sym is the stable letter or its inverse: Gen(ng) / Inv(ng), index ng < png.
+        assert(st == Symbol::Gen(ng) && inverse_symbol(st) == Symbol::Inv(ng));
+        assert(symbol_valid(p_sym, png));
+        let psw: Word = seq![p_sym];
+        assert(word_valid(psw, png)) by {
+            assert forall|k: int| 0 <= k < psw.len()
+                implies symbol_valid(#[trigger] psw[k], png) by { }
+        }
+        //  concat the three valid pieces (concat == +).
+        lemma_concat_word_valid(kp.head, psw, png);
+        assert(concat(kp.head, psw) == kp.head + psw);
+        lemma_concat_word_valid(kp.head + psw, kp_value(st, rest), png);
+        assert(concat(kp.head + psw, kp_value(st, rest)) == (kp.head + psw) + kp_value(st, rest));
+        assert(kp_value(st, kp) =~= (kp.head + psw) + kp_value(st, rest));
+    }
+}
+
 } //  verus!
