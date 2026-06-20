@@ -21,6 +21,7 @@ use crate::benign::{apply_embedding, concat_all, lemma_concat_all_empty, lemma_a
 use crate::machine_group::*;
 use crate::kp_pinch::{in_kp_subgroup, is_kp_factor, all_kp_factors, lemma_property_ii};
 use crate::ii_subset::lemma_gexp_config_signed_zero;
+use crate::prop_v::lemma_prop_v_holds;
 
 verus! {
 
@@ -527,17 +528,18 @@ pub proof fn lemma_vi_upto(mm: ModMachine, l: nat, w: Word)
     }
 }
 
-//  Property (vi):  A ∩ ⟨T(M), rᵢ, lⱼ⟩ = T(M).
+//  Property (vi):  A ∩ ⟨T(M), rᵢ, lⱼ⟩ = T(M).  UNCONDITIONAL — prop_v_holds discharged by
+//  lemma_prop_v_holds (E2.B), so the only hypotheses are well-formedness + terminal origin.
 pub proof fn lemma_vi(mm: ModMachine, w: Word)
     requires
         mod_machine_wf(mm),
         mm_terminal(mm, 0, 0),
-        prop_v_holds(mm),
         in_TMstable(mm, w),
         word_valid(w, 3),
     ensures
         in_TM(mm, w),
 {
+    lemma_prop_v_holds(mm);                              //  E2.B discharges the last hole
     lemma_in_TMstable_upto_full(mm, w);
     assert(in_TMstable_upto(mm, mm.quads.len(), w));
     lemma_vi_upto(mm, mm.quads.len(), w);
