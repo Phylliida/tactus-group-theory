@@ -251,4 +251,51 @@ pub proof fn lemma_w_c_valid(c_base: nat, n: nat, m: nat, alpha: nat, ng: nat)
     }
 }
 
+// ----------------------------------------------------------------------------
+// Generator-index range lemmas (each w_c letter lives in its own block)
+// ----------------------------------------------------------------------------
+
+/// Each digit-letter's generator index lies in the block `[base, base+n)`.
+pub proof fn lemma_alphabet_letter_gen_in_block(base: nat, n: nat, j: nat)
+    requires 1 <= j <= 2 * n,
+    ensures base <= generator_index(alphabet_letter(base, n, j)) < base + n,
+{
+    if j <= n {
+        assert(generator_index(alphabet_letter(base, n, j)) == (base + j - 1) as nat);
+    } else {
+        assert(generator_index(alphabet_letter(base, n, j)) == (base + (j - n) - 1) as nat);
+    }
+}
+
+/// Every symbol of `w_c` has generator index in `[c_base, c_base+n)` (when α ∈ I).
+/// Used by the kill homomorphism to see `w_α(b)` lies entirely in the b-block.
+pub proof fn lemma_w_c_gens_in_block(c_base: nat, n: nat, m: nat, alpha: nat)
+    requires numbers_word(n, m, alpha), 2 * n < m,
+    ensures forall|j: int| 0 <= j < w_c(c_base, n, m, alpha).len()
+        ==> c_base <= generator_index(#[trigger] w_c(c_base, n, m, alpha)[j]) < c_base + n,
+    decreases alpha,
+{
+    if alpha == 0 || m <= 1 {
+        assert(w_c(c_base, n, m, alpha) =~= empty_word());
+    } else {
+        let d = alpha % m;
+        assert(1 <= d <= 2 * n);                      // numbers_word: lowest digit ∈ 1..=2n
+        vstd::arithmetic::div_mod::lemma_div_decreases(alpha as int, m as int);
+        lemma_w_c_gens_in_block(c_base, n, m, alpha / m);
+        lemma_alphabet_letter_gen_in_block(c_base, n, d);
+        let pref = w_c(c_base, n, m, alpha / m);
+        let last = Seq::new(1, |_i: int| alphabet_letter(c_base, n, d));
+        assert(w_c(c_base, n, m, alpha) =~= pref + last);
+        assert forall|j: int| #![trigger (pref + last)[j]] 0 <= j < (pref + last).len()
+            implies c_base <= generator_index((pref + last)[j]) < c_base + n by {
+            if j < pref.len() {
+                assert((pref + last)[j] == pref[j]);
+            } else {
+                assert((pref + last)[j] == last[0]);
+                assert(last[0] == alphabet_letter(c_base, n, d));
+            }
+        }
+    }
+}
+
 } // verus!
