@@ -16,7 +16,7 @@ use crate::ii_subset::{lemma_ii_subset, lemma_signed_power_inverse, lemma_exact_
     lemma_gexp_config_signed_zero, lemma_gexp_concat_all_zero};
 use crate::benign::{apply_embedding, apply_embedding_symbol, in_generated_subgroup,
     lemma_apply_embedding_concat, lemma_apply_embedding_valid, concat_all};
-use crate::tower_peel::{quad_data, lemma_in_TM_gexp_zero};
+use crate::tower_peel::{quad_data, lemma_in_TM_gexp_zero, prop_v_holds};
 use crate::config_reduce::*;
 
 verus! {
@@ -1641,6 +1641,153 @@ pub proof fn lemma_emb_b_reduced(mm: ModMachine, qi: nat, uw: Word) -> (red: Seq
         assert((qa[j].r - aa as int) % mri == 0 && (qa[j].s - bb as int) % msi == 0);
     }
     red
+}
+
+//  Reverse direction of property (v):  in_TM(emb(b_gens,uw)) ⟹ in_TM(emb(a_gens,uw)).
+//  Mirror of lemma_prop_v_AtoB: reduce g_b on the asymmetric b-side, fold a single U over the 3 base
+//  gens, reconstruct both sides, reverse-conjugate ([st]·g_b·[si] ≡ g_a), restrict to base A by
+//  base-faithfulness, and land emb(a_gens,U) in T(M) via the quad_step pre-image (reverse step).
+#[verifier::rlimit(400)]
+pub proof fn lemma_prop_v_BtoA(mm: ModMachine, qi: nat, uw: Word)
+    requires
+        mod_machine_wf(mm),
+        qi < mm.quads.len(),
+        word_valid(uw, 3),
+        in_TM(mm, apply_embedding(hnn_b_gens(quad_data(mm, qi)), uw)),
+    ensures
+        in_TM(mm, apply_embedding(hnn_a_gens(quad_data(mm, qi)), uw)),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let data = quad_data(mm, qi);
+    let hp = hnn_presentation(data);
+    let q = mm.quads[qi as int];
+    let m = mm.m;
+    let ag = hnn_a_gens(data);
+    let bg = hnn_b_gens(data);
+    let g_a = apply_embedding(ag, uw);
+    let g_b = apply_embedding(bg, uw);
+    let aa = b_aa(q);
+    let bb = b_bb(q);
+    let mr = b_mr(q, m);
+    let ms = b_ms(q, m);
+    let mri = mr as int;
+    let msi = ms as int;
+    lemma_quad_data_valid(mm, qi);
+    lemma_hnn_presentation_valid(data);              //  presentation_valid(hp)
+    assert(data.base.num_generators == 3);
+    assert(ag.len() == 3 && bg.len() == 3);
+    lemma_quad_associations_valid(q, m, 3);
+    assert(forall|i: int| 0 <= i < ag.len() ==> word_valid(#[trigger] ag[i], 3)) by {
+        assert forall|i: int| 0 <= i < ag.len() implies word_valid(#[trigger] ag[i], 3) by {
+            assert(ag[i] == quad_associations(q, m)[i].0);
+        }
+    }
+    assert(forall|i: int| 0 <= i < bg.len() ==> word_valid(#[trigger] bg[i], 3)) by {
+        assert forall|i: int| 0 <= i < bg.len() implies word_valid(#[trigger] bg[i], 3) by {
+            assert(bg[i] == quad_associations(q, m)[i].1);
+        }
+    }
+    lemma_apply_embedding_valid(ag, uw, 3);          //  word_valid(g_a, 3)
+    lemma_apply_embedding_valid(bg, uw, 3);          //  word_valid(g_b, 3)
+
+    //  Step 1: reduced b-residue config form red_b (coords in H₀ ∩ b-residue).
+    let red_b = lemma_emb_b_reduced(mm, qi, uw);
+    let big_u = red_to_U2(red_b, mri, msi);
+    lemma_red_to_U2_valid(red_b, mri, msi);          //  word_valid(big_u, 3)
+
+    //  b-side equality:  emb(bg, big_u) ≡_A canw_eval(red_b) ≡_A g_b
+    lemma_quad_b_gens_form(mm, qi);
+    assert(bg =~= acc_gens(aa, bb, mr, ms));
+    assert(bg[0] =~= config_word(aa, bb));
+    assert(bg[1] =~= signed_power(1, mri)) by { assert(bg[1] == symbol_power(Symbol::Gen(1), mr)); }
+    assert(bg[2] =~= signed_power(2, msi)) by { assert(bg[2] == symbol_power(Symbol::Gen(2), ms)); }
+    assert(aa < mr && bb < ms) by {
+        assert(q.c < m * m) by { assert(quad_wf(q, m)); }
+        match q.dir {
+            Dir::R => { assert(aa == q.c && mr == m * m && bb == 0 && ms == 1); }
+            Dir::L => { assert(aa == 0 && mr == 1 && bb == q.c && ms == m * m); }
+        }
+    }
+    assert(forall|i: int| 0 <= i < red_b.len() ==> {
+        &&& (#[trigger] red_b[i]).r >= 0
+        &&& red_b[i].s >= 0
+        &&& (red_b[i].r - aa as int) % mri == 0
+        &&& (red_b[i].s - bb as int) % msi == 0
+    });
+    lemma_emb_accgens_eq(bg, red_b, aa, bb, mr, ms);  //  emb(bg, big_u) ≡_A canw_eval(red_b)
+    let b_u = apply_embedding(bg, big_u);
+    lemma_apply_embedding_valid(bg, big_u, 3);        //  word_valid(b_u, 3)
+    lemma_equiv_transitive(p, b_u, canw_eval(red_b), g_b);
+    lemma_equiv_symmetric(p, b_u, g_b);               //  g_b ≡_A b_u
+    lemma_base_embeds_in_hnn(data, g_b, b_u);         //  g_b ≡_hp b_u
+
+    //  Reverse conjugation:  [st]·g_b·[si] ≡_hp g_a  and  [st]·b_u·[si] ≡_hp a_u.
+    let st = stable_letter(data);
+    let si = stable_letter_inv(data);
+    let png = hp.num_generators;
+    assert(png == 4);
+    assert(st == Symbol::Gen(3) && si == Symbol::Inv(3));
+    lemma_stable_conj_factorization_rev(data, uw);    //  [st]+g_b+[si] ≡_hp g_a
+    lemma_stable_conj_factorization_rev(data, big_u); //  [st]+b_u+[si] ≡_hp a_u
+    let a_u = apply_embedding(ag, big_u);
+    lemma_apply_embedding_valid(ag, big_u, 3);        //  word_valid(a_u, 3)
+    let lhs_uw = seq![st] + g_b + seq![si];
+    let lhs_u = seq![st] + b_u + seq![si];
+    lemma_word_valid_mono(g_b, 3, png);
+    assert(word_valid(seq![st], png)) by {
+        assert forall|t: int| 0 <= t < 1 implies symbol_valid(#[trigger] seq![st][t], png) by { }
+    }
+    assert(word_valid(seq![si], png)) by {
+        assert forall|t: int| 0 <= t < 1 implies symbol_valid(#[trigger] seq![si][t], png) by { }
+    }
+    lemma_concat_word_valid(seq![st], g_b, png);
+    lemma_concat_word_valid(seq![st] + g_b, seq![si], png);
+    assert(lhs_uw =~= (seq![st] + g_b) + seq![si]);
+    assert(word_valid(lhs_uw, png));
+    //  congruence:  lhs_uw ≡_hp lhs_u   (from g_b ≡_hp b_u)
+    lemma_equiv_concat_right(hp, seq![st], g_b, b_u);
+    lemma_equiv_concat_left(hp, seq![st] + g_b, seq![st] + b_u, seq![si]);
+    assert(lhs_uw =~= (seq![st] + g_b) + seq![si]);
+    assert(lhs_u =~= (seq![st] + b_u) + seq![si]);
+    //  chain:  g_a ≡ lhs_uw ≡ lhs_u ≡ a_u
+    lemma_equiv_transitive(hp, lhs_uw, lhs_u, a_u);   //  lhs_uw ≡ a_u
+    lemma_equiv_symmetric(hp, lhs_uw, g_a);           //  g_a ≡ lhs_uw
+    lemma_equiv_transitive(hp, g_a, lhs_uw, a_u);     //  g_a ≡ a_u
+    //  base-faithful: g_a ≡_A a_u
+    lemma_quad_base_faithful(mm, qi, g_a, a_u);
+    //  a_u ∈ T(M); respects_equiv ⟹ g_a ∈ T(M)
+    lemma_emb_aside_in_TM(mm, qi, red_b);
+    lemma_equiv_symmetric(p, g_a, a_u);               //  a_u ≡_A g_a
+    lemma_in_subgroup_pred_respects_equiv(p, tm_pred(mm), a_u, g_a);
+}
+
+//  ============================================================
+//  E2.B COMPLETE:  prop_v_holds(mm)  — both directions, all quads.
+//  Discharges the last hole of lemma_vi (property (vi) tower peel) ⟹ property (vi) unconditional.
+//  ============================================================
+pub proof fn lemma_prop_v_holds(mm: ModMachine)
+    requires
+        mod_machine_wf(mm),
+    ensures
+        prop_v_holds(mm),
+{
+    assert forall|qi: nat, uw: Word|
+        #![trigger apply_embedding(hnn_a_gens(quad_data(mm, qi)), uw)]
+        #![trigger apply_embedding(hnn_b_gens(quad_data(mm, qi)), uw)]
+        (qi < mm.quads.len() && word_valid(uw, 3)) implies {
+            &&& (in_TM(mm, apply_embedding(hnn_a_gens(quad_data(mm, qi)), uw))
+                    ==> in_TM(mm, apply_embedding(hnn_b_gens(quad_data(mm, qi)), uw)))
+            &&& (in_TM(mm, apply_embedding(hnn_b_gens(quad_data(mm, qi)), uw))
+                    ==> in_TM(mm, apply_embedding(hnn_a_gens(quad_data(mm, qi)), uw)))
+        } by {
+        if in_TM(mm, apply_embedding(hnn_a_gens(quad_data(mm, qi)), uw)) {
+            lemma_prop_v_AtoB(mm, qi, uw);
+        }
+        if in_TM(mm, apply_embedding(hnn_b_gens(quad_data(mm, qi)), uw)) {
+            lemma_prop_v_BtoA(mm, qi, uw);
+        }
+    }
 }
 
 } //  verus!
