@@ -85,12 +85,33 @@ Reference: `docs/aanderaa-cohen-construction.md` (Layer 1), `docs/higman-embeddi
 *Critical path. Closes the headline `[k,t(α,β)]=1 ⟺ (α,β)∈H₀(M)`.*
 
 - [ ] **E2.C — generic property-II (THE central engine).** `docs/e2c-property-ii-design.md`.
-  - [ ] **L1 — pinch-elimination** (the hard core): a KPWord with a pinch ⟹ a KPWord with 2 fewer
-        `p`'s, `≡` value, still a KP-word. Uses the HNN relation `p⁻¹kᵢp≡φ(kᵢ)` + the compatibility
-        `φ(K∩A₊)=K∩A₋`. **← current next brick; deepest single lemma left.**
-  - [ ] **L2 — reduce to pinch-free** (induction on `kp_pcount` via L1).
-  - [ ] **junction** (`pinch-free · p-free` is pinch-free) + **no-KP-pinch ⟹ no-raw-pinch**.
-  - [ ] **assembly** (Britton: pinch-free ∧ `≡ε` ⟹ stable-free ⟹ K-word; E1 is the template).
+        Engine lives in `kp_pinch.rs` (abstract over `in_k: spec_fn`), built on `machine_group`'s
+        conjugation telescope (`lemma_stable_conj_factorization`). The duplicate engine that once
+        sat in `ii_subset.rs` was pruned (2026-06-19) — see the design doc's "single source of truth".
+  - [x] **L1 — pinch-elimination** DONE — `lemma_kp_eliminate_pinch` (+ `lemma_kp_phi_fwd/rev`,
+        `lemma_kp_value_head_split`). `kp_pinch` 6/0.
+  - [x] **L2 — reduce to pinch-free** DONE — `lemma_kp_reduce_pinch_free` (induction on `kp_pcount`).
+  - [ ] **no-KP-pinch ⟹ no-raw-pinch** + **junction** + **assembly** — **← current next brick.**
+    - [x] **3a/3b foundation** DONE — `kp_syllables_valid` (every syllable is a BASE word ⟹
+          stable-free, since the stable letter is gen index `base.num_generators`) +
+          `lemma_kp_value_word_valid` (so `W = kp_value(t, kp)` can feed `britton_lemma_full`).
+    - [ ] **3c — the structural core** (no-raw-pinch): `kp_syllables_valid ∧ kp_pinch_free ⟹
+          ¬has_pinch(data, kp_value(t, kp))`. *Plan (head-peeling induction on `kp.tail`):* the only
+          stable letters of `W` are the `p` separators (syllables are base words). Peel
+          `W = head ++ [p₀] ++ W'` (`W' = kp_value(rest)`, `rest = {head: tail[0].1, tail: drop_first}`).
+          Any raw pinch `(i,j)`: both `W[i],W[j]` stable ⟹ both separators; "no stable between" ⟹
+          **consecutive** separators ⟹ middle `= kₘ = tail[m].1`; opposite + assoc-subgroup is exactly
+          `kp_has_pinch_at(kp, m)` — ruled out by `kp_pinch_free`. Two cases in the induction: pinch
+          uses `p₀` (⟹ `kp_has_pinch_at(kp,0)`, since the next stable in `W'` is `p₁` with middle `k₀`)
+          or pinch lives entirely in `W'` (⟹ IH, using `kp_pinch_free(kp) ⟹ kp_pinch_free(rest)` and
+          `kp_has_pinch_at(rest,m) ↔ kp_has_pinch_at(kp,m+1)`). Needs moderate subrange/position
+          helpers: head contributes no stable letter; first stable of `W` is `p₀` at `|head|`.
+    - [ ] **junction** (`W` raw-pinch-free ∧ `u` stable-free ⟹ `W·u` raw-pinch-free) — appending a
+          `p`-free word adds no stable letters, so no adjacent-stable middle changes.
+    - [ ] **assembly** — (1) `g ∈ ⟨K,p⟩ ⟹ ∃ KPWord kp₀, kp_value ≡ g`; (2) L2 ⟹ pinch-free `kp`;
+          (3) 3c+junction ⟹ `W·g⁻¹` raw-pinch-free; (4) `britton_lemma_full`: `≡ε ∧ raw-pinch-free
+          ⟹ stable-free`; (5) stable-free ⟹ `tail` empty ⟹ `g ≡ head ∈ K`. E1
+          (`lemma_k_commutes_implies_subgroup`) is the template for (3)–(4).
 - [ ] **(ii)⊇** — residue configs ⊆ `T∩⟨t(i,j),xᵐ,yᵐ⟩` (inverts the move lemmas; completes (ii)).
 - [ ] **(iv)** — the index-shift isomorphism of associated subgroups (HNN-validity backbone).
 - [ ] **E2.B — property (v)** — the φ-compatibility: `rᵢ` maps `T(M)∩A₊ ↔ T(M)∩A₋`, because
