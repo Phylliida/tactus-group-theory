@@ -817,4 +817,82 @@ pub proof fn lemma_kp_no_raw_pinch(data: HNNData, kp: KPWord)
     }
 }
 
+//  ============================================================
+//  Junction — appending a stable-free word preserves raw-pinch-freeness.
+//  ============================================================
+//  For the Britton assembly we need `W·g⁻¹` raw-pinch-free, where W = kp_value(t, kp) is raw-pinch-free
+//  (3c) and g⁻¹ is stable-free (g is a base/H word).  Appending a p-free word adds no stable letters,
+//  so any raw pinch's two stable letters live in W and its middle is unchanged — hence it is a raw
+//  pinch of W, contradicting raw-pinch-freeness.
+
+//  Subrange of a concatenation lying entirely in the LEFT part is just that part's subrange.
+pub proof fn lemma_word_subrange_concat_left(w1: Word, w2: Word, a: int, b: int)
+    requires
+        0 <= a,
+        a <= b,
+        b <= w1.len(),
+    ensures
+        (w1 + w2).subrange(a, b) =~= w1.subrange(a, b),
+{
+    let lhs = (w1 + w2).subrange(a, b);
+    let rhs = w1.subrange(a, b);
+    assert(lhs.len() == rhs.len());
+    assert forall|k: int| 0 <= k < lhs.len() implies lhs[k] == rhs[k] by {
+        assert(lhs[k] == (w1 + w2)[a + k]);
+        assert(a + k < w1.len());               //  a + k < b <= w1.len()
+        assert((w1 + w2)[a + k] == w1[a + k]);
+        assert(rhs[k] == w1[a + k]);
+    }
+}
+
+//  Junction:  W raw-pinch-free ∧ u stable-free ⟹ W·u raw-pinch-free.
+pub proof fn lemma_kp_junction(data: HNNData, w: Word, u: Word)
+    requires
+        !has_pinch(data, w),
+        !has_stable_letter(data, u),
+    ensures
+        !has_pinch(data, w + u),
+{
+    if has_pinch(data, w + u) {
+        let ij = choose|i: int, j: int| has_pinch_at(data, w + u, i, j);
+        let i = ij.0;
+        let j = ij.1;
+        assert(has_pinch_at(data, w + u, i, j));
+        let wu = w + u;
+        assert(is_stable(data, wu[i]) && is_stable(data, wu[j]) && wu[i] != wu[j] && 0 <= i < j < wu.len());
+        //  both stable letters lie in w (u contributes none)
+        assert(i < w.len()) by {
+            if i >= w.len() {
+                assert(0 <= i - w.len() < u.len());
+                assert(wu[i] == u[i - w.len() as int]);
+                assert(!is_stable(data, u[i - w.len() as int]));   //  from !has_stable_letter(u)
+                assert(false);
+            }
+        }
+        assert(j < w.len()) by {
+            if j >= w.len() {
+                assert(0 <= j - w.len() < u.len());
+                assert(wu[j] == u[j - w.len() as int]);
+                assert(!is_stable(data, u[j - w.len() as int]));
+                assert(false);
+            }
+        }
+        //  the middle (and the "no stable between") lie entirely within w
+        lemma_word_subrange_concat_left(w, u, i + 1, j);
+        assert(wu.subrange(i + 1, j) =~= w.subrange(i + 1, j));
+        assert(w[i] == wu[i] && w[j] == wu[j]);                 //  i, j < w.len()
+        //  the pinch transfers to w (same symbols, same middle, same inline gen-lists)
+        assert(has_pinch_at(data, w, i, j)) by {
+            assert(0 <= i < j < w.len());
+            assert(is_stable(data, w[i]) && is_stable(data, w[j]) && w[i] != w[j]);
+            assert forall|k: int| i < k < j implies !is_stable(data, #[trigger] w[k]) by {
+                assert(w[k] == wu[k]);                          //  k < j < w.len()
+            }
+            assert(w.subrange(i + 1, j) == wu.subrange(i + 1, j));
+        }
+        assert(has_pinch(data, w));
+        assert(false);
+    }
+}
+
 } //  verus!
