@@ -75,7 +75,10 @@ Reference: `docs/aanderaa-cohen-construction.md` (Layer 1), `docs/higman-embeddi
   - **E2 (`t(α,β)∈⟨t,rᵢ,lⱼ⟩ ⟹ (α,β)∈H₀`) — under way** (`ii_subset.rs`, 31/0):
     - **(ii)⊆ DONE** — the structural decomposition + `lemma_ii_subset` (the hardest sub-brick so far).
     - **(vii) easy half DONE** — `(α,β)∈H₀ ⟹ t(α,β)∈⟨t,rᵢ,lⱼ⟩`.
-    - **E2.C design + representation DONE** — the `⟨K,p⟩`-word (KPWord) encoding.
+    - **E2.C — the abstract property-II engine — COMPLETE** (`kp_pinch.rs` 21/0). `lemma_property_ii`:
+      a stable-free base word in `⟨K,p⟩` lies in `K`, for any subgroup-closed φ-compatible `K` (abstract
+      `in_k`). Full chain L1→L2→3c→junction→assembly (membership-fold + Britton core) verified. Only the
+      `K=T(M)` instantiation of its hypotheses remains (see §3.1 / §5).
 
 ---
 
@@ -84,34 +87,42 @@ Reference: `docs/aanderaa-cohen-construction.md` (Layer 1), `docs/higman-embeddi
 ### 3.1 — Finish Layer 1 `G(M)`: the faithfulness crux (E) ⟹ Theorem 1
 *Critical path. Closes the headline `[k,t(α,β)]=1 ⟺ (α,β)∈H₀(M)`.*
 
-- [ ] **E2.C — generic property-II (THE central engine).** `docs/e2c-property-ii-design.md`.
-        Engine lives in `kp_pinch.rs` (abstract over `in_k: spec_fn`), built on `machine_group`'s
-        conjugation telescope (`lemma_stable_conj_factorization`). The duplicate engine that once
-        sat in `ii_subset.rs` was pruned (2026-06-19) — see the design doc's "single source of truth".
+- [x] **E2.C — generic property-II (THE central engine) — ABSTRACT ENGINE COMPLETE (`kp_pinch` 21/0).**
+        `docs/e2c-property-ii-design.md`. Engine lives in `kp_pinch.rs` (abstract over `in_k: spec_fn`),
+        built on `machine_group`'s conjugation telescope (`lemma_stable_conj_factorization`). The duplicate
+        engine that once sat in `ii_subset.rs` was pruned (2026-06-19) — see the design doc's "single
+        source of truth". **Headline = `lemma_property_ii`**: `g` a stable-free base word ∧
+        `in_kp_subgroup(data, in_k, g)` ⟹ `in_k(g)`, given K subgroup-closed (`in_k(ε)`/H_mul/H_resp) +
+        φ-compatibility (H_ab/H_ba). **Remaining for E2.C = INSTANTIATION only:** discharge the five
+        `in_k` hypotheses for `K=T(M)` (build-order step 5; H_ab/H_ba come from property (v) = E2.B, and
+        the membership form `in_kp_subgroup` gets fed from (vii)/(vi) = E2.D).
   - [x] **L1 — pinch-elimination** DONE — `lemma_kp_eliminate_pinch` (+ `lemma_kp_phi_fwd/rev`,
-        `lemma_kp_value_head_split`). `kp_pinch` 6/0.
-  - [x] **L2 — reduce to pinch-free** DONE — `lemma_kp_reduce_pinch_free` (induction on `kp_pcount`).
-  - [ ] **no-KP-pinch ⟹ no-raw-pinch** (DONE, see 3c) + **junction** + **assembly** — **← junction next.**
+        `lemma_kp_value_head_split`). Now also threads `kp_syllables_valid` (φ-helpers ensure
+        `word_valid(phi, base.num_generators)`).
+  - [x] **L2 — reduce to pinch-free** DONE — `lemma_kp_reduce_pinch_free` (induction on `kp_pcount`);
+        also requires+preserves `kp_syllables_valid`.
+  - [x] **no-KP-pinch ⟹ no-raw-pinch** (3c) + **junction** + **assembly** — ALL DONE.
     - [x] **3a/3b foundation** DONE — `kp_syllables_valid` (every syllable is a BASE word ⟹
           stable-free, since the stable letter is gen index `base.num_generators`) +
           `lemma_kp_value_word_valid` (so `W = kp_value(t, kp)` can feed `britton_lemma_full`).
     - [x] **3c — the structural core** (no-raw-pinch) DONE — `lemma_kp_no_raw_pinch`
-          (`kp_syllables_valid ∧ kp_pinch_free ⟹ ¬has_pinch(data, kp_value(t, kp))`), `kp_pinch` 16/0.
+          (`kp_syllables_valid ∧ kp_pinch_free ⟹ ¬has_pinch(data, kp_value(t, kp))`).
           Built witness-form via head-peeling induction `lemma_kp_raw_pinch_gives_kp_pinch` (a raw pinch
           of `W` yields a KP-pinch index), with modular helpers: `lemma_kp_first_stable` (head occupies
           positions `0..|head|`, all base/non-stable; position `|head|` is the first separator `p₀`),
           `lemma_kp_pinch_case_a` (pinch hits `p₀` ⟹ `kp_has_pinch_at(kp,0)`, middle `= k₀`),
           `lemma_kp_pinch_transfer_tail` (pinch past `p₀` ⟹ shifted raw pinch of `W' = kp_value(rest)`),
           `lemma_kp_pinch_lift` (`kp_has_pinch_at(rest,m) ⟹ kp_has_pinch_at(kp,m+1)`), plus
-          `lemma_word_subrange_concat_right`, `lemma_base_word_index_no_stable`, `lemma_pinch_gens_eq`
-          (bridges the inline `Seq::new` gen-lists of `has_pinch_at` to `hnn_a_gens`/`hnn_b_gens`).
-    - [ ] **junction** (`W` raw-pinch-free ∧ `u` stable-free ⟹ `W·u` raw-pinch-free) — appending a
-          `p`-free word adds no stable letters, so no adjacent-stable middle changes. **← current next
-          brick.** (Reuse `lemma_base_word_no_stable` + the position helpers from 3c.)
-    - [ ] **assembly** — (1) `g ∈ ⟨K,p⟩ ⟹ ∃ KPWord kp₀, kp_value ≡ g`; (2) L2 ⟹ pinch-free `kp`;
-          (3) 3c+junction ⟹ `W·g⁻¹` raw-pinch-free; (4) `britton_lemma_full`: `≡ε ∧ raw-pinch-free
-          ⟹ stable-free`; (5) stable-free ⟹ `tail` empty ⟹ `g ≡ head ∈ K`. E1
-          (`lemma_k_commutes_implies_subgroup`) is the template for (3)–(4).
+          `lemma_word_subrange_concat_right`, `lemma_base_word_index_no_stable`, `lemma_pinch_gens_eq`.
+    - [x] **junction** DONE — `lemma_kp_junction` (`W` raw-pinch-free ∧ `u` stable-free ⟹ `W·u`
+          raw-pinch-free) + `lemma_word_subrange_concat_left`.
+    - [x] **assembly** DONE — split into the membership→KPWord conversion + the Britton core:
+          - **step 1** = `lemma_kp_factors_to_kpword` — fold a kp-factor list (each factor a K-element
+            base word, or `[p]`/`[p⁻¹]`) into the alternating KP-word with the *same value*; the
+            membership form is `in_kp_subgroup`/`all_kp_factors`/`is_kp_factor`.
+          - **steps 2–5** = `lemma_kp_property_ii_core` — L2 reduce → 3c+junction raw-pinch-free →
+            `britton_lemma_full` (no pinch ⟹ no stable letter) → `tail` empty ⟹ `W = head ∈ K`, then
+            `britton_lemma_unconditional` descends `W·g⁻¹ ≡ ε` to base ⟹ `W ≡_base g` ⟹ `in_k(g)`.
 - [ ] **(ii)⊇** — residue configs ⊆ `T∩⟨t(i,j),xᵐ,yᵐ⟩` (inverts the move lemmas; completes (ii)).
 - [ ] **(iv)** — the index-shift isomorphism of associated subgroups (HNN-validity backbone).
 - [ ] **E2.B — property (v)** — the φ-compatibility: `rᵢ` maps `T(M)∩A₊ ↔ T(M)∩A₋`, because
@@ -163,10 +174,17 @@ Reference: `docs/aanderaa-cohen-construction.md` (Layer 1), `docs/higman-embeddi
 ---
 
 ## 5. Sequencing & honest effort notes
-- **Critical path right now: §3.1 E2.C (L1).** It is the highest-uncertainty engine; everything in
-  the abstract faithfulness route depends on it. De-risk it before investing further in E2.B/(iv)/E2.E.
-- **Fallback** if L1's surgery won't formalize: the *direct pinch-decoding* route (each pinch = one
-  machine step), noted in `docs/e2-faithfulness-scope.md`.
+- **E2.C (the abstract property-II engine) is DONE & de-risked** (`kp_pinch` 21/0, `lemma_property_ii`).
+  The highest-uncertainty piece of the faithfulness route is behind us; the fallback route is no longer
+  needed for the engine itself.
+- **Critical path now: instantiating property II for `K=T(M)`.** Two prongs feed `lemma_property_ii`:
+  (a) **E2.B — property (v)** discharges its φ-compatibility hypotheses (H_ab/H_ba) for `T(M)`; and
+  (b) **E2.D — property (vi)/tower peel** supplies the `in_kp_subgroup` membership form from (vii).
+  The other `in_k` hypotheses (`in_k(ε)`, H_mul, H_resp) for `T(M)` reduce to T(M)'s subgroup closure
+  (`lemma_h0_config_in_T`/`lemma_in_T_product` + base-equiv respect — mostly already in `machine_group`).
+  Recommended order: **E2.B (v) → (iv) → E2.D (vi) → E2.E → E2.glue → F**. `(ii)⊇` is independent.
+- **Fallback** (now only relevant if the *instantiation* snags, not the engine): the *direct
+  pinch-decoding* route (each pinch = one machine step), noted in `docs/e2-faithfulness-scope.md`.
 - Layer 1 (§3.1) is the bulk of the *novel* proof work. Layer 2 (§3.2) is intricate but follows a
   fixed blueprint. §3.3–3.4 are assembly once 1+2 exist.
 - Keep Britton's proof **technique** faithful to the paper (the "deceptive dragons" rule); only the
