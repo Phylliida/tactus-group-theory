@@ -78,10 +78,12 @@ Reference: `docs/aanderaa-cohen-construction.md` (Layer 1), `docs/higman-embeddi
     - **E2.C — the abstract property-II engine — COMPLETE** (`kp_pinch.rs` 21/0). `lemma_property_ii`:
       a stable-free base word in `⟨K,p⟩` lies in `K`, for any subgroup-closed φ-compatible `K` (abstract
       `in_k`). Full chain L1→L2→3c→junction→assembly (membership-fold + Britton core) verified.
-    - **E2.D — property (vi) tower peel — VERIFIED mod `prop_v`** (`tower_peel.rs` 18/0). `lemma_vi`:
+    - **E2.D — property (vi) tower peel — VERIFIED, UNCONDITIONAL** (`tower_peel.rs` 21/0). `lemma_vi`:
       `A∩⟨T(M),rᵢ,lⱼ⟩=T(M)`, by instantiating E2.C down the B(M) tower (`lemma_vi_upto`, downward
-      induction). All engine hypotheses discharged except the φ-compat, which reduces to property (v)
-      = `prop_v_holds` (the sole remaining hole). `docs/e2d-tower-peel-plan.md`.
+      induction). `docs/e2d-tower-peel-plan.md`.
+    - **E2.B — property (v) = `prop_v_holds` — DONE** (`prop_v.rs` 56/0, `lemma_prop_v_holds`). Both
+      directions, all quads; discharges the φ-compat hole, making `lemma_vi` unconditional.
+      `docs/property-v-tfree-architecture.md`.
 
 ---
 
@@ -133,22 +135,30 @@ Reference: `docs/aanderaa-cohen-construction.md` (Layer 1), `docs/higman-embeddi
       infra (`lemma_spow_{pos,neg,int}_mult_in_G`) and fed through a new generic closure
       (`lemma_pred_subgroup_in_generated`: a pred-subgroup ⊆ ⟨gens⟩ when each pred-elt is). Both
       directions of (ii) now hold. *(The "T∩" framing: residue ⊆ T(M) is separate, part of E2.glue.)*
-- [x] **E2.D — property (vi) via the tower peel — VERIFIED, conditional on prop_v** (`tower_peel.rs`
-      18/0). `docs/e2d-tower-peel-plan.md`. `lemma_vi`: `A ∩ ⟨T(M),rᵢ,lⱼ⟩ = T(M)` by **top-down tower
+- [x] **E2.D — property (vi) via the tower peel — VERIFIED, UNCONDITIONAL** (`tower_peel.rs` 21/0).
+      `docs/e2d-tower-peel-plan.md`. `lemma_vi`: `A ∩ ⟨T(M),rᵢ,lⱼ⟩ = T(M)` by **top-down tower
       peel** — a downward induction `lemma_vi_upto(l)` that instantiates the single-letter engine
       `lemma_property_ii` (E2.C) at each level with `in_k = in_TMstable_upto(l-1)`. The engine's
       φ-compat hypotheses (H_ab/H_ba) are discharged by **IH + property (v) + T(M)-lift**; membership
       via a near-free conversion bridge (same factor list). Ladder predicate `in_TMstable_upto`
       (level-0 = T(M), level-N = full); endpoint identities, closures, lift, extensionality all built.
-      **The whole tower architecture is now machine-checked.** Only hole = `prop_v_holds` (below).
-- [ ] **E2.B — property (v) = `prop_v_holds(mm)`** — the *only* remaining hole feeding `lemma_vi`.
-      Per-quad, membership form (already stated in `tower_peel.rs`): `in_TM(emb(a_gens,uw)) ⟹
-      in_TM(emb(b_gens,uw))` (+ reverse). = (ii)⊆ [done] + **(iv)** index-shift iso [build] +
-      (v)-machine [`lemma_step_preserves_h0`, done] + T-free [done]. Index map (derived): for an R-quad
-      `(α,β,γ)`, `t(α+am, β+bm) ↦ t(γ+am², b)`; the (r,s)→(r',s') is the machine yield, so H₀ is
-      preserved both ways. The crux is decomposing `emb(a_gens,uw)∈T(M)` into `∏ t(r,s)`, r≡α,s≡β,
-      each `(r,s)∈H₀` (uses T-freeness on the residue basis). See `docs/property-v-plan.md`.
-- [ ] **(iv)** — the index-shift isomorphism of associated subgroups (sub-step of property (v) above).
+      **`prop_v_holds` is now discharged (E2.B below), so `lemma_vi` requires only well-formedness +
+      terminal origin — no remaining hole.**
+- [x] **E2.B — property (v) = `prop_v_holds(mm)` — DONE** (`prop_v.rs` 56/0). `lemma_prop_v_holds(mm)`
+      proves both directions for every quad, discharging the last hole of `lemma_vi`.
+      `docs/property-v-tfree-architecture.md`. **A→B** (`lemma_prop_v_AtoB`): reduce `emb(a_gens,uw)∈T(M)`
+      to a `canw_reduced` residue form (H₀∩residue `(a,b mod m)`), fold a single `U` over the 3 base
+      gens, reconstruct both sides (`lemma_emb_aside_eq`), conjugate in the HNN, restrict to base A by
+      base-faithfulness (`lemma_quad_base_faithful`/`lemma_single_hnn_base_faithful`), and land
+      `emb(b_gens,U)` in T(M) via the forward `quad_step` (`lemma_step_preserves_h0`). **B→A**
+      (`lemma_prop_v_BtoA`): mirror with the **asymmetric b-side** moduli `(m²,1)`/`(1,m²)` — the
+      residue factorization comes straight from `lemma_accumulator_inv` (bypassing single-modulus
+      ii_subset), `gexp=0` drops the trailing powers, a generic reduction core
+      (`lemma_in_TM_canon_reduced`) + the T-free crux gives H₀∩residue, then the **reverse** conjugation
+      (`lemma_stable_conj_factorization_rev`) + base-faithfulness lands `emb(a_gens,U)` at the
+      `quad_step` PRE-image, in H₀ via the reverse of `step_preserves_h0` (it is an iff).
+- [x] **(iv)** — the index-shift isomorphism: subsumed by the lockstep accumulator / `quad_step`
+      relabel inside E2.B (no separate conjugation telescope needed).
 - [ ] **E2.E — T-freeness (property i) + free-factor membership** (the "last mile"): `T=⟨t⟩^A` is
       free on `{t(r,s)}`; `t(α,β)∈T(M)` ⟹ `(α,β)∈H₀`. Uses `free_product.rs`.
 - [ ] **E2.glue** — `t(α,β)∈A ∧ ∈⟨t,rᵢ,lⱼ⟩` →(vii)→ `∈A∩⟨T(M),rᵢ,lⱼ⟩` →(vi)→ `∈T(M)` →(E2.E)→ `∈H₀`.
@@ -194,16 +204,13 @@ Reference: `docs/aanderaa-cohen-construction.md` (Layer 1), `docs/higman-embeddi
 
 ## 5. Sequencing & honest effort notes
 - **E2.C (the abstract property-II engine) is DONE & de-risked** (`kp_pinch` 21/0, `lemma_property_ii`).
-- **E2.D (the tower peel = property (vi)) is DONE & de-risked** (`tower_peel` 18/0, `lemma_vi`),
-  conditional on `prop_v_holds`. The tower-architecture uncertainty that paused the prior session is
-  fully resolved: the top-down peel reuses the single-letter engine, the conversion bridge is near-free,
-  and the φ-compat is discharged by a clean nested induction (IH + property (v)). See
-  `docs/e2d-tower-peel-plan.md`. **All `in_k` hypotheses except the φ-compat are now machine-checked**
-  (`in_k(ε)`/H_mul/H_resp via `in_subgroup_pred` closures; T(M)-lift; data-validity).
-- **Critical path now: property (v) = `prop_v_holds(mm)`** — the single remaining hole feeding
-  `lemma_vi`. It is precisely specified in `tower_peel.rs` (per-quad, membership form). Build order:
-  **(iv) index-shift iso → (v)/`prop_v_holds` → wire into `lemma_vi` → (vii)⊆ [done] chain →
-  E2.E (in_TM→H₀) → E2.glue → F**. `(ii)` both directions DONE; `lemma_vii_subset` DONE.
+- **E2.D (the tower peel = property (vi)) is DONE & UNCONDITIONAL** (`tower_peel` 21/0, `lemma_vi`).
+- **E2.B (property (v) = `prop_v_holds`) is DONE** (`prop_v` 56/0, `lemma_prop_v_holds`). Both
+  directions; the asymmetric b-side `(m²,1)` reduction was handled via `lemma_accumulator_inv` +
+  a generic reduction core, NOT a single-modulus ii_subset rebuild. `lemma_vi` is now unconditional.
+- **Critical path now: E2.E (T-freeness, in_TM→H₀) → E2.glue → F.** Build order:
+  **(vii)⊆ [done] chain → E2.E (in_TM→H₀) → E2.glue → F**. `(ii)` both directions DONE;
+  `lemma_vii_subset` DONE; `(vi)`/`(v)`/`(iv)` DONE.
 - **Fallback** (now only relevant if the *instantiation* snags, not the engine): the *direct
   pinch-decoding* route (each pinch = one machine step), noted in `docs/e2-faithfulness-scope.md`.
 - Layer 1 (§3.1) is the bulk of the *novel* proof work. Layer 2 (§3.2) is intricate but follows a
