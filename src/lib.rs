@@ -146,3 +146,9 @@ pub mod h3;
 // "{t_α w_α(b) d} is a free basis of H₁" (lemma_basis_elt_free + lemma_free_to_basis_elt).
 #[cfg(verus_keep_ghost)]
 pub mod free_basis;
+
+// higman_consequences: Layer 2 / Brick 5 — the Higman payoff. The BRIDGE THEOREM
+// `(α,0)∈H₀(M) ⟹ h3_pres ⊢ w_α(c)=1` (soundness = Cohen's (II)/(III)-from-(I)); the c.e. set
+// S={w_α(c)} realized as H₃'s word problem among the c-gens. See docs/brick5-plan.md.
+#[cfg(verus_keep_ghost)]
+pub mod higman_consequences;
