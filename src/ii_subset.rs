@@ -521,6 +521,65 @@ pub proof fn lemma_config_signed_in_G(i: nat, j: nat, m: nat, r: int, s: int)
     lemma_in_subgroup_respects_equiv(p, gens, conj, config_word_signed(r, s));
 }
 
+//  A residue gen (config word t(r,s) or its inverse, r≡i s≡j mod m) lies in ⟨t(i,j),xᵐ,yᵐ⟩.
+pub proof fn lemma_residue_gen_in_G(i: nat, j: nat, m: nat, g: Word)
+    requires
+        m > 0,
+        is_residue_gen(i as int, j as int, m as int, g),
+    ensures
+        in_generated_subgroup(base_A(),
+            seq![config_word(i, j), signed_power(1, m as int), signed_power(2, m as int)], g),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let mm = m as int;
+    let gens = seq![config_word(i, j), signed_power(1, mm), signed_power(2, mm)];
+    let rs = choose|r: int, s: int| #![trigger config_word_signed(r, s)]
+        (r - i as int) % mm == 0 && (s - j as int) % mm == 0
+        && (g == config_word_signed(r, s) || g == inverse_word(config_word_signed(r, s)));
+    let r = rs.0;
+    let s = rs.1;
+    assert((r - i as int) % mm == 0 && (s - j as int) % mm == 0
+        && (g == config_word_signed(r, s) || g == inverse_word(config_word_signed(r, s))));
+    lemma_config_signed_in_G(i, j, m, r, s);                //  t(r,s) ∈ G
+    if g != config_word_signed(r, s) {
+        //  g = inverse_word(t(r,s)) ∈ G via inverse closure
+        assert(g == inverse_word(config_word_signed(r, s)));
+        lemma_config_signed_valid(r, s);                    //  word_valid(t(r,s), 3)
+        assert(p.num_generators == 3);
+        assert forall|t: int| 0 <= t < gens.len()
+            implies word_valid(#[trigger] gens[t], p.num_generators) by {
+            if t == 0 { lemma_config_word_valid(i, j); assert(gens[0] == config_word(i, j)); }
+            else if t == 1 { lemma_signed_power_valid(1, mm, 3); assert(gens[1] == signed_power(1, mm)); }
+            else { lemma_signed_power_valid(2, mm, 3); assert(gens[2] == signed_power(2, mm)); }
+        }
+        crate::normal_form_afp_textbook::lemma_subgroup_inverse(p, gens, config_word_signed(r, s));
+    }
+}
+
+//  ============================================================
+//  PROPERTY (ii)⊇ — the residue-class subgroup ⊆ ⟨t(i,j),xᵐ,yᵐ⟩  (inverts (ii)⊆).
+//  ============================================================
+pub proof fn lemma_ii_superset(i: nat, j: nat, m: nat, w: Word)
+    requires
+        m > 0,
+        in_residue_class(i as int, j as int, m as int, w),
+    ensures
+        in_generated_subgroup(base_A(),
+            seq![config_word(i, j), signed_power(1, m as int), signed_power(2, m as int)], w),
+{
+    let p = base_A();
+    let mm = m as int;
+    let gens = seq![config_word(i, j), signed_power(1, mm), signed_power(2, mm)];
+    let pred = residue_pred(i as int, j as int, mm);
+    assert(in_subgroup_pred(p, pred, w));                   //  = in_residue_class
+    assert forall|gg: Word| pred(gg) implies in_generated_subgroup(p, gens, gg) by {
+        assert(pred(gg) == is_residue_gen(i as int, j as int, mm, gg));
+        lemma_residue_gen_in_G(i, j, m, gg);
+    }
+    lemma_pred_subgroup_in_generated(p, pred, gens, w);
+}
+
 //  ============================================================
 //  Property (vii), the easy half:  every H₀ config word is in ⟨t, rᵢ, lⱼ⟩.
 //  ============================================================
