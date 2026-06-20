@@ -351,6 +351,87 @@ pub proof fn lemma_kp_value_cons(stable: Symbol, kp: KPWord)
 }
 
 //  ============================================================
+//  Brick C — head-independent `tail_value`:  the surgery substrate.
+//  ============================================================
+//  The head-first fold `kp_value` is awkward to split at an interior index.  Reformulate the
+//  tail's contribution as a head-INDEPENDENT fold `tail_value`, where each entry contributes
+//  [p^{s}]·k independently.  Then  kp_value(kp) = head · tail_value(tail)  and `tail_value`
+//  distributes over Seq concatenation — so a surgery splicing the tail becomes a local rewrite.
+
+//  The signed stable letter for an entry's bool flag (true = p, false = p⁻¹).
+pub open spec fn kp_stable_sym(stable: Symbol, b: bool) -> Symbol {
+    if b { stable } else { inverse_symbol(stable) }
+}
+
+//  The tail's contribution:  [p^{s₀}]·k₀ · [p^{s₁}]·k₁ · … (no head).
+pub open spec fn tail_value(stable: Symbol, tail: Seq<(bool, Word)>) -> Word
+    decreases tail.len(),
+{
+    if tail.len() == 0 {
+        empty_word()
+    } else {
+        seq![kp_stable_sym(stable, tail.first().0)] + tail.first().1
+            + tail_value(stable, tail.drop_first())
+    }
+}
+
+//  kp_value(kp) = head · tail_value(tail).
+pub proof fn lemma_kp_value_as_tail(stable: Symbol, kp: KPWord)
+    ensures
+        kp_value(stable, kp) =~= kp.head + tail_value(stable, kp.tail),
+    decreases kp.tail.len(),
+{
+    if kp.tail.len() == 0 {
+        assert(tail_value(stable, kp.tail) =~= empty_word());
+    } else {
+        let rest_kp = KPWord { head: kp.tail.first().1, tail: kp.tail.drop_first() };
+        lemma_kp_value_as_tail(stable, rest_kp);
+        //  kp_value(kp) = head + [p^{s₀}] + kp_value(rest_kp)
+        //              = head + [p^{s₀}] + (tail.first().1 + tail_value(drop_first))
+        //              = head + tail_value(tail)
+    }
+}
+
+//  tail_value distributes over Seq concatenation.
+pub proof fn lemma_tail_value_concat(stable: Symbol, a: Seq<(bool, Word)>, b: Seq<(bool, Word)>)
+    ensures
+        tail_value(stable, a + b) =~= tail_value(stable, a) + tail_value(stable, b),
+    decreases a.len(),
+{
+    if a.len() == 0 {
+        assert(a + b =~= b);
+        assert(tail_value(stable, a) =~= empty_word());
+    } else {
+        assert((a + b).first() == a.first());
+        assert((a + b).drop_first() =~= a.drop_first() + b);
+        lemma_tail_value_concat(stable, a.drop_first(), b);
+    }
+}
+
+//  Singleton:  tail_value([(s, k)]) = [p^{s}]·k.
+pub proof fn lemma_tail_value_singleton(stable: Symbol, e: (bool, Word))
+    ensures
+        tail_value(stable, seq![e]) =~= seq![kp_stable_sym(stable, e.0)] + e.1,
+{
+    let s1: Seq<(bool, Word)> = seq![e];
+    assert(s1.first() == e);
+    assert(s1.drop_first() =~= Seq::<(bool, Word)>::empty());
+    assert(tail_value(stable, Seq::<(bool, Word)>::empty()) =~= empty_word());
+}
+
+//  Pair:  tail_value([(s₀,k₀),(s₁,k₁)]) = [p^{s₀}]·k₀·[p^{s₁}]·k₁.
+pub proof fn lemma_tail_value_pair(stable: Symbol, e0: (bool, Word), e1: (bool, Word))
+    ensures
+        tail_value(stable, seq![e0, e1]) =~=
+            seq![kp_stable_sym(stable, e0.0)] + e0.1 + seq![kp_stable_sym(stable, e1.0)] + e1.1,
+{
+    let s2: Seq<(bool, Word)> = seq![e0, e1];
+    assert(s2.first() == e0);
+    assert(s2.drop_first() =~= seq![e1]);
+    lemma_tail_value_singleton(stable, e1);
+}
+
+//  ============================================================
 //  Brick A — generalized HNN conjugation over a whole subgroup element.
 //  ============================================================
 //  The single-generator relation  t⁻¹·a_i·t ≡ b_i  (lemma_hnn_conjugation) lifts to an
