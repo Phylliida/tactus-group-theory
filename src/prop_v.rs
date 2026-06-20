@@ -704,4 +704,67 @@ pub proof fn lemma_bside_letter_in_TM(mm: ModMachine, qi: nat, c: CanonLetter)
     }
 }
 
+//  ── b-side fold:  apply_embedding(b_gens, red_to_U(red,m)) ∈ T(M). ──
+pub proof fn lemma_emb_bside_in_TM(mm: ModMachine, qi: nat, red: Seq<CanonLetter>)
+    requires
+        mod_machine_wf(mm),
+        qi < mm.quads.len(),
+        forall|i: int| 0 <= i < red.len() ==> {
+            &&& (#[trigger] red[i]).r >= 0
+            &&& red[i].s >= 0
+            &&& mm_in_H0(mm, red[i].r as nat, red[i].s as nat)
+            &&& (red[i].r - mm.quads[qi as int].a as int) % (mm.m as int) == 0
+            &&& (red[i].s - mm.quads[qi as int].b as int) % (mm.m as int) == 0
+        },
+    ensures
+        in_TM(mm, apply_embedding(hnn_b_gens(quad_data(mm, qi)), red_to_U(red, mm.m as int))),
+    decreases red.len(),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let bg = hnn_b_gens(quad_data(mm, qi));
+    let mi = mm.m as int;
+    if red.len() == 0 {
+        assert(red_to_U(red, mi) =~= empty_word());
+        assert(apply_embedding(bg, red_to_U(red, mi)) =~= empty_word()) by {
+            reveal_with_fuel(apply_embedding, 2);
+        }
+        lemma_empty_in_TM(mm);
+    } else {
+        let c = red[0];
+        let rest = red.drop_first();
+        assert(red_to_U(red, mi) == letter_to_U(c, mi) + red_to_U(rest, mi));
+        lemma_apply_embedding_concat(bg, letter_to_U(c, mi), red_to_U(rest, mi));
+        let h = apply_embedding(bg, letter_to_U(c, mi));
+        let t = apply_embedding(bg, red_to_U(rest, mi));
+        assert(apply_embedding(bg, red_to_U(red, mi)) =~= h + t);
+        //  head ∈ T(M)
+        assert((red[0]).r >= 0 && red[0].s >= 0
+            && mm_in_H0(mm, red[0].r as nat, red[0].s as nat)
+            && (red[0].r - mm.quads[qi as int].a as int) % mi == 0
+            && (red[0].s - mm.quads[qi as int].b as int) % mi == 0);
+        lemma_bside_letter_in_TM(mm, qi, c);
+        //  rest ∈ T(M) by IH
+        assert(forall|i: int| 0 <= i < rest.len() ==> {
+            &&& (#[trigger] rest[i]).r >= 0
+            &&& rest[i].s >= 0
+            &&& mm_in_H0(mm, rest[i].r as nat, rest[i].s as nat)
+            &&& (rest[i].r - mm.quads[qi as int].a as int) % mi == 0
+            &&& (rest[i].s - mm.quads[qi as int].b as int) % mi == 0
+        }) by {
+            assert forall|i: int| 0 <= i < rest.len() implies {
+                &&& (#[trigger] rest[i]).r >= 0
+                &&& rest[i].s >= 0
+                &&& mm_in_H0(mm, rest[i].r as nat, rest[i].s as nat)
+                &&& (rest[i].r - mm.quads[qi as int].a as int) % mi == 0
+                &&& (rest[i].s - mm.quads[qi as int].b as int) % mi == 0
+            } by {
+                assert(rest[i] == red[i + 1]);
+            }
+        }
+        lemma_emb_bside_in_TM(mm, qi, rest);
+        lemma_product_in_subgroup_pred(p, tm_pred(mm), h, t);
+    }
+}
+
 } //  verus!
