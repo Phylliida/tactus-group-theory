@@ -22,8 +22,9 @@ use crate::presentation::*;
 use crate::presentation_lemmas::*;
 use crate::hnn::*;
 use crate::machine_group::{hnn_a_gens, hnn_b_gens, lemma_stable_conj_factorization,
-    lemma_stable_conj_factorization_rev, lemma_in_gen_implies_emb};
-use crate::benign::{in_generated_subgroup, apply_embedding};
+    lemma_stable_conj_factorization_rev, lemma_in_gen_implies_emb, lemma_hnn_presentation_valid,
+    lemma_word_valid_mono};
+use crate::benign::{in_generated_subgroup, apply_embedding, lemma_apply_embedding_valid};
 use crate::ii_subset::{KPWord, kp_value, kp_pcount, is_kp_word, lemma_kp_value_cons};
 
 verus! {
@@ -56,9 +57,17 @@ pub proof fn lemma_kp_phi_fwd(data: HNNData, in_k: spec_fn(Word) -> bool, mid: W
         && equiv_in_presentation(data.base, apply_embedding(ag, uw), mid));
     let g = apply_embedding(ag, uw);
     let phi = apply_embedding(bg, uw);
+    //  validity of g (and pres) — needed by the symmetric flip (only its w1 must be valid)
+    lemma_hnn_presentation_valid(data);
+    assert(presentation_valid(data.base));
+    assert(pres.num_generators == data.base.num_generators + 1);
+    assert forall|t: int| 0 <= t < ag.len() implies word_valid(#[trigger] ag[t], data.base.num_generators)
+        by { assert(ag[t] == data.associations[t].0); }
+    lemma_apply_embedding_valid(ag, uw, data.base.num_generators);
+    lemma_word_valid_mono(g, data.base.num_generators, pres.num_generators);
     //  conjugation:  [si] + g + [st] ≡ phi
     lemma_stable_conj_factorization(data, uw);
-    //  bridge  mid ≡_pres g
+    //  bridge  mid ≡_pres g, flip to  mid ≡_pres g  (only g must be valid)
     lemma_base_embeds_in_hnn(data, g, mid);
     lemma_equiv_symmetric(pres, g, mid);
     //  congruence:  [si] + mid + [st] ≡ [si] + g + [st]
@@ -100,9 +109,17 @@ pub proof fn lemma_kp_phi_rev(data: HNNData, in_k: spec_fn(Word) -> bool, mid: W
         && equiv_in_presentation(data.base, apply_embedding(bg, uw), mid));
     let g = apply_embedding(bg, uw);
     let phi = apply_embedding(ag, uw);
+    //  validity of g (and pres) — needed by the symmetric flip (only its w1 must be valid)
+    lemma_hnn_presentation_valid(data);
+    assert(presentation_valid(data.base));
+    assert(pres.num_generators == data.base.num_generators + 1);
+    assert forall|t: int| 0 <= t < bg.len() implies word_valid(#[trigger] bg[t], data.base.num_generators)
+        by { assert(bg[t] == data.associations[t].1); }
+    lemma_apply_embedding_valid(bg, uw, data.base.num_generators);
+    lemma_word_valid_mono(g, data.base.num_generators, pres.num_generators);
     //  reverse conjugation:  [st] + g + [si] ≡ phi
     lemma_stable_conj_factorization_rev(data, uw);
-    //  bridge  mid ≡_pres g
+    //  bridge  mid ≡_pres g, flip to  mid ≡_pres g  (only g must be valid)
     lemma_base_embeds_in_hnn(data, g, mid);
     lemma_equiv_symmetric(pres, g, mid);
     //  congruence:  [st] + mid + [si] ≡ [st] + g + [si]
@@ -141,6 +158,146 @@ pub proof fn lemma_kp_value_head_split(stable: Symbol, head: Word, tail: Seq<(bo
     } else {
         lemma_kp_value_cons(stable, KPWord { head, tail });
         lemma_kp_value_cons(stable, KPWord { head: empty_word(), tail });
+    }
+}
+
+//  ============================================================
+//  L1 — eliminate one KP-pinch (the hard core of property II).
+//  ============================================================
+//  A KP-word with a pinch at i ⟹ a KP-word with 2 fewer p's, ≡ value, still a KP-word.
+//  Recursion on the pinch index i:  base case (i==0) splices φ(mid) for the cancelling p's;
+//  recursive case peels the head and recurses into the tail.
+pub proof fn lemma_kp_eliminate_pinch(
+    data: HNNData, in_k: spec_fn(Word) -> bool, kp: KPWord, i: int,
+) -> (kp_prime: KPWord)
+    requires
+        hnn_data_valid(data),
+        forall|a: Word, b: Word| in_k(a) && #[trigger] equiv_in_presentation(data.base, a, b) ==> in_k(b),
+        forall|a: Word, b: Word| in_k(a) && in_k(b) ==> in_k(#[trigger] (a + b)),
+        forall|uw: Word| word_valid(uw, data.associations.len() as nat)
+            && in_k(apply_embedding(hnn_a_gens(data), uw))
+            ==> in_k(#[trigger] apply_embedding(hnn_b_gens(data), uw)),
+        forall|uw: Word| word_valid(uw, data.associations.len() as nat)
+            && in_k(apply_embedding(hnn_b_gens(data), uw))
+            ==> in_k(#[trigger] apply_embedding(hnn_a_gens(data), uw)),
+        is_kp_word(in_k, kp),
+        kp_has_pinch_at(data, kp, i),
+    ensures
+        kp_pcount(kp_prime) == kp_pcount(kp) - 2,
+        is_kp_word(in_k, kp_prime),
+        equiv_in_presentation(hnn_presentation(data),
+            kp_value(stable_letter(data), kp), kp_value(stable_letter(data), kp_prime)),
+    decreases i,
+{
+    let st = stable_letter(data);
+    let si = stable_letter_inv(data);
+    let pres = hnn_presentation(data);
+    let tail = kp.tail;
+    assert(inverse_symbol(st) == si);
+    if i == 0 {
+        //  ===== BASE CASE: the surgery =====
+        let mid = tail[0].1;
+        let m1 = tail.drop_first().first().1;
+        let t2 = tail.drop_first().drop_first();
+        let rest1 = KPWord { head: tail.first().1, tail: tail.drop_first() };
+        let rest2 = KPWord { head: m1, tail: t2 };
+        assert(tail.drop_first()[0] == tail[1]);
+        assert(tail.drop_first().first() == tail[1]);
+        assert(m1 == tail[1].1);
+
+        lemma_kp_value_cons(st, kp);
+        lemma_kp_value_cons(st, rest1);
+
+        let s0sym = if tail[0].0 { st } else { si };
+        let s1sym = if tail[1].0 { st } else { si };
+        let conj = seq![s0sym] + mid + seq![s1sym];
+
+        let phi: Word;
+        if tail[0].0 == false {
+            assert(tail[1].0 == true);
+            assert(in_generated_subgroup(data.base, hnn_a_gens(data), mid));
+            phi = lemma_kp_phi_fwd(data, in_k, mid);
+            assert(conj =~= seq![si] + mid + seq![st]);
+        } else {
+            assert(tail[0].0 == true);
+            assert(tail[1].0 == false);
+            assert(in_generated_subgroup(data.base, hnn_b_gens(data), mid));
+            phi = lemma_kp_phi_rev(data, in_k, mid);
+            assert(conj =~= seq![st] + mid + seq![si]);
+        }
+        assert(equiv_in_presentation(pres, conj, phi));
+        assert(in_k(phi));
+
+        let kp_prime = KPWord { head: kp.head + phi + m1, tail: t2 };
+
+        //  --- value preservation ---
+        assert(kp_value(st, kp) =~= kp.head + conj + kp_value(st, rest2));
+        lemma_equiv_concat_right(pres, kp.head, conj, phi);
+        lemma_equiv_concat_left(pres, kp.head + conj, kp.head + phi, kp_value(st, rest2));
+        lemma_kp_value_head_split(st, kp_prime.head, t2);
+        lemma_kp_value_head_split(st, m1, t2);
+        assert(kp.head + phi + kp_value(st, rest2) =~= kp_value(st, kp_prime));
+        assert(equiv_in_presentation(pres, kp_value(st, kp), kp_value(st, kp_prime)));
+
+        //  --- is_kp_word(kp_prime) ---
+        assert(in_k(kp.head));
+        assert(in_k(m1));
+        assert(in_k(kp.head + phi));
+        assert(in_k(kp.head + phi + m1));
+        assert(is_kp_word(in_k, kp_prime)) by {
+            assert(in_k(kp_prime.head));
+            assert forall|j: int| 0 <= j < kp_prime.tail.len()
+                implies in_k(#[trigger] kp_prime.tail[j].1) by {
+                assert(kp_prime.tail[j] == tail[j + 2]);
+            }
+        }
+        assert(kp_pcount(kp_prime) == kp_pcount(kp) - 2);
+        kp_prime
+    } else {
+        //  ===== RECURSIVE CASE: peel the head =====
+        let rest = KPWord { head: tail.first().1, tail: tail.drop_first() };
+        assert(is_kp_word(in_k, rest)) by {
+            assert(rest.head == tail[0].1);
+            assert(in_k(rest.head));
+            assert forall|j: int| 0 <= j < rest.tail.len()
+                implies in_k(#[trigger] rest.tail[j].1) by {
+                assert(rest.tail[j] == tail[j + 1]);
+            }
+        }
+        assert(kp_has_pinch_at(data, rest, i - 1)) by {
+            assert(rest.tail[i - 1] == tail[i]);
+            assert(rest.tail[i] == tail[i + 1]);
+        }
+        let rest_prime = lemma_kp_eliminate_pinch(data, in_k, rest, i - 1);
+        let kp_prime = KPWord {
+            head: kp.head,
+            tail: seq![(tail.first().0, rest_prime.head)] + rest_prime.tail,
+        };
+        let prefix = kp.head + seq![if tail.first().0 { st } else { inverse_symbol(st) }];
+        assert(kp_prime.tail.first() == (tail.first().0, rest_prime.head));
+        assert(kp_prime.tail.drop_first() =~= rest_prime.tail);
+        lemma_kp_value_cons(st, kp);
+        lemma_kp_value_cons(st, kp_prime);
+        assert(kp_value(st, kp) =~= prefix + kp_value(st, rest));
+        assert(kp_value(st, kp_prime) =~= prefix + kp_value(st, rest_prime));
+        lemma_equiv_concat_right(pres, prefix, kp_value(st, rest), kp_value(st, rest_prime));
+        assert(equiv_in_presentation(pres, kp_value(st, kp), kp_value(st, kp_prime)));
+
+        assert(is_kp_word(in_k, kp_prime)) by {
+            assert(in_k(kp_prime.head));
+            assert forall|j: int| 0 <= j < kp_prime.tail.len()
+                implies in_k(#[trigger] kp_prime.tail[j].1) by {
+                if j == 0 {
+                    assert(kp_prime.tail[0] == (tail.first().0, rest_prime.head));
+                    assert(in_k(rest_prime.head));
+                } else {
+                    assert(kp_prime.tail[j] == rest_prime.tail[j - 1]);
+                }
+            }
+        }
+        assert(kp_prime.tail.len() == 1 + rest_prime.tail.len());
+        assert(kp_pcount(kp_prime) == kp_pcount(kp) - 2);
+        kp_prime
     }
 }
 

@@ -4,7 +4,7 @@ use crate::word::*;
 use crate::presentation::*;
 use crate::presentation_lemmas::*;
 use crate::machine_group::*;
-use crate::hnn::{HNNData, stable_letter, stable_letter_inv, hnn_presentation, hnn_data_valid, lemma_hnn_conjugation};
+use crate::hnn::{HNNData, stable_letter, stable_letter_inv, hnn_presentation, hnn_data_valid, lemma_hnn_conjugation, lemma_base_embeds_in_hnn};
 use crate::benign::{in_generated_subgroup, factors_from_generators, is_generator_or_inverse, concat_all};
 use crate::benign::{apply_embedding, apply_embedding_symbol, lemma_apply_embedding_concat, lemma_apply_embedding_valid};
 
@@ -816,6 +816,146 @@ pub proof fn lemma_subgroup_member_to_witness(p: Presentation, gens: Seq<Word>, 
     //  apply_embedding(gens, wit) =~= concat_all(factors) ≡ w
     assert(apply_embedding(gens, wit) =~= concat_all(factors));
     wit
+}
+
+//  ============================================================
+//  Brick D2 — the local pinch equivalence (heart of L1).
+//  ============================================================
+//  K is an abstract subgroup of the base, presented as a predicate-generated subgroup
+//  `in_subgroup_pred(base, kpred, ·)` (closure for free).  The only K-specific facts are the
+//  φ-compatibility  φ(K∩A₊)=K∩A₋  (both inclusions).
+
+//  φ(K∩A₊) ⊆ K∩A₋ :  if φ_a(wit) ∈ K then φ_b(wit) ∈ K.
+pub open spec fn kp_compat_fwd(data: HNNData, kpred: spec_fn(Word) -> bool) -> bool {
+    forall|wit: Word| #![trigger apply_embedding(hnn_a_words(data), wit)]
+        word_valid(wit, data.associations.len() as nat) ==>
+        (in_subgroup_pred(data.base, kpred, apply_embedding(hnn_a_words(data), wit))
+            ==> in_subgroup_pred(data.base, kpred, apply_embedding(hnn_b_words(data), wit)))
+}
+
+//  φ(K∩A₊) ⊇ K∩A₋ :  if φ_b(wit) ∈ K then φ_a(wit) ∈ K.
+pub open spec fn kp_compat_bwd(data: HNNData, kpred: spec_fn(Word) -> bool) -> bool {
+    forall|wit: Word| #![trigger apply_embedding(hnn_b_words(data), wit)]
+        word_valid(wit, data.associations.len() as nat) ==>
+        (in_subgroup_pred(data.base, kpred, apply_embedding(hnn_b_words(data), wit))
+            ==> in_subgroup_pred(data.base, kpred, apply_embedding(hnn_a_words(data), wit)))
+}
+
+//  φ_a(wit), φ_b(wit) are valid over the BASE generators (they are products of base words).
+pub proof fn lemma_kp_phi_base_valid(data: HNNData, wit: Word)
+    requires
+        hnn_data_valid(data),
+        word_valid(wit, data.associations.len() as nat),
+    ensures
+        word_valid(apply_embedding(hnn_a_words(data), wit), data.base.num_generators),
+        word_valid(apply_embedding(hnn_b_words(data), wit), data.base.num_generators),
+{
+    let nb = data.base.num_generators;
+    let aw = hnn_a_words(data);
+    let bw = hnn_b_words(data);
+    assert(aw.len() == data.associations.len());
+    assert(bw.len() == data.associations.len());
+    assert forall|q: int| 0 <= q < aw.len() implies word_valid(#[trigger] aw[q], nb) by {
+        assert(aw[q] == data.associations[q].0);
+    }
+    assert forall|q: int| 0 <= q < bw.len() implies word_valid(#[trigger] bw[q], nb) by {
+        assert(bw[q] == data.associations[q].1);
+    }
+    lemma_apply_embedding_valid(aw, wit, nb);
+    lemma_apply_embedding_valid(bw, wit, nb);
+}
+
+//  A pinch's middle  [p^{b_i}]·k·[p^{b_i1}]  (opposite signs, k in the matching associated
+//  subgroup and in K) is HNN-equivalent to a word c that is STILL in K (compatibility).
+pub proof fn lemma_kp_pinch_middle(
+    data: HNNData, kpred: spec_fn(Word) -> bool, b_i: bool, b_i1: bool, k: Word,
+) -> (c: Word)
+    requires
+        hnn_data_valid(data),
+        b_i != b_i1,
+        word_valid(k, data.base.num_generators),
+        b_i == false ==> in_generated_subgroup(data.base, hnn_a_words(data), k),
+        b_i == true ==> in_generated_subgroup(data.base, hnn_b_words(data), k),
+        in_subgroup_pred(data.base, kpred, k),
+        kp_compat_fwd(data, kpred),
+        kp_compat_bwd(data, kpred),
+    ensures
+        equiv_in_presentation(hnn_presentation(data),
+            seq![kp_stable_sym(stable_letter(data), b_i)] + k + seq![kp_stable_sym(stable_letter(data), b_i1)],
+            c),
+        in_subgroup_pred(data.base, kpred, c),
+        word_valid(c, data.base.num_generators),
+{
+    let hp = hnn_presentation(data);
+    let base = data.base;
+    let t = stable_letter(data);
+    let ti = stable_letter_inv(data);
+    let ng = hp.num_generators;
+    let aw = hnn_a_words(data);
+    let bw = hnn_b_words(data);
+    crate::britton_infra::lemma_hnn_presentation_valid(data);
+    lemma_word_valid_mono(k, base.num_generators, ng);
+    if b_i == false {
+        //  p⁻¹·k·p,  k ∈ A₊.  c = φ_b(wit).
+        assert(b_i1 == true);
+        assert(kp_stable_sym(t, b_i) == ti);
+        assert(kp_stable_sym(t, b_i1) == t);
+        let wit = lemma_subgroup_member_to_witness(base, aw, k);
+        //  word_valid(wit, aw.len()=ka),  equiv(base, φ_a(wit), k)
+        assert(aw.len() == data.associations.len());
+        let xa = apply_embedding(aw, wit);   //  φ_a(wit)
+        let c = apply_embedding(bw, wit);    //  φ_b(wit)
+        lemma_hnn_phi_valid(data, wit);      //  word_valid(xa, ng), word_valid(c, ng)
+        lemma_kp_phi_base_valid(data, wit);  //  word_valid(xa, nb), word_valid(c, nb)
+        assert(presentation_valid(base));
+        //  Brick B gave  equiv(base, xa, k);  embed into hp, flip:  equiv(hp, k, xa)
+        lemma_base_embeds_in_hnn(data, xa, k);          //  equiv(hp, xa, k)
+        lemma_equiv_symmetric(hp, xa, k);               //  equiv(hp, k, xa)
+        //  [ti]·k·[t] ≡ [ti]·xa·[t]
+        lemma_equiv_concat_right(hp, seq![ti], k, xa);
+        lemma_equiv_concat_left(hp, seq![ti] + k, seq![ti] + xa, seq![t]);
+        assert((seq![ti] + k) + seq![t] =~= seq![ti] + k + seq![t]);
+        assert((seq![ti] + xa) + seq![t] =~= seq![ti] + xa + seq![t]);
+        //  Brick A:  [ti]·xa·[t] ≡ c
+        lemma_hnn_conjugation_subgroup(data, wit);
+        lemma_equiv_transitive(hp, seq![ti] + k + seq![t], seq![ti] + xa + seq![t], c);
+        //  in_k(c):  k ∈ K → xa ∈ K (respects equiv) → c ∈ K (compat fwd)
+        lemma_equiv_symmetric(base, xa, k);             //  equiv(base, k, xa)
+        lemma_in_subgroup_pred_respects_equiv(base, kpred, k, xa);
+        assert(kp_compat_fwd(data, kpred));
+        assert(in_subgroup_pred(base, kpred, c));        //  trigger compat_fwd on xa
+        assert(seq![kp_stable_sym(t, b_i)] + k + seq![kp_stable_sym(t, b_i1)] =~= seq![ti] + k + seq![t]);
+        c
+    } else {
+        //  p·k·p⁻¹,  k ∈ A₋.  c = φ_a(wit).
+        assert(b_i1 == false);
+        assert(kp_stable_sym(t, b_i) == t);
+        assert(kp_stable_sym(t, b_i1) == ti);
+        let wit = lemma_subgroup_member_to_witness(base, bw, k);
+        assert(bw.len() == data.associations.len());
+        let yb = apply_embedding(bw, wit);   //  φ_b(wit)
+        let c = apply_embedding(aw, wit);    //  φ_a(wit)
+        lemma_hnn_phi_valid(data, wit);
+        lemma_kp_phi_base_valid(data, wit);
+        assert(presentation_valid(base));
+        lemma_base_embeds_in_hnn(data, yb, k);          //  equiv(hp, yb, k)
+        lemma_equiv_symmetric(hp, yb, k);               //  equiv(hp, k, yb)
+        //  [t]·k·[ti] ≡ [t]·yb·[ti]
+        lemma_equiv_concat_right(hp, seq![t], k, yb);
+        lemma_equiv_concat_left(hp, seq![t] + k, seq![t] + yb, seq![ti]);
+        assert((seq![t] + k) + seq![ti] =~= seq![t] + k + seq![ti]);
+        assert((seq![t] + yb) + seq![ti] =~= seq![t] + yb + seq![ti]);
+        //  D1:  [t]·yb·[ti] ≡ c
+        lemma_hnn_conjugation_subgroup_inv(data, wit);
+        lemma_equiv_transitive(hp, seq![t] + k + seq![ti], seq![t] + yb + seq![ti], c);
+        //  in_k(c):  k ∈ K → yb ∈ K → c ∈ K (compat bwd)
+        lemma_equiv_symmetric(base, yb, k);             //  equiv(base, k, yb)
+        lemma_in_subgroup_pred_respects_equiv(base, kpred, k, yb);
+        assert(kp_compat_bwd(data, kpred));
+        assert(in_subgroup_pred(base, kpred, c));        //  trigger compat_bwd on yb
+        assert(seq![kp_stable_sym(t, b_i)] + k + seq![kp_stable_sym(t, b_i1)] =~= seq![t] + k + seq![ti]);
+        c
+    }
 }
 
 //  ============================================================
