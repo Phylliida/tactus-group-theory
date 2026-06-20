@@ -511,4 +511,35 @@ pub proof fn lemma_cw_reduce_coords(w: Seq<CanonLetter>)
     }
 }
 
+//  ============================================================
+//  A5 — trivial config words have empty reduced form.
+//  ============================================================
+//  Bridge to the proven nontriviality lemma (lemma_canw_eval_nontrivial): a canw_reduced nonempty
+//  word is ≢_A ε; so if canw_eval(w) ≡_A ε, the reduced form must be empty.
+pub proof fn lemma_cw_reduce_trivial_empty(w: Seq<CanonLetter>)
+    requires
+        equiv_in_presentation(base_A(), canw_eval(w), empty_word()),
+    ensures
+        cw_reduce(w).len() == 0,
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    let r = cw_reduce(w);
+    lemma_cw_reduce_reduced(w);   //  canw_reduced(r)
+    lemma_cw_reduce_eval(w);      //  canw_eval(r) ≡ canw_eval(w)
+    if r.len() >= 1 {
+        //  Extract the nontriviality lemma's hypotheses from canw_reduced(r).
+        assert(canw_reduced(r));
+        assert forall|j: int| 0 <= j < r.len() implies (#[trigger] r[j]).e != 0 by { }
+        assert forall|j: int| 0 <= j < r.len() - 1
+            implies (#[trigger] r[j]).r != r[j + 1].r || r[j].s != r[j + 1].s by {
+            assert(!(r[j].r == r[j + 1].r && r[j].s == r[j + 1].s));
+        }
+        lemma_canw_eval_nontrivial(r);   //  canw_eval(r) ≢_A ε
+        //  but canw_eval(r) ≡ canw_eval(w) ≡ ε — contradiction.
+        lemma_equiv_transitive(a, canw_eval(r), canw_eval(w), empty_word());
+        assert(false);
+    }
+}
+
 } //  verus!
