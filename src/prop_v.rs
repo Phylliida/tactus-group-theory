@@ -16,7 +16,7 @@ use crate::ii_subset::{lemma_ii_subset, lemma_signed_power_inverse, lemma_exact_
     lemma_gexp_config_signed_zero, lemma_gexp_concat_all_zero};
 use crate::benign::{apply_embedding, apply_embedding_symbol, in_generated_subgroup,
     lemma_apply_embedding_concat, lemma_apply_embedding_valid, concat_all};
-use crate::tower_peel::{quad_data, lemma_in_TM_gexp_zero, prop_v_holds};
+use crate::tower_peel::{quad_data, lemma_in_TM_gexp_zero, prop_v_holds, lemma_vi};
 use crate::config_reduce::*;
 
 verus! {
@@ -1787,6 +1787,50 @@ pub proof fn lemma_prop_v_holds(mm: ModMachine)
         if in_TM(mm, apply_embedding(hnn_b_gens(quad_data(mm, qi)), uw)) {
             lemma_prop_v_BtoA(mm, qi, uw);
         }
+    }
+}
+
+//  ============================================================
+//  F — THEOREM 1 (the headline iff):  [k, t(α,β)] = 1  ⟺  (α,β) ∈ H₀(M).
+//  ============================================================
+//  Assembles the whole faithfulness chain for `K_M = G(M)`:
+//    ⟸  (α,β)∈H₀ → reaches → k_commutes        (`lemma_reaches_implies_k_commutes`, brick 19)
+//    ⟹  k_commutes → ⟨t,rᵢ,lⱼ⟩ (E1) → ⟨T(M),rᵢ,lⱼ⟩ (vii) → T(M) (vi) → H₀ (E2.E)
+//  `k_commutes(mm, t(α,β))` is exactly `[k, t(α,β)] = 1` in `g_m(mm) = G(M)`.
+pub proof fn lemma_theorem1(mm: ModMachine, alpha: nat, beta: nat)
+    requires
+        mod_machine_wf(mm),
+        mm_terminal(mm, 0, 0),
+    ensures
+        k_commutes(mm, config_word(alpha, beta)) <==> mm_in_H0(mm, alpha, beta),
+{
+    let w = config_word(alpha, beta);
+    lemma_config_word_valid(alpha, beta);            //  word_valid(w, 3)
+    //  ⟸ : (α,β)∈H₀ ⟹ k_commutes
+    if mm_in_H0(mm, alpha, beta) {
+        let k = choose|k: nat| mm_reaches(mm, alpha, beta, 0, 0, k);
+        assert(mm_reaches(mm, alpha, beta, 0, 0, k));
+        lemma_reaches_implies_k_commutes(mm, alpha, beta, k);
+    }
+    //  ⟹ : k_commutes ⟹ (α,β)∈H₀
+    if k_commutes(mm, w) {
+        //  E1: config(α,β) ∈ ⟨g_subgens⟩ over b_m
+        lemma_k_commutes_implies_subgroup(mm, alpha, beta);
+        //  g_subgens = .1 column = .0 column (associations are diagonal) = hnn_a_gens(g_m data)
+        let gdata = HNNData { base: b_m(mm), associations: g_m_associations(mm) };
+        assert(g_subgens(mm) =~= hnn_a_gens(gdata)) by {
+            assert(g_subgens(mm).len() == hnn_a_gens(gdata).len());
+            assert forall|i: int| 0 <= i < g_subgens(mm).len()
+                implies g_subgens(mm)[i] == hnn_a_gens(gdata)[i] by {
+                assert(g_subgens(mm)[i] == g_m_associations(mm)[i].1);
+                assert(hnn_a_gens(gdata)[i] == g_m_associations(mm)[i].0);
+                assert(g_m_associations(mm)[i].0 == g_m_associations(mm)[i].1);
+            }
+        }
+        assert(in_generated_subgroup(b_m(mm), hnn_a_gens(gdata), w));
+        lemma_vii_subset(mm, w);                      //  ∈ ⟨T(M), rᵢ, lⱼ⟩
+        lemma_vi(mm, w);                              //  ∈ T(M)  (unconditional)
+        lemma_in_TM_config_implies_H0(mm, alpha, beta);  //  (α,β) ∈ H₀
     }
 }
 
