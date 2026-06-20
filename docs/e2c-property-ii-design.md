@@ -82,3 +82,25 @@ Britton bookkeeping we've done before (E1 is the template for steps 3–4).
    wire into the B(M) tower peel (E2.D).
 
 Fallback if L1's surgery won't formalize cleanly: the direct pinch-decoding route (scope doc).
+
+## Implementation note — single source of truth for the conjugation engine
+
+The HNN conjugation telescope (`t⁻¹·φ_a(u)·t ≡ φ_b(u)` and its reverse) lives **once**, in
+`machine_group.rs`:
+- `hnn_a_gens` / `hnn_b_gens` — the A₊ / A₋ generator word-lists.
+- `lemma_stable_conj_symbol` (per-symbol) → `lemma_stable_conj_factorization` (subgroup element) +
+  `lemma_stable_conj_factorization_rev` (the `t·g·t⁻¹` orientation).
+
+`kp_pinch.rs` consumes these directly to build the **abstract** pinch-middle helpers
+`lemma_kp_phi_fwd` / `lemma_kp_phi_rev` (over `in_k: spec_fn(Word)->bool`), which feed
+`lemma_kp_eliminate_pinch` (L1). `ii_subset.rs` supplies only the **KPWord representation**
+(`KPWord`, `kp_value`, `kp_pcount`, `is_kp_word`, `lemma_kp_value_cons`).
+
+A first draft once re-derived the whole engine inside `ii_subset.rs`
+(`hnn_a_words`/`hnn_b_words`, `lemma_hnn_conjugation_subgroup`(`_inv`), and a *concrete*
+`lemma_kp_pinch_middle` over `in_subgroup_pred` + `kp_compat_fwd`/`bwd`). That copy was
+character-identical to the machine_group engine and was never wired into the live L1 path — it was
+pruned (2026-06-19). **Do not reintroduce a second conjugation engine in `ii_subset`:** import from
+`machine_group` and keep the abstract `in_k` interface in `kp_pinch`. When K=T(M) is instantiated,
+discharge `kp_pinch`'s `H_ab`/`H_ba` hypotheses via property (v) directly — not via a concrete
+pinch-middle lemma.
