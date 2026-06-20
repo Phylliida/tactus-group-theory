@@ -134,3 +134,8 @@ pub mod h1;
 // p-relation of set (I); built over h1_base, stable letter at the layout's p slot.
 #[cfg(verus_keep_ghost)]
 pub mod h2;
+
+// h3: Layer 2 / Brick 4 — the top of the tower H₃ = HNN(H₂; a_i, k | a_i:A↔A_i, k:A₊↔A₋). The
+// finite a_i (φ_i) / k (ψ) HNN associations of set (I); iterated single-letter HNN over h2_pres.
+#[cfg(verus_keep_ghost)]
+pub mod h3;
