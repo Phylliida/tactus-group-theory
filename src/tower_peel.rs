@@ -47,7 +47,15 @@ pub open spec fn in_TMstable_upto_pred(mm: ModMachine, l: nat) -> spec_fn(Word) 
     |x: Word| in_TMstable_upto(mm, l, x)
 }
 
-//  The single HNN step that adds level l (quad l-1) over b_m_upto(l-1).
+//  The single HNN step that adds level l (quad l-1) over b_m_upto(l-1) — what the engine peels.
+pub open spec fn step_data(mm: ModMachine, l: nat) -> HNNData {
+    HNNData {
+        base: b_m_upto(mm, (l - 1) as nat),
+        associations: quad_associations(mm.quads[(l - 1) as int], mm.m),
+    }
+}
+
+//  The quad's associations over base A (associations are level-independent; used by prop_v_holds).
 pub open spec fn quad_data(mm: ModMachine, qi: nat) -> HNNData {
     HNNData { base: base_A(), associations: quad_associations(mm.quads[qi as int], mm.m) }
 }
@@ -239,27 +247,117 @@ pub proof fn lemma_quad_step_data_valid(mm: ModMachine, l: nat)
         mod_machine_wf(mm),
         1 <= l <= mm.quads.len(),
     ensures
-        hnn_data_valid(HNNData {
-            base: b_m_upto(mm, (l - 1) as nat),
-            associations: quad_associations(mm.quads[(l - 1) as int], mm.m),
-        }),
-        hnn_associations_isomorphic(HNNData {
-            base: b_m_upto(mm, (l - 1) as nat),
-            associations: quad_associations(mm.quads[(l - 1) as int], mm.m),
-        }),
-        hnn_presentation(HNNData {
-            base: b_m_upto(mm, (l - 1) as nat),
-            associations: quad_associations(mm.quads[(l - 1) as int], mm.m),
-        }) == b_m_upto(mm, l),
+        hnn_data_valid(step_data(mm, l)),
+        hnn_associations_isomorphic(step_data(mm, l)),
+        hnn_presentation(step_data(mm, l)) == b_m_upto(mm, l),
+        step_data(mm, l).base.num_generators == (3 + (l - 1)) as nat,
 {
     let prev = b_m_upto(mm, (l - 1) as nat);
-    let data = HNNData { base: prev, associations: quad_associations(mm.quads[(l - 1) as int], mm.m) };
+    let data = step_data(mm, l);
     lemma_b_m_upto_valid(mm, (l - 1) as nat);
     lemma_b_m_upto_num_generators(mm, (l - 1) as nat);
     lemma_quad_associations_valid(mm.quads[(l - 1) as int], mm.m, prev.num_generators);
     assert(hnn_data_valid(data));
     lemma_b_m_step_isomorphic(mm, (l - 1) as nat);
     lemma_b_m_upto_unfold(mm, l);
+}
+
+//  ============================================================
+//  Conversion bridge: in_TMstable_upto(l) ⟹ in_kp_subgroup(step_data, in_TMstable_upto_pred(l-1))
+//  ============================================================
+
+//  Each level-l T(M)stable factor is a kp-factor for the top step (K = level l-1):
+//  a T(M)-gen / lower stable letter is an in_k base word; the top letter Gen(l+2) is p.
+pub proof fn lemma_tmstable_factor_is_kp_factor(mm: ModMachine, l: nat, f: Word)
+    requires
+        mod_machine_wf(mm),
+        1 <= l <= mm.quads.len(),
+        tmstable_pred_upto(mm, l)(f),
+    ensures
+        is_kp_factor(step_data(mm, l), in_TMstable_upto_pred(mm, (l - 1) as nat), f),
+{
+    let d = step_data(mm, l);
+    let ng = d.base.num_generators;
+    lemma_b_m_upto_num_generators(mm, (l - 1) as nat);
+    assert(ng == (3 + (l - 1)) as nat);
+    let in_k = in_TMstable_upto_pred(mm, (l - 1) as nat);
+    if is_tm_gen(mm, f) {
+        //  Case A: a T(M)-gen.  in_k(f) by lift; word_valid(f, ng) since config words are valid over 3.
+        lemma_gen_in_subgroup_pred(base_A(), tm_pred(mm), f);
+        lemma_in_TM_implies_TMstable_upto(mm, (l - 1) as nat, f);
+        assert(in_k(f));
+        let ab = choose|a: nat, b: nat| #![trigger config_word(a, b)]
+            mm_in_H0(mm, a, b) && (f == config_word(a, b) || f == inverse_word(config_word(a, b)));
+        assert(mm_in_H0(mm, ab.0, ab.1)
+            && (f == config_word(ab.0, ab.1) || f == inverse_word(config_word(ab.0, ab.1))));
+        lemma_config_word_valid(ab.0, ab.1);
+        lemma_inverse_word_valid(config_word(ab.0, ab.1), 3);
+        lemma_word_valid_mono(f, 3, ng);
+        assert(is_kp_factor(d, in_k, f));
+    } else {
+        //  Case B: a stable letter Gen(3+i)/Inv(3+i), 0 ≤ i < l.
+        let i = choose|i: int|
+            #![trigger seq![Symbol::Gen((3 + i) as nat)]]
+            #![trigger seq![Symbol::Inv((3 + i) as nat)]]
+            0 <= i < l
+            && (f == seq![Symbol::Gen((3 + i) as nat)] || f == seq![Symbol::Inv((3 + i) as nat)]);
+        assert(0 <= i < l
+            && (f == seq![Symbol::Gen((3 + i) as nat)] || f == seq![Symbol::Inv((3 + i) as nat)]));
+        if i == l - 1 {
+            //  The TOP letter p = Gen(ng) / Inv(ng):  ng == 3+(l-1) == 3+i.
+            assert((3 + i) as nat == ng);
+            assert(stable_letter(d) == Symbol::Gen(ng));
+            assert(stable_letter_inv(d) == Symbol::Inv(ng));
+            assert(f == seq![stable_letter(d)] || f == seq![stable_letter_inv(d)]);
+            assert(is_kp_factor(d, in_k, f));
+        } else {
+            //  A LOWER letter, 0 ≤ i < l-1:  in_k(f) (singleton tmstable_pred_upto(l-1)); word_valid.
+            assert(0 <= i < (l - 1) as int);
+            assert(tmstable_pred_upto(mm, (l - 1) as nat)(f)) by {
+                assert(0 <= i < (l - 1)
+                    && (f == seq![Symbol::Gen((3 + i) as nat)] || f == seq![Symbol::Inv((3 + i) as nat)]));
+            }
+            lemma_gen_in_subgroup_pred(b_m_upto(mm, (l - 1) as nat), tmstable_pred_upto(mm, (l - 1) as nat), f);
+            assert(in_k(f));
+            assert(word_valid(f, ng)) by {
+                assert(0 <= i < (l - 1));
+                assert((3 + i) < ng);
+                assert forall|q: int| 0 <= q < f.len() implies symbol_valid(#[trigger] f[q], ng) by {
+                    assert(f[q] == Symbol::Gen((3 + i) as nat) || f[q] == Symbol::Inv((3 + i) as nat));
+                }
+            }
+            assert(is_kp_factor(d, in_k, f));
+        }
+    }
+}
+
+//  The bridge: the SAME factor list of in_TMstable_upto(l) witnesses in_kp_subgroup at the top step.
+pub proof fn lemma_TMstable_upto_to_kp(mm: ModMachine, l: nat, w: Word)
+    requires
+        mod_machine_wf(mm),
+        1 <= l <= mm.quads.len(),
+        in_TMstable_upto(mm, l, w),
+    ensures
+        in_kp_subgroup(step_data(mm, l), in_TMstable_upto_pred(mm, (l - 1) as nat), w),
+{
+    let d = step_data(mm, l);
+    let in_k = in_TMstable_upto_pred(mm, (l - 1) as nat);
+    lemma_quad_step_data_valid(mm, l);   //  hnn_presentation(d) == b_m_upto(mm, l)
+    let factors = choose|factors: Seq<Word>| #[trigger] factors_from_pred(tmstable_pred_upto(mm, l), factors)
+        && equiv_in_presentation(b_m_upto(mm, l), concat_all(factors), w);
+    assert(factors_from_pred(tmstable_pred_upto(mm, l), factors)
+        && equiv_in_presentation(b_m_upto(mm, l), concat_all(factors), w));
+    assert(all_kp_factors(d, in_k, factors)) by {
+        assert forall|j: int| 0 <= j < factors.len()
+            implies is_kp_factor(d, in_k, #[trigger] factors[j]) by {
+            assert(tmstable_pred_upto(mm, l)(factors[j]));
+            lemma_tmstable_factor_is_kp_factor(mm, l, factors[j]);
+        }
+    }
+    assert(in_kp_subgroup(d, in_k, w)) by {
+        assert(all_kp_factors(d, in_k, factors)
+            && equiv_in_presentation(hnn_presentation(d), concat_all(factors), w));
+    }
 }
 
 } //  verus!
