@@ -4,8 +4,9 @@ use crate::word::*;
 use crate::presentation::*;
 use crate::presentation_lemmas::*;
 use crate::machine_group::*;
+use crate::hnn::{HNNData, stable_letter, stable_letter_inv, hnn_presentation, hnn_data_valid, lemma_hnn_conjugation};
 use crate::benign::{in_generated_subgroup, factors_from_generators, is_generator_or_inverse, concat_all};
-use crate::benign::{apply_embedding, apply_embedding_symbol, lemma_apply_embedding_concat};
+use crate::benign::{apply_embedding, apply_embedding_symbol, lemma_apply_embedding_concat, lemma_apply_embedding_valid};
 
 verus! {
 
@@ -347,6 +348,219 @@ pub proof fn lemma_kp_value_cons(stable: Symbol, kp: KPWord)
             + seq![if kp.tail.first().0 { stable } else { inverse_symbol(stable) }]
             + kp_value(stable, KPWord { head: kp.tail.first().1, tail: kp.tail.drop_first() }),
 {
+}
+
+//  ============================================================
+//  Brick A — generalized HNN conjugation over a whole subgroup element.
+//  ============================================================
+//  The single-generator relation  t⁻¹·a_i·t ≡ b_i  (lemma_hnn_conjugation) lifts to an
+//  arbitrary element of A₊ = ⟨a_i⟩:  for any witness word `wit` over the k association
+//  indices,  t⁻¹·φ_a(wit)·t ≡ φ_b(wit)  where φ_a/φ_b substitute a_i / b_i.  This is the
+//  HNN conjugation engine the pinch surgery (L1) needs.
+
+//  The a-side / b-side image word-lists (A₊ resp. A₋ generators).
+pub open spec fn hnn_a_words(data: HNNData) -> Seq<Word> {
+    Seq::new(data.associations.len(), |i: int| data.associations[i].0)
+}
+
+pub open spec fn hnn_b_words(data: HNNData) -> Seq<Word> {
+    Seq::new(data.associations.len(), |i: int| data.associations[i].1)
+}
+
+//  Per-symbol conjugation:  t⁻¹ · φ_a(sym) · t ≡ φ_b(sym).
+pub proof fn lemma_hnn_conj_symbol(data: HNNData, sym: Symbol)
+    requires
+        hnn_data_valid(data),
+        symbol_valid(sym, data.associations.len() as nat),
+    ensures
+        equiv_in_presentation(hnn_presentation(data),
+            seq![stable_letter_inv(data)] + apply_embedding_symbol(hnn_a_words(data), sym)
+                + seq![stable_letter(data)],
+            apply_embedding_symbol(hnn_b_words(data), sym)),
+{
+    let hp = hnn_presentation(data);
+    let t = stable_letter(data);
+    let ti = stable_letter_inv(data);
+    let k = data.associations.len();
+    let aw = hnn_a_words(data);
+    let bw = hnn_b_words(data);
+    let ng = hp.num_generators;
+    let tiw: Word = seq![ti];
+    let tw: Word = seq![t];
+    crate::britton_infra::lemma_hnn_presentation_valid(data);
+    //  singleton bridges:  seq![x] is the same Seq as Seq::new(1, |_| x).
+    assert(tiw =~= Seq::new(1, |_j: int| ti));
+    assert(tw =~= Seq::new(1, |_j: int| t));
+    let i = generator_index(sym) as int;
+    assert(0 <= i < k);
+    assert(aw[i] == data.associations[i].0);
+    assert(bw[i] == data.associations[i].1);
+    lemma_hnn_conjugation(data, i);
+    //  lemma_hnn_conjugation:  Seq::new(1,|_|ti) + assoc[i].0 + Seq::new(1,|_|t) ≡ assoc[i].1
+    let ai = data.associations[i].0;
+    let bi = data.associations[i].1;
+    let l_: Word = tiw + ai + tw;
+    let r_: Word = bi;
+    assert(l_ =~= Seq::new(1, |_j: int| ti) + ai + Seq::new(1, |_j: int| t));
+    //  so  l_ ≡ r_  in hp.
+    match sym {
+        Symbol::Gen(ii) => {
+            assert(apply_embedding_symbol(aw, sym) == aw[i]);
+            assert(apply_embedding_symbol(bw, sym) == bw[i]);
+            assert(tiw + apply_embedding_symbol(aw, sym) + tw =~= l_);
+            assert(apply_embedding_symbol(bw, sym) =~= r_);
+        }
+        Symbol::Inv(ii) => {
+            //  goal LHS = inverse_word(l_),  goal RHS = inverse_word(r_).
+            assert(word_valid(ai, data.base.num_generators));
+            assert(word_valid(bi, data.base.num_generators));
+            lemma_word_valid_mono(ai, data.base.num_generators, ng);
+            lemma_word_valid_mono(bi, data.base.num_generators, ng);
+            assert(symbol_valid(t, ng) && symbol_valid(ti, ng));
+            assert(word_valid(tiw, ng)) by {
+                assert forall|q: int| 0 <= q < tiw.len() implies symbol_valid(#[trigger] tiw[q], ng) by { }
+            }
+            assert(word_valid(tw, ng)) by {
+                assert forall|q: int| 0 <= q < tw.len() implies symbol_valid(#[trigger] tw[q], ng) by { }
+            }
+            lemma_concat_word_valid(tiw, ai, ng);
+            lemma_concat_word_valid(tiw + ai, tw, ng);
+            crate::normal_form_afp_textbook::lemma_equiv_inverse(hp, l_, r_);
+            //  inverse_word(l_) = inverse_word(tw) + inverse_word(a_i) + inverse_word(tiw)
+            lemma_inverse_word_concat(tiw + ai, tw);
+            lemma_inverse_word_concat(tiw, ai);
+            lemma_inverse_word_one(t);
+            lemma_inverse_word_one(ti);
+            assert(inverse_symbol(t) == ti);
+            assert(inverse_symbol(ti) == t);
+            assert(apply_embedding_symbol(aw, sym) =~= inverse_word(ai));
+            assert(apply_embedding_symbol(bw, sym) =~= inverse_word(bi));
+            assert(tiw + apply_embedding_symbol(aw, sym) + tw =~= inverse_word(l_));
+            assert(apply_embedding_symbol(bw, sym) =~= inverse_word(r_));
+        }
+    }
+}
+
+//  Generalized conjugation:  t⁻¹ · φ_a(wit) · t ≡ φ_b(wit)  for any witness word over k indices.
+pub proof fn lemma_hnn_conjugation_subgroup(data: HNNData, wit: Word)
+    requires
+        hnn_data_valid(data),
+        word_valid(wit, data.associations.len() as nat),
+    ensures
+        equiv_in_presentation(hnn_presentation(data),
+            seq![stable_letter_inv(data)] + apply_embedding(hnn_a_words(data), wit)
+                + seq![stable_letter(data)],
+            apply_embedding(hnn_b_words(data), wit)),
+    decreases wit.len(),
+{
+    let hp = hnn_presentation(data);
+    let t = stable_letter(data);
+    let ti = stable_letter_inv(data);
+    let aw = hnn_a_words(data);
+    let bw = hnn_b_words(data);
+    crate::britton_infra::lemma_hnn_presentation_valid(data);
+    if wit.len() == 0 {
+        //  φ_a(ε) = ε, φ_b(ε) = ε;  goal  [ti]·ε·[t] ≡ ε.
+        assert(apply_embedding(aw, wit) =~= empty_word());
+        assert(apply_embedding(bw, wit) =~= empty_word());
+        //  [ti] + ε + [t] = [ti] + [t] = inverse_word([t]) + [t] ≡ ε
+        lemma_inverse_word_one(t);
+        assert(inverse_symbol(t) == ti);
+        assert(inverse_word(seq![t]) =~= seq![ti]);
+        lemma_word_inverse_left(hp, seq![t]);
+        //  concat(inverse_word([t]), [t]) ≡ ε
+        assert(concat(inverse_word(seq![t]), seq![t]) =~= seq![ti] + seq![t]);
+        assert(seq![ti] + apply_embedding(aw, wit) + seq![t] =~= seq![ti] + seq![t]);
+    } else {
+        let sym = wit.first();
+        let rest = wit.drop_first();
+        assert(word_valid(rest, data.associations.len() as nat)) by {
+            assert forall|q: int| 0 <= q < rest.len() implies symbol_valid(#[trigger] rest[q], data.associations.len() as nat) by {
+                assert(rest[q] == wit[q + 1]);
+            }
+        }
+        assert(symbol_valid(sym, data.associations.len() as nat)) by { assert(sym == wit[0]); }
+        //  IH:  [ti]·φ_a(rest)·[t] ≡ φ_b(rest)
+        lemma_hnn_conjugation_subgroup(data, rest);
+        //  per-symbol:  [ti]·φ_a(sym)·[t] ≡ φ_b(sym)
+        lemma_hnn_conj_symbol(data, sym);
+
+        let asym = apply_embedding_symbol(aw, sym);
+        let arest = apply_embedding(aw, rest);
+        let bsym = apply_embedding_symbol(bw, sym);
+        let brest = apply_embedding(bw, rest);
+        //  φ_a(wit) = asym + arest
+        assert(apply_embedding(aw, wit) =~= asym + arest);
+        assert(apply_embedding(bw, wit) =~= bsym + brest);
+
+        //  --- validity of the manipulated words (needed for lemma_equiv_symmetric) ---
+        let ng = hp.num_generators;
+        let tiw: Word = seq![ti];
+        let tw: Word = seq![t];
+        assert(symbol_valid(t, ng) && symbol_valid(ti, ng));
+        assert(word_valid(tiw, ng)) by {
+            assert forall|q: int| 0 <= q < tiw.len() implies symbol_valid(#[trigger] tiw[q], ng) by { }
+        }
+        assert(word_valid(tw, ng)) by {
+            assert forall|q: int| 0 <= q < tw.len() implies symbol_valid(#[trigger] tw[q], ng) by { }
+        }
+        assert forall|q: int| 0 <= q < aw.len() implies word_valid(#[trigger] aw[q], ng) by {
+            assert(aw[q] == data.associations[q].0);
+            assert(word_valid(data.associations[q].0, data.base.num_generators));
+            lemma_word_valid_mono(data.associations[q].0, data.base.num_generators, ng);
+        }
+        //  arest = φ_a(rest) valid
+        lemma_apply_embedding_valid(aw, rest, ng);
+        //  asym = φ_a([sym]) valid (apply_embedding over the singleton word collapses to asym)
+        let symw: Word = seq![sym];
+        assert(word_valid(symw, aw.len())) by {
+            assert forall|q: int| 0 <= q < symw.len() implies symbol_valid(#[trigger] symw[q], aw.len()) by {
+                assert(symw[q] == sym);
+            }
+        }
+        lemma_apply_embedding_valid(aw, symw, ng);
+        reveal_with_fuel(apply_embedding, 2);
+        assert(symw.drop_first() =~= empty_word());
+        assert(apply_embedding(aw, symw) =~= asym);
+        //  csym = [ti]·asym·[t],  crest = [ti]·arest·[t]  valid
+        lemma_concat_word_valid(tiw, asym, ng);
+        lemma_concat_word_valid(tiw + asym, tw, ng);
+        lemma_concat_word_valid(tiw, arest, ng);
+        lemma_concat_word_valid(tiw + arest, tw, ng);
+        lemma_concat_word_valid(seq![ti] + asym + seq![t], seq![ti] + arest + seq![t], ng);
+
+        //  GOAL:  [ti] + asym + arest + [t]  ≡  bsym + brest.
+        //  Insert  [t]·[ti] ≡ ε  to split conjugation across the product.
+        let csym = seq![ti] + asym + seq![t];     //  ≡ bsym
+        let crest = seq![ti] + arest + seq![t];   //  ≡ brest
+        //  csym + crest = [ti]·asym·[t]·[ti]·arest·[t]
+        //  delete the middle [t]·[ti] ≡ ε  →  [ti]·asym·arest·[t]
+        lemma_inverse_word_one(t);
+        assert(inverse_symbol(t) == ti);
+        lemma_word_inverse_right(hp, seq![t]);   //  [t]·inverse_word([t]) ≡ ε
+        assert(inverse_word(seq![t]) =~= seq![ti]);
+        assert(equiv_in_presentation(hp, seq![t] + seq![ti], empty_word()));
+        //  csym + crest =~= ([ti]+asym) · ([t]+[ti]) · (arest+[t])
+        assert(csym + crest =~= (seq![ti] + asym) + (seq![t] + seq![ti]) + (arest + seq![t]));
+        crate::britton_via_tower::lemma_delete_equiv_empty(hp, seq![ti] + asym, seq![t] + seq![ti], arest + seq![t]);
+        //  → ([ti]+asym)·(arest+[t])
+        assert((seq![ti] + asym) + (arest + seq![t]) =~= seq![ti] + asym + arest + seq![t]);
+        assert(empty_word() + (arest + seq![t]) =~= arest + seq![t]);
+        assert(concat(seq![ti] + asym, concat(seq![t] + seq![ti], arest + seq![t]))
+            =~= csym + crest);
+        assert(concat(seq![ti] + asym, arest + seq![t]) =~= seq![ti] + asym + arest + seq![t]);
+        //  csym + crest ≡ [ti]·asym·arest·[t]   ( = goal LHS )
+        lemma_equiv_symmetric(hp, csym + crest, seq![ti] + asym + arest + seq![t]);
+
+        //  csym ≡ bsym, crest ≡ brest  ⟹  csym·crest ≡ bsym·brest
+        lemma_equiv_concat_left(hp, csym, bsym, crest);     //  csym·crest ≡ bsym·crest
+        lemma_equiv_concat_right(hp, bsym, crest, brest);   //  bsym·crest ≡ bsym·brest
+        lemma_equiv_transitive(hp, csym + crest, bsym + crest, bsym + brest);
+        //  chain:  goalLHS ≡ csym·crest ≡ bsym·brest = goalRHS
+        lemma_equiv_transitive(hp, seq![ti] + asym + arest + seq![t], csym + crest, bsym + brest);
+        assert(seq![ti] + apply_embedding(aw, wit) + seq![t] =~= seq![ti] + asym + arest + seq![t]);
+        assert(bsym + brest =~= apply_embedding(bw, wit));
+    }
 }
 
 //  ============================================================
