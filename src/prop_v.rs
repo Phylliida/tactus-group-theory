@@ -12,7 +12,7 @@ use crate::presentation::*;
 use crate::presentation_lemmas::*;
 use crate::machine_group::*;
 use crate::hnn::*;
-use crate::ii_subset::{lemma_ii_subset, lemma_signed_power_inverse};
+use crate::ii_subset::{lemma_ii_subset, lemma_signed_power_inverse, lemma_exact_div};
 use crate::benign::{apply_embedding, apply_embedding_symbol, in_generated_subgroup,
     lemma_apply_embedding_concat};
 use crate::tower_peel::{quad_data, lemma_in_TM_gexp_zero};
@@ -444,6 +444,127 @@ pub proof fn lemma_emb_gsconfig(gens: Seq<Word>, a: nat, b: nat, px: nat, py: na
     lemma_equiv_refl(p, apply_embedding(gens, gsconfig(k, l, e)));
     assert(equiv_in_presentation(p, apply_embedding(gens, gsconfig(k, l, e)), fullA));
     lemma_equiv_transitive(p, apply_embedding(gens, gsconfig(k, l, e)), fullA, g2);
+}
+
+//  ============================================================
+//  B4/B5 — fold the reduced config word into one embedding word U, then run it through both sides.
+//  ============================================================
+
+//  Residue reconstruction:  for r ≡ a (mod m), 0≤a<m,  a + m·(r/m) == r.
+proof fn lemma_residue_recon(r: int, a: int, m: int)
+    requires
+        r >= 0,
+        0 <= a < m,
+        (r - a) % m == 0,
+    ensures
+        a + m * (r / m) == r,
+{
+    lemma_exact_div(r - a, m);                                       //  r-a == ((r-a)/m)·m
+    let q = (r - a) / m;
+    assert(q * m == m * q) by (nonlinear_arith);
+    assert(r == q * m + a);                                          //  from r-a == q·m
+    vstd::arithmetic::div_mod::lemma_fundamental_div_mod_converse(r, m, q, a);  //  q == r/m
+    assert(m * (r / m) == m * q);                                    //  congruence from q == r/m
+    //  a + m·(r/m) == a + m·q == a + q·m == a + (r - a) == r
+}
+
+//  Per-letter embedding word over the 3 quad generators:  gsconfig(r/m, s/m, e) (the residue quotients).
+pub open spec fn letter_to_U(c: CanonLetter, m: int) -> Word {
+    gsconfig(c.r / m, c.s / m, c.e)
+}
+
+//  Fold a reduced config word into a single embedding word.
+pub open spec fn red_to_U(red: Seq<CanonLetter>, m: int) -> Word
+    decreases red.len(),
+{
+    if red.len() == 0 {
+        empty_word()
+    } else {
+        letter_to_U(red[0], m) + red_to_U(red.drop_first(), m)
+    }
+}
+
+//  a-side:  apply_embedding(a_gens, red_to_U(red,m)) ≡_A canw_eval(red),  where a_gens = [t(a,b), xᵐ, yᵐ]
+//  and every coordinate of red lies in the residue class (a,b mod m).
+pub proof fn lemma_emb_aside_eq(gens: Seq<Word>, red: Seq<CanonLetter>, a: nat, b: nat, m: nat)
+    requires
+        m > 0,
+        a < m,
+        b < m,
+        gens.len() == 3,
+        gens[0] =~= config_word(a, b),
+        gens[1] =~= signed_power(1, m as int),
+        gens[2] =~= signed_power(2, m as int),
+        forall|i: int| 0 <= i < red.len() ==> {
+            &&& (#[trigger] red[i]).r >= 0
+            &&& red[i].s >= 0
+            &&& (red[i].r - a as int) % (m as int) == 0
+            &&& (red[i].s - b as int) % (m as int) == 0
+        },
+    ensures
+        equiv_in_presentation(base_A(), apply_embedding(gens, red_to_U(red, m as int)), canw_eval(red)),
+    decreases red.len(),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let mi = m as int;
+    if red.len() == 0 {
+        assert(red_to_U(red, mi) =~= empty_word());
+        assert(apply_embedding(gens, red_to_U(red, mi)) =~= empty_word()) by {
+            reveal_with_fuel(apply_embedding, 2);
+        }
+        assert(canw_eval(red) =~= empty_word());
+        lemma_equiv_refl(p, empty_word());
+    } else {
+        let c = red[0];
+        let rest = red.drop_first();
+        assert(red_to_U(red, mi) == letter_to_U(c, mi) + red_to_U(rest, mi));
+        lemma_apply_embedding_concat(gens, letter_to_U(c, mi), red_to_U(rest, mi));
+        let ae_head = apply_embedding(gens, letter_to_U(c, mi));
+        let ae_rest = apply_embedding(gens, red_to_U(rest, mi));
+        assert(apply_embedding(gens, red_to_U(red, mi)) =~= ae_head + ae_rest);
+        //  head: per-letter lemma with px=py=m, k=c.r/mi, l=c.s/mi
+        lemma_emb_gsconfig(gens, a, b, m, m, c.r / mi, c.s / mi, c.e);
+        //  reconstruct: a + m·(c.r/m) == c.r,  b + m·(c.s/m) == c.s
+        assert((red[0]).r >= 0 && red[0].s >= 0
+            && (red[0].r - a as int) % mi == 0 && (red[0].s - b as int) % mi == 0);
+        lemma_residue_recon(c.r, a as int, mi);
+        lemma_residue_recon(c.s, b as int, mi);
+        assert(a as int + mi * (c.r / mi) == c.r);
+        assert(b as int + mi * (c.s / mi) == c.s);
+        assert(gsconfig(a as int + mi * (c.r / mi), b as int + mi * (c.s / mi), c.e)
+            == gsconfig(c.r, c.s, c.e));
+        assert(ae_head == apply_embedding(gens, gsconfig(c.r / mi, c.s / mi, c.e)));
+        assert(equiv_in_presentation(p, ae_head, canl_eval(c)));     //  canl_eval(c) = gsconfig(c.r,c.s,c.e)
+        //  rest: IH
+        assert(forall|i: int| 0 <= i < rest.len() ==> {
+            &&& (#[trigger] rest[i]).r >= 0
+            &&& rest[i].s >= 0
+            &&& (rest[i].r - a as int) % mi == 0
+            &&& (rest[i].s - b as int) % mi == 0
+        }) by {
+            assert forall|i: int| 0 <= i < rest.len() implies {
+                &&& (#[trigger] rest[i]).r >= 0
+                &&& rest[i].s >= 0
+                &&& (rest[i].r - a as int) % mi == 0
+                &&& (rest[i].s - b as int) % mi == 0
+            } by {
+                assert(rest[i] == red[i + 1]);
+            }
+        }
+        lemma_emb_aside_eq(gens, rest, a, b, m);
+        assert(equiv_in_presentation(p, ae_rest, canw_eval(rest)));
+        //  congruence:  ae_head + ae_rest ≡ canl_eval(c) + canw_eval(rest) = canw_eval(red)
+        lemma_equiv_concat_left(p, ae_head, canl_eval(c), ae_rest);
+        lemma_equiv_concat_right(p, canl_eval(c), ae_rest, canw_eval(rest));
+        lemma_equiv_transitive(p, ae_head + ae_rest, canl_eval(c) + ae_rest,
+            canl_eval(c) + canw_eval(rest));
+        assert(canw_eval(red) == canl_eval(c) + canw_eval(rest));
+        assert(apply_embedding(gens, red_to_U(red, mi)) =~= ae_head + ae_rest);
+        lemma_equiv_refl(p, apply_embedding(gens, red_to_U(red, mi)));
+        lemma_equiv_transitive(p, apply_embedding(gens, red_to_U(red, mi)), ae_head + ae_rest,
+            canw_eval(red));
+    }
 }
 
 } //  verus!
