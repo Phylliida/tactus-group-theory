@@ -1032,4 +1032,315 @@ pub proof fn lemma_prop_v_AtoB(mm: ModMachine, qi: nat, uw: Word)
     lemma_in_subgroup_pred_respects_equiv(p, tm_pred(mm), b_u, g_b);
 }
 
+//  ============================================================
+//  B6-REV — the reverse direction (B→A).
+//  ============================================================
+//  The b-side is acc_gens(c,0,m²,1) [R] / acc_gens(0,c,1,m²) [L], with ASYMMETRIC moduli, so the
+//  single-modulus ii_subset reduction (lemma_emb_a_reduced) does not apply.  Instead we get the
+//  residue factorization directly from lemma_accumulator_inv and feed it into a generic reduction
+//  core.  Mirror of A→B with the conjugation reversed and step_preserves_h0 used backwards (it is an
+//  iff).  See docs/property-v-tfree-architecture.md, B6 "B→A".
+
+//  Generic reduction core:  in_TM(g) ∧ canw_eval(qa) ≡_A g  ⟹  red = cw_reduce(qa) is reduced,
+//  ≡_A g, and every coordinate is BOTH H₀ AND a coordinate of qa.  (Factors lemma_in_TM_residue_reduced
+//  so the residue form qa can come from the accumulator with arbitrary moduli — the residue property
+//  of red's coords then follows from coord_in(qa,·) at the call site.)
+pub proof fn lemma_in_TM_canon_reduced(mm: ModMachine, g: Word, qa: Seq<CanonLetter>)
+    requires
+        in_TM(mm, g),
+        equiv_in_presentation(base_A(), canw_eval(qa), g),
+    ensures
+        canw_reduced(cw_reduce(qa)),
+        equiv_in_presentation(base_A(), canw_eval(cw_reduce(qa)), g),
+        forall|i: int| 0 <= i < cw_reduce(qa).len() ==> {
+            &&& (#[trigger] cw_reduce(qa)[i]).r >= 0
+            &&& cw_reduce(qa)[i].s >= 0
+            &&& mm_in_H0(mm, cw_reduce(qa)[i].r as nat, cw_reduce(qa)[i].s as nat)
+            &&& coord_in(qa, cw_reduce(qa)[i].r, cw_reduce(qa)[i].s)
+        },
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    let p_canon = lemma_in_TM_to_canon(mm, g);           //  canw_eval(p_canon) ≡ g, coords ∈ H₀
+    lemma_canw_eval_valid(p_canon);
+    lemma_equiv_symmetric(a, canw_eval(p_canon), g);
+    lemma_equiv_transitive(a, canw_eval(qa), g, canw_eval(p_canon));   //  canw(qa) ≡ canw(p_canon)
+    let red = cw_reduce(qa);
+    lemma_cw_reduce_reduced(qa);                          //  canw_reduced(red)
+    lemma_cw_reduce_eval(qa);                             //  canw_eval(red) ≡ canw_eval(qa) ≡ g
+    lemma_equiv_transitive(a, canw_eval(red), canw_eval(qa), g);
+    lemma_cw_reduce_coords(qa);                           //  coord_in(red) ⟹ coord_in(qa)
+    assert forall|i: int| 0 <= i < red.len() implies {
+        &&& (#[trigger] red[i]).r >= 0
+        &&& red[i].s >= 0
+        &&& mm_in_H0(mm, red[i].r as nat, red[i].s as nat)
+        &&& coord_in(qa, red[i].r, red[i].s)
+    } by {
+        let r = red[i].r;
+        let s = red[i].s;
+        assert(coord_in(red, r, s)) by { assert(red[i].r == r && red[i].s == s); }
+        assert(coord_in(qa, r, s));                       //  from lemma_cw_reduce_coords
+        lemma_tfree_coord_restrict(qa, p_canon, r, s);    //  ⟹ coord_in(p_canon, r, s)
+        let jp = choose|j: int| 0 <= j < p_canon.len() && p_canon[j].r == r && p_canon[j].s == s;
+        assert(0 <= jp < p_canon.len() && p_canon[jp].r == r && p_canon[jp].s == s);
+        assert(p_canon[jp].r >= 0 && p_canon[jp].s >= 0
+            && mm_in_H0(mm, p_canon[jp].r as nat, p_canon[jp].s as nat));
+    }
+}
+
+//  ── 2-modulus U-fold (for the asymmetric b-side: divide r by mr, s by ms). ──
+pub open spec fn letter_to_U2(c: CanonLetter, mr: int, ms: int) -> Word {
+    gsconfig(c.r / mr, c.s / ms, c.e)
+}
+
+pub open spec fn red_to_U2(red: Seq<CanonLetter>, mr: int, ms: int) -> Word
+    decreases red.len(),
+{
+    if red.len() == 0 {
+        empty_word()
+    } else {
+        letter_to_U2(red[0], mr, ms) + red_to_U2(red.drop_first(), mr, ms)
+    }
+}
+
+//  ── b-side residue parameters:  acc_gens(b_aa,b_bb,b_mr,b_ms) == hnn_b_gens(quad_data). ──
+//  R: (c,0) with moduli (m²,1);  L: (0,c) with moduli (1,m²).
+pub open spec fn b_aa(q: Quad) -> nat { match q.dir { Dir::R => q.c, Dir::L => 0 } }
+pub open spec fn b_bb(q: Quad) -> nat { match q.dir { Dir::R => 0, Dir::L => q.c } }
+pub open spec fn b_mr(q: Quad, m: nat) -> nat { match q.dir { Dir::R => m * m, Dir::L => 1 } }
+pub open spec fn b_ms(q: Quad, m: nat) -> nat { match q.dir { Dir::R => 1, Dir::L => m * m } }
+
+pub proof fn lemma_quad_b_gens_form(mm: ModMachine, qi: nat)
+    requires
+        qi < mm.quads.len(),
+    ensures
+        hnn_b_gens(quad_data(mm, qi)) =~= acc_gens(b_aa(mm.quads[qi as int]),
+            b_bb(mm.quads[qi as int]), b_mr(mm.quads[qi as int], mm.m), b_ms(mm.quads[qi as int], mm.m)),
+{
+    let q = mm.quads[qi as int];
+    let m = mm.m;
+    let bg = hnn_b_gens(quad_data(mm, qi));
+    let assoc = quad_associations(q, m);
+    let ag2 = acc_gens(b_aa(q), b_bb(q), b_mr(q, m), b_ms(q, m));
+    assert(bg.len() == 3 && ag2.len() == 3);
+    assert(bg[0] == assoc[0].1 && bg[1] == assoc[1].1 && bg[2] == assoc[2].1);
+    match q.dir {
+        Dir::R => {
+            assert(b_aa(q) == q.c && b_bb(q) == 0 && b_mr(q, m) == m * m && b_ms(q, m) == 1);
+            assert(bg[0] == config_word(q.c, 0));
+            assert(bg[1] == symbol_power(Symbol::Gen(1), m * m));
+            assert(bg[2] == symbol_power(Symbol::Gen(2), 1));
+        }
+        Dir::L => {
+            assert(b_aa(q) == 0 && b_bb(q) == q.c && b_mr(q, m) == 1 && b_ms(q, m) == m * m);
+            assert(bg[0] == config_word(0, q.c));
+            assert(bg[1] == symbol_power(Symbol::Gen(1), 1));
+            assert(bg[2] == symbol_power(Symbol::Gen(2), m * m));
+        }
+    }
+}
+
+//  ── a-side per b-residue letter:  apply_embedding(a_gens, letter_to_U2(c, m²,1)) ∈ T(M). ──
+//  Mirror of lemma_bside_letter_in_TM: each b-residue config letter c=(R,S)∈H₀ maps under the a-gens
+//  to a config at the quad_step PRE-image, which is in H₀ by the reverse of step_preserves_h0 (an iff).
+#[verifier::rlimit(300)]
+pub proof fn lemma_aside_letter_in_TM(mm: ModMachine, qi: nat, c: CanonLetter)
+    requires
+        mod_machine_wf(mm),
+        qi < mm.quads.len(),
+        c.r >= 0,
+        c.s >= 0,
+        mm_in_H0(mm, c.r as nat, c.s as nat),
+        (c.r - b_aa(mm.quads[qi as int]) as int) % (b_mr(mm.quads[qi as int], mm.m) as int) == 0,
+        (c.s - b_bb(mm.quads[qi as int]) as int) % (b_ms(mm.quads[qi as int], mm.m) as int) == 0,
+    ensures
+        in_TM(mm, apply_embedding(hnn_a_gens(quad_data(mm, qi)),
+            letter_to_U2(c, b_mr(mm.quads[qi as int], mm.m) as int, b_ms(mm.quads[qi as int], mm.m) as int))),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let q = mm.quads[qi as int];
+    let m = mm.m;
+    let ag = hnn_a_gens(quad_data(mm, qi));
+    assert(q.a < m && q.b < m && q.c < m * m) by { assert(quad_wf(q, m)); }
+    lemma_quad_a_gens_form(mm, qi);                     //  ag =~= [config(a,b), x^m, y^m]
+    let mri = b_mr(q, m) as int;
+    let msi = b_ms(q, m) as int;
+    let kr = c.r / mri;
+    let ks = c.s / msi;
+    let g0 = letter_to_U2(c, mri, msi);
+    assert(g0 == gsconfig(kr, ks, c.e));
+    lemma_quad_associations_valid(q, m, 3);
+    lemma_gsconfig_valid(kr, ks, c.e);
+    assert(forall|i: int| 0 <= i < ag.len() ==> word_valid(#[trigger] ag[i], 3)) by {
+        assert forall|i: int| 0 <= i < ag.len() implies word_valid(#[trigger] ag[i], 3) by {
+            assert(ag[i] == quad_associations(q, m)[i].0);
+        }
+    }
+    lemma_apply_embedding_valid(ag, g0, 3);
+    //  a-side image:  emb(ag, gsconfig(kr,ks,e)) ≡ gsconfig(a + m·kr, b + m·ks, e)
+    lemma_emb_gsconfig(ag, q.a, q.b, m, m, kr, ks, c.e);
+    let pp = q.a as int + (m as int) * kr;
+    let qq = q.b as int + (m as int) * ks;
+    assert(equiv_in_presentation(p, apply_embedding(ag, g0), gsconfig(pp, qq, c.e)));
+    assert(kr >= 0 && ks >= 0);
+    assert(pp >= 0 && qq >= 0);
+    let ppn = pp as nat;
+    let qqn = qq as nat;
+    //  nat coords of the preimage; their residues are (a,b), quotients (kr,ks)
+    assert((m as int) * kr == kr * (m as int)) by (nonlinear_arith);
+    assert((m as int) * ks == ks * (m as int)) by (nonlinear_arith);
+    assert(pp == kr * (m as int) + q.a as int);
+    assert(qq == ks * (m as int) + q.b as int);
+    assert((q.a as int) >= 0 && (q.a as int) < (m as int) && (q.b as int) >= 0 && (q.b as int) < (m as int));
+    vstd::arithmetic::div_mod::lemma_fundamental_div_mod_converse(pp, m as int, kr, q.a as int);
+    vstd::arithmetic::div_mod::lemma_fundamental_div_mod_converse(qq, m as int, ks, q.b as int);
+    lemma_nat_div_int(pp, m as int);                 //  nat % / int % bridge for pp
+    lemma_nat_div_int(qq, m as int);                 //  nat % / int % bridge for qq
+    assert(ppn % m == q.a && qqn % m == q.b);
+    assert(ppn / m == kr && qqn / m == ks);
+    //  quad_step(pp,qq) == (c.r, c.s)
+    let target = quad_step(q, m, ppn, qqn);
+    match q.dir {
+        Dir::R => {
+            assert(mri == (m * m) as int && msi == 1);
+            //  residue recon on r:  c + m²·kr == c.r ;  s free (ms=1 ⟹ ks = c.s)
+            lemma_residue_recon(c.r, q.c as int, mri);   //  q.c + m²·(c.r/m²) == c.r
+            assert(q.c as int + mri * kr == c.r);
+            assert(ks == c.s) by { assert(c.s / 1 == c.s); }
+            assert(target.0 == (ppn / m) * (m * m) + q.c && target.1 == qqn / m);
+            assert(target.0 == kr * (m * m) + q.c);
+            assert((kr * (m * m)) as int == kr * (m * m) as int);
+            assert(mri * kr == kr * (m * m) as int) by (nonlinear_arith) requires mri == (m * m) as int;
+            assert(target.0 as int == c.r);
+            assert(target.1 as int == c.s);
+        }
+        Dir::L => {
+            assert(mri == 1 && msi == (m * m) as int);
+            lemma_residue_recon(c.s, q.c as int, msi);   //  q.c + m²·(c.s/m²) == c.s
+            assert(q.c as int + msi * ks == c.s);
+            assert(kr == c.r) by { assert(c.r / 1 == c.r); }
+            assert(target.0 == ppn / m && target.1 == (qqn / m) * (m * m) + q.c);
+            assert(target.1 == ks * (m * m) + q.c);
+            assert((ks * (m * m)) as int == ks * (m * m) as int);
+            assert(msi * ks == ks * (m * m) as int) by (nonlinear_arith) requires msi == (m * m) as int;
+            assert(target.0 as int == c.r);
+            assert(target.1 as int == c.s);
+        }
+    }
+    assert(target == (c.r as nat, c.s as nat));
+    //  mm_yields(pp,qq → c.r,c.s) ; (c.r,c.s)∈H₀ ; step_preserves_h0 (⟸) ⟹ (pp,qq)∈H₀
+    assert(mm_yields(mm, ppn, qqn, c.r as nat, c.s as nat)) by {
+        assert(quad_matches(q, m, ppn, qqn));
+        assert(quad_step(mm.quads[qi as int], m, ppn, qqn) == (c.r as nat, c.s as nat));
+    }
+    lemma_step_preserves_h0(mm, ppn, qqn, c.r as nat, c.s as nat);
+    assert(mm_in_H0(mm, ppn, qqn));
+    lemma_gsconfig_in_TM(mm, ppn, qqn, c.e);
+    assert(gsconfig(ppn as int, qqn as int, c.e) == gsconfig(pp, qq, c.e));
+    lemma_equiv_symmetric(p, apply_embedding(ag, g0), gsconfig(pp, qq, c.e));
+    lemma_in_subgroup_pred_respects_equiv(p, tm_pred(mm), gsconfig(pp, qq, c.e),
+        apply_embedding(ag, g0));
+}
+
+pub proof fn lemma_red_to_U2_valid(red: Seq<CanonLetter>, mr: int, ms: int)
+    ensures
+        word_valid(red_to_U2(red, mr, ms), 3),
+    decreases red.len(),
+{
+    if red.len() == 0 {
+        assert(red_to_U2(red, mr, ms) =~= empty_word());
+    } else {
+        let c = red[0];
+        lemma_gsconfig_valid(c.r / mr, c.s / ms, c.e);
+        lemma_red_to_U2_valid(red.drop_first(), mr, ms);
+        lemma_concat_word_valid(letter_to_U2(c, mr, ms), red_to_U2(red.drop_first(), mr, ms), 3);
+    }
+}
+
+//  2-modulus reconstruction:  apply_embedding(acc_gens(aa,bb,mr,ms), red_to_U2(red,mr,ms)) ≡_A
+//  canw_eval(red),  when every coordinate of red lies in the residue class (aa mod mr, bb mod ms).
+//  Generalizes lemma_emb_aside_eq (mr=ms=m) to the asymmetric b-side.
+pub proof fn lemma_emb_accgens_eq(gens: Seq<Word>, red: Seq<CanonLetter>, aa: nat, bb: nat, mr: nat, ms: nat)
+    requires
+        mr > 0,
+        ms > 0,
+        aa < mr,
+        bb < ms,
+        gens.len() == 3,
+        gens[0] =~= config_word(aa, bb),
+        gens[1] =~= signed_power(1, mr as int),
+        gens[2] =~= signed_power(2, ms as int),
+        forall|i: int| 0 <= i < red.len() ==> {
+            &&& (#[trigger] red[i]).r >= 0
+            &&& red[i].s >= 0
+            &&& (red[i].r - aa as int) % (mr as int) == 0
+            &&& (red[i].s - bb as int) % (ms as int) == 0
+        },
+    ensures
+        equiv_in_presentation(base_A(), apply_embedding(gens, red_to_U2(red, mr as int, ms as int)),
+            canw_eval(red)),
+    decreases red.len(),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let mri = mr as int;
+    let msi = ms as int;
+    if red.len() == 0 {
+        assert(red_to_U2(red, mri, msi) =~= empty_word());
+        assert(apply_embedding(gens, red_to_U2(red, mri, msi)) =~= empty_word()) by {
+            reveal_with_fuel(apply_embedding, 2);
+        }
+        assert(canw_eval(red) =~= empty_word());
+        lemma_equiv_refl(p, empty_word());
+    } else {
+        let c = red[0];
+        let rest = red.drop_first();
+        assert(red_to_U2(red, mri, msi) == letter_to_U2(c, mri, msi) + red_to_U2(rest, mri, msi));
+        lemma_apply_embedding_concat(gens, letter_to_U2(c, mri, msi), red_to_U2(rest, mri, msi));
+        let ae_head = apply_embedding(gens, letter_to_U2(c, mri, msi));
+        let ae_rest = apply_embedding(gens, red_to_U2(rest, mri, msi));
+        assert(apply_embedding(gens, red_to_U2(red, mri, msi)) =~= ae_head + ae_rest);
+        //  head: per-letter lemma with px=mr, py=ms, k=c.r/mri, l=c.s/msi
+        lemma_emb_gsconfig(gens, aa, bb, mr, ms, c.r / mri, c.s / msi, c.e);
+        assert((red[0]).r >= 0 && red[0].s >= 0
+            && (red[0].r - aa as int) % mri == 0 && (red[0].s - bb as int) % msi == 0);
+        lemma_residue_recon(c.r, aa as int, mri);
+        lemma_residue_recon(c.s, bb as int, msi);
+        assert(aa as int + mri * (c.r / mri) == c.r);
+        assert(bb as int + msi * (c.s / msi) == c.s);
+        assert(gsconfig(aa as int + mri * (c.r / mri), bb as int + msi * (c.s / msi), c.e)
+            == gsconfig(c.r, c.s, c.e));
+        assert(ae_head == apply_embedding(gens, gsconfig(c.r / mri, c.s / msi, c.e)));
+        assert(equiv_in_presentation(p, ae_head, canl_eval(c)));
+        //  rest: IH
+        assert(forall|i: int| 0 <= i < rest.len() ==> {
+            &&& (#[trigger] rest[i]).r >= 0
+            &&& rest[i].s >= 0
+            &&& (rest[i].r - aa as int) % mri == 0
+            &&& (rest[i].s - bb as int) % msi == 0
+        }) by {
+            assert forall|i: int| 0 <= i < rest.len() implies {
+                &&& (#[trigger] rest[i]).r >= 0
+                &&& rest[i].s >= 0
+                &&& (rest[i].r - aa as int) % mri == 0
+                &&& (rest[i].s - bb as int) % msi == 0
+            } by {
+                assert(rest[i] == red[i + 1]);
+            }
+        }
+        lemma_emb_accgens_eq(gens, rest, aa, bb, mr, ms);
+        assert(equiv_in_presentation(p, ae_rest, canw_eval(rest)));
+        //  congruence:  ae_head + ae_rest ≡ canl_eval(c) + canw_eval(rest) = canw_eval(red)
+        lemma_equiv_concat_left(p, ae_head, canl_eval(c), ae_rest);
+        lemma_equiv_concat_right(p, canl_eval(c), ae_rest, canw_eval(rest));
+        lemma_equiv_transitive(p, ae_head + ae_rest, canl_eval(c) + ae_rest,
+            canl_eval(c) + canw_eval(rest));
+        assert(canw_eval(red) == canl_eval(c) + canw_eval(rest));
+        lemma_equiv_refl(p, apply_embedding(gens, red_to_U2(red, mri, msi)));
+        lemma_equiv_transitive(p, apply_embedding(gens, red_to_U2(red, mri, msi)), ae_head + ae_rest,
+            canw_eval(red));
+    }
+}
+
 } //  verus!
