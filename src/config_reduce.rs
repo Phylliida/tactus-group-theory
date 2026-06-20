@@ -613,4 +613,207 @@ pub proof fn lemma_gsconfig_inverse(r: int, s: int, e: int)
     assert(gsconfig(r, s, -e) =~= av + (bv + (signed_power(0, -e) + (dv + fv))));
 }
 
+//  Reverse-and-invert a config word (the inverse in the config basis).
+pub open spec fn canl_inv(c: CanonLetter) -> CanonLetter {
+    CanonLetter { r: c.r, s: c.s, e: -c.e }
+}
+
+pub open spec fn revinv(v: Seq<CanonLetter>) -> Seq<CanonLetter>
+    decreases v.len(),
+{
+    if v.len() == 0 {
+        Seq::<CanonLetter>::empty()
+    } else {
+        revinv(v.drop_first()) + seq![canl_inv(v[0])]
+    }
+}
+
+//  canw_eval(revinv(v)) ≡_A inverse_word(canw_eval(v)).
+pub proof fn lemma_revinv_eval(v: Seq<CanonLetter>)
+    ensures
+        equiv_in_presentation(base_A(), canw_eval(revinv(v)), inverse_word(canw_eval(v))),
+    decreases v.len(),
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    if v.len() == 0 {
+        assert(revinv(v) =~= Seq::<CanonLetter>::empty());
+        assert(canw_eval(v) =~= empty_word());
+        assert(inverse_word(canw_eval(v)) =~= empty_word()) by { lemma_inverse_empty(); }
+        assert(canw_eval(revinv(v)) =~= empty_word());
+        lemma_equiv_refl(a, canw_eval(revinv(v)));
+    } else {
+        let v0 = v[0];
+        let tail = v.drop_first();
+        //  canw_eval(revinv(v)) =~= canw_eval(revinv(tail)) + gsconfig(v0.r,v0.s,-v0.e)
+        lemma_canw_eval_concat(revinv(tail), seq![canl_inv(v0)]);
+        assert(seq![canl_inv(v0)][0] == canl_inv(v0));
+        assert(seq![canl_inv(v0)].drop_first() =~= Seq::<CanonLetter>::empty());
+        assert(canw_eval(Seq::<CanonLetter>::empty()) =~= empty_word());
+        assert(canw_eval(seq![canl_inv(v0)])
+            =~= canl_eval(canl_inv(v0)) + canw_eval(seq![canl_inv(v0)].drop_first()));
+        assert(canw_eval(seq![canl_inv(v0)]) =~= canl_eval(canl_inv(v0)));
+        assert(canl_eval(canl_inv(v0)) =~= gsconfig(v0.r, v0.s, -v0.e));
+        let g_inv = gsconfig(v0.r, v0.s, -v0.e);
+        assert(canw_eval(revinv(v)) =~= canw_eval(revinv(tail)) + g_inv);
+        //  IH: canw_eval(revinv(tail)) ≡ inverse_word(canw_eval(tail))
+        lemma_revinv_eval(tail);
+        lemma_equiv_concat_left(a, canw_eval(revinv(tail)), inverse_word(canw_eval(tail)), g_inv);
+        //  inverse_word(canw_eval(v)) =~= inverse_word(canw_eval(tail)) + g_inv
+        assert(canw_eval(v) =~= canl_eval(v0) + canw_eval(tail));
+        lemma_inverse_word_concat(canl_eval(v0), canw_eval(tail));
+        lemma_gsconfig_inverse(v0.r, v0.s, v0.e);
+        assert(canl_eval(v0) =~= gsconfig(v0.r, v0.s, v0.e));
+        assert(inverse_word(canl_eval(v0)) =~= g_inv);
+        assert(inverse_word(canw_eval(v)) =~= inverse_word(canw_eval(tail)) + g_inv);
+        //  chain:  canw_eval(revinv(v)) =~= LHS ≡ RHS =~= inverse_word(canw_eval(v))
+        assert(equiv_in_presentation(a, canw_eval(revinv(v)), inverse_word(canw_eval(v))));
+    }
+}
+
+//  revinv only uses coordinates already in v.
+pub proof fn lemma_revinv_coord(v: Seq<CanonLetter>, r: int, s: int)
+    requires
+        coord_in(revinv(v), r, s),
+    ensures
+        coord_in(v, r, s),
+    decreases v.len(),
+{
+    let rv = revinv(v);
+    let j = choose|j: int| 0 <= j < rv.len() && rv[j].r == r && rv[j].s == s;
+    assert(0 <= j < rv.len() && rv[j].r == r && rv[j].s == s);
+    let tail = v.drop_first();
+    let rt = revinv(tail);
+    assert(rv =~= rt + seq![canl_inv(v[0])]);
+    if j < rt.len() {
+        assert(rv[j] == rt[j]);
+        assert(coord_in(rt, r, s)) by { assert(rt[j].r == r && rt[j].s == s); }
+        lemma_revinv_coord(tail, r, s);
+        assert(coord_in(v, r, s)) by {
+            let k = choose|k: int| 0 <= k < tail.len() && tail[k].r == r && tail[k].s == s;
+            assert(0 <= k < tail.len() && tail[k].r == r && tail[k].s == s);
+            assert(tail[k] == v[k + 1]);
+        }
+    } else {
+        assert(rv[j] == canl_inv(v[0]));
+        assert(coord_in(v, r, s)) by { assert(v[0].r == r && v[0].s == s); }
+    }
+}
+
+//  cw_cons keeps a foreign coordinate (one not equal to the consed letter's) that lives in acc.
+pub proof fn lemma_cw_cons_preserves_foreign(c: CanonLetter, acc: Seq<CanonLetter>, r: int, s: int)
+    requires
+        coord_in(acc, r, s),
+        !(c.r == r && c.s == s),
+    ensures
+        coord_in(cw_cons(c, acc), r, s),
+{
+    let res = cw_cons(c, acc);
+    let j0 = choose|j: int| 0 <= j < acc.len() && acc[j].r == r && acc[j].s == s;
+    assert(0 <= j0 < acc.len() && acc[j0].r == r && acc[j0].s == s);
+    if c.e == 0 {
+        assert(res =~= acc);
+        assert(res[j0] == acc[j0]);
+    } else if acc.len() > 0 && acc[0].r == c.r && acc[0].s == c.s {
+        //  acc[0] has c's coordinate ≠ (r,s), so the (r,s) witness is at index ≥ 1.
+        assert(j0 >= 1) by { if j0 == 0 { assert(acc[0].r == c.r && acc[0].s == c.s); } }
+        let me = c.e + acc[0].e;
+        if me == 0 {
+            assert(res =~= acc.drop_first());
+            assert(res[j0 - 1] == acc.drop_first()[j0 - 1]);
+            assert(acc.drop_first()[j0 - 1] == acc[j0]);
+            assert(coord_in(res, r, s)) by { assert(res[j0 - 1].r == r && res[j0 - 1].s == s); }
+        } else {
+            let merged = CanonLetter { r: c.r, s: c.s, e: me };
+            assert(res =~= seq![merged] + acc.drop_first());
+            assert(res[j0] == acc.drop_first()[j0 - 1]);
+            assert(acc.drop_first()[j0 - 1] == acc[j0]);
+            assert(coord_in(res, r, s)) by { assert(res[j0].r == r && res[j0].s == s); }
+        }
+    } else {
+        assert(res =~= seq![c] + acc);
+        assert(res[j0 + 1] == acc[j0]);
+        assert(coord_in(res, r, s)) by { assert(res[j0 + 1].r == r && res[j0 + 1].s == s); }
+    }
+}
+
+//  Fold-survival:  a coordinate in acc that is FOREIGN to x survives the fold cw_reduce_from(x, acc).
+pub proof fn lemma_fold_preserves_foreign_coords(
+    x: Seq<CanonLetter>, acc: Seq<CanonLetter>, r: int, s: int,
+)
+    requires
+        coord_in(acc, r, s),
+        !coord_in(x, r, s),
+    ensures
+        coord_in(cw_reduce_from(x, acc), r, s),
+    decreases x.len(),
+{
+    if x.len() == 0 {
+        assert(cw_reduce_from(x, acc) =~= acc);
+    } else {
+        let inner = cw_reduce_from(x.drop_first(), acc);
+        //  foreign to x ⟹ foreign to x.drop_first() and ≠ x[0]'s coordinate
+        assert(!coord_in(x.drop_first(), r, s)) by {
+            if coord_in(x.drop_first(), r, s) {
+                let k = choose|k: int| 0 <= k < x.drop_first().len()
+                    && x.drop_first()[k].r == r && x.drop_first()[k].s == s;
+                assert(0 <= k < x.drop_first().len()
+                    && x.drop_first()[k].r == r && x.drop_first()[k].s == s);
+                assert(x.drop_first()[k] == x[k + 1]);
+                assert(coord_in(x, r, s)) by { assert(x[k + 1].r == r && x[k + 1].s == s); }
+            }
+        }
+        assert(!(x[0].r == r && x[0].s == s)) by {
+            if x[0].r == r && x[0].s == s { assert(coord_in(x, r, s)) by { assert(x[0].r == r); } }
+        }
+        lemma_fold_preserves_foreign_coords(x.drop_first(), acc, r, s);   //  coord_in(inner, r, s)
+        lemma_cw_cons_preserves_foreign(x[0], inner, r, s);
+        assert(cw_reduce_from(x, acc) == cw_cons(x[0], inner));
+    }
+}
+
+//  ============================================================
+//  THE CRUX (A6 headline):  coordinate restriction.
+//  ============================================================
+//  If canw_eval(u) ≡_A canw_eval(v), then every coordinate of the reduced form of u appears in v.
+//  (Instantiated in B3 with v = the H₀ factorization: forces cw_reduce(u)'s coords ⊆ H₀.)
+pub proof fn lemma_tfree_coord_restrict(u: Seq<CanonLetter>, v: Seq<CanonLetter>, r: int, s: int)
+    requires
+        equiv_in_presentation(base_A(), canw_eval(u), canw_eval(v)),
+        coord_in(cw_reduce(u), r, s),
+    ensures
+        coord_in(v, r, s),
+{
+    let a = base_A();
+    lemma_base_A_valid();
+    let d = revinv(v) + u;
+    //  --- canw_eval(d) ≡ ε ---
+    lemma_canw_eval_concat(revinv(v), u);                       //  canw(d) =~= canw(revinv v) + canw(u)
+    lemma_revinv_eval(v);                                       //  canw(revinv v) ≡ inverse_word(canw v)
+    lemma_equiv_concat_left(a, canw_eval(revinv(v)), inverse_word(canw_eval(v)), canw_eval(u));
+    //  inverse_word(canw v) + canw(u) ≡ inverse_word(canw v) + canw(v)   (canw u ≡ canw v)
+    lemma_equiv_concat_right(a, inverse_word(canw_eval(v)), canw_eval(u), canw_eval(v));
+    lemma_word_inverse_left(a, canw_eval(v));                   //  inverse_word(canw v) + canw(v) ≡ ε
+    lemma_equiv_transitive(a, inverse_word(canw_eval(v)) + canw_eval(u),
+        inverse_word(canw_eval(v)) + canw_eval(v), empty_word());
+    lemma_equiv_transitive(a, canw_eval(d),
+        inverse_word(canw_eval(v)) + canw_eval(u), empty_word());
+    //  --- cw_reduce(d) == [] ---
+    lemma_cw_reduce_trivial_empty(d);
+    assert(cw_reduce(d).len() == 0);
+    //  cw_reduce(d) = cw_reduce_from(revinv(v), cw_reduce(u))
+    lemma_cw_reduce_from_concat(revinv(v), u, Seq::<CanonLetter>::empty());
+    assert(cw_reduce(d) == cw_reduce_from(revinv(v), cw_reduce(u)));
+    //  --- contradiction if (r,s) ∉ v ---
+    if !coord_in(v, r, s) {
+        assert(!coord_in(revinv(v), r, s)) by {
+            if coord_in(revinv(v), r, s) { lemma_revinv_coord(v, r, s); }
+        }
+        lemma_fold_preserves_foreign_coords(revinv(v), cw_reduce(u), r, s);
+        assert(coord_in(cw_reduce_from(revinv(v), cw_reduce(u)), r, s));
+        assert(cw_reduce_from(revinv(v), cw_reduce(u)).len() == 0);
+        assert(false);
+    }
+}
+
 } //  verus!
