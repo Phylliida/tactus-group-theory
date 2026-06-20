@@ -119,3 +119,8 @@ pub mod prop_v;
 // symbol.rs / word.rs; abstract base-offsets leave the global layout to Brick 2 (h1.rs).
 #[cfg(verus_keep_ghost)]
 pub mod word_numbering;
+
+// layout: Layer 2 / Brick 2 foundation — the global generator-index table for the Higman tower
+// H₁ ⊆ H₂ ⊆ H₃ (K_M, c, b, d, p, a-block, k blocks). Pure arithmetic; reused across bricks 2–5.
+#[cfg(verus_keep_ghost)]
+pub mod layout;
