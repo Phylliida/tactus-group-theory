@@ -124,3 +124,8 @@ pub mod word_numbering;
 // H₁ ⊆ H₂ ⊆ H₃ (K_M, c, b, d, p, a-block, k blocks). Pure arithmetic; reused across bricks 2–5.
 #[cfg(verus_keep_ghost)]
 pub mod layout;
+
+// h1: Layer 2 / Brick 2 — the H₁-level finite generators/relators (word-numbering maps at the
+// layout bases + the b_i c_j = c_j b_i commutator relators of set (I)). Approach (b): finite only.
+#[cfg(verus_keep_ghost)]
+pub mod h1;
