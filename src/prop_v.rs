@@ -186,4 +186,168 @@ pub proof fn lemma_conj_gsconfig_by_y(r: int, s: int, e: int, qq: int)
     lemma_equiv_transitive(a, lhs, m1, rhs);
 }
 
+//  ── apply_embedding of a generator power scales the exponent (literal equality). ──
+//  gens[i] = xᵖᵖ (well, the gen-i image is the symbol-power);  apply_embedding sends Gen(i)ⁿ ↦ Gen(i)^{pp·n}.
+pub proof fn lemma_emb_gen_pow(gens: Seq<Word>, i: nat, pp: nat, n: nat)
+    requires
+        (i as int) < gens.len(),
+        gens[i as int] =~= symbol_power(Symbol::Gen(i), pp),
+    ensures
+        apply_embedding(gens, symbol_power(Symbol::Gen(i), n)) =~= symbol_power(Symbol::Gen(i), pp * n),
+    decreases n,
+{
+    reveal_with_fuel(apply_embedding, 2);
+    if n == 0 {
+        assert(symbol_power(Symbol::Gen(i), n) =~= Seq::<Symbol>::empty());
+        assert(apply_embedding(gens, symbol_power(Symbol::Gen(i), n)) =~= Seq::<Symbol>::empty());
+        assert(pp * n == 0);
+        assert(symbol_power(Symbol::Gen(i), pp * n) =~= Seq::<Symbol>::empty());
+    } else {
+        let n1: nat = (n - 1) as nat;
+        let tail = symbol_power(Symbol::Gen(i), n1);
+        assert(n == n1 + 1);
+        assert(symbol_power(Symbol::Gen(i), n) =~= seq![Symbol::Gen(i)] + tail) by {
+            lemma_symbol_power_merge(Symbol::Gen(i), 1, n1);
+            lemma_symbol_power_one(Symbol::Gen(i));
+        }
+        lemma_apply_embedding_concat(gens, seq![Symbol::Gen(i)], tail);
+        assert(apply_embedding(gens, seq![Symbol::Gen(i)]) =~= symbol_power(Symbol::Gen(i), pp));
+        lemma_emb_gen_pow(gens, i, pp, n1);
+        lemma_symbol_power_merge(Symbol::Gen(i), pp, pp * n1);
+        assert(pp + pp * n1 == pp * n) by (nonlinear_arith) requires n == n1 + 1;
+    }
+}
+
+pub proof fn lemma_emb_inv_pow(gens: Seq<Word>, i: nat, pp: nat, n: nat)
+    requires
+        (i as int) < gens.len(),
+        gens[i as int] =~= symbol_power(Symbol::Gen(i), pp),
+    ensures
+        apply_embedding(gens, symbol_power(Symbol::Inv(i), n)) =~= symbol_power(Symbol::Inv(i), pp * n),
+    decreases n,
+{
+    reveal_with_fuel(apply_embedding, 2);
+    reveal_with_fuel(inverse_word, 2);
+    if n == 0 {
+        assert(symbol_power(Symbol::Inv(i), n) =~= Seq::<Symbol>::empty());
+        assert(apply_embedding(gens, symbol_power(Symbol::Inv(i), n)) =~= Seq::<Symbol>::empty());
+        assert(pp * n == 0);
+        assert(symbol_power(Symbol::Inv(i), pp * n) =~= Seq::<Symbol>::empty());
+    } else {
+        let n1: nat = (n - 1) as nat;
+        let tail = symbol_power(Symbol::Inv(i), n1);
+        assert(n == n1 + 1);
+        assert(symbol_power(Symbol::Inv(i), n) =~= seq![Symbol::Inv(i)] + tail) by {
+            lemma_symbol_power_merge(Symbol::Inv(i), 1, n1);
+            lemma_symbol_power_one(Symbol::Inv(i));
+        }
+        lemma_apply_embedding_concat(gens, seq![Symbol::Inv(i)], tail);
+        //  apply_embedding(gens, [Inv(i)]) = inverse_word(gens[i]) = inverse_word(xᵖᵖ) = x⁻ᵖᵖ-as-Inv-power
+        lemma_inverse_word_sympower(Symbol::Gen(i), pp);
+        assert(apply_embedding(gens, seq![Symbol::Inv(i)]) =~= symbol_power(Symbol::Inv(i), pp));
+        lemma_emb_inv_pow(gens, i, pp, n1);
+        lemma_symbol_power_merge(Symbol::Inv(i), pp, pp * n1);
+        assert(pp + pp * n1 == pp * n) by (nonlinear_arith) requires n == n1 + 1;
+    }
+}
+
+//  Signed wrapper:  apply_embedding(gens, signed_power(i,k)) =~= signed_power(i, pp·k).
+pub proof fn lemma_emb_signed_scaled(gens: Seq<Word>, i: nat, pp: nat, k: int)
+    requires
+        (i as int) < gens.len(),
+        gens[i as int] =~= signed_power(i, pp as int),
+    ensures
+        apply_embedding(gens, signed_power(i, k)) =~= signed_power(i, (pp as int) * k),
+{
+    assert(gens[i as int] =~= symbol_power(Symbol::Gen(i), pp));
+    if k >= 0 {
+        assert(signed_power(i, k) =~= symbol_power(Symbol::Gen(i), k as nat));
+        lemma_emb_gen_pow(gens, i, pp, k as nat);
+        assert((pp as int) * k >= 0) by (nonlinear_arith) requires pp >= 0, k >= 0;
+        assert(pp * (k as nat) == ((pp as int) * k) as nat) by (nonlinear_arith) requires k >= 0;
+        assert(signed_power(i, (pp as int) * k) =~= symbol_power(Symbol::Gen(i), pp * (k as nat)));
+    } else {
+        assert(signed_power(i, k) =~= symbol_power(Symbol::Inv(i), (-k) as nat));
+        lemma_emb_inv_pow(gens, i, pp, (-k) as nat);
+        assert((pp as int) * k <= 0) by (nonlinear_arith) requires pp >= 0, k < 0;
+        assert(pp * ((-k) as nat) == (-((pp as int) * k)) as nat) by (nonlinear_arith) requires k < 0;
+        assert(signed_power(i, (pp as int) * k) =~= symbol_power(Symbol::Inv(i), pp * ((-k) as nat)));
+    }
+}
+
+//  apply_embedding(gens, signed_power(0,e)) ≡_A gsconfig(a,b,e)  when gens[0] = config_word(a,b).
+//  (The t-generator image is a config; its e-th power is the conjugated power gsconfig(·,·,e).)
+pub proof fn lemma_emb_tpow(gens: Seq<Word>, a: nat, b: nat, e: int)
+    requires
+        0 < gens.len(),
+        gens[0] =~= config_word(a, b),
+    ensures
+        equiv_in_presentation(base_A(), apply_embedding(gens, signed_power(0, e)),
+            gsconfig(a as int, b as int, e)),
+    decreases (if e >= 0 { e } else { -e }),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let ai = a as int;
+    let bi = b as int;
+    //  config_word(a,b) =~= gsconfig(a,b,1):  config_word =~= sconfig =~= gsconfig(·,·,1).
+    lemma_sconfig_nat(ai, bi);
+    lemma_sconfig_is_gsconfig1(ai, bi);
+    assert(config_word(a, b) =~= gsconfig(ai, bi, 1));
+    if e == 0 {
+        assert(signed_power(0, 0) =~= Seq::<Symbol>::empty());
+        assert(apply_embedding(gens, signed_power(0, 0)) =~= empty_word()) by {
+            reveal_with_fuel(apply_embedding, 2);
+        }
+        lemma_gsconfig_zero(ai, bi);                          //  gsconfig(a,b,0) ≡ empty
+        lemma_equiv_symmetric(p, gsconfig(ai, bi, 0), empty_word());
+        lemma_equiv_refl(p, empty_word());
+        lemma_equiv_transitive(p, apply_embedding(gens, signed_power(0, 0)), empty_word(),
+            gsconfig(ai, bi, 0));
+    } else if e > 0 {
+        let e1 = e - 1;
+        let tail = signed_power(0, e1);
+        assert(signed_power(0, e) =~= seq![Symbol::Gen(0)] + tail) by {
+            lemma_symbol_power_merge(Symbol::Gen(0), 1, e1 as nat);
+            lemma_symbol_power_one(Symbol::Gen(0));
+        }
+        lemma_apply_embedding_concat(gens, seq![Symbol::Gen(0)], tail);
+        assert(apply_embedding(gens, seq![Symbol::Gen(0)]) =~= gens[0]) by {
+            reveal_with_fuel(apply_embedding, 2);
+        }
+        //  AE(signed_power(0,e)) =~= config_word(a,b) + AE(tail) == gsconfig(a,b,1) + AE(tail)
+        let ae_tail = apply_embedding(gens, tail);
+        assert(apply_embedding(gens, signed_power(0, e)) =~= gsconfig(ai, bi, 1) + ae_tail);
+        lemma_emb_tpow(gens, a, b, e1);                        //  AE(tail) ≡ gsconfig(a,b,e-1)
+        lemma_equiv_concat_right(p, gsconfig(ai, bi, 1), ae_tail, gsconfig(ai, bi, e1));
+        lemma_gsconfig_merge(ai, bi, 1, e1);                   //  g(·,1)·g(·,e-1) ≡ g(·,e)
+        assert(1 + e1 == e);
+        lemma_equiv_transitive(p, apply_embedding(gens, signed_power(0, e)),
+            gsconfig(ai, bi, 1) + gsconfig(ai, bi, e1), gsconfig(ai, bi, e));
+    } else {
+        let e1 = e + 1;
+        let tail = signed_power(0, e1);
+        assert(signed_power(0, e) =~= seq![Symbol::Inv(0)] + tail) by {
+            lemma_symbol_power_merge(Symbol::Inv(0), 1, (-e1) as nat);
+            lemma_symbol_power_one(Symbol::Inv(0));
+        }
+        lemma_apply_embedding_concat(gens, seq![Symbol::Inv(0)], tail);
+        //  AE([Inv(0)]) = inverse_word(gens[0]) =~= inverse_word(config_word(a,b)) =~= gsconfig(a,b,-1)
+        assert(apply_embedding(gens, seq![Symbol::Inv(0)]) =~= inverse_word(gens[0])) by {
+            reveal_with_fuel(apply_embedding, 2);
+            reveal_with_fuel(inverse_word, 2);
+        }
+        lemma_gsconfig_neg_one(ai, bi);                        //  gsconfig(a,b,-1) =~= inverse_word(sconfig(a,b))
+        assert(inverse_word(gens[0]) =~= gsconfig(ai, bi, -1));
+        let ae_tail = apply_embedding(gens, tail);
+        assert(apply_embedding(gens, signed_power(0, e)) =~= gsconfig(ai, bi, -1) + ae_tail);
+        lemma_emb_tpow(gens, a, b, e1);                        //  AE(tail) ≡ gsconfig(a,b,e+1)
+        lemma_equiv_concat_right(p, gsconfig(ai, bi, -1), ae_tail, gsconfig(ai, bi, e1));
+        lemma_gsconfig_merge(ai, bi, -1, e1);                  //  g(·,-1)·g(·,e+1) ≡ g(·,e)
+        assert(-1 + e1 == e);
+        lemma_equiv_transitive(p, apply_embedding(gens, signed_power(0, e)),
+            gsconfig(ai, bi, -1) + gsconfig(ai, bi, e1), gsconfig(ai, bi, e));
+    }
+}
+
 } //  verus!
