@@ -15,6 +15,7 @@ use crate::presentation::*;
 use crate::presentation_lemmas::*;
 use crate::homomorphism::*;
 use crate::machine_group::*;
+use crate::word_numbering::*;
 use crate::layout::*;
 use crate::h1::*;
 
@@ -239,6 +240,65 @@ pub proof fn lemma_kill_hom_valid(mm: ModMachine, n: nat)
             lemma_equiv_refl(g_m(mm), empty_word());
         }
     }
+}
+
+// ----------------------------------------------------------------------------
+// φ on the candidate basis element  t_α · w_α(b) · d  ↦  t_α
+// ----------------------------------------------------------------------------
+
+/// The candidate free-basis element `t_α · w_α(b) · d` of `H₁` (one per α∈I): the
+/// config word `t_α = config(α,0)`, the b-substitution `w_α(b) = h_w_b`, and `d`.
+pub open spec fn basis_elt(mm: ModMachine, n: nat, m: nat, alpha: nat) -> Word {
+    let nk = g_m(mm).num_generators;
+    config_word(alpha, 0) + h_w_b(nk, n, m, alpha) + seq![Symbol::Gen(d_idx(nk, n))]
+}
+
+/// `φ(t_α w_α(b) d) = t_α`: φ fixes `t_α` (K_M block) and kills `w_α(b)·d`
+/// (b/d block). The image is the Layer-1 free family `{t_α}` — the setup for the
+/// free-basis pullback (Cohen Prop-1.8-Cor-1).
+pub proof fn lemma_kill_on_basis_elt(mm: ModMachine, n: nat, m: nat, alpha: nat)
+    requires numbers_word(n, m, alpha), 2 * n < m,
+    ensures apply_hom(kill_hom(mm, n), basis_elt(mm, n, m, alpha)) =~= config_word(alpha, 0),
+{
+    let h = kill_hom(mm, n);
+    let nk = g_m(mm).num_generators;
+    let ng = h1_num_gens(nk, n);
+    lemma_g_m_num_generators(mm);                  // nk = 4 + |quads| ≥ 4
+    let tw = config_word(alpha, 0);
+    let wb = h_w_b(nk, n, m, alpha);
+    let dw: Word = seq![Symbol::Gen(d_idx(nk, n))];
+
+    // φ(t_α) = t_α  (config uses gens {0,1,2} < nk).
+    lemma_config_word_valid(alpha, 0);
+    lemma_word_valid_mono(tw, 3, nk);
+    lemma_kill_fixes_low(mm, n, tw);
+
+    // φ(w_α(b)) = ε  (wb = w_c at b_base; gens ∈ [nk+n, nk+2n) ≥ nk, < ng).
+    lemma_h_w_b_valid(nk, n, m, alpha, ng);        // word_valid(wb, ng): b_base+n = nk+2n ≤ ng
+    lemma_w_c_gens_in_block(b_base(nk, n), n, m, alpha);
+    assert(wb == w_c(b_base(nk, n), n, m, alpha)); // h_w_b = w_b = w_c at b_base
+    assert forall|k: int| 0 <= k < wb.len() implies nk <= generator_index(#[trigger] wb[k]) by {
+        assert(wb[k] == w_c(b_base(nk, n), n, m, alpha)[k]);   // fires the gens-in-block fact
+    }
+    lemma_kill_kills_high(mm, n, wb);
+
+    // φ(d) = ε  (d_idx = nk+2n ≥ nk, < ng).
+    assert(word_valid(dw, ng)) by {
+        assert forall|q: int| 0 <= q < dw.len() implies symbol_valid(#[trigger] dw[q], ng) by {
+            assert(dw[0] == Symbol::Gen(d_idx(nk, n)));
+        }
+    }
+    assert forall|k: int| 0 <= k < dw.len() implies nk <= generator_index(#[trigger] dw[k]) by {
+        assert(dw[0] == Symbol::Gen(d_idx(nk, n)));
+    }
+    lemma_kill_kills_high(mm, n, dw);
+
+    // combine over the two concatenations:  φ((t_α·w_b)·d) = (t_α·ε)·ε = t_α.
+    lemma_hom_respects_concat(h, tw + wb, dw);
+    lemma_hom_respects_concat(h, tw, wb);
+    assert(basis_elt(mm, n, m, alpha) == tw + wb + dw);
+    assert(apply_hom(h, tw + wb) =~= tw);
+    assert(apply_hom(h, basis_elt(mm, n, m, alpha)) =~= tw);
 }
 
 } // verus!
