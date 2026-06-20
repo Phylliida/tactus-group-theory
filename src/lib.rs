@@ -103,3 +103,9 @@ pub mod kp_pinch;
 // reusing the single-letter engine in kp_pinch.  See docs/e2d-tower-peel-plan.md.
 #[cfg(verus_keep_ghost)]
 pub mod tower_peel;
+
+// config_reduce: E2.B — config reduction core (property (v) T-free uniqueness).
+// Run-merge / zero-drop atoms → reduction function → ≡_A / coord lemmas → uniqueness.
+// See docs/property-v-tfree-architecture.md.
+#[cfg(verus_keep_ghost)]
+pub mod config_reduce;
