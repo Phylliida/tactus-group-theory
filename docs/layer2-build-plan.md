@@ -182,17 +182,25 @@ stable letters); iso-validity (`hnn_associations_isomorphic`) is NOT needed for 
 presentation + validity (only for Britton/faithfulness in brick 5); omitting `S` from the base is the
 intended Higman trick (forces (III) as a derived consequence of finite (I)).
 
-### NEXT — the deep tail
-1. **Free-basis lemma** (Brick 2's hard half): `{ t_α w_α(b) d : α∈I }` is a free basis of the
-   subgroup it generates. Route: the kill map is **`φ: H₁ → K_M`** (NOT `H₃ → K_M`!) — identity on the
-   K_M block `0..nk`, killing `c/b/d`. **Why H₁, not H₃:** `H₁`'s only relators are K_M-relators +
-   commutators, both ≡ε under `φ`, so `φ` is a valid homomorphism (`is_valid_homomorphism`); but the
-   `H₃` kill map is INVALID — the `φ_i` relator `a_i⁻¹ t a_i t_i⁻¹` would map to `t·config(i,0)⁻¹`,
-   and `t ≢ config(i,0)` in K_M for `i≠0`. So establish the free basis in `H₁` (image `{t_α}` free by
-   Layer-1 property (i) — `config`-basis injectivity, `lemma_tfree_coord_restrict`/`config_reduce`;
-   pull back via Cohen Prop-1.8-Cor-1), then carry it up the HNN tower (HNN base-injectivity / Britton).
-   Tools: `homomorphism.rs` (`apply_hom`, `is_valid_homomorphism`, `lemma_hom_preserves_equiv`,
-   `compose_hom`). NB: "free basis" has no predicate yet — define it (or the independence needed) first.
+### Free-basis lemma — IN PROGRESS (`free_basis.rs`, 7/0)
+The kill map is **`φ: H₁ → K_M`** (NOT `H₃ → K_M`!) — identity on the K_M block `0..nk`, killing
+`c/b/d`. **Why H₁, not H₃:** `H₁`'s only relators are K_M-relators + commutators, both ≡ε under `φ`,
+so `φ` is a valid homomorphism; but the `H₃` kill map is INVALID — the `φ_i` relator `a_i⁻¹ t a_i
+t_i⁻¹` maps to `t·config(i,0)⁻¹`, and `t ≢ config(i,0)` in K_M for `i≠0`.
+- **DONE:** `kill_hom(mm,n)` + `lemma_kill_hom_valid` (`is_valid_homomorphism`); transport helpers
+  `lemma_kill_{fixes_low,kills_high}` (φ fixes K_M words / kills c-b-d words) + per-symbol lemmas +
+  `lemma_comm_relator_high`. `basis_elt(mm,n,m,α) = t_α·w_α(b)·d` + **`lemma_kill_on_basis_elt`:
+  `φ(basis_elt) = config(α,0) = t_α`** (needs `word_numbering::lemma_w_c_gens_in_block`, also new).
+- **REMAINING (design-heavy):** (a) decide how to express **"free basis"** — no predicate exists; the
+  operative form is likely the `apply_embedding` (`benign.rs`) injectivity-up-to-≡ used by
+  `hnn_associations_isomorphic` (a product of basis elements `≡ε` iff the abstract word is trivial).
+  (b) **pullback principle:** if `{g_α}` maps under a hom to a free/independent family, `{g_α}` is
+  itself free — apply with `φ`, `g_α = basis_elt(α)`, image `{t_α}` free by Layer-1 **property (i)**
+  (config-basis injectivity: `config_reduce::lemma_tfree_coord_restrict` /
+  `lemma_in_TM_config_implies_H0`, at the `CanonLetter` level — connect via the coord-survival
+  argument). (c) carry the basis up the HNN tower (HNN base-injectivity / Britton).
+  Tools: `homomorphism.rs` (`apply_hom`, `lemma_hom_preserves_equiv`, `compose_hom`), `benign.rs`
+  (`apply_embedding`).
 2. **Brick 5 — faithfulness `C ↪ H₃`** (the deep part): soundness `relator_pred(w) ⟹ H₃ ⊢ φ(w)=1`
    (from (III)=consequence-of-(I): the `lemma_h2_p_conjugates_t`-style HNN-conjugation chain + Layer-1
    `in_TM`/Theorem 1 faithfulness, conjugate (II) by `k`, use `k:b_j↦b_j c_j` + the `w_α(bc)=w_α(b)
