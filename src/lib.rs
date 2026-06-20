@@ -109,3 +109,7 @@ pub mod tower_peel;
 // See docs/property-v-tfree-architecture.md.
 #[cfg(verus_keep_ghost)]
 pub mod config_reduce;
+
+// prop_v: E2.B — property (v) assembly (prop_v_holds), consuming config_reduce + the quad wiring.
+#[cfg(verus_keep_ghost)]
+pub mod prop_v;
