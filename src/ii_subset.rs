@@ -644,6 +644,107 @@ pub proof fn lemma_hnn_conjugation_subgroup(data: HNNData, wit: Word)
     }
 }
 
+//  φ_a(wit) and φ_b(wit) are valid words over the HNN presentation's generators.
+pub proof fn lemma_hnn_phi_valid(data: HNNData, wit: Word)
+    requires
+        hnn_data_valid(data),
+        word_valid(wit, data.associations.len() as nat),
+    ensures
+        word_valid(apply_embedding(hnn_a_words(data), wit), hnn_presentation(data).num_generators),
+        word_valid(apply_embedding(hnn_b_words(data), wit), hnn_presentation(data).num_generators),
+{
+    let ng = hnn_presentation(data).num_generators;
+    let aw = hnn_a_words(data);
+    let bw = hnn_b_words(data);
+    assert(aw.len() == data.associations.len());
+    assert(bw.len() == data.associations.len());
+    assert forall|q: int| 0 <= q < aw.len() implies word_valid(#[trigger] aw[q], ng) by {
+        assert(aw[q] == data.associations[q].0);
+        assert(word_valid(data.associations[q].0, data.base.num_generators));
+        lemma_word_valid_mono(data.associations[q].0, data.base.num_generators, ng);
+    }
+    assert forall|q: int| 0 <= q < bw.len() implies word_valid(#[trigger] bw[q], ng) by {
+        assert(bw[q] == data.associations[q].1);
+        assert(word_valid(data.associations[q].1, data.base.num_generators));
+        lemma_word_valid_mono(data.associations[q].1, data.base.num_generators, ng);
+    }
+    lemma_apply_embedding_valid(aw, wit, ng);
+    lemma_apply_embedding_valid(bw, wit, ng);
+}
+
+//  ============================================================
+//  Brick D1 — inverse-direction conjugation:  t · φ_b(wit) · t⁻¹ ≡ φ_a(wit).
+//  ============================================================
+//  The p·k·p⁻¹ pinch case needs the mirror of Brick A.  Derive it by conjugating Brick A's
+//  relation by t on the left and t⁻¹ on the right, then cancelling the t·t⁻¹ collars.
+pub proof fn lemma_hnn_conjugation_subgroup_inv(data: HNNData, wit: Word)
+    requires
+        hnn_data_valid(data),
+        word_valid(wit, data.associations.len() as nat),
+    ensures
+        equiv_in_presentation(hnn_presentation(data),
+            seq![stable_letter(data)] + apply_embedding(hnn_b_words(data), wit)
+                + seq![stable_letter_inv(data)],
+            apply_embedding(hnn_a_words(data), wit)),
+{
+    let hp = hnn_presentation(data);
+    let t = stable_letter(data);
+    let ti = stable_letter_inv(data);
+    let ng = hp.num_generators;
+    let x = apply_embedding(hnn_a_words(data), wit);   //  X = φ_a(wit)
+    let y = apply_embedding(hnn_b_words(data), wit);   //  Y = φ_b(wit)
+    let tw: Word = seq![t];
+    let tiw: Word = seq![ti];
+    crate::britton_infra::lemma_hnn_presentation_valid(data);
+    lemma_hnn_phi_valid(data, wit);   //  word_valid(x, ng), word_valid(y, ng)
+    assert(symbol_valid(t, ng) && symbol_valid(ti, ng));
+    assert(word_valid(tw, ng)) by {
+        assert forall|q: int| 0 <= q < tw.len() implies symbol_valid(#[trigger] tw[q], ng) by { }
+    }
+    assert(word_valid(tiw, ng)) by {
+        assert forall|q: int| 0 <= q < tiw.len() implies symbol_valid(#[trigger] tiw[q], ng) by { }
+    }
+    //  validity of the conjugated word  lhs_conj = [t]·([ti]+X+[t])·[ti]
+    lemma_concat_word_valid(tiw, x, ng);
+    lemma_concat_word_valid(tiw + x, tw, ng);
+    let inner = tiw + x + tw;
+    lemma_concat_word_valid(tw, inner, ng);
+    lemma_concat_word_valid(tw + inner, tiw, ng);
+    let lhs_conj = tw + inner + tiw;
+
+    //  A:  [ti]+X+[t] ≡ Y
+    lemma_hnn_conjugation_subgroup(data, wit);
+    //  conjugate by t (left) and ti (right)
+    lemma_equiv_concat_right(hp, tw, inner, y);                //  [t]·inner ≡ [t]·Y
+    lemma_equiv_concat_left(hp, tw + inner, tw + y, tiw);      //  ([t]·inner)·[ti] ≡ ([t]·Y)·[ti]
+    //  lhs_conj ≡ [t]·Y·[ti] (= goal LHS)
+    assert(lhs_conj =~= tw + inner + tiw);
+    assert((tw + y) + tiw =~= tw + y + tiw);
+
+    //  [t]+[ti] ≡ ε
+    lemma_word_inverse_right(hp, tw);
+    lemma_inverse_word_one(t);
+    assert(inverse_symbol(t) == ti);
+    assert(inverse_word(tw) =~= tiw);
+    assert(equiv_in_presentation(hp, tw + tiw, empty_word()));
+
+    //  reduce lhs_conj = [t]+[ti]+X+[t]+[ti]  ≡  X
+    //  delete the front [t]+[ti]:
+    crate::britton_via_tower::lemma_delete_equiv_empty(hp, empty_word(), tw + tiw, x + tw + tiw);
+    assert(empty_word() + (x + tw + tiw) =~= x + tw + tiw);
+    assert(concat(empty_word(), concat(tw + tiw, x + tw + tiw)) =~= (tw + tiw) + (x + tw + tiw));
+    //  delete the back [t]+[ti]:
+    crate::britton_via_tower::lemma_delete_equiv_empty(hp, x, tw + tiw, empty_word());
+    assert(concat(x, concat(tw + tiw, empty_word())) =~= x + tw + tiw);
+    assert(concat(x, empty_word()) =~= x);
+    //  chain:  lhs_conj =~= (tw+tiw)+(x+tw+tiw) ≡ x+tw+tiw ≡ x
+    assert(lhs_conj =~= (tw + tiw) + (x + tw + tiw));
+    lemma_equiv_transitive(hp, (tw + tiw) + (x + tw + tiw), x + tw + tiw, x);
+    //  so  lhs_conj ≡ x.  Combine with  lhs_conj ≡ [t]·Y·[ti].
+    lemma_equiv_symmetric(hp, lhs_conj, tw + y + tiw);        //  needs word_valid(lhs_conj)
+    lemma_equiv_transitive(hp, tw + y + tiw, lhs_conj, x);
+}
+
 //  ============================================================
 //  Brick B — subgroup membership ⟹ an embedding witness word.
 //  ============================================================

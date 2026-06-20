@@ -93,3 +93,8 @@ pub mod machine_group;
 // predicate-heavy in_residue_class goals don't pollute machine_group's triggers.
 #[cfg(verus_keep_ghost)]
 pub mod ii_subset;
+
+// kp_pinch: E2.C / L1 — the ⟨K,p⟩ pinch-elimination engine (property II central core).
+// Its own module to avoid trigger pollution / concurrent-edit churn with ii_subset.
+#[cfg(verus_keep_ghost)]
+pub mod kp_pinch;
