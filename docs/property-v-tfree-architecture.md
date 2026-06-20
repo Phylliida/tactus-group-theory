@@ -81,6 +81,41 @@ sconfig letter).
 
 ## Status / sequencing
 
-Largest remaining arc of Layer 1. Start at **A0** (atoms), climb A1→A6 (the freeness core, the deep
-part), then B is mostly wiring on proven pieces. Commit per brick. `lemma_canw_eval_nontrivial`
-(brick 108, machine_group.rs:9966) is the foundation everything stands on.
+Largest remaining arc of Layer 1. `lemma_canw_eval_nontrivial` (brick 108, machine_group.rs:9966)
+is the foundation everything stands on.
+
+**DONE (config_reduce.rs, 33 verified, 0 errors):**
+- Part A (A0–A6) — the config-reduction core + the T-free crux `lemma_tfree_coord_restrict`.
+- B-core conversion (`is_canl_word`/`canon_represents`/`lemma_canon_represents_eval`).
+- B2 `lemma_in_TM_to_canon` (in_TM → CanonLetter, H₀ coords from witness).
+- B1 `lemma_residue_to_canon` (in_residue_class → CanonLetter, residue coords).
+- **B3 `lemma_in_TM_residue_reduced`** — the Part-B intermediate: `in_TM(g) ∧ in_residue_class(aa,bb,m,g)
+  ⟹ ∃ canw_reduced `red`, `canw_eval(red)≡_A g`, every coord BOTH H₀ AND residue-(aa,bb mod m)`.
+
+**REMAINING — B4 (relabel) + B5 + B6 (assembly).** The route (decided): **HNN conjugation +
+base-faithfulness**, NOT a joint accumulator (which would rebuild ~200 lines).
+
+- **B4a — U-bridge:** `canw_eval(red) ≡_A apply_embedding(a_gens, U)` for an explicit `U` over 3 gens.
+  Each residue config `t(r,s)` (coord of `red`) ∈ `⟨a_gens⟩` — reuse `lemma_config_signed_in_G`
+  (ii_subset.rs:443, gives `in_generated_subgroup`), then the factors↔embedding-word bridge
+  (`factors_to_word`, machine_group.rs ~7152) to get a single `U`. Fold over `red`'s letters.
+- **B4b — conjugation:** `emb(b) ≡_{step_data} si·emb(a)·st ≡ si·apply_embedding(a_gens,U)·st
+  ≡ apply_embedding(b_gens,U)` via `lemma_stable_conj_factorization(step_data, U)` (machine_group.rs:7018).
+  Lift `emb(a)≡_A canw_eval(red)≡_A apply_embedding(a_gens,U)` into the HNN presentation (the `lemma_lift_to_bm`
+  used in tower_peel), congruence, then **base-faithfulness** restricts `≡_{HNN}` back to `≡_A` on the
+  base-A words `emb(b)` and `apply_embedding(b_gens,U)` (find the base-faithful lemma — `a_base_faithful`
+  / the HNN base-faithfulness used by ψ-injectivity & britton_via_tower).
+- **B5 — b-side ∈ T(M):** `apply_embedding(b_gens,U)` decomposes (b-side accumulator `lemma_accumulator_inv`
+  on `acc_gens(c,0,m²,1)`/`(0,c,1,m²)`, χ=0) into residue-(c,0) configs at coords = **quad_step relabel**
+  of `red`'s coords. THE ARITHMETIC: residue (r,s)=(a+mk,b+ml), `quad_step(R,m,r,s)=(c+m²k, l)`
+  (nat: `r/m=k` since `0≤a<m`, `r%m=a`); `(r,s)∈H₀ ⟺ quad_step∈H₀` (`lemma_step_preserves_h0`). So each
+  b-side config ∈H₀ ⟹ `∈in_TM` (`lemma_config_in_TM`) ⟹ product-closure ⟹ `apply_embedding(b_gens,U)∈T(M)`.
+  *(Watch nat/int/division carefully — `quad_step` takes nat; `red` coords are int≥0 in H₀∩residue.)*
+- **B6 — assemble `prop_v_holds`:** for each quad index + R/L + A→B/B→A direction. Derive the
+  `in_residue_class` hypothesis of B3 from `in_TM` via: `emb(a)∈⟨a_gens⟩` (`lemma_apply_embedding_in_subgroup`,
+  machine_group.rs:10139) + `gexp=0` (`lemma_in_TM_gexp_zero`, tower_peel.rs) + **`lemma_ii_subset`**
+  (ii_subset.rs:236). B→A is the mirror (b-side is also an `acc_gens`; `step_preserves_h0` is an iff).
+  Then `prop_v_holds` discharges the last hole of `lemma_vi` (tower_peel.rs) ⟹ property (vi) unconditional.
+
+Estimated ~12–18 lemmas, arithmetic-heavy. The deep mathematical content is DONE; B4–B6 is mechanical
+but intricate — best done with fresh focus to keep the division/modular reasoning clean.
