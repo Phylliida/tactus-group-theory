@@ -543,4 +543,83 @@ pub proof fn lemma_h1_in_h3(mm: ModMachine, n: nat, m: nat, w1: Word, w2: Word)
     lemma_h2_in_h3(mm, n, m, w1, w2);
 }
 
+// ----------------------------------------------------------------------------
+// Forward lift from base_A all the way to h3_pres.  Layer-1 config-algebra facts
+// (config conjugation, power merges) live at `base_A`; we lift them up the K_M
+// tower (`lemma_lift_to_gm`), across the c/b/d-extension (g_m → h1_base, a prefix
+// extension with MORE generators — neither `extends_presentation` nor
+// `relators_included` applies, so we replay the derivation), then up the Higman
+// tower (`lemma_h1_in_h3`).  This is the keystone lift for sub-bricks 2–5.
+// ----------------------------------------------------------------------------
+
+/// One derivation step valid in `g_m` replays in `h1_base`. `h1_base.relators` extends
+/// `g_m.relators` by the commutators (a prefix), and `h1_base` has MORE generators; `apply_step`
+/// gates only on `symbol_valid` (monotone) and on relator index/content (a prefix), so the step
+/// produces the identical result.
+proof fn lemma_step_gm_to_h1(mm: ModMachine, n: nat, w: Word, step: DerivationStep, w2: Word)
+    requires apply_step(g_m(mm), w, step) == Some(w2),
+    ensures apply_step(h1_base(mm, n), w, step) == Some(w2),
+{
+    let g = g_m(mm);
+    let h = h1_base(mm, n);
+    let nk = g.num_generators;
+    lemma_g_m_num_generators(mm);
+    assert(h.relators =~= g.relators + comm_relators(nk, n));
+    assert(g.num_generators <= h.num_generators);     // nk ≤ nk+2n+1
+    match step {
+        DerivationStep::FreeReduce { position } => {},
+        DerivationStep::FreeExpand { position, symbol } => {
+            // symbol_valid(symbol, nk) ⟹ symbol_valid(symbol, h.num_generators)
+        },
+        DerivationStep::RelatorInsert { position, relator_index, inverted } => {
+            assert(0 <= relator_index < g.relators.len());
+            assert(h.relators[relator_index as int] == g.relators[relator_index as int]);
+            assert(get_relator(h, relator_index, inverted) == get_relator(g, relator_index, inverted));
+        },
+        DerivationStep::RelatorDelete { position, relator_index, inverted } => {
+            assert(0 <= relator_index < g.relators.len());
+            assert(h.relators[relator_index as int] == g.relators[relator_index as int]);
+            assert(get_relator(h, relator_index, inverted) == get_relator(g, relator_index, inverted));
+        },
+    }
+}
+
+/// A whole `g_m` derivation replays in `h1_base`.
+proof fn lemma_deriv_gm_to_h1(mm: ModMachine, n: nat, steps: Seq<DerivationStep>, w1: Word, w2: Word)
+    requires derivation_produces(g_m(mm), steps, w1) == Some(w2),
+    ensures derivation_produces(h1_base(mm, n), steps, w1) == Some(w2),
+    decreases steps.len(),
+{
+    if steps.len() == 0 {
+    } else {
+        let step = steps.first();
+        let next = apply_step(g_m(mm), w1, step).unwrap();
+        lemma_step_gm_to_h1(mm, n, w1, step, next);
+        lemma_deriv_gm_to_h1(mm, n, steps.drop_first(), next, w2);
+    }
+}
+
+/// **Lift from `g_m` (= K_M) to `h1_base`.** An equivalence in `K_M` holds in `H₁`.
+pub proof fn lemma_gm_in_h1(mm: ModMachine, n: nat, w1: Word, w2: Word)
+    requires equiv_in_presentation(g_m(mm), w1, w2),
+    ensures equiv_in_presentation(h1_base(mm, n), w1, w2),
+{
+    let d = choose|d: Derivation| derivation_valid(g_m(mm), d, w1, w2);
+    lemma_deriv_gm_to_h1(mm, n, d.steps, w1, w2);
+    let d2 = Derivation { steps: d.steps };
+    assert(derivation_valid(h1_base(mm, n), d2, w1, w2));
+}
+
+/// **The keystone lift: `base_A → h3_pres`.** A `base_A` equivalence (config-algebra facts) holds
+/// in the full finite group `H₃`. Chains `lemma_lift_to_gm` (K_M tower) → `lemma_gm_in_h1`
+/// (c/b/d extension) → `lemma_h1_in_h3` (Higman tower).
+pub proof fn lemma_base_A_in_h3(mm: ModMachine, n: nat, m: nat, w1: Word, w2: Word)
+    requires equiv_in_presentation(base_A(), w1, w2),
+    ensures equiv_in_presentation(h3_pres(mm, n, m), w1, w2),
+{
+    lemma_lift_to_gm(mm, w1, w2);
+    lemma_gm_in_h1(mm, n, w1, w2);
+    lemma_h1_in_h3(mm, n, m, w1, w2);
+}
+
 } // verus!
