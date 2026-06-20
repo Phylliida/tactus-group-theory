@@ -12,9 +12,10 @@ use crate::presentation::*;
 use crate::presentation_lemmas::*;
 use crate::machine_group::*;
 use crate::hnn::*;
-use crate::ii_subset::{lemma_ii_subset, lemma_signed_power_inverse, lemma_exact_div};
+use crate::ii_subset::{lemma_ii_subset, lemma_signed_power_inverse, lemma_exact_div,
+    lemma_gexp_config_signed_zero, lemma_gexp_concat_all_zero};
 use crate::benign::{apply_embedding, apply_embedding_symbol, in_generated_subgroup,
-    lemma_apply_embedding_concat, lemma_apply_embedding_valid};
+    lemma_apply_embedding_concat, lemma_apply_embedding_valid, concat_all};
 use crate::tower_peel::{quad_data, lemma_in_TM_gexp_zero};
 use crate::config_reduce::*;
 
@@ -1341,6 +1342,305 @@ pub proof fn lemma_emb_accgens_eq(gens: Seq<Word>, red: Seq<CanonLetter>, aa: na
         lemma_equiv_transitive(p, apply_embedding(gens, red_to_U2(red, mri, msi)), ae_head + ae_rest,
             canw_eval(red));
     }
+}
+
+//  ── a-side fold:  apply_embedding(a_gens, red_to_U2(red, b_mr, b_ms)) ∈ T(M). ──
+//  Mirror of lemma_emb_bside_in_TM: each b-residue ∩ H₀ coordinate folds in via lemma_aside_letter_in_TM.
+pub proof fn lemma_emb_aside_in_TM(mm: ModMachine, qi: nat, red: Seq<CanonLetter>)
+    requires
+        mod_machine_wf(mm),
+        qi < mm.quads.len(),
+        forall|i: int| 0 <= i < red.len() ==> {
+            &&& (#[trigger] red[i]).r >= 0
+            &&& red[i].s >= 0
+            &&& mm_in_H0(mm, red[i].r as nat, red[i].s as nat)
+            &&& (red[i].r - b_aa(mm.quads[qi as int]) as int) % (b_mr(mm.quads[qi as int], mm.m) as int) == 0
+            &&& (red[i].s - b_bb(mm.quads[qi as int]) as int) % (b_ms(mm.quads[qi as int], mm.m) as int) == 0
+        },
+    ensures
+        in_TM(mm, apply_embedding(hnn_a_gens(quad_data(mm, qi)),
+            red_to_U2(red, b_mr(mm.quads[qi as int], mm.m) as int, b_ms(mm.quads[qi as int], mm.m) as int))),
+    decreases red.len(),
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let q = mm.quads[qi as int];
+    let ag = hnn_a_gens(quad_data(mm, qi));
+    let mri = b_mr(q, mm.m) as int;
+    let msi = b_ms(q, mm.m) as int;
+    if red.len() == 0 {
+        assert(red_to_U2(red, mri, msi) =~= empty_word());
+        assert(apply_embedding(ag, red_to_U2(red, mri, msi)) =~= empty_word()) by {
+            reveal_with_fuel(apply_embedding, 2);
+        }
+        lemma_empty_in_TM(mm);
+    } else {
+        let c = red[0];
+        let rest = red.drop_first();
+        assert(red_to_U2(red, mri, msi) == letter_to_U2(c, mri, msi) + red_to_U2(rest, mri, msi));
+        lemma_apply_embedding_concat(ag, letter_to_U2(c, mri, msi), red_to_U2(rest, mri, msi));
+        let h = apply_embedding(ag, letter_to_U2(c, mri, msi));
+        let t = apply_embedding(ag, red_to_U2(rest, mri, msi));
+        assert(apply_embedding(ag, red_to_U2(red, mri, msi)) =~= h + t);
+        //  head ∈ T(M)
+        assert((red[0]).r >= 0 && red[0].s >= 0
+            && mm_in_H0(mm, red[0].r as nat, red[0].s as nat)
+            && (red[0].r - b_aa(q) as int) % mri == 0
+            && (red[0].s - b_bb(q) as int) % msi == 0);
+        lemma_aside_letter_in_TM(mm, qi, c);
+        //  rest ∈ T(M) by IH
+        assert(forall|i: int| 0 <= i < rest.len() ==> {
+            &&& (#[trigger] rest[i]).r >= 0
+            &&& rest[i].s >= 0
+            &&& mm_in_H0(mm, rest[i].r as nat, rest[i].s as nat)
+            &&& (rest[i].r - b_aa(q) as int) % mri == 0
+            &&& (rest[i].s - b_bb(q) as int) % msi == 0
+        }) by {
+            assert forall|i: int| 0 <= i < rest.len() implies {
+                &&& (#[trigger] rest[i]).r >= 0
+                &&& rest[i].s >= 0
+                &&& mm_in_H0(mm, rest[i].r as nat, rest[i].s as nat)
+                &&& (rest[i].r - b_aa(q) as int) % mri == 0
+                &&& (rest[i].s - b_bb(q) as int) % msi == 0
+            } by {
+                assert(rest[i] == red[i + 1]);
+            }
+        }
+        lemma_emb_aside_in_TM(mm, qi, rest);
+        lemma_product_in_subgroup_pred(p, tm_pred(mm), h, t);
+    }
+}
+
+//  ── accumulator residue factors → CanonLetter list (2-modulus residue coords). ──
+//  Mirror of res_factor_to_canl / lemma_residue_to_canon, but for the accumulator's residue_config
+//  factors (parameterized k,l) with possibly-asymmetric moduli (mr, ms).
+pub open spec fn acc_factor_to_canl(aa: nat, bb: nat, mr: nat, ms: nat, f: Word) -> CanonLetter {
+    let kl = choose|k: int, l: int| #![trigger sconfig((aa + mr * k), (bb + ms * l))]
+        f == sconfig((aa + mr * k), (bb + ms * l))
+        || f == inverse_word(sconfig((aa + mr * k), (bb + ms * l)));
+    if f == sconfig((aa + mr * kl.0), (bb + ms * kl.1)) {
+        CanonLetter { r: aa + mr * kl.0, s: bb + ms * kl.1, e: 1 }
+    } else {
+        CanonLetter { r: aa + mr * kl.0, s: bb + ms * kl.1, e: -1 }
+    }
+}
+
+pub proof fn lemma_acc_factor_to_canl(aa: nat, bb: nat, mr: nat, ms: nat, f: Word)
+    requires
+        mr > 0,
+        ms > 0,
+        residue_config(f, aa, bb, mr, ms),
+    ensures
+        is_canl_word(f, acc_factor_to_canl(aa, bb, mr, ms, f)),
+        (acc_factor_to_canl(aa, bb, mr, ms, f).r - aa as int) % (mr as int) == 0,
+        (acc_factor_to_canl(aa, bb, mr, ms, f).s - bb as int) % (ms as int) == 0,
+{
+    let kl = choose|k: int, l: int| #![trigger sconfig((aa + mr * k), (bb + ms * l))]
+        f == sconfig((aa + mr * k), (bb + ms * l))
+        || f == inverse_word(sconfig((aa + mr * k), (bb + ms * l)));
+    assert(f == sconfig((aa + mr * kl.0), (bb + ms * kl.1))
+        || f == inverse_word(sconfig((aa + mr * kl.0), (bb + ms * kl.1))));
+    let c = acc_factor_to_canl(aa, bb, mr, ms, f);
+    assert(c.r == aa + mr * kl.0 && c.s == bb + ms * kl.1);
+    //  residue:  c.r - aa == mr·k  ⟹  %mr == 0
+    assert(c.r - aa as int == (mr as int) * kl.0);
+    assert(c.s - bb as int == (ms as int) * kl.1);
+    vstd::arithmetic::div_mod::lemma_mod_multiples_vanish(kl.0, 0, mr as int);  //  (mr·k+0)%mr == 0%mr
+    vstd::arithmetic::div_mod::lemma_mod_multiples_vanish(kl.1, 0, ms as int);
+    assert((c.r - aa as int) % (mr as int) == 0);
+    assert((c.s - bb as int) % (ms as int) == 0);
+    //  is_canl_word
+    if f == sconfig(c.r, c.s) {
+        assert(c.e == 1);
+    } else {
+        assert(c.e == -1);
+        assert(f == inverse_word(sconfig(c.r, c.s)));
+    }
+}
+
+//  ── accumulator factor list → CanonLetter list (residue coords, same evaluation). ──
+pub proof fn lemma_accgens_to_canon(aa: nat, bb: nat, mr: nat, ms: nat, factors: Seq<Word>) -> (canon: Seq<CanonLetter>)
+    requires
+        mr > 0,
+        ms > 0,
+        all_residue_configs(factors, aa, bb, mr, ms),
+    ensures
+        concat_all(factors) =~= canw_eval(canon),
+        forall|i: int| 0 <= i < canon.len() ==> {
+            &&& ((#[trigger] canon[i]).r - aa as int) % (mr as int) == 0
+            &&& (canon[i].s - bb as int) % (ms as int) == 0
+        },
+{
+    let canon = Seq::new(factors.len(), |i: int| acc_factor_to_canl(aa, bb, mr, ms, factors[i]));
+    assert(canon.len() == factors.len());
+    assert forall|i: int| 0 <= i < canon.len() implies {
+        &&& ((#[trigger] canon[i]).r - aa as int) % (mr as int) == 0
+        &&& (canon[i].s - bb as int) % (ms as int) == 0
+    } by {
+        assert(canon[i] == acc_factor_to_canl(aa, bb, mr, ms, factors[i]));
+        assert(residue_config(factors[i], aa, bb, mr, ms));
+        lemma_acc_factor_to_canl(aa, bb, mr, ms, factors[i]);
+    }
+    assert(canon_represents(factors, canon)) by {
+        assert forall|i: int| 0 <= i < factors.len()
+            implies is_canl_word(#[trigger] factors[i], canon[i]) by {
+            assert(canon[i] == acc_factor_to_canl(aa, bb, mr, ms, factors[i]));
+            assert(residue_config(factors[i], aa, bb, mr, ms));
+            lemma_acc_factor_to_canl(aa, bb, mr, ms, factors[i]);
+        }
+    }
+    lemma_canon_represents_eval(factors, canon);
+    canon
+}
+
+//  ── gexp of a residue_config factor is 0 (it is a config or its inverse). ──
+proof fn lemma_gexp_residue_config_zero(i: nat, f: Word, aa: nat, bb: nat, mr: nat, ms: nat)
+    requires
+        i == 1 || i == 2,
+        residue_config(f, aa, bb, mr, ms),
+    ensures
+        gexp(i, f) == 0,
+{
+    let kl = choose|k: int, l: int| #![trigger sconfig((aa + mr * k), (bb + ms * l))]
+        f == sconfig((aa + mr * k), (bb + ms * l))
+        || f == inverse_word(sconfig((aa + mr * k), (bb + ms * l)));
+    assert(f == sconfig((aa + mr * kl.0), (bb + ms * kl.1))
+        || f == inverse_word(sconfig((aa + mr * kl.0), (bb + ms * kl.1))));
+    let r = aa + mr * kl.0;
+    let s = bb + ms * kl.1;
+    assert(sconfig(r, s) =~= config_word_signed(r, s));    //  identical definitions
+    lemma_gexp_config_signed_zero(i, r, s);                //  gexp(i, config_word_signed) == 0
+    assert(gexp(i, sconfig(r, s)) == 0);
+    if f == inverse_word(sconfig(r, s)) {
+        lemma_gexp_inverse(i, sconfig(r, s));
+    }
+}
+
+//  ── gexp of concat_all of residue configs is 0. ──
+proof fn lemma_gexp_residue_concat_zero(i: nat, factors: Seq<Word>, aa: nat, bb: nat, mr: nat, ms: nat)
+    requires
+        i == 1 || i == 2,
+        all_residue_configs(factors, aa, bb, mr, ms),
+    ensures
+        gexp(i, concat_all(factors)) == 0,
+{
+    assert forall|k: int| 0 <= k < factors.len() implies gexp(i, #[trigger] factors[k]) == 0 by {
+        assert(residue_config(factors[k], aa, bb, mr, ms));
+        lemma_gexp_residue_config_zero(i, factors[k], aa, bb, mr, ms);
+    }
+    lemma_gexp_concat_all_zero(i, factors);
+}
+
+//  ── b-side reduction:  in_TM(emb(b_gens,uw)) ⟹ a reduced form with H₀ ∩ b-residue coords. ──
+//  The asymmetric-moduli analog of lemma_emb_a_reduced: gets the residue factorization from the
+//  accumulator (bypassing single-modulus ii_subset), drops trailing powers via gexp=0 (forced by
+//  in_TM), then runs the generic reduction core.
+#[verifier::rlimit(300)]
+pub proof fn lemma_emb_b_reduced(mm: ModMachine, qi: nat, uw: Word) -> (red: Seq<CanonLetter>)
+    requires
+        mod_machine_wf(mm),
+        qi < mm.quads.len(),
+        word_valid(uw, 3),
+        in_TM(mm, apply_embedding(hnn_b_gens(quad_data(mm, qi)), uw)),
+    ensures
+        canw_reduced(red),
+        equiv_in_presentation(base_A(), canw_eval(red),
+            apply_embedding(hnn_b_gens(quad_data(mm, qi)), uw)),
+        forall|i: int| 0 <= i < red.len() ==> {
+            &&& (#[trigger] red[i]).r >= 0
+            &&& red[i].s >= 0
+            &&& mm_in_H0(mm, red[i].r as nat, red[i].s as nat)
+            &&& (red[i].r - b_aa(mm.quads[qi as int]) as int) % (b_mr(mm.quads[qi as int], mm.m) as int) == 0
+            &&& (red[i].s - b_bb(mm.quads[qi as int]) as int) % (b_ms(mm.quads[qi as int], mm.m) as int) == 0
+        },
+{
+    let p = base_A();
+    lemma_base_A_valid();
+    let q = mm.quads[qi as int];
+    let m = mm.m;
+    let bg = hnn_b_gens(quad_data(mm, qi));
+    let g = apply_embedding(bg, uw);
+    let aa = b_aa(q);
+    let bb = b_bb(q);
+    let mr = b_mr(q, m);
+    let ms = b_ms(q, m);
+    let mri = mr as int;
+    let msi = ms as int;
+    assert(m > 1);
+    assert(mr > 0 && ms > 0) by {
+        match q.dir {
+            Dir::R => { assert(mr == m * m && ms == 1); assert(m * m > 0) by (nonlinear_arith) requires m > 1; }
+            Dir::L => { assert(mr == 1 && ms == m * m); assert(m * m > 0) by (nonlinear_arith) requires m > 1; }
+        }
+    }
+    //  word_valid(g, 3)
+    lemma_quad_associations_valid(q, m, 3);
+    assert(forall|i: int| 0 <= i < bg.len() ==> word_valid(#[trigger] bg[i], 3)) by {
+        assert forall|i: int| 0 <= i < bg.len() implies word_valid(#[trigger] bg[i], 3) by {
+            assert(bg[i] == quad_associations(q, m)[i].1);
+        }
+    }
+    lemma_apply_embedding_valid(bg, uw, 3);
+    //  bg == acc_gens(aa,bb,mr,ms)
+    lemma_quad_b_gens_form(mm, qi);
+    assert(bg =~= acc_gens(aa, bb, mr, ms));
+    assert(apply_embedding(acc_gens(aa, bb, mr, ms), uw) == g);
+    //  accumulator factorization
+    let factors = lemma_accumulator_inv(aa, bb, mr, ms, uw);
+    let chi1 = gexp(1, uw);
+    let chi2 = gexp(2, uw);
+    let rhs = concat_all(factors) + signed_power(1, mri * chi1) + signed_power(2, msi * chi2);
+    assert(equiv_in_presentation(p, g, rhs));
+    //  --- gexp(i, uw) = 0 (forced by in_TM) ---
+    lemma_gexp_residue_concat_zero(1, factors, aa, bb, mr, ms);
+    lemma_gexp_residue_concat_zero(2, factors, aa, bb, mr, ms);
+    //  gexp(1, rhs) = mri·chi1
+    lemma_gexp_concat(1, concat_all(factors) + signed_power(1, mri * chi1), signed_power(2, msi * chi2));
+    lemma_gexp_concat(1, concat_all(factors), signed_power(1, mri * chi1));
+    lemma_gexp_signed_power(1, 1, mri * chi1);
+    lemma_gexp_signed_power(2, 1, msi * chi2);
+    assert(gexp(1, rhs) == mri * chi1);
+    //  gexp(2, rhs) = msi·chi2
+    lemma_gexp_concat(2, concat_all(factors) + signed_power(1, mri * chi1), signed_power(2, msi * chi2));
+    lemma_gexp_concat(2, concat_all(factors), signed_power(1, mri * chi1));
+    lemma_gexp_signed_power(1, 2, mri * chi1);
+    lemma_gexp_signed_power(2, 2, msi * chi2);
+    assert(gexp(2, rhs) == msi * chi2);
+    //  gexp preserved by ≡_A; in_TM ⟹ gexp(g)=0
+    lemma_equiv_in_A_preserves_gexp(1, g, rhs);
+    lemma_equiv_in_A_preserves_gexp(2, g, rhs);
+    lemma_in_TM_gexp_zero(mm, g, 1);
+    lemma_in_TM_gexp_zero(mm, g, 2);
+    assert(mri * chi1 == 0 && msi * chi2 == 0);
+    assert(chi1 == 0) by (nonlinear_arith) requires mri > 0, mri * chi1 == 0;
+    assert(chi2 == 0) by (nonlinear_arith) requires msi > 0, msi * chi2 == 0;
+    //  --- powers vanish:  rhs =~= concat_all(factors) ---
+    assert(signed_power(1, mri * chi1) =~= empty_word());
+    assert(signed_power(2, msi * chi2) =~= empty_word());
+    assert(rhs =~= concat_all(factors));
+    //  convert factors → qa (residue coords), with concat_all(factors) =~= canw_eval(qa)
+    let qa = lemma_accgens_to_canon(aa, bb, mr, ms, factors);
+    //  canw_eval(qa) ≡_A g
+    assert(rhs =~= canw_eval(qa));
+    lemma_equiv_symmetric(p, g, rhs);                    //  rhs ≡ g  (g valid)
+    assert(equiv_in_presentation(p, canw_eval(qa), g));
+    //  --- generic reduction core ---
+    lemma_in_TM_canon_reduced(mm, g, qa);
+    let red = cw_reduce(qa);
+    //  residue: coord_in(qa, red[i]) + qa residue
+    assert forall|i: int| 0 <= i < red.len() implies {
+        &&& (#[trigger] red[i]).r >= 0
+        &&& red[i].s >= 0
+        &&& mm_in_H0(mm, red[i].r as nat, red[i].s as nat)
+        &&& (red[i].r - aa as int) % mri == 0
+        &&& (red[i].s - bb as int) % msi == 0
+    } by {
+        assert(coord_in(qa, red[i].r, red[i].s));
+        let j = choose|j: int| 0 <= j < qa.len() && qa[j].r == red[i].r && qa[j].s == red[i].s;
+        assert(0 <= j < qa.len() && qa[j].r == red[i].r && qa[j].s == red[i].s);
+        assert((qa[j].r - aa as int) % mri == 0 && (qa[j].s - bb as int) % msi == 0);
+    }
+    red
 }
 
 } //  verus!
