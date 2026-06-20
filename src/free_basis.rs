@@ -947,4 +947,124 @@ pub proof fn lemma_config_emb_free(mm: ModMachine, alphas: Seq<nat>, w: Word)
     lemma_w_canon_free(alphas, w);
 }
 
+// ============================================================================
+// THE FREE-BASIS LEMMA — `{ t_α w_α(b) d : α∈I }` freely generates in H₁.
+//
+// Cohen p.279: "Mapping H₁ → K_M … and Cor 1 to Prop 1.8". We instantiate the
+// abstract engine (Phase 1) at φ = `kill_hom`, with `basis_emb` the candidate
+// basis and its φ-image the config family `config_emb`. F2 (config freeness)
+// supplies the target-side freeness; the engine pulls it back to H₁. The
+// reconstruction direction (`lemma_free_to_basis_elt`, via F3) and the symmetric
+// config reconstruction together give the iso `⟨t_α⟩ ≅ free ≅ ⟨t_α w_α(b) d⟩`
+// that the H₂ HNN validity / brick-5 faithfulness consume.
+// ============================================================================
+
+/// The candidate free basis as an embedding: index `i ↦ basis_elt(α_i) = t_{α_i} w_{α_i}(b) d`.
+pub open spec fn basis_emb(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>) -> Seq<Word> {
+    Seq::new(alphas.len(), |i: int| basis_elt(mm, n, m, alphas[i]))
+}
+
+/// `basis_elt(α)` is valid over H₁'s generators.
+pub proof fn lemma_basis_elt_valid(mm: ModMachine, n: nat, m: nat, alpha: nat)
+    requires numbers_word(n, m, alpha), 2 * n < m,
+    ensures word_valid(basis_elt(mm, n, m, alpha), h1_num_gens(g_m(mm).num_generators, n)),
+{
+    let nk = g_m(mm).num_generators;
+    let ng = h1_num_gens(nk, n);
+    lemma_g_m_num_generators(mm);   // nk = 4 + |quads| ≥ 4 > 3
+    let tw = config_word(alpha, 0);
+    let wb = h_w_b(nk, n, m, alpha);
+    let dw: Word = seq![Symbol::Gen(d_idx(nk, n))];
+    lemma_config_word_valid(alpha, 0);
+    lemma_word_valid_mono(tw, 3, ng);
+    lemma_h_w_b_valid(nk, n, m, alpha, ng);
+    assert(word_valid(dw, ng)) by {
+        assert forall|q: int| 0 <= q < dw.len() implies symbol_valid(#[trigger] dw[q], ng) by {
+            assert(dw[0] == Symbol::Gen(d_idx(nk, n)));
+        }
+    }
+    lemma_concat_word_valid(tw, wb, ng);
+    lemma_concat_word_valid(tw + wb, dw, ng);
+    assert(basis_elt(mm, n, m, alpha) == tw + wb + dw);
+}
+
+/// The φ-image of the basis embedding IS the config family: `φ ∘ basis_emb = config_emb`.
+pub proof fn lemma_comp_is_config_emb(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>)
+    requires
+        2 * n < m,
+        forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, alphas[i]),
+    ensures
+        comp_images(kill_hom(mm, n), basis_emb(mm, n, m, alphas)) =~= config_emb(alphas),
+{
+    let h = kill_hom(mm, n);
+    let be = basis_emb(mm, n, m, alphas);
+    let comp = comp_images(h, be);
+    let ce = config_emb(alphas);
+    assert forall|i: int| 0 <= i < alphas.len() implies comp[i] =~= ce[i] by {
+        assert(comp[i] == apply_hom(h, be[i]));
+        assert(be[i] == basis_elt(mm, n, m, alphas[i]));
+        lemma_kill_on_basis_elt(mm, n, m, alphas[i]);
+        assert(ce[i] == config_word(alphas[i], 0));
+    }
+}
+
+/// **FREE BASIS (ε-form).** For DISTINCT `alphas` each numbering a word, the family
+/// `{ basis_elt(α_i) }` is free in H₁: a product trivial in H₁ comes from a freely
+/// trivial `w`. (Pullback engine at `kill_hom`, then F2 on the config image.)
+pub proof fn lemma_basis_elt_free(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, w: Word)
+    requires
+        mod_machine_wf(mm),
+        2 * n < m,
+        alphas.no_duplicates(),
+        forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, alphas[i]),
+        word_valid(w, alphas.len()),
+        equiv_in_presentation(h1_base(mm, n),
+            apply_embedding(basis_emb(mm, n, m, alphas), w), empty_word()),
+    ensures
+        equiv_in_presentation(free_group(alphas.len()), w, empty_word()),
+{
+    let h = kill_hom(mm, n);
+    let be = basis_emb(mm, n, m, alphas);
+    let nk = g_m(mm).num_generators;
+    lemma_kill_hom_valid(mm, n);
+    assert(h.source == h1_base(mm, n) && h.target == g_m(mm));
+    assert(h.source.num_generators == h1_num_gens(nk, n));
+    assert forall|i: int| 0 <= i < be.len() implies
+        word_valid(#[trigger] be[i], h.source.num_generators) by {
+        assert(be[i] == basis_elt(mm, n, m, alphas[i]));
+        lemma_basis_elt_valid(mm, n, m, alphas[i]);
+    }
+    // engine: equiv(g_m, apply_embedding(φ∘basis_emb, w), ε)
+    lemma_pullback_free(h, be, w);
+    lemma_comp_is_config_emb(mm, n, m, alphas);
+    assert(apply_embedding(comp_images(h, be), w) =~= apply_embedding(config_emb(alphas), w));
+    // F2: config family free ⟹ w ≡_free ε.
+    lemma_config_emb_free(mm, alphas, w);
+}
+
+/// **FREE BASIS (reconstruction).** A freely-trivial `w` gives a trivial basis product
+/// in H₁ — the converse of `lemma_basis_elt_free`. Together they say `φ` restricts to
+/// an isomorphism `⟨basis_elt(α)⟩ ≅ ⟨t_α⟩` (both free on matched bases). Via F3.
+pub proof fn lemma_free_to_basis_elt(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, w: Word)
+    requires
+        2 * n < m,
+        forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, alphas[i]),
+        word_valid(w, alphas.len()),
+        equiv_in_presentation(free_group(alphas.len()), w, empty_word()),
+    ensures
+        equiv_in_presentation(h1_base(mm, n),
+            apply_embedding(basis_emb(mm, n, m, alphas), w), empty_word()),
+{
+    let be = basis_emb(mm, n, m, alphas);
+    let nk = g_m(mm).num_generators;
+    lemma_h1_base_valid(mm, n);
+    assert(h1_base(mm, n).num_generators == h1_num_gens(nk, n));
+    assert forall|i: int| 0 <= i < be.len() implies
+        word_valid(#[trigger] be[i], h1_base(mm, n).num_generators) by {
+        assert(be[i] == basis_elt(mm, n, m, alphas[i]));
+        lemma_basis_elt_valid(mm, n, m, alphas[i]);
+    }
+    lemma_free_to_embedding(be, h1_base(mm, n), w);
+}
+
 } // verus!
