@@ -1687,6 +1687,139 @@ pub proof fn lemma_k_commutes_t_alpha(mm: ModMachine, n: nat, m: nat, alpha: nat
     lemma_commutes_respects_equiv_right(p, kw, concat_all(factors), config_word(alpha, 0));
 }
 
+/// `k` commutes with `d`.
+pub proof fn lemma_k_commutes_d(mm: ModMachine, n: nat, m: nat)
+    ensures
+        commutes(h3_pres(mm, n, m), seq![Symbol::Gen(k_top(g_m(mm).num_generators, n))],
+            seq![Symbol::Gen(d_idx(g_m(mm).num_generators, n))]),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    lemma_h3_num_generators(mm, n, m);
+    let ng = h3_num_gens(nk, n);
+    let up = psi_ublock(mm);
+    let dpair: Seq<(Word, Word)> = seq![(seq![Symbol::Gen(d_idx(nk, n))], seq![Symbol::Gen(d_idx(nk, n))])];
+    let bc = psi_bcblock(nk, n);
+    let ppair: Seq<(Word, Word)> = seq![(seq![Symbol::Gen(p_idx(nk, n))], seq![Symbol::Gen(p_idx(nk, n))])];
+    let nu = g_subgens(mm).len();
+    assert(up.len() == nu);
+    assert(psi_assoc(mm, n) =~= ((up + dpair) + bc) + ppair);
+    let idx: int = nu as int;
+    assert(((up + dpair) + bc)[idx] == (up + dpair)[idx]);
+    assert((up + dpair)[idx] == dpair[idx - nu]);
+    assert(psi_assoc(mm, n)[idx] == dpair[0]);
+    let xw: Word = seq![Symbol::Gen(d_idx(nk, n))];
+    assert(d_idx(nk, n) < ng);
+    assert(word_valid(xw, ng)) by { assert(xw[0] == Symbol::Gen(d_idx(nk, n))); }
+    assert(0 <= idx < psi_assoc(mm, n).len());
+    lemma_k_commutes_diag(mm, n, m, idx, xw);
+}
+
+/// `k` commutes with `p`.
+pub proof fn lemma_k_commutes_p(mm: ModMachine, n: nat, m: nat)
+    ensures
+        commutes(h3_pres(mm, n, m), seq![Symbol::Gen(k_top(g_m(mm).num_generators, n))],
+            seq![Symbol::Gen(p_idx(g_m(mm).num_generators, n))]),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    lemma_h3_num_generators(mm, n, m);
+    let ng = h3_num_gens(nk, n);
+    let up = psi_ublock(mm);
+    let dpair: Seq<(Word, Word)> = seq![(seq![Symbol::Gen(d_idx(nk, n))], seq![Symbol::Gen(d_idx(nk, n))])];
+    let bc = psi_bcblock(nk, n);
+    let ppair: Seq<(Word, Word)> = seq![(seq![Symbol::Gen(p_idx(nk, n))], seq![Symbol::Gen(p_idx(nk, n))])];
+    let nu = g_subgens(mm).len();
+    assert(up.len() == nu);
+    assert(bc.len() == n);
+    assert(psi_assoc(mm, n) =~= ((up + dpair) + bc) + ppair);
+    let idx: int = (nu + 1 + n) as int;
+    assert(((up + dpair) + bc).len() == nu + 1 + n);
+    assert((((up + dpair) + bc) + ppair)[idx] == ppair[idx - (nu + 1 + n)]);
+    assert(psi_assoc(mm, n)[idx] == ppair[0]);
+    let xw: Word = seq![Symbol::Gen(p_idx(nk, n))];
+    assert(p_idx(nk, n) < ng);
+    assert(word_valid(xw, ng)) by { assert(xw[0] == Symbol::Gen(p_idx(nk, n))); }
+    assert(0 <= idx < psi_assoc(mm, n).len());
+    lemma_k_commutes_diag(mm, n, m, idx, xw);
+}
+
+/// Conjugating a word `V` by a commuting single-letter `g`: `g⁻¹ · V · g ≡ V`.
+pub proof fn lemma_conj_of_commuting(p: Presentation, g: Symbol, gi: Symbol, vv: Word)
+    requires
+        is_inverse_pair(g, gi),
+        presentation_valid(p),
+        symbol_valid(g, p.num_generators),
+        word_valid(vv, p.num_generators),
+        commutes(p, seq![g], vv),
+    ensures equiv_in_presentation(p, seq![gi] + vv + seq![g], vv),
+{
+    let ng = p.num_generators;
+    lemma_inverse_preserves_index(g);
+    assert(symbol_valid(gi, ng));
+    // [g]·V ≡ V·[g]  (commutes)
+    lemma_equiv_concat_right(p, seq![gi], seq![g] + vv, vv + seq![g]);   // [gi]([g]V) ≡ [gi](V[g])
+    lemma_cancel_pair_equiv_empty(p, gi, g);                            // [gi,g] ≡ ε
+    lemma_equiv_concat_left(p, seq![gi, g], empty_word(), vv);          // [gi,g]·V ≡ ε·V
+    assert(seq![gi] + (seq![g] + vv) =~= seq![gi, g] + vv);
+    assert(empty_word() + vv =~= vv);
+    assert(equiv_in_presentation(p, seq![gi] + (seq![g] + vv), vv));    // [gi][g]V ≡ V
+    // [gi](V[g]) ≡ [gi][g]V ≡ V ; and [gi](V[g]) =~= [gi]V[g]
+    assert(word_valid(seq![gi], ng)) by { assert(seq![gi][0] == gi); }
+    assert(word_valid(seq![g], ng)) by { assert(seq![g][0] == g); }
+    lemma_concat_word_valid(seq![g], vv, ng);
+    lemma_concat_word_valid(seq![gi], seq![g] + vv, ng);
+    // E_b: [gi]([g]V) ≡ [gi](V[g])  (concat_right above);  symmetrize, then chain with [gi][g]V ≡ V.
+    lemma_equiv_symmetric(p, seq![gi] + (seq![g] + vv), seq![gi] + (vv + seq![g]));
+    lemma_equiv_transitive(p, seq![gi] + (vv + seq![g]), seq![gi] + (seq![g] + vv), vv);
+    assert(seq![gi] + (vv + seq![g]) =~= seq![gi] + vv + seq![g]);
+}
+
+/// **Two-sided cancellation.** `X·Z ≡ (X·Y)·Z ⟹ Y ≡ ε`.
+pub proof fn lemma_cancel_both_sides(p: Presentation, xx: Word, yy: Word, zz: Word)
+    requires
+        presentation_valid(p),
+        word_valid(xx, p.num_generators),
+        word_valid(yy, p.num_generators),
+        word_valid(zz, p.num_generators),
+        equiv_in_presentation(p, xx + zz, (xx + yy) + zz),
+    ensures equiv_in_presentation(p, yy, empty_word()),
+{
+    let ng = p.num_generators;
+    let xi = inverse_word(xx);
+    let zi = inverse_word(zz);
+    lemma_inverse_word_valid(xx, ng);
+    lemma_inverse_word_valid(zz, ng);
+    // left-cancel X:  Z ≡ Y·Z
+    lemma_equiv_concat_right(p, xi, xx + zz, (xx + yy) + zz);   // xi·(X·Z) ≡ xi·((X·Y)·Z)
+    lemma_word_inverse_left(p, xx);                            // xi·X ≡ ε
+    lemma_equiv_concat_left(p, xi + xx, empty_word(), zz);     // (xi·X)·Z ≡ ε·Z
+    lemma_equiv_concat_left(p, xi + xx, empty_word(), yy + zz);// (xi·X)·(Y·Z) ≡ ε·(Y·Z)
+    assert(xi + (xx + zz) =~= (xi + xx) + zz);
+    assert(empty_word() + zz =~= zz);
+    assert(xi + ((xx + yy) + zz) =~= (xi + xx) + (yy + zz));
+    assert(empty_word() + (yy + zz) =~= yy + zz);
+    assert(equiv_in_presentation(p, xi + (xx + zz), zz));      // xi·(X·Z) ≡ Z  (F1)
+    lemma_concat_word_valid(xx, zz, ng);
+    lemma_concat_word_valid(xi, xx + zz, ng);
+    lemma_equiv_symmetric(p, xi + (xx + zz), zz);              // Z ≡ xi·(X·Z)
+    lemma_equiv_transitive(p, zz, xi + (xx + zz), xi + ((xx + yy) + zz));   // Z ≡ xi·((X·Y)·Z)
+    lemma_equiv_transitive(p, zz, xi + ((xx + yy) + zz), yy + zz);          // Z ≡ Y·Z
+    // right-cancel Z:  ε ≡ Y
+    lemma_equiv_concat_left(p, zz, yy + zz, zi);              // Z·zi ≡ (Y·Z)·zi
+    lemma_word_inverse_right(p, zz);                         // Z·zi ≡ ε
+    assert((yy + zz) + zi =~= yy + (zz + zi));
+    lemma_equiv_concat_right(p, yy, zz + zi, empty_word());   // Y·(Z·zi) ≡ Y·ε
+    assert(yy + empty_word() =~= yy);
+    assert(equiv_in_presentation(p, (yy + zz) + zi, yy));     // (Y·Z)·zi ≡ Y
+    lemma_concat_word_valid(zz, zi, ng);
+    lemma_equiv_symmetric(p, zz + zi, empty_word());          // ε ≡ Z·zi
+    lemma_equiv_transitive(p, empty_word(), zz + zi, (yy + zz) + zi);   // ε ≡ (Y·Z)·zi
+    lemma_equiv_transitive(p, empty_word(), (yy + zz) + zi, yy);        // ε ≡ Y
+    lemma_concat_word_valid(yy, zz, ng);
+    lemma_equiv_symmetric(p, empty_word(), yy);              // Y ≡ ε
+}
+
 /// **Stage A — `k⁻¹ · w_α(b) · k ≡ w_α(bc)`** in `h3_pres`, by induction on α's digits
 /// (`lemma_conj_distributes` + per-letter `lemma_k_conj_b_letter`).
 pub proof fn lemma_k_conj_wb(mm: ModMachine, n: nat, m: nat, alpha: nat)
