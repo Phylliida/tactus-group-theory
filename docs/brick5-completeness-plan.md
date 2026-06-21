@@ -77,6 +77,45 @@ a stylistic choice.
 (The same analysis shows the φ_i / a_i levels *are* fine to Britton-peel directly — they only touch
 `t,x,d,b_j` and use the residue facts; the c-entanglement is purely at the k-level.)
 
+### 2.3 ARCHITECTURAL LANDMINE: `lemma_property_ii` requires the iso it cannot get at k-level
+
+The `kp_pinch` engine's headline `lemma_property_ii(data, in_k, g)` has, among its `requires`, the
+hard precondition **`hnn_associations_isomorphic(data)`**. For `data = psi_data` this is the iso of
+§2.2 — over the base `h3_upto(2n)`, where it is **false**. No `in_k` predicate can repair a false
+statement about a literal base presentation. So **the engine cannot be instantiated at the k-level as
+written** — the brick5-plan's "Route A = instantiate `lemma_property_ii`" is blocked by exactly the
+non-iso fact. (In Layer-1 the engine was used where the iso *did* hold — the `b_m`/T(M) tower.)
+
+The deeper reason: under Approach-(b) our `h3_pres` carries only finite set (I); II/III hold in it
+only as *derived consequences* (soundness). As a **group**, `h3_pres` therefore equals Cohen's H₃
+(all his relations are consequences), and there the iso `A₊≅A₋` holds. But the iso the engine checks
+is about the *base presentation* `h3_upto(2n)` (free c's), not the group `h3_pres` — and at the base,
+before climbing into the k-HNN that resolves the c's, the iso genuinely fails. The standard Britton
+engine wants a base that *already* has the iso; our finite-(I) base does not.
+
+**The fork (a real architecture decision — resolve before building C4):**
+- **Fork A — predicate-relator "with-S" base.** Make the k-level base be `h3_upto(2n)` *plus S* so the
+  iso holds there. `S` infinite ⟹ need (i) a **predicate-relator presentation** notion (relators as a
+  `spec_fn(Word)->bool`, not a `Seq`), (ii) a predicate version of `hnn_associations_isomorphic`, and
+  (iii) a predicate version of `lemma_property_ii`/Britton over it. Large new infra, but each piece is
+  a clean generalization of an existing finite one (`quotient.rs add_relators`, `hnn.rs`, `kp_pinch`).
+- **Fork B — bespoke non-iso k-engine (Route B).** A Britton/pinch variant **not** gated on the global
+  iso: decode each k-pinch of `w_α(c)=1` locally, each pinch licensed by the `S`-predicate (the
+  "Pinch-to-Membership" idea), bottoming at `lemma_theorem1`. Avoids predicate-relator presentations
+  but needs a new pinch-decode lemma the generic engine doesn't provide.
+
+Both bottom out at the same circularity-breaker (`lemma_theorem1`).
+
+**DECISION (2026-06-21, w/ Danielle): Fork B.** Fork A is an architectural trap — making the base use
+predicate-relators triggers a cascade of refactoring across every lemma that assumes a concrete finite
+presentation (`hnn`, `britton_via_tower`, `quotient`, the whole tower). Fork B is the surgical strike:
+decode the k-pinch locally via the `S`-predicate, replacing the *structural* iso requirement with a
+*membership* proof, bottoming at `lemma_theorem1`. Danielle's "third way" — a lifting lemma letting
+`lemma_property_ii` accept a **virtual isomorphism** (iso provable in the *group* `h3_pres` even though
+it fails in the base presentation `h3_upto(2n)`) — is the useful conceptual framing of Fork B: the
+new engine takes "iso-holds-in-the-quotient" (a per-pinch membership fact, discharged by soundness +
+`lemma_theorem1`) where the old one took `hnn_associations_isomorphic`.
+
 ---
 
 ## 3. Cohen's faithfulness design (p.280–281) — the math we are formalizing
@@ -122,11 +161,21 @@ Bottom-up. Each brick names the existing infra it reduces to.
   `h3_upto(l-1)` (the φ_l associations only touch t,x,d,b_j,p — no c — so the iso may hold literally;
   CHECK whether the residue facts give it without S). If it holds literally, C3 is *not* blocked on
   the predicate engine.
-- **C4 — k-level via the `kp_pinch` predicate engine (THE crux).** Instantiate `lemma_property_ii`
-  with `data = psi_data`, `in_k = in_C` (the §C1 predicate, "trivial in C"). Discharge the five
-  hypotheses: `in_k(ε)`, H_mul, H_resp, H_ab, H_ba — where H_ab/H_ba (φ-compatibility) reduce to the
-  A₊≅A₋ design (§3), bottoming out at `lemma_theorem1`. This mirrors the Layer-1 (vi) instantiation
-  (`tower_peel.rs` 21/0) in size and shape.
+- **C4 — k-level decode via a NON-ISO pinch engine (THE crux; Fork B, see §2.3).** **Cannot** call
+  `lemma_property_ii` (its `hnn_associations_isomorphic(psi_data)` precondition is false, §2.2/§2.3).
+  Instead build a **"virtual-iso" pinch-decode**: a variant of the `kp_pinch` machinery whose iso
+  input is replaced by a per-pinch **membership** obligation discharged from the `S`-predicate
+  (`in_C`) + soundness + `lemma_theorem1`. Mechanically reuse as much of `kp_pinch.rs` as possible
+  (`lemma_kp_phi_fwd/rev`, the pinch-elimination recursion) — those parts already take the φ-compat
+  (H_ab/H_ba) as *predicate* hypotheses, NOT the global iso. The iso is consumed at exactly **two
+  spots** — inside `lemma_kp_property_ii_core` (`kp_pinch.rs`), the calls `britton_lemma_full(data,
+  wgi)` (~line 1166) and `britton_lemma_unconditional(data, wgi)` (~line 1200), i.e. the
+  "`W·g⁻¹≡ε` ∧ no-pinch ⟹ no-stable-letter, then descend to base" Britton-decode half. **Fork B's
+  surgical target = replace those two calls with non-iso variants** whose missing iso is supplied by a
+  per-pinch membership obligation (virtual iso) from `in_C` + soundness + `lemma_theorem1`. Everything
+  else in `kp_pinch.rs` (the `lemma_kp_phi_fwd/rev` conjugation surgery, the pinch-elimination
+  recursion, the KPWord folding) is already iso-free and reusable verbatim. Size: a `tower_peel`-scale
+  arc plus the two new non-iso Britton variants.
 
   **Framing correction (important).** `w_α(c)` is a **base word** of the k-HNN — pure c-generators,
   all at indices `< k_top`, no `k`. So completeness is **NOT** "Britton-peel `w_α(c)` down to the
@@ -151,10 +200,18 @@ Bottom-up. Each brick names the existing infra it reduces to.
 ## 5. Honest scope
 
 This is a **multi-session arc**, comparable in size to all of E2 (the `ii_subset`/`kp_pinch`/
-`tower_peel`/`prop_v` cluster). C4 alone is a `tower_peel`-sized instantiation. No `assume`/`admit`/
-`external_body` (standing rule). Sequence: C0 (now) → C1 (predicate + statement) → C3 (check if φ_i
-iso holds literally) → C2 (package free basis) → C4 (the engine) → C5 (assembly).
+`tower_peel`/`prop_v` cluster), and **harder than the brick5-plan routing suggested** — the generic
+engine does not apply at the k-level (§2.3), so C4 is **Fork B**: build the two non-iso Britton
+variants + thread them through a virtual-iso `kp_property_ii_core`. No `assume`/`admit`/`external_body`
+(standing rule). Sequence: **C0 DONE** → C1 (the `in_C` predicate + faithfulness theorem statement) →
+C3 (check whether φ_i iso holds *literally* at `h3_upto(l-1)` — likely yes, no c's — so a_i levels may
+use the existing `britton_lemma_unconditional` directly) → C2 (package the `free_basis.rs` p-level
+recognition) → C4 (the Fork-B non-iso k-engine — the crux) → C5 (assembly + free-product projection).
 
-The single most valuable next concrete step after C0 is **C1**: pin down the `in_C` predicate and the
-exact faithfulness theorem statement, so C2–C5 have a fixed target. Get that signature right before
-proving anything downstream.
+**Most valuable next concrete step after C0 = C1:** pin down `in_C: spec_fn(Word)->bool` ("trivial in
+`C=⟨c;S⟩`", i.e. `∈ ncl(S)`; mirror `quotient.rs`'s finite `add_relators`/normal-closure-conjugate
+lemmas but predicate-valued over the `S`-predicate) and the exact faithfulness theorem signature, so
+C2–C5 have a fixed target. Shape `in_C` to satisfy the engine's `in_k` hypotheses by construction
+(`in_C(ε)`, H_mul, H_resp are structural; H_ab/H_ba are the deep §3 content for C4). Get this
+signature right *before* proving anything downstream. The easy closure props (`in_C(ε)`, H_mul,
+H_resp) are a safe first verifiable down-payment on C1.
