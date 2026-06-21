@@ -1287,4 +1287,94 @@ pub proof fn lemma_II(mm: ModMachine, n: nat, m: nat, alpha: nat)
     assert(lhs =~= pgi + cfg + pg);
 }
 
+/// Equivalence respects word inverse: `a ≡ b ⟹ a⁻¹ ≡ b⁻¹`.
+pub proof fn lemma_equiv_inverse(p: Presentation, a: Word, b: Word)
+    requires
+        presentation_valid(p),
+        word_valid(a, p.num_generators),
+        word_valid(b, p.num_generators),
+        equiv_in_presentation(p, a, b),
+    ensures equiv_in_presentation(p, inverse_word(a), inverse_word(b)),
+{
+    let ng = p.num_generators;
+    let ai = inverse_word(a);
+    let bi = inverse_word(b);
+    lemma_inverse_word_valid(a, ng);
+    lemma_inverse_word_valid(b, ng);
+    // ai·b ≡ ai·a ≡ ε
+    lemma_equiv_symmetric(p, a, b);                       // b ≡ a
+    lemma_equiv_concat_right(p, ai, b, a);                // ai·b ≡ ai·a
+    lemma_word_inverse_left(p, a);                        // ai·a ≡ ε
+    lemma_equiv_transitive(p, ai + b, ai + a, empty_word());   // ai·b ≡ ε
+    // ai ≡ ai·(b·bi) =~= (ai·b)·bi ≡ ε·bi =~= bi
+    lemma_word_inverse_right(p, b);                       // b·bi ≡ ε
+    lemma_equiv_symmetric(p, b + bi, empty_word());       // ε ≡ b·bi
+    lemma_equiv_concat_right(p, ai, empty_word(), b + bi);     // ai·ε ≡ ai·(b·bi)
+    assert(ai + empty_word() =~= ai);
+    assert(equiv_in_presentation(p, ai, ai + (b + bi)));
+    lemma_equiv_concat_left(p, ai + b, empty_word(), bi);      // (ai·b)·bi ≡ ε·bi
+    assert(empty_word() + bi =~= bi);
+    assert(ai + (b + bi) =~= (ai + b) + bi);
+    assert(equiv_in_presentation(p, ai + (b + bi), bi));
+    lemma_equiv_transitive(p, ai, ai + (b + bi), bi);
+}
+
+// ----------------------------------------------------------------------------
+// Sub-brick 5 — (III):  (α,0)∈H₀(M)  ⟹  w_α(c) ≡ 1  in H₃   (THE HEADLINE).
+// k-conjugation is DIRECT in h3_pres = hnn_presentation(psi_data).
+// ----------------------------------------------------------------------------
+
+/// `k⁻¹ · b_j · k ≡ b_j c_j` in `h3_pres` (ψ bc-block, 1 ≤ j ≤ n).
+pub proof fn lemma_psi_bcblock_conj(mm: ModMachine, n: nat, m: nat, j: nat)
+    requires 1 <= j <= n,
+    ensures
+        equiv_in_presentation(h3_pres(mm, n, m),
+            seq![Symbol::Inv(k_top(g_m(mm).num_generators, n))]
+                + seq![Symbol::Gen(b_idx(g_m(mm).num_generators, n, j))]
+                + seq![Symbol::Gen(k_top(g_m(mm).num_generators, n))],
+            seq![Symbol::Gen(b_idx(g_m(mm).num_generators, n, j)),
+                 Symbol::Gen(c_idx(g_m(mm).num_generators, j))]),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let base = h3_upto(mm, n, m, (2 * n) as nat);
+    let data = HNNData { base, associations: psi_assoc(mm, n) };
+    assert(h3_pres(mm, n, m) == hnn_presentation(data));
+    lemma_h3_upto_valid(mm, n, m, (2 * n) as nat);
+    lemma_h3_upto_num_generators(mm, n, m, (2 * n) as nat);     // base.num = nk+4n+2
+    assert(base.num_generators >= nk + 2 * n + 2);
+    lemma_psi_assoc_valid(mm, n, base.num_generators);
+    lemma_hnn_data_valid_from(data, base.num_generators);
+
+    // index nu+j into psi_assoc = ublock ++ [d] ++ bcblock ++ [p]
+    let up = psi_ublock(mm);
+    let dpair: Seq<(Word, Word)> = seq![(seq![Symbol::Gen(d_idx(nk, n))], seq![Symbol::Gen(d_idx(nk, n))])];
+    let bc = psi_bcblock(nk, n);
+    let ppair: Seq<(Word, Word)> = seq![(seq![Symbol::Gen(p_idx(nk, n))], seq![Symbol::Gen(p_idx(nk, n))])];
+    let nu = g_subgens(mm).len();
+    assert(up.len() == nu);
+    assert(bc.len() == n);
+    assert(psi_assoc(mm, n) =~= ((up + dpair) + bc) + ppair);
+    let idx: int = (nu + j) as int;
+    // peel: idx ∈ [nu+1, nu+n] lands in bc at idx-(nu+1) = j-1
+    assert(((up + dpair) + bc)[idx] == bc[idx - (nu + 1)]);
+    assert(idx - (nu + 1) == (j - 1));
+    assert(psi_assoc(mm, n)[idx] == bc[(j - 1) as int]);
+    let bj = Symbol::Gen(b_idx(nk, n, j));
+    let cj = Symbol::Gen(c_idx(nk, j));
+    assert(bc[(j - 1) as int] == (seq![bj], seq![bj, cj]));
+    assert(psi_assoc(mm, n)[idx].0 == seq![bj]);
+    assert(psi_assoc(mm, n)[idx].1 == seq![bj, cj]);
+
+    lemma_hnn_conjugation(data, idx);
+    let st = stable_letter(data);
+    let si = stable_letter_inv(data);
+    lemma_h3_k_stable_letter(mm, n, m);
+    assert(st == Symbol::Gen(k_top(nk, n)));
+    assert(si == Symbol::Inv(k_top(nk, n)));
+    let lhs = Seq::new(1, |_q: int| si) + data.associations[idx].0 + Seq::new(1, |_q: int| st);
+    assert(lhs =~= seq![Symbol::Inv(k_top(nk, n))] + seq![bj] + seq![Symbol::Gen(k_top(nk, n))]);
+    assert(data.associations[idx].1 =~= seq![bj, cj]);
+}
+
 } // verus!
