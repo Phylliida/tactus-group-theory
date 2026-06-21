@@ -849,4 +849,242 @@ pub proof fn lemma_IIa(mm: ModMachine, n: nat, m: nat, alpha: nat)
     }
 }
 
+// ----------------------------------------------------------------------------
+// (IIb) support — conjugation of φ_d associations by a_d, lifted to H₃.
+// ----------------------------------------------------------------------------
+
+/// Conjugating the `i`-th `φ_d` association by `a_d` gives its image, in `H₃`:
+/// `a_d⁻¹ · φ_assoc[i].0 · a_d ≡ φ_assoc[i].1`. Shared by `lemma_a_conj_d` (i=2, the d-letter)
+/// and the b-commutation (i = 2+j, the b_j block).
+pub proof fn lemma_phi_d_conj_in_h3(mm: ModMachine, n: nat, m: nat, d: nat, i: int)
+    requires 1 <= d <= 2 * n, 0 <= i < n + 4,
+    ensures
+        equiv_in_presentation(h3_pres(mm, n, m),
+            seq![Symbol::Inv(a_idx(g_m(mm).num_generators, n, d))]
+                + phi_assoc(g_m(mm).num_generators, n, m, d)[i].0
+                + seq![Symbol::Gen(a_idx(g_m(mm).num_generators, n, d))],
+            phi_assoc(g_m(mm).num_generators, n, m, d)[i].1),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let base = h3_upto(mm, n, m, (d - 1) as nat);
+    let data = HNNData { base, associations: phi_assoc(nk, n, m, d) };
+    assert(h3_upto(mm, n, m, d) == hnn_presentation(data));
+    lemma_h3_upto_valid(mm, n, m, (d - 1) as nat);
+    lemma_h3_upto_num_generators(mm, n, m, (d - 1) as nat);
+    assert(base.num_generators >= nk + 2 * n + 2);
+    lemma_phi_assoc_valid(nk, n, m, d, base.num_generators);
+    lemma_hnn_data_valid_from(data, base.num_generators);
+    assert(data.associations.len() == n + 4);              // 3 + n + 1
+    lemma_hnn_conjugation(data, i);
+    let st = stable_letter(data);
+    let si = stable_letter_inv(data);
+    lemma_h3_a_stable_letter(mm, n, m, d);
+    assert(st == Symbol::Gen(a_idx(nk, n, d)));
+    assert(si == Symbol::Inv(a_idx(nk, n, d)));
+    let lhs = Seq::new(1, |_j: int| si) + data.associations[i].0 + Seq::new(1, |_j: int| st);
+    assert(lhs =~= seq![Symbol::Inv(a_idx(nk, n, d))] + phi_assoc(nk, n, m, d)[i].0
+        + seq![Symbol::Gen(a_idx(nk, n, d))]);
+    lemma_h3_upto_in_h3(mm, n, m, d, lhs, data.associations[i].1);
+}
+
+/// **a_d conjugates d.** `a_d⁻¹ · d · a_d ≡ b_d · d` in `H₃` (φ_d head[2]; `b_d = alphabet_letter`).
+pub proof fn lemma_a_conj_d(mm: ModMachine, n: nat, m: nat, d: nat)
+    requires 1 <= d <= 2 * n,
+    ensures
+        equiv_in_presentation(h3_pres(mm, n, m),
+            seq![Symbol::Inv(a_idx(g_m(mm).num_generators, n, d))]
+                + seq![Symbol::Gen(d_idx(g_m(mm).num_generators, n))]
+                + seq![Symbol::Gen(a_idx(g_m(mm).num_generators, n, d))],
+            seq![alphabet_letter(b_base(g_m(mm).num_generators, n), n, d),
+                 Symbol::Gen(d_idx(g_m(mm).num_generators, n))]),
+{
+    let nk = g_m(mm).num_generators;
+    // phi_assoc[2] = (d, b_d·d)
+    assert(phi_assoc(nk, n, m, d)[2].0 == seq![Symbol::Gen(d_idx(nk, n))]);
+    assert(phi_assoc(nk, n, m, d)[2].1
+        =~= seq![alphabet_letter(b_base(nk, n), n, d), Symbol::Gen(d_idx(nk, n))]);
+    lemma_phi_d_conj_in_h3(mm, n, m, d, 2);
+}
+
+/// `a_d` commutes with any single b-block symbol (generator index in `[b_base, b_base+n)`).
+pub proof fn lemma_a_commutes_b_symbol(mm: ModMachine, n: nat, m: nat, d: nat, s: Symbol)
+    requires
+        1 <= d <= 2 * n,
+        b_base(g_m(mm).num_generators, n) <= generator_index(s)
+            < b_base(g_m(mm).num_generators, n) + n,
+    ensures
+        commutes(h3_pres(mm, n, m), seq![Symbol::Gen(a_idx(g_m(mm).num_generators, n, d))], seq![s]),
+{
+    let nk = g_m(mm).num_generators;
+    let p = h3_pres(mm, n, m);
+    lemma_h3_pres_valid(mm, n, m);
+    lemma_h3_num_generators(mm, n, m);
+    lemma_g_m_num_generators(mm);
+    let ng = h3_num_gens(nk, n);
+    let bg = generator_index(s);                 // ∈ [b_base, b_base+n)
+    let j = (bg - b_base(nk, n) + 1) as nat;     // ∈ [1, n]
+    assert(1 <= j <= n);
+    assert(b_idx(nk, n, j) == bg);
+    // phi_assoc[2+j] = b_j ↦ b_j
+    let ji: int = 2 + (j as int);
+    assert(phi_assoc(nk, n, m, d)[ji].0 == seq![Symbol::Gen(b_idx(nk, n, j))]);
+    assert(phi_assoc(nk, n, m, d)[ji].1 == seq![Symbol::Gen(b_idx(nk, n, j))]);
+    lemma_phi_d_conj_in_h3(mm, n, m, d, ji);   // a_d⁻¹ b_j a_d ≡ b_j
+    let ad = Symbol::Gen(a_idx(nk, n, d));
+    let adi = Symbol::Inv(a_idx(nk, n, d));
+    let gbj: Word = seq![Symbol::Gen(b_idx(nk, n, j))];
+    assert(a_idx(nk, n, d) < ng);                 // a_idx ≤ nk+4n+1 < nk+4n+3
+    assert(b_idx(nk, n, j) < ng);
+    assert(is_inverse_pair(ad, adi));
+    assert(symbol_valid(ad, ng));
+    assert(word_valid(gbj, ng)) by { assert(gbj[0] == Symbol::Gen(b_idx(nk, n, j))); }
+    assert(equiv_in_presentation(p, seq![adi] + gbj + seq![ad], gbj));
+    lemma_commute_from_conj(p, ad, adi, gbj);     // commutes([ad], [Gen b_j])
+    // s = Gen(bg) or Inv(bg); bg = b_idx(nk,n,j)
+    lemma_inverse_singleton(Symbol::Gen(b_idx(nk, n, j)));
+    assert(gbj =~= Seq::new(1, |_i: int| Symbol::Gen(b_idx(nk, n, j))));
+    assert(inverse_word(gbj) =~= seq![Symbol::Inv(b_idx(nk, n, j))]);
+    match s {
+        Symbol::Gen(g) => { assert(g == bg); assert(seq![s] == gbj); },
+        Symbol::Inv(g) => {
+            assert(g == bg);
+            lemma_commutes_inv_right(p, seq![ad], gbj);   // commutes([ad], [Inv b_j])
+            assert(seq![s] =~= inverse_word(gbj));
+        },
+    }
+}
+
+/// `a_d` commutes with any word all of whose symbols are b-block symbols.
+pub proof fn lemma_a_commutes_b_word(mm: ModMachine, n: nat, m: nat, d: nat, w: Word)
+    requires
+        1 <= d <= 2 * n,
+        forall|k: int| 0 <= k < w.len() ==>
+            b_base(g_m(mm).num_generators, n) <= generator_index(#[trigger] w[k])
+                < b_base(g_m(mm).num_generators, n) + n,
+    ensures
+        commutes(h3_pres(mm, n, m), seq![Symbol::Gen(a_idx(g_m(mm).num_generators, n, d))], w),
+    decreases w.len(),
+{
+    let nk = g_m(mm).num_generators;
+    let p = h3_pres(mm, n, m);
+    let ad_w: Word = seq![Symbol::Gen(a_idx(nk, n, d))];
+    if w.len() == 0 {
+        lemma_commutes_empty_right(p, ad_w);
+        assert(w =~= empty_word());
+    } else {
+        let s = w.first();
+        let rest = w.drop_first();
+        assert(b_base(nk, n) <= generator_index(s) < b_base(nk, n) + n) by { assert(w[0] == s); }
+        lemma_a_commutes_b_symbol(mm, n, m, d, s);
+        assert forall|k: int| 0 <= k < rest.len() implies
+            b_base(nk, n) <= generator_index(#[trigger] rest[k]) < b_base(nk, n) + n by {
+            assert(rest[k] == w[k + 1]);
+        }
+        lemma_a_commutes_b_word(mm, n, m, d, rest);
+        lemma_commutes_concat_right(p, ad_w, seq![s], rest);
+        assert(seq![s] + rest =~= w);
+    }
+}
+
+/// **(IIb).** `w_α(a)⁻¹ · d · w_α(a) ≡ w_α(b) · d` in `h3_pres`, by induction on α's digits.
+/// Step α↦αm+l: conjugate by `a_l`; push `a_l` past the b-word `w_α(b)` (commutes), then
+/// `a_l⁻¹ d a_l ≡ b_l d` (`lemma_a_conj_d`), giving the snoc `w_α(b)·b_l = w_{αm+l}(b)`.
+pub proof fn lemma_IIb(mm: ModMachine, n: nat, m: nat, alpha: nat)
+    requires numbers_word(n, m, alpha), 2 * n < m,
+    ensures
+        equiv_in_presentation(h3_pres(mm, n, m),
+            inverse_word(w_a(g_m(mm).num_generators, n, m, alpha))
+                + seq![Symbol::Gen(d_idx(g_m(mm).num_generators, n))]
+                + w_a(g_m(mm).num_generators, n, m, alpha),
+            w_b(b_base(g_m(mm).num_generators, n), n, m, alpha)
+                + seq![Symbol::Gen(d_idx(g_m(mm).num_generators, n))]),
+    decreases alpha,
+{
+    let nk = g_m(mm).num_generators;
+    let p = h3_pres(mm, n, m);
+    lemma_g_m_num_generators(mm);
+    lemma_h3_num_generators(mm, n, m);
+    lemma_h3_pres_valid(mm, n, m);
+    let ng = h3_num_gens(nk, n);
+    let dl: Word = seq![Symbol::Gen(d_idx(nk, n))];
+    let wa = w_a(nk, n, m, alpha);
+    let wb = w_b(b_base(nk, n), n, m, alpha);
+    if alpha == 0 {
+        assert(wa =~= empty_word());
+        assert(inverse_word(wa) =~= empty_word()) by { lemma_inverse_empty(); }
+        assert(wb =~= empty_word());
+        assert(inverse_word(wa) + dl + wa =~= dl);
+        assert(wb + dl =~= dl);
+        lemma_equiv_refl(p, dl);
+    } else {
+        assert(m > 1);
+        let ap = alpha / m;
+        let d = alpha % m;
+        assert(1 <= d <= 2 * n && numbers_word(n, m, ap));
+        vstd::arithmetic::div_mod::lemma_div_decreases(alpha as int, m as int);
+
+        let ad = Symbol::Gen(a_idx(nk, n, d));
+        let adi = Symbol::Inv(a_idx(nk, n, d));
+        let bl = alphabet_letter(b_base(nk, n), n, d);
+        let wap = w_a(nk, n, m, ap);
+        let wbap = w_b(b_base(nk, n), n, m, ap);
+        let inner = inverse_word(wap) + dl + wap;
+
+        // unfold snocs:  wa = wap·a_d ;  wb = wbap·b_d ;  inverse_word(wa) = a_d⁻¹·wap⁻¹
+        assert(wa =~= wap + seq![ad]);
+        assert(wb =~= wbap + seq![bl]);
+        lemma_inverse_concat(wap, seq![ad]);
+        lemma_inverse_singleton(Symbol::Gen(a_idx(nk, n, d)));
+        assert(seq![ad] =~= Seq::new(1, |_i: int| Symbol::Gen(a_idx(nk, n, d))));
+        assert(inverse_word(seq![ad]) =~= seq![adi]);
+        assert(inverse_word(wa) =~= seq![adi] + inverse_word(wap));
+        assert(inverse_word(wa) + dl + wa =~= seq![adi] + inner + seq![ad]);
+
+        // IH:  inner ≡ wbap·dl
+        lemma_IIb(mm, n, m, ap);
+        assert(equiv_in_presentation(p, inner, wbap + dl));
+
+        // conjugate by a_d:  a_d⁻¹·inner·a_d ≡ a_d⁻¹·(wbap·dl)·a_d
+        lemma_equiv_concat_right(p, seq![adi], inner, wbap + dl);
+        lemma_equiv_concat_left(p, seq![adi] + inner, seq![adi] + (wbap + dl), seq![ad]);
+        let x1 = (seq![adi] + (wbap + dl)) + seq![ad];
+        assert(equiv_in_presentation(p, seq![adi] + inner + seq![ad], x1));
+
+        // a_d (hence a_d⁻¹) commutes with the b-word wbap
+        lemma_w_c_gens_in_block(b_base(nk, n), n, m, ap);
+        lemma_a_commutes_b_word(mm, n, m, d, wbap);        // commutes([a_d], wbap)
+        lemma_w_c_valid(b_base(nk, n), n, m, ap, ng);      // word_valid(wbap, ng)
+        assert(word_valid(seq![ad], ng)) by { assert(seq![ad][0] == ad); }
+        assert(word_valid(seq![adi], ng)) by { assert(seq![adi][0] == adi); }
+        lemma_commutes_sym(p, seq![ad], wbap);             // commutes(wbap, [a_d])
+        lemma_commutes_inv_right(p, wbap, seq![ad]);       // commutes(wbap, [a_d⁻¹])
+        lemma_commutes_sym(p, wbap, seq![adi]);            // commutes([a_d⁻¹], wbap)
+        // x1 =~= ([a_d⁻¹]·wbap)·(dl·a_d) ; commute → (wbap·[a_d⁻¹])·(dl·a_d)
+        lemma_equiv_concat_left(p, seq![adi] + wbap, wbap + seq![adi], dl + seq![ad]);
+        let x2 = (wbap + seq![adi]) + (dl + seq![ad]);
+        assert(x1 =~= (seq![adi] + wbap) + (dl + seq![ad]));
+        assert(equiv_in_presentation(p, x1, x2));
+
+        // a_d⁻¹·dl·a_d ≡ b_d·dl  (lemma_a_conj_d)
+        lemma_a_conj_d(mm, n, m, d);
+        assert(seq![bl, Symbol::Gen(d_idx(nk, n))] =~= seq![bl] + dl);
+        assert(equiv_in_presentation(p, seq![adi] + dl + seq![ad], seq![bl] + dl));
+        // x2 =~= wbap·(a_d⁻¹·dl·a_d) ; rewrite → wbap·(b_d·dl)
+        lemma_equiv_concat_right(p, wbap, seq![adi] + dl + seq![ad], seq![bl] + dl);
+        let x3 = wbap + (seq![bl] + dl);
+        assert(x2 =~= wbap + (seq![adi] + dl + seq![ad]));
+        assert(equiv_in_presentation(p, x2, x3));
+        // x3 =~= (wbap·b_d)·dl = wb·dl
+        assert(x3 =~= (wbap + seq![bl]) + dl);
+        assert(x3 =~= wb + dl);
+
+        // chain:  LHS ≡ x1 ≡ x2 ≡ x3 = wb·dl
+        lemma_equiv_transitive(p, seq![adi] + inner + seq![ad], x1, x2);
+        lemma_equiv_transitive(p, seq![adi] + inner + seq![ad], x2, x3);
+        assert(inverse_word(wa) + dl + wa =~= seq![adi] + inner + seq![ad]);
+        assert(wb + dl =~= x3);
+    }
+}
+
 } // verus!
