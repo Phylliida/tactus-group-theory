@@ -147,8 +147,10 @@ pub mod h3;
 #[cfg(verus_keep_ghost)]
 pub mod free_basis;
 
-// higman_consequences: Layer 2 / Brick 5 — the Higman payoff. The BRIDGE THEOREM
-// `(α,0)∈H₀(M) ⟹ h3_pres ⊢ w_α(c)=1` (soundness = Cohen's (II)/(III)-from-(I)); the c.e. set
-// S={w_α(c)} realized as H₃'s word problem among the c-gens. See docs/brick5-plan.md.
+// higman_consequences: Layer 2 / Brick 5 — the Higman payoff. SOUNDNESS of the BRIDGE THEOREM
+// COMPLETE (60/0): the headline `lemma_III` proves `(α,0)∈H₀(M) ⟹ h3_pres ⊢ w_α(c)=1` — Cohen's
+// "(II),(III) are consequences of the finite set (I)", so h3_pres IS the f.p. Higman group. The c.e.
+// set S={w_α(c)} is realized as H₃'s word problem among the c-gens. Completeness (⟹) is the remaining
+// arc (see docs/brick5-plan.md: h3_pres = h3_with_S + benign/kp_pinch).
 #[cfg(verus_keep_ghost)]
 pub mod higman_consequences;

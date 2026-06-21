@@ -198,9 +198,15 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
     config family (`lemma_comp_is_config_emb`, from `lemma_kill_on_basis_elt`), then F2.
 - [ ] **H₂ = HNN(H₁, p | p⁻¹ tα p = tα wα(b) d)** — contains `C`. (Literal single-relation
       `h2.rs` built; the free basis above is the prerequisite for its HNN faithfulness.)
-- [ ] **H₃ = HNN(H₂, aᵢ (1≤i≤2n), k | aᵢ:A↔Aᵢ, k:A₊↔A₋)** — **finitely presented, ⊇ C.**
-- [ ] **finiteness of relations (I)** — show the infinite families (II)(III) are consequences of the
-      finite set (the payoff: `H₃` really is finitely presented).
+- [x] **H₃ = HNN(H₂, aᵢ (1≤i≤2n), k | aᵢ:A↔Aᵢ, k:A₊↔A₋)** — built as the literal finite
+      presentation `h3_pres` (`h3.rs` 16/0), valid (`lemma_h3_pres_valid`).
+- [x] **finiteness of relations (I) — SOUNDNESS DONE** (`higman_consequences.rs` 60/0,
+      `docs/brick5-plan.md`). The infinite families (II)/(III) hold in the FINITE `h3_pres` as derived
+      theorems: `lemma_II` (`p⁻¹t_α p ≡ t_α w_α(b) d`) and the **headline `lemma_III`
+      (`(α,0)∈H₀(M) ⟹ w_α(c) ≡ 1`)** — Cohen's "(II),(III) are consequences of (I)", fully
+      machine-checked. So `h3_pres` really is the finitely presented Higman group. **Remaining for the
+      bridge theorem ⟺: completeness `h3_pres ⊢ w_α(c)=1 ⟹ (α,0)∈H₀` (routing in brick5-plan.md:
+      `h3_pres = h3_with_S` + benign/kp_pinch).**
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).

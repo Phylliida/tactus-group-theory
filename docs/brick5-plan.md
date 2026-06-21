@@ -121,8 +121,23 @@ mechanics) — `ψ`/`φ_i` iso-validity in with-S reduces to Layer-1 faithfulnes
       `p⁻¹ t p ≡ t d` (`lemma_h2_p_conjugates_t` lifted via `lemma_h2_in_h3`); (IIa)+(IIb); full
       conjugation-commute chain.
 
-### REMAINING — sub-brick 5 (III), THE HEADLINE  (everything else is DONE, 40/0)
-- [ ] **(III)** `(α,0)∈H₀(M) ⟹ w_α(c) ≡ 1` in `h3_pres`. Precise plan (all pointers confirmed):
+### SOUNDNESS COMPLETE — sub-brick 5 (III) DONE (`higman_consequences.rs` 60/0)
+- [x] **(III) DONE** (`lemma_III`): `(α,0)∈H₀(M) ⟹ w_α(c) ≡ 1` in `h3_pres`. THE HEADLINE.
+      Stage A `lemma_k_conj_wb` (`k⁻¹ w_α(b) k ≡ w_α(bc)`: per-letter `lemma_k_conj_b_letter` +
+      `lemma_conj_distributes` induction; ψ-bcblock via `lemma_psi_bcblock_conj`/`lemma_psi_conj_in_h3`).
+      Stage B `lemma_k_commutes_t_alpha` (k fixes t_α: `lemma_h0_config_in_subgroup` → `lemma_bm_in_h3`
+      → `lemma_k_commutes_diag` per U-factor → `lemma_commutes_respects_equiv_right`). Stage C: helpers
+      `lemma_k_fixes_V` (k fixes `V=p⁻¹t_α p`), `lemma_k_conj_W` (`k⁻¹Wk ≡ t_α w_α(bc) d`),
+      `lemma_cancel_both_sides` (`X·Z≡(X·Y)·Z ⟹ Y≡ε`). `lemma_III` conjugates (II) by k and cancels.
+      (Split into helpers to stay under rlimit.) Also reusable: `lemma_equiv_inverse`,
+      `lemma_conj_of_commuting`.
+
+**The whole soundness direction of the Higman bridge theorem `h3_pres ⊢ w_α(c)=1 ⟸ (α,0)∈H₀(M)` is
+machine-checked.** Remaining for the full bridge theorem ⟺: the COMPLETENESS direction (⟹), a
+separate large arc — see the routing analysis above (`h3_pres = h3_with_S`; benign/kp_pinch engine).
+
+#### (III) — original plan (now realized)
+- [x] **(III)** `(α,0)∈H₀(M) ⟹ w_α(c) ≡ 1` in `h3_pres`. Precise plan (all pointers confirmed):
   - **k-conjugation is DIRECT in `h3_pres`** = `hnn_presentation(psi_data)`, `psi_data = {base: h3_upto(2n),
     associations: psi_assoc(mm,n)}`, `k = Gen(k_top)`. No lifting for k-facts: use `lemma_hnn_conjugation(psi_data, i)`
     / `lemma_stable_conj_factorization(psi_data, u)` straight at `h3_pres`. `psi_assoc` layout:
