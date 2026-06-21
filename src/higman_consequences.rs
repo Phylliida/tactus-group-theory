@@ -2083,4 +2083,46 @@ pub proof fn lemma_III(mm: ModMachine, n: nat, m: nat, alpha: nat)
     lemma_cancel_both_sides(p, xx, wc, dl);                           // wc ≡ ε
 }
 
+// ----------------------------------------------------------------------------
+// COMPLETENESS — C0: structural seed lemmas (docs/brick5-completeness-plan.md).
+//
+// `w_α(c)` is the seed of the completeness analysis. It lives entirely in the
+// c-block (`c_base .. c_base+n`), so it is valid over H₁'s generators and — being
+// below every tower stable letter `p`,`a_i`,`k` (all at indices ≥ h1_num_gens) — is
+// a BASE word of the k-HNN. This is exactly what lets the hypothesis `w_α(c)=1` feed
+// the k-level predicate engine (C4): it is a statement about a base word that the
+// (non-iso, S-controlled) ψ-association collapses.
+// ----------------------------------------------------------------------------
+
+/// `w_α(c)` is valid over H₁'s generators: it occupies only the c-block
+/// `c_base(nk)..c_base(nk)+n`, which ends at `nk+n ≤ nk+2n+1 = h1_num_gens`.
+pub proof fn lemma_w_c_valid_h1(nk: nat, n: nat, m: nat, alpha: nat)
+    requires numbers_word(n, m, alpha), 2 * n < m,
+    ensures word_valid(h_w_c(nk, n, m, alpha), h1_num_gens(nk, n)),
+{
+    // c_base(nk) + n = nk + n ≤ nk + 2n + 1 = h1_num_gens(nk, n).
+    lemma_h_w_c_valid(nk, n, m, alpha, h1_num_gens(nk, n));
+}
+
+/// `w_α(c)` is a BASE word of the top (k) HNN: valid over the base
+/// `h3_upto(2n).num_generators` (= `k_top`), so it contains no stable letter `k`.
+/// Seeds the k-level completeness engine (C4).
+pub proof fn lemma_w_c_valid_h3_base(mm: ModMachine, n: nat, m: nat, alpha: nat)
+    requires numbers_word(n, m, alpha), 2 * n < m,
+    ensures word_valid(
+        h_w_c(g_m(mm).num_generators, n, m, alpha),
+        h3_upto(mm, n, m, (2 * n) as nat).num_generators),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_w_c_valid_h1(nk, n, m, alpha);                       // valid over h1_num_gens(nk,n)
+    lemma_h3_upto_num_generators(mm, n, m, (2 * n) as nat);    // base.num = h2_num_gens(4+|q|,n)+2n
+    lemma_g_m_num_generators(mm);                              // nk = 4 + |quads|
+    // h1_num_gens(nk,n) = nk+2n+1 ≤ nk+4n+2 = base.num_generators.
+    assert(h1_num_gens(nk, n) <= h3_upto(mm, n, m, (2 * n) as nat).num_generators);
+    lemma_word_valid_mono(
+        h_w_c(nk, n, m, alpha),
+        h1_num_gens(nk, n),
+        h3_upto(mm, n, m, (2 * n) as nat).num_generators);
+}
+
 } // verus!
