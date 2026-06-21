@@ -24,8 +24,10 @@ use crate::hnn::*;
 use crate::machine_group::*;
 use crate::word_numbering::*;
 use crate::layout::*;
-use crate::benign::{apply_embedding, lemma_apply_embedding_concat};
+use crate::benign::{apply_embedding, lemma_apply_embedding_concat,
+    concat_all, factors_from_generators, is_generator_or_inverse};
 use crate::prop_v::lemma_emb_signed_scaled;
+use crate::ii_subset::lemma_h0_config_in_subgroup;
 use crate::h1::*;
 use crate::h2::*;
 use crate::h3::*;
@@ -1324,6 +1326,71 @@ pub proof fn lemma_equiv_inverse(p: Presentation, a: Word, b: Word)
 // k-conjugation is DIRECT in h3_pres = hnn_presentation(psi_data).
 // ----------------------------------------------------------------------------
 
+/// Conjugating the `i`-th ψ association by `k` gives its image, in `h3_pres`:
+/// `k⁻¹ · psi_assoc[i].0 · k ≡ psi_assoc[i].1`.
+pub proof fn lemma_psi_conj_in_h3(mm: ModMachine, n: nat, m: nat, i: int)
+    requires 0 <= i < psi_assoc(mm, n).len(),
+    ensures
+        equiv_in_presentation(h3_pres(mm, n, m),
+            seq![Symbol::Inv(k_top(g_m(mm).num_generators, n))]
+                + psi_assoc(mm, n)[i].0
+                + seq![Symbol::Gen(k_top(g_m(mm).num_generators, n))],
+            psi_assoc(mm, n)[i].1),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let base = h3_upto(mm, n, m, (2 * n) as nat);
+    let data = HNNData { base, associations: psi_assoc(mm, n) };
+    assert(h3_pres(mm, n, m) == hnn_presentation(data));
+    lemma_h3_upto_valid(mm, n, m, (2 * n) as nat);
+    lemma_h3_upto_num_generators(mm, n, m, (2 * n) as nat);
+    assert(base.num_generators >= nk + 2 * n + 2);
+    lemma_psi_assoc_valid(mm, n, base.num_generators);
+    lemma_hnn_data_valid_from(data, base.num_generators);
+    lemma_hnn_conjugation(data, i);
+    let st = stable_letter(data);
+    let si = stable_letter_inv(data);
+    lemma_h3_k_stable_letter(mm, n, m);
+    assert(st == Symbol::Gen(k_top(nk, n)));
+    assert(si == Symbol::Inv(k_top(nk, n)));
+    // hnn_presentation(data) IS h3_pres (the k-HNN), so the conjugation is directly in h3_pres.
+    let lhs = Seq::new(1, |_q: int| si) + data.associations[i].0 + Seq::new(1, |_q: int| st);
+    assert(lhs =~= seq![Symbol::Inv(k_top(nk, n))] + psi_assoc(mm, n)[i].0
+        + seq![Symbol::Gen(k_top(nk, n))]);
+    assert(equiv_in_presentation(hnn_presentation(data), lhs, data.associations[i].1));
+}
+
+/// `commutes` respects equivalence on the right argument.
+pub proof fn lemma_commutes_respects_equiv_right(p: Presentation, a: Word, b: Word, bb: Word)
+    requires
+        presentation_valid(p),
+        word_valid(a, p.num_generators),
+        word_valid(b, p.num_generators),
+        word_valid(bb, p.num_generators),
+        commutes(p, a, b),
+        equiv_in_presentation(p, b, bb),
+    ensures commutes(p, a, bb),
+{
+    lemma_equiv_symmetric(p, b, bb);                 // bb ≡ b
+    lemma_equiv_concat_right(p, a, bb, b);           // a·bb ≡ a·b
+    lemma_equiv_concat_left(p, b, bb, a);            // b·a ≡ bb·a
+    lemma_equiv_transitive(p, a + bb, a + b, b + a); // a·bb ≡ b·a
+    lemma_equiv_transitive(p, a + bb, b + a, bb + a);// a·bb ≡ bb·a
+}
+
+/// **Lift `b_m → h3_pres`** (through the K_M k'-HNN, then g_m→h1→h3). For the Layer-1
+/// subgroup-membership witness of `t_α ∈ ⟨U⟩`.
+pub proof fn lemma_bm_in_h3(mm: ModMachine, n: nat, m: nat, w1: Word, w2: Word)
+    requires equiv_in_presentation(b_m(mm), w1, w2),
+    ensures equiv_in_presentation(h3_pres(mm, n, m), w1, w2),
+{
+    let gdata = HNNData { base: b_m(mm), associations: g_m_associations(mm) };
+    assert(g_m(mm) == hnn_presentation(gdata));
+    lemma_base_embeds_in_hnn(gdata, w1, w2);         // equiv(g_m, w1, w2)
+    lemma_gm_in_h1(mm, n, w1, w2);
+    lemma_h1_in_h3(mm, n, m, w1, w2);
+}
+
 /// `k⁻¹ · b_j · k ≡ b_j c_j` in `h3_pres` (ψ bc-block, 1 ≤ j ≤ n).
 pub proof fn lemma_psi_bcblock_conj(mm: ModMachine, n: nat, m: nat, j: nat)
     requires 1 <= j <= n,
@@ -1337,15 +1404,6 @@ pub proof fn lemma_psi_bcblock_conj(mm: ModMachine, n: nat, m: nat, j: nat)
 {
     let nk = g_m(mm).num_generators;
     lemma_g_m_num_generators(mm);
-    let base = h3_upto(mm, n, m, (2 * n) as nat);
-    let data = HNNData { base, associations: psi_assoc(mm, n) };
-    assert(h3_pres(mm, n, m) == hnn_presentation(data));
-    lemma_h3_upto_valid(mm, n, m, (2 * n) as nat);
-    lemma_h3_upto_num_generators(mm, n, m, (2 * n) as nat);     // base.num = nk+4n+2
-    assert(base.num_generators >= nk + 2 * n + 2);
-    lemma_psi_assoc_valid(mm, n, base.num_generators);
-    lemma_hnn_data_valid_from(data, base.num_generators);
-
     // index nu+j into psi_assoc = ublock ++ [d] ++ bcblock ++ [p]
     let up = psi_ublock(mm);
     let dpair: Seq<(Word, Word)> = seq![(seq![Symbol::Gen(d_idx(nk, n))], seq![Symbol::Gen(d_idx(nk, n))])];
@@ -1365,16 +1423,8 @@ pub proof fn lemma_psi_bcblock_conj(mm: ModMachine, n: nat, m: nat, j: nat)
     assert(bc[(j - 1) as int] == (seq![bj], seq![bj, cj]));
     assert(psi_assoc(mm, n)[idx].0 == seq![bj]);
     assert(psi_assoc(mm, n)[idx].1 == seq![bj, cj]);
-
-    lemma_hnn_conjugation(data, idx);
-    let st = stable_letter(data);
-    let si = stable_letter_inv(data);
-    lemma_h3_k_stable_letter(mm, n, m);
-    assert(st == Symbol::Gen(k_top(nk, n)));
-    assert(si == Symbol::Inv(k_top(nk, n)));
-    let lhs = Seq::new(1, |_q: int| si) + data.associations[idx].0 + Seq::new(1, |_q: int| st);
-    assert(lhs =~= seq![Symbol::Inv(k_top(nk, n))] + seq![bj] + seq![Symbol::Gen(k_top(nk, n))]);
-    assert(data.associations[idx].1 =~= seq![bj, cj]);
+    assert(0 <= idx < psi_assoc(mm, n).len());
+    lemma_psi_conj_in_h3(mm, n, m, idx);             // [k⁻¹]·psi[idx].0·[k] ≡ psi[idx].1
 }
 
 /// `k⁻¹ · b_d · k ≡ bc_letter(d)` for any digit-letter `b_d = alphabet_letter(b_base,n,d)`,
@@ -1450,6 +1500,191 @@ pub proof fn lemma_k_conj_b_letter(mm: ModMachine, n: nat, m: nat, d: nat)
         assert(bc_letter(b_base(nk, n), c_base(nk), n, d)
             =~= seq![Symbol::Inv(c_idx(nk, jj)), Symbol::Inv(b_idx(nk, n, jj))]);
     }
+}
+
+/// `k` commutes with `X` whenever ψ has a DIAGONAL association `(X,X)` at some index (ublock/d/p).
+pub proof fn lemma_k_commutes_diag(mm: ModMachine, n: nat, m: nat, i: int, x: Word)
+    requires
+        0 <= i < psi_assoc(mm, n).len(),
+        psi_assoc(mm, n)[i].0 == x,
+        psi_assoc(mm, n)[i].1 == x,
+        word_valid(x, h3_num_gens(g_m(mm).num_generators, n)),
+    ensures
+        commutes(h3_pres(mm, n, m), seq![Symbol::Gen(k_top(g_m(mm).num_generators, n))], x),
+{
+    let nk = g_m(mm).num_generators;
+    let p = h3_pres(mm, n, m);
+    lemma_h3_pres_valid(mm, n, m);
+    lemma_h3_num_generators(mm, n, m);
+    lemma_g_m_num_generators(mm);
+    let ng = h3_num_gens(nk, n);
+    let kt = k_top(nk, n);
+    assert(kt < ng);
+    lemma_psi_conj_in_h3(mm, n, m, i);               // [k⁻¹]·x·[k] ≡ x
+    assert(is_inverse_pair(Symbol::Gen(kt), Symbol::Inv(kt)));
+    assert(symbol_valid(Symbol::Gen(kt), ng));
+    lemma_commute_from_conj(p, Symbol::Gen(kt), Symbol::Inv(kt), x);
+}
+
+/// `k` commutes with the `i`-th `U`-generator `g_subgens[i]`.
+pub proof fn lemma_k_commutes_gsub(mm: ModMachine, n: nat, m: nat, i: int)
+    requires 0 <= i < g_subgens(mm).len(),
+    ensures
+        commutes(h3_pres(mm, n, m), seq![Symbol::Gen(k_top(g_m(mm).num_generators, n))],
+            g_subgens(mm)[i]),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    lemma_h3_num_generators(mm, n, m);
+    let ng = h3_num_gens(nk, n);
+    // psi_assoc[i] = psi_ublock[i] = (g_subgens[i], g_subgens[i]) for i < nu
+    let up = psi_ublock(mm);
+    let dpair: Seq<(Word, Word)> = seq![(seq![Symbol::Gen(d_idx(nk, n))], seq![Symbol::Gen(d_idx(nk, n))])];
+    let bc = psi_bcblock(nk, n);
+    let ppair: Seq<(Word, Word)> = seq![(seq![Symbol::Gen(p_idx(nk, n))], seq![Symbol::Gen(p_idx(nk, n))])];
+    assert(up.len() == g_subgens(mm).len());
+    assert(psi_assoc(mm, n) =~= ((up + dpair) + bc) + ppair);
+    assert(((up + dpair) + bc)[i] == (up + dpair)[i]);
+    assert((up + dpair)[i] == up[i]);
+    assert(up[i] == (g_subgens(mm)[i], g_subgens(mm)[i]));
+    assert(psi_assoc(mm, n)[i] == up[i]);
+    // validity of g_subgens[i] over ng
+    lemma_g_m_associations_valid(mm);
+    assert(g_subgens(mm)[i] == g_m_associations(mm)[i].1);
+    lemma_word_valid_mono(g_subgens(mm)[i], (3 + mm.quads.len()) as nat, ng);
+    lemma_k_commutes_diag(mm, n, m, i, g_subgens(mm)[i]);
+}
+
+/// `k` commutes with any factor (a `U`-generator or its inverse).
+pub proof fn lemma_k_commutes_factor(mm: ModMachine, n: nat, m: nat, f: Word)
+    requires is_generator_or_inverse(g_subgens(mm), f),
+    ensures
+        commutes(h3_pres(mm, n, m), seq![Symbol::Gen(k_top(g_m(mm).num_generators, n))], f),
+{
+    let nk = g_m(mm).num_generators;
+    let p = h3_pres(mm, n, m);
+    lemma_h3_pres_valid(mm, n, m);
+    lemma_h3_num_generators(mm, n, m);
+    lemma_g_m_num_generators(mm);
+    let ng = h3_num_gens(nk, n);
+    let kt = k_top(nk, n);
+    let kw: Word = seq![Symbol::Gen(kt)];
+    let j = choose|j: int| 0 <= j < g_subgens(mm).len()
+        && (f == g_subgens(mm)[j] || f == inverse_word(g_subgens(mm)[j]));
+    assert(0 <= j < g_subgens(mm).len()
+        && (f == g_subgens(mm)[j] || f == inverse_word(g_subgens(mm)[j])));
+    lemma_k_commutes_gsub(mm, n, m, j);              // commutes(kw, g_subgens[j])
+    lemma_g_m_associations_valid(mm);
+    assert(g_subgens(mm)[j] == g_m_associations(mm)[j].1);
+    lemma_word_valid_mono(g_subgens(mm)[j], (3 + mm.quads.len()) as nat, ng);
+    assert(kt < ng);
+    assert(word_valid(kw, ng)) by { assert(kw[0] == Symbol::Gen(kt)); }
+    if f == g_subgens(mm)[j] {
+    } else {
+        lemma_commutes_inv_right(p, kw, g_subgens(mm)[j]);   // commutes(kw, inverse_word(g_subgens[j]) = f)
+    }
+}
+
+/// A product of `U`-factors is valid over `h3_pres`'s generators.
+pub proof fn lemma_concat_all_gsub_valid(mm: ModMachine, n: nat, factors: Seq<Word>)
+    requires factors_from_generators(g_subgens(mm), factors),
+    ensures word_valid(concat_all(factors), h3_num_gens(g_m(mm).num_generators, n)),
+    decreases factors.len(),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let ng = h3_num_gens(nk, n);
+    if factors.len() == 0 {
+        assert(concat_all(factors) =~= empty_word());
+    } else {
+        let f0 = factors.first();
+        let rest = factors.drop_first();
+        assert(is_generator_or_inverse(g_subgens(mm), f0)) by { assert(factors[0] == f0); }
+        // f0 valid
+        let j = choose|j: int| 0 <= j < g_subgens(mm).len()
+            && (f0 == g_subgens(mm)[j] || f0 == inverse_word(g_subgens(mm)[j]));
+        assert(0 <= j < g_subgens(mm).len()
+            && (f0 == g_subgens(mm)[j] || f0 == inverse_word(g_subgens(mm)[j])));
+        lemma_g_m_associations_valid(mm);
+        assert(g_subgens(mm)[j] == g_m_associations(mm)[j].1);
+        lemma_word_valid_mono(g_subgens(mm)[j], (3 + mm.quads.len()) as nat, ng);
+        if f0 == g_subgens(mm)[j] {
+        } else {
+            lemma_inverse_word_valid(g_subgens(mm)[j], ng);
+        }
+        assert(factors_from_generators(g_subgens(mm), rest)) by {
+            assert forall|k: int| 0 <= k < rest.len()
+                implies is_generator_or_inverse(g_subgens(mm), #[trigger] rest[k]) by {
+                assert(rest[k] == factors[k + 1]);
+            }
+        }
+        lemma_concat_all_gsub_valid(mm, n, rest);
+        assert(concat_all(factors) =~= concat(f0, concat_all(rest)));
+        lemma_concat_word_valid(f0, concat_all(rest), ng);
+    }
+}
+
+/// `k` commutes with any product of `U`-factors.
+pub proof fn lemma_k_commutes_concat_all(mm: ModMachine, n: nat, m: nat, factors: Seq<Word>)
+    requires factors_from_generators(g_subgens(mm), factors),
+    ensures
+        commutes(h3_pres(mm, n, m), seq![Symbol::Gen(k_top(g_m(mm).num_generators, n))],
+            concat_all(factors)),
+    decreases factors.len(),
+{
+    let nk = g_m(mm).num_generators;
+    let p = h3_pres(mm, n, m);
+    let kw: Word = seq![Symbol::Gen(k_top(nk, n))];
+    if factors.len() == 0 {
+        lemma_commutes_empty_right(p, kw);
+        assert(concat_all(factors) =~= empty_word());
+    } else {
+        let f0 = factors.first();
+        let rest = factors.drop_first();
+        assert(is_generator_or_inverse(g_subgens(mm), f0)) by { assert(factors[0] == f0); }
+        lemma_k_commutes_factor(mm, n, m, f0);
+        assert(factors_from_generators(g_subgens(mm), rest)) by {
+            assert forall|k: int| 0 <= k < rest.len()
+                implies is_generator_or_inverse(g_subgens(mm), #[trigger] rest[k]) by {
+                assert(rest[k] == factors[k + 1]);
+            }
+        }
+        lemma_k_commutes_concat_all(mm, n, m, rest);
+        lemma_commutes_concat_right(p, kw, f0, concat_all(rest));
+        assert(concat_all(factors) =~= f0 + concat_all(rest));
+    }
+}
+
+/// **Stage B — `k` commutes with `t_α`** when `(α,0)∈H₀(M)` (since then `t_α ∈ ⟨U⟩`, and `k` fixes `U`).
+pub proof fn lemma_k_commutes_t_alpha(mm: ModMachine, n: nat, m: nat, alpha: nat)
+    requires mod_machine_wf(mm), mm_in_H0(mm, alpha, 0),
+    ensures
+        commutes(h3_pres(mm, n, m), seq![Symbol::Gen(k_top(g_m(mm).num_generators, n))],
+            config_word(alpha, 0)),
+{
+    let nk = g_m(mm).num_generators;
+    let p = h3_pres(mm, n, m);
+    lemma_h3_pres_valid(mm, n, m);
+    lemma_h3_num_generators(mm, n, m);
+    lemma_g_m_num_generators(mm);
+    let ng = h3_num_gens(nk, n);
+    let kw: Word = seq![Symbol::Gen(k_top(nk, n))];
+    // t_α ∈ ⟨U⟩ over b_m
+    lemma_h0_config_in_subgroup(mm, alpha, 0);
+    let factors = choose|factors: Seq<Word>| #[trigger] factors_from_generators(g_subgens(mm), factors)
+        && equiv_in_presentation(b_m(mm), concat_all(factors), config_word(alpha, 0));
+    assert(factors_from_generators(g_subgens(mm), factors)
+        && equiv_in_presentation(b_m(mm), concat_all(factors), config_word(alpha, 0)));
+    // k commutes with the product; product ≡ t_α (lifted)
+    lemma_k_commutes_concat_all(mm, n, m, factors);
+    lemma_bm_in_h3(mm, n, m, concat_all(factors), config_word(alpha, 0));
+    // validities for respects-equiv-right
+    assert(k_top(nk, n) < ng);
+    assert(word_valid(kw, ng)) by { assert(kw[0] == Symbol::Gen(k_top(nk, n))); }
+    lemma_concat_all_gsub_valid(mm, n, factors);
+    lemma_config_word_valid(alpha, 0);
+    lemma_word_valid_mono(config_word(alpha, 0), 3, ng);
+    lemma_commutes_respects_equiv_right(p, kw, concat_all(factors), config_word(alpha, 0));
 }
 
 /// **Stage A — `k⁻¹ · w_α(b) · k ≡ w_α(bc)`** in `h3_pres`, by induction on α's digits
