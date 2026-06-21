@@ -1087,4 +1087,204 @@ pub proof fn lemma_IIb(mm: ModMachine, n: nat, m: nat, alpha: nat)
     }
 }
 
+// ----------------------------------------------------------------------------
+// Sub-brick 4 — (II):  p⁻¹ · t_α · p ≡ t_α · w_α(b) · d  in H₃.
+// `p` commutes with `w_α(a)` (φ_l: p↦p), and `p⁻¹ t p ≡ t d`; combine with (IIa)/(IIb).
+// ----------------------------------------------------------------------------
+
+/// `p` commutes with the single a-stable-letter `a_l` (φ_l tail: `a_l⁻¹ p a_l ≡ p`).
+pub proof fn lemma_p_commutes_a_letter(mm: ModMachine, n: nat, m: nat, l: nat)
+    requires 1 <= l <= 2 * n,
+    ensures
+        commutes(h3_pres(mm, n, m), seq![Symbol::Gen(p_idx(g_m(mm).num_generators, n))],
+            seq![Symbol::Gen(a_idx(g_m(mm).num_generators, n, l))]),
+{
+    let nk = g_m(mm).num_generators;
+    let p = h3_pres(mm, n, m);
+    lemma_h3_pres_valid(mm, n, m);
+    lemma_h3_num_generators(mm, n, m);
+    lemma_g_m_num_generators(mm);
+    let ng = h3_num_gens(nk, n);
+    let ti: int = (n + 3) as int;                 // phi_assoc tail (p,p)
+    assert(phi_assoc(nk, n, m, l)[ti].0 == seq![Symbol::Gen(p_idx(nk, n))]);
+    assert(phi_assoc(nk, n, m, l)[ti].1 == seq![Symbol::Gen(p_idx(nk, n))]);
+    lemma_phi_d_conj_in_h3(mm, n, m, l, ti);      // a_l⁻¹ p a_l ≡ p
+    let al = Symbol::Gen(a_idx(nk, n, l));
+    let ali = Symbol::Inv(a_idx(nk, n, l));
+    let pg: Word = seq![Symbol::Gen(p_idx(nk, n))];
+    assert(a_idx(nk, n, l) < ng);
+    assert(p_idx(nk, n) < ng);
+    assert(is_inverse_pair(al, ali));
+    assert(symbol_valid(al, ng));
+    assert(word_valid(pg, ng)) by { assert(pg[0] == Symbol::Gen(p_idx(nk, n))); }
+    assert(word_valid(seq![al], ng)) by { assert(seq![al][0] == al); }
+    assert(equiv_in_presentation(p, seq![ali] + pg + seq![al], pg));
+    lemma_commute_from_conj(p, al, ali, pg);      // commutes([a_l], [p])
+    lemma_commutes_sym(p, seq![al], pg);          // commutes([p], [a_l])
+}
+
+/// `p` commutes with the whole a-word `w_α(a)`.
+pub proof fn lemma_p_commutes_wa(mm: ModMachine, n: nat, m: nat, alpha: nat)
+    requires numbers_word(n, m, alpha), 2 * n < m,
+    ensures
+        commutes(h3_pres(mm, n, m), seq![Symbol::Gen(p_idx(g_m(mm).num_generators, n))],
+            w_a(g_m(mm).num_generators, n, m, alpha)),
+    decreases alpha,
+{
+    let nk = g_m(mm).num_generators;
+    let p = h3_pres(mm, n, m);
+    let pg: Word = seq![Symbol::Gen(p_idx(nk, n))];
+    if alpha == 0 {
+        lemma_commutes_empty_right(p, pg);
+        assert(w_a(nk, n, m, alpha) =~= empty_word());
+    } else {
+        assert(m > 1);
+        let ap = alpha / m;
+        let d = alpha % m;
+        assert(1 <= d <= 2 * n && numbers_word(n, m, ap));
+        vstd::arithmetic::div_mod::lemma_div_decreases(alpha as int, m as int);
+        let adw: Word = seq![Symbol::Gen(a_idx(nk, n, d))];
+        lemma_p_commutes_wa(mm, n, m, ap);                  // commutes(pg, w_a(ap))
+        lemma_p_commutes_a_letter(mm, n, m, d);             // commutes(pg, [a_d])
+        lemma_commutes_concat_right(p, pg, w_a(nk, n, m, ap), adw);
+        assert(w_a(nk, n, m, alpha) =~= w_a(nk, n, m, ap) + adw);
+    }
+}
+
+/// `w_α(a)` is valid over any generator count covering the a-block.
+pub proof fn lemma_w_a_valid(nk: nat, n: nat, m: nat, alpha: nat, ng: nat)
+    requires numbers_word(n, m, alpha), a_base(nk, n) + 2 * n <= ng, 2 * n < m,
+    ensures word_valid(w_a(nk, n, m, alpha), ng),
+    decreases alpha,
+{
+    if alpha == 0 || m <= 1 {
+        assert(w_a(nk, n, m, alpha) =~= empty_word());
+    } else {
+        let d = alpha % m;
+        assert(1 <= d <= 2 * n);
+        vstd::arithmetic::div_mod::lemma_div_decreases(alpha as int, m as int);
+        lemma_w_a_valid(nk, n, m, alpha / m, ng);
+        let pref = w_a(nk, n, m, alpha / m);
+        let last: Word = seq![Symbol::Gen(a_idx(nk, n, d))];
+        assert(a_idx(nk, n, d) < ng);                  // a_base+(d-1) < a_base+2n ≤ ng
+        assert(word_valid(last, ng)) by { assert(last[0] == Symbol::Gen(a_idx(nk, n, d))); }
+        assert(w_a(nk, n, m, alpha) =~= pref + last);
+        lemma_concat_word_valid(pref, last, ng);
+    }
+}
+
+/// **Sub-brick 4 — (II).** `p⁻¹ · t_α · p ≡ t_α · w_α(b) · d` in `h3_pres`. Combine (IIa)/(IIb)
+/// with `p` commuting past `w_α(a)` and `p⁻¹ t p ≡ t d`.
+pub proof fn lemma_II(mm: ModMachine, n: nat, m: nat, alpha: nat)
+    requires numbers_word(n, m, alpha), 2 * n < m,
+    ensures
+        equiv_in_presentation(h3_pres(mm, n, m),
+            seq![Symbol::Inv(p_idx(g_m(mm).num_generators, n))]
+                + config_word(alpha, 0)
+                + seq![Symbol::Gen(p_idx(g_m(mm).num_generators, n))],
+            config_word(alpha, 0)
+                + w_b(b_base(g_m(mm).num_generators, n), n, m, alpha)
+                + seq![Symbol::Gen(d_idx(g_m(mm).num_generators, n))]),
+{
+    let nk = g_m(mm).num_generators;
+    let p = h3_pres(mm, n, m);
+    lemma_g_m_num_generators(mm);
+    lemma_h3_num_generators(mm, n, m);
+    lemma_h3_pres_valid(mm, n, m);
+    let ng = h3_num_gens(nk, n);
+
+    let pg: Word = seq![Symbol::Gen(p_idx(nk, n))];
+    let pgi: Word = seq![Symbol::Inv(p_idx(nk, n))];
+    let t: Word = seq![Symbol::Gen(0)];
+    let dl: Word = seq![Symbol::Gen(d_idx(nk, n))];
+    let wa = w_a(nk, n, m, alpha);
+    let wai = inverse_word(wa);
+    let wb = w_b(b_base(nk, n), n, m, alpha);
+    let cfg = config_word(alpha, 0);
+
+    // validities
+    assert(word_valid(pg, ng)) by { assert(pg[0] == Symbol::Gen(p_idx(nk, n))); }
+    assert(word_valid(pgi, ng)) by { assert(pgi[0] == Symbol::Inv(p_idx(nk, n))); }
+    lemma_w_a_valid(nk, n, m, alpha, ng);              // word_valid(wa, ng)
+    lemma_inverse_word_valid(wa, ng);                 // word_valid(wai, ng)
+    lemma_inverse_singleton(Symbol::Gen(p_idx(nk, n)));
+    assert(pg =~= Seq::new(1, |_i: int| Symbol::Gen(p_idx(nk, n))));
+    assert(Seq::new(1, |_i: int| inverse_symbol(Symbol::Gen(p_idx(nk, n)))) =~= pgi);
+    assert(inverse_word(pg) =~= pgi);
+
+    // ---- atoms ----
+    lemma_IIa(mm, n, m, alpha);                        // wai·t·wa ≡ cfg
+    let iia = wai + t + wa;
+    assert(equiv_in_presentation(p, iia, cfg));
+    lemma_equiv_symmetric(p, iia, cfg);               // cfg ≡ wai·t·wa  (need word_valid(iia))
+    lemma_IIb(mm, n, m, alpha);                        // wai·dl·wa ≡ wb·dl
+    let iib = wai + dl + wa;
+    assert(equiv_in_presentation(p, iib, wb + dl));
+
+    // p⁻¹ t p ≡ t d  (lift lemma_h2_p_conjugates_t)
+    lemma_h2_p_conjugates_t(mm, n);
+    lemma_h2_in_h3(mm, n, m, pgi + t + pg, td_word(nk, n));
+    assert(td_word(nk, n) =~= t + dl);
+    assert(equiv_in_presentation(p, pgi + t + pg, t + dl));   // A_ptp
+
+    // p commutes with wa  ⟹  c1: pgi·wai ≡ wai·pgi ;  c2: wa·pg ≡ pg·wa
+    lemma_p_commutes_wa(mm, n, m, alpha);             // commutes(pg, wa)
+    lemma_commutes_sym(p, pg, wa);                    // commutes(wa, pg): wa·pg ≡ pg·wa  (c2)
+    lemma_commutes_inv_right(p, pg, wa);              // commutes(pg, wai)
+    lemma_commutes_sym(p, pg, wai);                   // commutes(wai, pg)
+    lemma_commutes_inv_right(p, wai, pg);             // commutes(wai, pgi)  (inverse_word(pg)=pgi)
+    lemma_commutes_sym(p, wai, pgi);                  // commutes(pgi, wai): pgi·wai ≡ wai·pgi  (c1)
+
+    // ---- the chain ----
+    // L = pgi·cfg·pg
+    let lhs = pgi + cfg + pg;
+    // step 2: cfg → wai·t·wa
+    lemma_equiv_concat_right(p, pgi, cfg, iia);
+    lemma_equiv_concat_left(p, pgi + cfg, pgi + iia, pg);
+    let e0 = (pgi + iia) + pg;
+    assert(equiv_in_presentation(p, lhs, e0));        // L ≡ pgi·(wai·t·wa)·pg
+
+    // step 3: commute p past wa →  wai·(pgi·t·pg)·wa
+    // e0 =~= (pgi+wai) + t + (wa+pg)  ;  target m3 =~= (wai+pgi) + t + (pg+wa)
+    let m3 = ((wai + pgi) + t) + (pg + wa);
+    lemma_equiv_concat_left(p, pgi + wai, wai + pgi, t + (wa + pg));   // (pgi·wai)·(t·(wa·pg)) ≡ (wai·pgi)·(t·(wa·pg))
+    lemma_equiv_concat_right(p, (wai + pgi) + t, wa + pg, pg + wa);    // ((wai·pgi)·t)·(wa·pg) ≡ ((wai·pgi)·t)·(pg·wa)
+    assert(e0 =~= (pgi + wai) + (t + (wa + pg)));
+    assert((wai + pgi) + (t + (wa + pg)) =~= ((wai + pgi) + t) + (wa + pg));
+    lemma_equiv_transitive(p, e0, (wai + pgi) + (t + (wa + pg)), m3);   // e0 ≡ m3
+    lemma_equiv_transitive(p, lhs, e0, m3);           // L ≡ m3
+
+    // step 4: pgi·t·pg → t·dl  inside wai·(_)·wa
+    // m3 =~= wai·(pgi·t·pg)·wa ; rewrite → wai·(t·dl)·wa
+    let m5 = (wai + (t + dl)) + wa;
+    lemma_equiv_concat_right(p, wai, pgi + t + pg, t + dl);
+    lemma_equiv_concat_left(p, wai + (pgi + t + pg), wai + (t + dl), wa);
+    assert(m3 =~= (wai + (pgi + t + pg)) + wa);
+    assert(equiv_in_presentation(p, m3, m5));          // m3 ≡ wai·(t·dl)·wa
+
+    // step 5: wai·(t·dl)·wa ≡ cfg·wb·dl
+    // N = (wai·t·wa)·(wai·dl·wa) ; N ≡ m5 (cancel wa·wai) and N ≡ cfg·(wb·dl)
+    let nN = iia + iib;
+    // N ≡ m5 :  N =~= (wai+t)·(wa·wai)·(dl·wa) ; wa·wai ≡ ε
+    lemma_word_inverse_right(p, wa);                   // wa·wai ≡ ε
+    lemma_equiv_concat_left(p, wa + wai, empty_word(), dl + wa);   // (wa·wai)·(dl·wa) ≡ ε·(dl·wa)
+    lemma_equiv_concat_right(p, wai + t, (wa + wai) + (dl + wa), dl + wa);
+    assert(nN =~= (wai + t) + ((wa + wai) + (dl + wa)));
+    assert((wai + t) + (empty_word() + (dl + wa)) =~= m5);
+    assert(equiv_in_presentation(p, nN, m5));          // N ≡ m5
+    lemma_equiv_symmetric(p, nN, m5);                  // m5 ≡ N  (need word_valid(nN))
+    // N ≡ cfg·(wb·dl)
+    lemma_equiv_concat_left(p, iia, cfg, iib);         // (wai·t·wa)·iib ≡ cfg·iib
+    lemma_equiv_concat_right(p, cfg, iib, wb + dl);    // cfg·iib ≡ cfg·(wb·dl)
+    lemma_equiv_transitive(p, nN, cfg + iib, cfg + (wb + dl));
+    assert(equiv_in_presentation(p, nN, cfg + (wb + dl)));
+
+    // assemble:  L ≡ m3 ≡ m5 ≡ N ≡ cfg·wb·dl
+    lemma_equiv_transitive(p, lhs, m3, m5);
+    lemma_equiv_transitive(p, lhs, m5, nN);
+    lemma_equiv_transitive(p, lhs, nN, cfg + (wb + dl));
+    assert(cfg + (wb + dl) =~= cfg + wb + dl);
+    assert(lhs =~= pgi + cfg + pg);
+}
+
 } // verus!
