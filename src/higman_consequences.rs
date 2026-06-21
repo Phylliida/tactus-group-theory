@@ -1377,4 +1377,147 @@ pub proof fn lemma_psi_bcblock_conj(mm: ModMachine, n: nat, m: nat, j: nat)
     assert(data.associations[idx].1 =~= seq![bj, cj]);
 }
 
+/// `k⁻¹ · b_d · k ≡ bc_letter(d)` for any digit-letter `b_d = alphabet_letter(b_base,n,d)`,
+/// 1 ≤ d ≤ 2n. Positive digit from `lemma_psi_bcblock_conj`; inverse digit via `lemma_equiv_inverse`.
+pub proof fn lemma_k_conj_b_letter(mm: ModMachine, n: nat, m: nat, d: nat)
+    requires 1 <= d <= 2 * n,
+    ensures
+        equiv_in_presentation(h3_pres(mm, n, m),
+            seq![Symbol::Inv(k_top(g_m(mm).num_generators, n))]
+                + seq![alphabet_letter(b_base(g_m(mm).num_generators, n), n, d)]
+                + seq![Symbol::Gen(k_top(g_m(mm).num_generators, n))],
+            bc_letter(b_base(g_m(mm).num_generators, n), c_base(g_m(mm).num_generators), n, d)),
+{
+    let nk = g_m(mm).num_generators;
+    let p = h3_pres(mm, n, m);
+    lemma_h3_pres_valid(mm, n, m);
+    lemma_h3_num_generators(mm, n, m);
+    lemma_g_m_num_generators(mm);
+    let ng = h3_num_gens(nk, n);
+    let kt = k_top(nk, n);
+    assert(kt < ng);
+    if d <= n {
+        lemma_psi_bcblock_conj(mm, n, m, d);
+        assert(alphabet_letter(b_base(nk, n), n, d) == Symbol::Gen(b_idx(nk, n, d)));
+        assert(bc_letter(b_base(nk, n), c_base(nk), n, d)
+            =~= seq![Symbol::Gen(b_idx(nk, n, d)), Symbol::Gen(c_idx(nk, d))]);
+    } else {
+        let jj = (d - n) as nat;
+        assert(1 <= jj <= n);
+        lemma_psi_bcblock_conj(mm, n, m, jj);           // [k⁻¹]·b_jj·[k] ≡ [b_jj, c_jj]
+        let bjj = Symbol::Gen(b_idx(nk, n, jj));
+        let cjj = Symbol::Gen(c_idx(nk, jj));
+        let aA: Word = seq![Symbol::Inv(kt)] + seq![bjj] + seq![Symbol::Gen(kt)];
+        let bB: Word = seq![bjj, cjj];
+        // validities
+        assert(b_idx(nk, n, jj) < ng);
+        assert(c_idx(nk, jj) < ng);
+        assert(word_valid(aA, ng)) by {
+            assert forall|q: int| 0 <= q < aA.len() implies symbol_valid(#[trigger] aA[q], ng) by {
+                if q == 0 { assert(aA[0] == Symbol::Inv(kt)); }
+                else if q == 1 { assert(aA[1] == bjj); }
+                else { assert(aA[2] == Symbol::Gen(kt)); }
+            }
+        }
+        assert(word_valid(bB, ng)) by {
+            assert forall|q: int| 0 <= q < bB.len() implies symbol_valid(#[trigger] bB[q], ng) by {
+                if q == 0 { assert(bB[0] == bjj); } else { assert(bB[1] == cjj); }
+            }
+        }
+        lemma_equiv_inverse(p, aA, bB);                 // inverse_word(aA) ≡ inverse_word(bB)
+        // inverse_word(aA) = [k⁻¹, b_jj⁻¹, k]  =  [k⁻¹] + [alphabet_letter(d)] + [k]
+        lemma_inverse_concat(seq![Symbol::Inv(kt)] + seq![bjj], seq![Symbol::Gen(kt)]);
+        lemma_inverse_concat(seq![Symbol::Inv(kt)], seq![bjj]);
+        lemma_inverse_singleton(Symbol::Gen(kt));
+        assert(seq![Symbol::Gen(kt)] =~= Seq::new(1, |_i: int| Symbol::Gen(kt)));
+        assert(inverse_word(seq![Symbol::Gen(kt)]) =~= seq![Symbol::Inv(kt)]);
+        lemma_inverse_singleton(Symbol::Inv(kt));
+        assert(seq![Symbol::Inv(kt)] =~= Seq::new(1, |_i: int| Symbol::Inv(kt)));
+        assert(inverse_word(seq![Symbol::Inv(kt)]) =~= seq![Symbol::Gen(kt)]);
+        lemma_inverse_singleton(bjj);
+        assert(seq![bjj] =~= Seq::new(1, |_i: int| bjj));
+        assert(inverse_word(seq![bjj]) =~= seq![Symbol::Inv(b_idx(nk, n, jj))]);
+        assert(alphabet_letter(b_base(nk, n), n, d) == Symbol::Inv(b_idx(nk, n, jj)));
+        assert(inverse_word(aA) =~= seq![Symbol::Inv(kt)]
+            + seq![alphabet_letter(b_base(nk, n), n, d)] + seq![Symbol::Gen(kt)]);
+        // inverse_word(bB) = [c_jj⁻¹, b_jj⁻¹] = bc_letter(d)
+        assert(bB =~= seq![bjj] + seq![cjj]);
+        lemma_inverse_concat(seq![bjj], seq![cjj]);
+        lemma_inverse_singleton(cjj);
+        assert(seq![cjj] =~= Seq::new(1, |_i: int| cjj));
+        assert(inverse_word(seq![cjj]) =~= seq![Symbol::Inv(c_idx(nk, jj))]);
+        assert(inverse_word(bB) =~= seq![Symbol::Inv(c_idx(nk, jj)), Symbol::Inv(b_idx(nk, n, jj))]);
+        assert(bc_letter(b_base(nk, n), c_base(nk), n, d)
+            =~= seq![Symbol::Inv(c_idx(nk, jj)), Symbol::Inv(b_idx(nk, n, jj))]);
+    }
+}
+
+/// **Stage A — `k⁻¹ · w_α(b) · k ≡ w_α(bc)`** in `h3_pres`, by induction on α's digits
+/// (`lemma_conj_distributes` + per-letter `lemma_k_conj_b_letter`).
+pub proof fn lemma_k_conj_wb(mm: ModMachine, n: nat, m: nat, alpha: nat)
+    requires numbers_word(n, m, alpha), 2 * n < m,
+    ensures
+        equiv_in_presentation(h3_pres(mm, n, m),
+            seq![Symbol::Inv(k_top(g_m(mm).num_generators, n))]
+                + w_b(b_base(g_m(mm).num_generators, n), n, m, alpha)
+                + seq![Symbol::Gen(k_top(g_m(mm).num_generators, n))],
+            w_bc(b_base(g_m(mm).num_generators, n), c_base(g_m(mm).num_generators), n, m, alpha)),
+    decreases alpha,
+{
+    let nk = g_m(mm).num_generators;
+    let p = h3_pres(mm, n, m);
+    lemma_h3_pres_valid(mm, n, m);
+    lemma_h3_num_generators(mm, n, m);
+    lemma_g_m_num_generators(mm);
+    let ng = h3_num_gens(nk, n);
+    let kt = k_top(nk, n);
+    let ki: Word = seq![Symbol::Inv(kt)];
+    let ks: Word = seq![Symbol::Gen(kt)];
+    let wb = w_b(b_base(nk, n), n, m, alpha);
+    let wbc = w_bc(b_base(nk, n), c_base(nk), n, m, alpha);
+    if alpha == 0 || m <= 1 {
+        assert(wb =~= empty_word());
+        assert(wbc =~= empty_word());
+        assert(ki + wb + ks =~= seq![Symbol::Inv(kt), Symbol::Gen(kt)]);
+        assert(kt < ng);
+        assert(is_inverse_pair(Symbol::Inv(kt), Symbol::Gen(kt)));
+        lemma_cancel_pair_equiv_empty(p, Symbol::Inv(kt), Symbol::Gen(kt));
+        // [k⁻¹, k] ≡ ε = wbc
+    } else {
+        assert(m > 1);
+        let ap = alpha / m;
+        let d = alpha % m;
+        assert(1 <= d <= 2 * n && numbers_word(n, m, ap));
+        vstd::arithmetic::div_mod::lemma_div_decreases(alpha as int, m as int);
+        let bld: Word = seq![alphabet_letter(b_base(nk, n), n, d)];
+        let bcd = bc_letter(b_base(nk, n), c_base(nk), n, d);
+        let wbap = w_b(b_base(nk, n), n, m, ap);
+        let wbcap = w_bc(b_base(nk, n), c_base(nk), n, m, ap);
+        assert(wb =~= wbap + bld);
+        assert(wbc =~= wbcap + bcd);
+        // distribute k over wb = wbap·bld
+        assert(is_inverse_pair(Symbol::Gen(kt), Symbol::Inv(kt)));
+        assert(kt < ng);
+        let kk2: Word = seq![Symbol::Gen(kt), Symbol::Inv(kt)];
+        assert(word_valid(kk2, ng)) by {
+            assert forall|q: int| 0 <= q < kk2.len() implies symbol_valid(#[trigger] kk2[q], ng) by {
+                if q == 0 { assert(kk2[0] == Symbol::Gen(kt)); } else { assert(kk2[1] == Symbol::Inv(kt)); }
+            }
+        }
+        lemma_conj_distributes(p, Symbol::Inv(kt), Symbol::Gen(kt), wbap, bld);
+        // ki·(wbap·bld)·ks ≡ (ki·wbap·ks)·(ki·bld·ks)
+        lemma_k_conj_wb(mm, n, m, ap);                  // ki·wbap·ks ≡ wbcap
+        lemma_k_conj_b_letter(mm, n, m, d);             // ki·bld·ks ≡ bcd
+        lemma_equiv_concat_left(p, ki + wbap + ks, wbcap, ki + bld + ks);
+        lemma_equiv_concat_right(p, wbcap, ki + bld + ks, bcd);
+        lemma_equiv_transitive(p, (ki + wbap + ks) + (ki + bld + ks), wbcap + (ki + bld + ks),
+            wbcap + bcd);
+        // chain with the distribute step
+        assert(ki + (wbap + bld) + ks =~= ki + wb + ks);
+        assert(equiv_in_presentation(p, ki + wb + ks, (ki + wbap + ks) + (ki + bld + ks)));
+        lemma_equiv_transitive(p, ki + wb + ks, (ki + wbap + ks) + (ki + bld + ks), wbcap + bcd);
+        assert(wbcap + bcd =~= wbc);
+    }
+}
+
 } // verus!
