@@ -17,9 +17,14 @@ That *is* Higman's embedding theorem made explicit: a recursively-presented `C=�
 the f.p. `H₃`, with `S` recovered as `H₃`'s relations among the `c`'s.
 
 - **⟸ (SOUNDNESS):** `(α,0)∈H₀(M) ⟹ h3_pres ⊢ w_α(c)=1`. = Cohen's "(II),(III) are consequences
-  of (I)". **This session.** Bounded, top-down, builds only on proven infra.
-- **⟹ (COMPLETENESS):** `h3_pres ⊢ w_α(c)=1 ⟹ (α,0)∈H₀(M)`. The deep faithfulness. **Deferred**
-  (separate arc; routing analysis below).
+  of (I)". **DONE** (`lemma_III`, 60/0). Bounded, top-down, builds only on proven infra.
+- **⟹ (COMPLETENESS):** the deep faithfulness. **TARGET CORRECTED — see
+  `docs/brick5-completeness-plan.md`.** It is **`h3_pres ⊢ w_α(c)=1 ⟹ w_α(c)=1 in C`** (faithfulness
+  of `C↪H₃`), NOT `⟹ (α,0)∈H₀` as the routing below originally stated (that conflates `S`-membership
+  with `ncl(S)`). The §3.3 machine bridge supplies `w_α(c)∈S ⟺ (α,0)∈H₀` separately. The routing
+  notes below are partly superseded: `S` is infinite (no literal `h3_with_S` Presentation), and the
+  k-level ψ-association is non-iso in `h3_pres`, so the **`kp_pinch` predicate engine is mandatory**
+  (Route A mechanics), not the literal `h3_pres = h3_with_S` Presentation equality sketched below.
 
 ## SOUNDNESS — decomposition (Cohen p.281 proof body)
 
