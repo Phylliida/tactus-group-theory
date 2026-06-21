@@ -149,9 +149,18 @@ Bottom-up. Each brick names the existing infra it reduces to.
   (`c_base..c_base+n`), hence over `h1_base.num_generators`, hence has **no stable letter** of any
   tower HNN (`p`, `a_i`, `k` all sit at indices `≥ h1_num_gens`). This is what lets the peel start.
   Pure index arithmetic over `layout.rs`. *(Verifiable immediately; good build-shakedown brick.)*
-- **C1 — the C predicate + `in_C`.** Define `in_C(α-word stuff)` / `c_trivial: spec_fn(Word)->bool`
-  capturing `w ∈ ncl(S)` at the h1 level via the benign/predicate machinery (NOT relators). State the
-  target faithfulness theorem signature against it.
+- **C1 — the C predicate + `in_C`.** Define `in_C : spec_fn(Word)->bool` capturing `w ∈ ncl(S)` (NOT
+  relators — `S` infinite). Template = `quotient.rs`'s finite normal-closure lemmas
+  (`add_relator`/`lemma_normal_closure_contains_conjugates`: a relator's conjugates are identity),
+  made **predicate-valued**: `in_C(w)` = `∃` a finite product of base-conjugates `cᵢ·rᵢ^{±}·cᵢ⁻¹` of
+  `S`-predicate relators `rᵢ` (each `rᵢ = w_β(c)` with `(β,0)∈H₀`) that is `≡_base w`. **CAUTION
+  (learned 2026-06-21):** the *exact* shape of `in_C` is **coupled to the Fork-B engine (C4)** — it
+  must be precisely what the non-iso virtual-iso engine consumes as `in_k` and produces as the
+  per-pinch membership obligation. So **co-design `in_C` with C4's engine signature**, don't pin it
+  speculatively first. The structural closure props (`in_C(ε)`, H_mul, H_resp) hold for almost any
+  reasonable ncl predicate, so proving them does NOT validate the design — validate against C4's
+  needs. State the faithfulness theorem `lemma_C_faithful` (`h3_pres ⊢ w_α(c)=1 ⟹ in_C(w_α(c))`)
+  signature once `in_C` is fixed.
 - **C2 — p-level iso (the free basis).** `A₊`'s HNN-recognition uses `{t_α w_α(b) d}` free basis —
   **already proven**, `free_basis.rs` (`lemma_basis_elt_free`). Package it as the p-level
   `kp_pinch` instantiation / the A₊ recognition.
