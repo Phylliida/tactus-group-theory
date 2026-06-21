@@ -754,4 +754,99 @@ pub proof fn lemma_a_conj_config(mm: ModMachine, n: nat, m: nat, l: nat, alpha: 
         + seq![Symbol::Gen(a_idx(nk, n, l))]);
 }
 
+// ----------------------------------------------------------------------------
+// Sub-brick 3 — the (IIa) / (IIb) inductions  (induction on α's base-m digits).
+//
+// `w_α(a)` = `w_α(b)` with each digit-letter replaced by the POSITIVE stable letter
+// `a_digit = Gen(a_idx(nk,n,digit))` (there are 2n a-stable-letters a₁…a₂ₙ, one per digit
+// value — no inverse convention). Snoc recursion mirrors `w_c`.
+// ----------------------------------------------------------------------------
+
+/// `w_α(a)` over the a-stable-letters. Lowest base-m digit appended last.
+pub open spec fn w_a(nk: nat, n: nat, m: nat, alpha: nat) -> Word
+    decreases alpha via w_a_decreases
+{
+    if alpha == 0 || m <= 1 {
+        empty_word()
+    } else {
+        w_a(nk, n, m, alpha / m) + seq![Symbol::Gen(a_idx(nk, n, alpha % m))]
+    }
+}
+
+#[via_fn]
+proof fn w_a_decreases(nk: nat, n: nat, m: nat, alpha: nat) {
+    if alpha != 0 && m > 1 {
+        vstd::arithmetic::div_mod::lemma_div_decreases(alpha as int, m as int);
+    }
+}
+
+/// **(IIa).** `w_α(a)⁻¹ · t · w_α(a) ≡ t_α = config(α,0)` in `h3_pres`, by induction on α's
+/// digits via the per-digit keystone `lemma_a_conj_config`.
+pub proof fn lemma_IIa(mm: ModMachine, n: nat, m: nat, alpha: nat)
+    requires numbers_word(n, m, alpha), 2 * n < m,
+    ensures
+        equiv_in_presentation(h3_pres(mm, n, m),
+            inverse_word(w_a(g_m(mm).num_generators, n, m, alpha))
+                + seq![Symbol::Gen(0)]
+                + w_a(g_m(mm).num_generators, n, m, alpha),
+            config_word(alpha, 0)),
+    decreases alpha,
+{
+    let nk = g_m(mm).num_generators;
+    let p = h3_pres(mm, n, m);
+    let t: Word = seq![Symbol::Gen(0)];
+    let wa = w_a(nk, n, m, alpha);
+    if alpha == 0 {
+        // w_a = ε, LHS = ε + t + ε = t = [Gen 0] = config(0,0).
+        assert(wa =~= empty_word());
+        assert(inverse_word(wa) =~= empty_word()) by { lemma_inverse_empty(); }
+        assert(config_word(0, 0) =~= t);
+        assert(inverse_word(wa) + t + wa =~= t);
+        lemma_equiv_refl(p, config_word(alpha, 0));
+    } else {
+        // α≠0, numbers_word ⟹ m>1 and 1 ≤ d ≤ 2n, numbers_word(ap)
+        assert(m > 1);
+        let ap = alpha / m;
+        let d = alpha % m;
+        assert(1 <= d <= 2 * n && numbers_word(n, m, ap));
+        vstd::arithmetic::div_mod::lemma_div_decreases(alpha as int, m as int);   // ap < alpha
+        vstd::arithmetic::div_mod::lemma_fundamental_div_mod(alpha as int, m as int);  // α = m·ap + d
+        assert(ap * m + d == alpha) by (nonlinear_arith)
+            requires alpha as int == m as int * (alpha as int / m as int) + alpha as int % m as int,
+                     ap == alpha / m, d == alpha % m;
+
+        let ad: Word = seq![Symbol::Gen(a_idx(nk, n, d))];
+        let adi: Word = seq![Symbol::Inv(a_idx(nk, n, d))];
+        let wap = w_a(nk, n, m, ap);
+        let inner = inverse_word(wap) + t + wap;
+        // w_a(α) = w_a(ap) + a_d ;  inverse_word(w_a(α)) = a_d⁻¹ + inverse_word(w_a(ap))
+        assert(wa =~= wap + ad);
+        lemma_inverse_concat(wap, ad);
+        lemma_inverse_singleton(Symbol::Gen(a_idx(nk, n, d)));
+        assert(ad =~= Seq::new(1, |_i: int| Symbol::Gen(a_idx(nk, n, d))));
+        assert(inverse_word(ad) =~= adi);
+        assert(inverse_word(wa) =~= adi + inverse_word(wap));
+        // LHS = a_d⁻¹ · inner · a_d
+        assert(inverse_word(wa) + t + wa =~= adi + inner + ad);
+
+        // IH:  inner ≡ config(ap, 0)
+        lemma_IIa(mm, n, m, ap);
+        assert(equiv_in_presentation(p, inner, config_word(ap, 0)));
+        // conjugate by a_d:  a_d⁻¹ · inner · a_d ≡ a_d⁻¹ · config(ap,0) · a_d
+        lemma_equiv_concat_right(p, adi, inner, config_word(ap, 0));
+        lemma_equiv_concat_left(p, adi + inner, adi + config_word(ap, 0), ad);
+        assert(equiv_in_presentation(p, adi + inner + ad, (adi + config_word(ap, 0)) + ad));
+        // keystone: a_d⁻¹ · config(ap,0) · a_d ≡ config(ap·m+d, 0) = config(α, 0)
+        lemma_a_conj_config(mm, n, m, d, ap);
+        assert((ap * m + d) as nat == alpha);
+        assert((adi + config_word(ap, 0)) + ad
+            =~= seq![Symbol::Inv(a_idx(nk, n, d))] + config_word(ap, 0)
+                + seq![Symbol::Gen(a_idx(nk, n, d))]);
+        // chain
+        lemma_equiv_transitive(p, adi + inner + ad, (adi + config_word(ap, 0)) + ad,
+            config_word(alpha, 0));
+        assert(inverse_word(wa) + t + wa =~= adi + inner + ad);
+    }
+}
+
 } // verus!
