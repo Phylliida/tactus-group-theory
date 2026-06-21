@@ -83,8 +83,48 @@ The catch: `h3_with_S` carries the **infinite** relator set `S`. Two ways to han
 soundness), then prove completeness in the with-S group via the `kp_pinch` predicate engine (Route A
 mechanics) — `ψ`/`φ_i` iso-validity in with-S reduces to Layer-1 faithfulness, no circularity.
 
-## Build order (this session)
-1. `higman_consequences.rs` skeleton + sub-brick 0 (lifting helpers) — verify, commit.
-2. sub-brick 1 (`w_bc` split) — verify, commit.
-3. sub-bricks 2–3 (config algebra + (IIa)/(IIb)) — the meat.
-4. sub-bricks 4–5 ((II) + (III)) — assemble the soundness headline.
+## Build order + STATUS (`higman_consequences.rs`, 28/0 so far)
+
+- [x] **sub-brick 0 — lifting helpers** (`lemma_h3_upto_in_h3`, `lemma_h2_in_h3`, `lemma_h1_in_h3`,
+      `lemma_h3_upto_climbs`). Lift any tower level → `h3_pres` via `lemma_base_embeds_in_hnn`.
+- [x] **keystone forward lift `base_A → h3_pres`** (`lemma_base_A_in_h3`): `lemma_lift_to_gm`
+      (existing, K_M tower) → `lemma_gm_in_h1` (NEW — g_m→h1_base derivation replay; prefix relators
+      + MORE generators, so neither `extends_presentation` nor `relators_included` applies) →
+      `lemma_h1_in_h3`. **Every base_A config fact now lifts to H₃.**
+- [x] **generic commutation algebra** (`commutes`, `lemma_commutes_{empty_right,sym,concat_right,inv_right}`,
+      `lemma_gen_commute_to_combos`). Reused in sub-brick 1 AND (II)/(III).
+- [x] **sub-brick 1 — `w_bc` split** (`lemma_w_bc_split`): `h1 ⊢ w_α(bc) ≡ w_α(b)·w_α(c)`. Supporting:
+      `lemma_h1_comm_relator_identity`, `lemma_bc_gen_commute`, `lemma_b_alpha_commutes_c_{symbol,word}`,
+      `lemma_bc_letter_split`.
+- [x] **sub-brick 2 keystone — `lemma_a_conj_config`**: `a_l⁻¹·config(α,0)·a_l ≡ config(α·m+l,0)` in
+      H₃ (1≤l≤2n). Via `lemma_stable_conj_factorization` (telescope at level l) + `conj_u`/`lemma_emb_conj_u`
+      (`emb(a_gens/b_gens, u)` using `lemma_emb_signed_scaled`) + `lemma_conj_config_signed_by_x`
+      (base_A config-move) + `lemma_config_signed_matches_nat`, lifted by `lemma_a_conj_config`'s
+      `lemma_h3_upto_in_h3` + `lemma_base_A_in_h3`.
+
+### REMAINING (next session) — sub-bricks 3–5
+- [ ] **w_a spec fn**: `w_a(nk,n,m,α)` = `w_α(b)` with each digit-letter `b_i` replaced by the POSITIVE
+      stable letter `a_digit = Gen(a_idx(nk,n,digit))` (NB: there are 2n a-stable-letters a₁…a₂ₙ, one per
+      digit value — NO inverse convention, unlike the n-letter b/c alphabet). Snoc recursion mirrors `w_c`.
+- [ ] **sub-brick 3 — (IIa)/(IIb)** by induction on α's digits:
+  - **(IIa)** `w_α(a)⁻¹·t·w_α(a) ≡ t_α = config(α,0)`. Step α↦αm+l: `(w_α(a)·a_l)⁻¹ t (w_α(a)·a_l)
+    = a_l⁻¹·(w_α(a)⁻¹ t w_α(a))·a_l ≡ a_l⁻¹·config(α,0)·a_l ≡ config(αm+l,0)` (IH + `lemma_a_conj_config`
+    + "conjugation-by-a_l respects ≡" = concat_left/right). Need `inverse_word(w_α(a)·a_l) = a_l⁻¹·w_α(a)⁻¹`
+    (`lemma_inverse_concat`).
+  - **(IIb)** `w_α(a)⁻¹·d·w_α(a) ≡ w_α(b)·d`. Analogous, but the per-digit step uses the φ_l relation
+    `a_l⁻¹ d a_l ≡ alphabet_letter(b_base,n,l)·d` (`lemma_hnn_conjugation` on `phi_assoc` head[2], lifted).
+    Build a companion keystone `lemma_a_conj_d`: `a_l⁻¹·(W·d)·a_l ≡ (W·b_l)·d`-style, OR conjugate d
+    directly then prepend. The b_l here IS `alphabet_letter(b_base,n,l)` (inverse convention) ⟹ result is
+    `w_c(b_base,…) = w_α(b)`.
+- [ ] **sub-brick 4 — (II)** `p⁻¹·t_α·p ≡ t_α·w_α(b)·d`. From (IIa): `t_α ≡ w_α(a)⁻¹ t w_α(a)`; `p`
+      commutes with `w_α(a)` (each `a_l⁻¹ p a_l ≡ p` ⟹ `commutes(p_letter, [a_l])` via `lemma_commute_from_conj`,
+      then `lemma_commutes_concat_right` over `w_α(a)`); `p⁻¹ t p ≡ t d` (`lemma_h2_p_conjugates_t`, lift
+      via `lemma_h2_in_h3`); regroup with (IIa)+(IIb).
+- [ ] **sub-brick 5 — (III)** `w_α(c) ≡ 1` (THE HEADLINE). `(α,0)∈H₀ ⟹ t_α∈⟨U⟩` (Layer-1 `lemma_vii`-easy-half
+      — find/confirm the exact lemma; AGENDA line 79). `k` fixes `U` pointwise (ψ:U↦U via `lemma_hnn_conjugation`
+      per U-gen), `k⁻¹dk≡d`, `k⁻¹pk≡p` ⟹ `k⁻¹ t_α k ≡ t_α` (per-factor commute induction over the ⟨U⟩
+      product). Conjugate (II) by k; ψ:b_j↦b_jc_j ⟹ `k⁻¹ w_α(b) k ≡ w_α(bc)` ≡ `w_α(b)·w_α(c)` (sub-brick 1);
+      equate ⟹ `w_α(c) ≡ 1`.
+
+Cast gotcha learned: `(a*b) as int == (a as int)*(b as int)` for nats needs `by (nonlinear_arith)`
+with the product INLINED (a `let mam = …` binding is opaque inside the nonlinear block).
