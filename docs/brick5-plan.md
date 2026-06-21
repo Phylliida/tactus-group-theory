@@ -116,15 +116,33 @@ mechanics) — `ψ`/`φ_i` iso-validity in with-S reduces to Layer-1 faithfulnes
     Build a companion keystone `lemma_a_conj_d`: `a_l⁻¹·(W·d)·a_l ≡ (W·b_l)·d`-style, OR conjugate d
     directly then prepend. The b_l here IS `alphabet_letter(b_base,n,l)` (inverse convention) ⟹ result is
     `w_c(b_base,…) = w_α(b)`.
-- [ ] **sub-brick 4 — (II)** `p⁻¹·t_α·p ≡ t_α·w_α(b)·d`. From (IIa): `t_α ≡ w_α(a)⁻¹ t w_α(a)`; `p`
-      commutes with `w_α(a)` (each `a_l⁻¹ p a_l ≡ p` ⟹ `commutes(p_letter, [a_l])` via `lemma_commute_from_conj`,
-      then `lemma_commutes_concat_right` over `w_α(a)`); `p⁻¹ t p ≡ t d` (`lemma_h2_p_conjugates_t`, lift
-      via `lemma_h2_in_h3`); regroup with (IIa)+(IIb).
-- [ ] **sub-brick 5 — (III)** `w_α(c) ≡ 1` (THE HEADLINE). `(α,0)∈H₀ ⟹ t_α∈⟨U⟩` (Layer-1 `lemma_vii`-easy-half
-      — find/confirm the exact lemma; AGENDA line 79). `k` fixes `U` pointwise (ψ:U↦U via `lemma_hnn_conjugation`
-      per U-gen), `k⁻¹dk≡d`, `k⁻¹pk≡p` ⟹ `k⁻¹ t_α k ≡ t_α` (per-factor commute induction over the ⟨U⟩
-      product). Conjugate (II) by k; ψ:b_j↦b_jc_j ⟹ `k⁻¹ w_α(b) k ≡ w_α(bc)` ≡ `w_α(b)·w_α(c)` (sub-brick 1);
-      equate ⟹ `w_α(c) ≡ 1`.
+- [x] **sub-brick 4 — (II) DONE** (`lemma_II`): `p⁻¹·t_α·p ≡ t_α·w_α(b)·d`. `p` commutes with `w_α(a)`
+      (`lemma_p_commutes_a_letter` via `lemma_commute_from_conj` on φ_l tail + `lemma_p_commutes_wa`);
+      `p⁻¹ t p ≡ t d` (`lemma_h2_p_conjugates_t` lifted via `lemma_h2_in_h3`); (IIa)+(IIb); full
+      conjugation-commute chain.
+
+### REMAINING — sub-brick 5 (III), THE HEADLINE  (everything else is DONE, 40/0)
+- [ ] **(III)** `(α,0)∈H₀(M) ⟹ w_α(c) ≡ 1` in `h3_pres`. Precise plan (all pointers confirmed):
+  - **k-conjugation is DIRECT in `h3_pres`** = `hnn_presentation(psi_data)`, `psi_data = {base: h3_upto(2n),
+    associations: psi_assoc(mm,n)}`, `k = Gen(k_top)`. No lifting for k-facts: use `lemma_hnn_conjugation(psi_data, i)`
+    / `lemma_stable_conj_factorization(psi_data, u)` straight at `h3_pres`. `psi_assoc` layout:
+    `psi_ublock` (len `nu = g_subgens.len() = 1+|quads|`) ++ `[d↦d]` (idx `nu`) ++ `psi_bcblock` (b_j at idx
+    `nu+1+(j-1)`, j∈1..n) ++ `[p↦p]` (idx `nu+1+n`).
+  - **Stage A — `k⁻¹ w_α(b) k ≡ w_α(bc)`**: per-letter `k⁻¹·alphabet_letter(b_base,n,d)·k ≡ bc_letter(d)`
+    (ψ bcblock at idx `nu+j`; positive b from `lemma_hnn_conjugation`, inverse-digit via inverse), then induct
+    on α's digits with `lemma_conj_distributes` (machine_group: `[k⁻¹](X+Y)[k] ≡ ([k⁻¹]X[k])([k⁻¹]Y[k])`).
+  - **Stage B — `k` commutes with `t_α`**: `lemma_h0_config_in_subgroup(mm,α,0)` (`(α,0)∈H₀ ⟹
+    in_generated_subgroup(b_m, g_subgens, t_α)`) → lift the witness equiv `concat_all(factors) ≡ t_α` to
+    `h3_pres` (NEW `lemma_bm_in_h3` = `lemma_base_embeds_in_hnn`(g_m k'-HNN) → `lemma_gm_in_h1` →
+    `lemma_h1_in_h3`) → `k` commutes with each `g_subgens` factor (ψ ublock `u↦u`, `lemma_hnn_conjugation` +
+    `lemma_commute_from_conj`) → `lemma_commutes_concat_right` over the factor list → `commutes(k, concat_all)`
+    → `commutes(k, t_α)` (NEW `lemma_commutes_respects_equiv_right`). Also `k` commutes with `p`,`d`
+    (ψ `p↦p`,`d↦d`).
+  - **Stage C — assemble + cancel**: conjugate (II) `V≡W` (V=`p⁻¹t_α p`, W=`t_α w_α(b) d`) by k:
+    `k⁻¹Vk ≡ V` (k commutes with p,t_α ⟹ with V); `k⁻¹Wk ≡ t_α·w_α(bc)·d` (distribute via
+    `lemma_conj_distributes`; k commutes with t_α,d; Stage A) `≡ t_α w_α(b) w_α(c) d` (sub-brick 1 `lemma_w_bc_split`
+    lifted via `lemma_h1_in_h3`). So `t_α w_α(b) d ≡ t_α w_α(b) w_α(c) d` ⟹ `w_α(c) ≡ ε` (NEW
+    `lemma_cancel_both_sides(p,X,Y,Z): X+Z ≡ X+Y+Z ⟹ Y ≡ ε`, X=t_α·w_α(b), Y=w_α(c), Z=d).
 
 Cast gotcha learned: `(a*b) as int == (a as int)*(b as int)` for nats needs `by (nonlinear_arith)`
 with the product INLINED (a `let mam = …` binding is opaque inside the nonlinear block).
