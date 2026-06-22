@@ -10,8 +10,12 @@ use crate::symbol::*;
 use crate::word::*;
 use crate::machine_group::{ModMachine, mod_machine_wf, g_m, config_word, lemma_g_m_num_generators,
     lemma_config_word_valid, lemma_word_valid_mono, lemma_config_word_zero};
-use crate::layout::{d_idx, b_base};
+use crate::layout::{d_idx, b_base, p_idx};
 use crate::benign::{apply_embedding, in_generated_subgroup};
+use crate::britton_via_tower::{has_pinch, has_pinch_at, has_adjacent_opposite_at, is_stable};
+use crate::phi_l_forward::{relabel_symbol, lemma_a_words_single_gen, lemma_single_gen_relabel,
+    lemma_single_gen_relabel_subrange, lemma_a_words_relabel_sym};
+use crate::h1::lemma_h1_base_num_generators;
 use crate::word_numbering::{w_b, w_c, numbers_word, lemma_w_c_valid};
 use crate::f_free::{is_free_family, lemma_apply_embedding_agree_prefix};
 use crate::higman_operations::free_group;
@@ -318,6 +322,135 @@ pub proof fn lemma_middle_descent_b(mm: ModMachine, n: nat, m: nat, alphas: Seq<
         assert(pcol[k] == pd.associations[k].1);
     }
     lemma_intersection_property(h1_base(mm, n), awf, pcol, u);
+}
+
+// ----------------------------------------------------------------------------
+// The pinch descent (same-index, since a_words is a relabeling).
+// ----------------------------------------------------------------------------
+
+/// **`map_a` pinch descent**: a pinch of `apply_embedding(a_words, w)` over `recog_data` descends to
+/// a pinch of `w` over `pa_data` — at the SAME indices, since `a_words` is a length-preserving
+/// relabeling that maps the `P_A` stable letter to the `recog` one (and F-gens to non-stable gens).
+/// The middle membership is the only real content (the per-side intersection descent).
+pub proof fn lemma_map_a_pinch_descends(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, w: Word)
+    requires
+        mod_machine_wf(mm),
+        2 * n < m,
+        forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]),
+        word_valid(w, (n + 4) as nat),
+        has_pinch(recog_data(mm, n, m, alphas), apply_embedding(a_words(mm, n), w)),
+    ensures
+        has_pinch(pa_data(n, m, betas(alphas)), w),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let rd = recog_data(mm, n, m, alphas);
+    let pd = pa_data(n, m, betas(alphas));
+    let aw = a_words(mm, n);
+    let pw = apply_embedding(aw, w);
+    let p = p_idx(nk, n);
+    let st: nat = (n + 3) as nat;
+
+    lemma_h1_base_num_generators(mm, n);
+    assert(rd.base.num_generators == p);
+    lemma_pa_data_shape(n, m, betas(alphas));
+    assert(pd.base.num_generators == st);
+
+    lemma_a_words_single_gen(mm, n);
+    lemma_single_gen_relabel(aw, w);
+    assert(pw.len() == w.len());
+    assert(forall|k: int| 0 <= k < w.len() ==> #[trigger] pw[k] == relabel_symbol(aw, w[k]));
+
+    let ij = choose|i: int, j: int| has_pinch_at(rd, pw, i, j);
+    let i = ij.0;
+    let j = ij.1;
+    assert(has_pinch_at(rd, pw, i, j));
+    assert(has_adjacent_opposite_at(rd, pw, i, j));
+    assert(0 <= i < j < w.len());
+
+    // per-symbol stable correspondence (relabel sends P_A stable ↔ recog stable, preserving Gen/Inv).
+    assert forall|k: int| 0 <= k < w.len() implies (
+        (pw[k] == Symbol::Gen(p) <==> w[k] == Symbol::Gen(st))
+        && (pw[k] == Symbol::Inv(p) <==> w[k] == Symbol::Inv(st))
+        && (is_stable(rd, pw[k]) <==> is_stable(pd, w[k]))
+    ) by {
+        assert(symbol_valid(w[k], (n + 4) as nat));
+        lemma_a_words_relabel_sym(mm, n, w[k]);
+        assert(pw[k] == relabel_symbol(aw, w[k]));
+    }
+
+    // has_adjacent_opposite_at(pd, w, i, j).
+    assert(has_adjacent_opposite_at(pd, w, i, j)) by {
+        assert(is_stable(pd, w[i]) && is_stable(pd, w[j]));
+        assert(w[i] != w[j]) by {
+            if w[i] == w[j] {
+                assert(pw[i] == relabel_symbol(aw, w[i]));
+                assert(pw[j] == relabel_symbol(aw, w[j]));
+            }
+        }
+        assert forall|k: int| i < k < j implies !is_stable(pd, #[trigger] w[k]) by {
+            assert(!is_stable(rd, pw[k]));
+        }
+    }
+
+    // the middle word.
+    let mid_w = w.subrange(i + 1, j);
+    assert(word_valid(mid_w, st)) by {
+        assert forall|t: int| 0 <= t < mid_w.len() implies symbol_valid(#[trigger] mid_w[t], st) by {
+            assert(mid_w[t] == w[i + 1 + t]);
+            assert(i < i + 1 + t < j);
+            assert(!is_stable(pd, w[i + 1 + t]));
+            assert(symbol_valid(w[i + 1 + t], (n + 4) as nat));
+            assert(generator_index(w[i + 1 + t]) != st) by {
+                if generator_index(w[i + 1 + t]) == st {
+                    match w[i + 1 + t] {
+                        Symbol::Gen(gg) => { assert(w[i + 1 + t] == Symbol::Gen(st)); },
+                        Symbol::Inv(gg) => { assert(w[i + 1 + t] == Symbol::Inv(st)); },
+                    }
+                }
+            }
+        }
+    }
+    lemma_single_gen_relabel_subrange(aw, w, i + 1, j);
+    assert(pw.subrange(i + 1, j) =~= apply_embedding(aw, mid_w));
+    lemma_a_words_eq_a_words_F(mm, n, mid_w);
+    assert(pw.subrange(i + 1, j) == apply_embedding(a_words_F(mm, n), mid_w));
+
+    let rd_b_col = Seq::new(rd.associations.len(), |k: int| rd.associations[k].1);
+    let rd_a_col = Seq::new(rd.associations.len(), |k: int| rd.associations[k].0);
+    let pd_b_col = Seq::new(pd.associations.len(), |k: int| pd.associations[k].1);
+    let pd_a_col = Seq::new(pd.associations.len(), |k: int| pd.associations[k].0);
+    assert(rd.base == h1_base(mm, n));
+
+    // orientation + middle descent.
+    assert(has_pinch_at(pd, w, i, j)) by {
+        assert(is_stable(rd, pw[i]));
+        if pw[i] == Symbol::Gen(p) {
+            // first disjunct of recog pinch: pw[j]=Inv(p), middle ∈ ⟨rd b-gens⟩.
+            assert(pw[j] == Symbol::Inv(p));
+            assert(w[i] == Symbol::Gen(st));
+            assert(w[j] == Symbol::Inv(st));
+            assert(in_generated_subgroup(rd.base, rd_b_col, pw.subrange(i + 1, j)));
+            assert(in_generated_subgroup(h1_base(mm, n), rd_b_col,
+                apply_embedding(a_words_F(mm, n), mid_w)));
+            lemma_middle_descent_b(mm, n, m, alphas, mid_w);
+            assert(w.subrange(i + 1, j) == mid_w);
+            assert(in_generated_subgroup(pd.base, pd_b_col, w.subrange(i + 1, j)));
+        } else {
+            // pw[i] stable but not Gen(p) ⟹ Inv(p); second disjunct.
+            assert(pw[i] == Symbol::Inv(p));
+            assert(pw[j] == Symbol::Gen(p));
+            assert(w[i] == Symbol::Inv(st));
+            assert(w[j] == Symbol::Gen(st));
+            assert(in_generated_subgroup(rd.base, rd_a_col, pw.subrange(i + 1, j)));
+            assert(in_generated_subgroup(h1_base(mm, n), rd_a_col,
+                apply_embedding(a_words_F(mm, n), mid_w)));
+            lemma_middle_descent_a(mm, n, m, alphas, mid_w);
+            assert(w.subrange(i + 1, j) == mid_w);
+            assert(in_generated_subgroup(pd.base, pd_a_col, w.subrange(i + 1, j)));
+        }
+    }
+    assert(has_pinch(pd, w)) by { assert(has_pinch_at(pd, w, i, j)); }
 }
 
 } // verus!
