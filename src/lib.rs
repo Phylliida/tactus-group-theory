@@ -197,3 +197,10 @@ pub mod f_free_h1;
 // (C5). See docs/brick5-completeness-plan.md.
 #[cfg(verus_keep_ghost)]
 pub mod higman_completeness;
+
+// f_free_a1: Layer 2 / Brick 5, C3.2c / A1 — the recognition-datum association isomorphism
+// `hnn_associations_isomorphic(recog_data)`. Rung 1 = lemma_km_faithful_in_h1 (the kill_hom
+// retraction: K_M ↪ h1_base faithful). Rung 2 = lemma_config_emb_free_in_h1 (config family free in
+// h1_base = F2 lifted via the retraction). See docs/brick5-c3.2c-plan.md §4.2.
+#[cfg(verus_keep_ghost)]
+pub mod f_free_a1;

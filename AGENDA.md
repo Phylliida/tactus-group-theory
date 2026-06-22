@@ -316,6 +316,13 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       is the SHORT `kill_hom`-retraction lemma (K_M faithful in `h1_base`). `prop_v`/`tower_peel`/
       `lemma_accumulator_inv` are NOT needed (already spent inside `lemma_basis_elt_free`). A1 is a clean focused
       arc; §4.2 has the concrete sub-ladder.
+      **A1 RUNGS 1+2 DONE 2026-06-22** (`f_free_a1.rs` 2/0, NEW module): `lemma_km_faithful_in_h1` (the SHORT
+      genuinely-new `kill_hom` retraction — `K_M`-word trivial in `h1_base` ⟹ trivial in `g_m`, via
+      `lemma_kill_hom_valid`+`lemma_hom_preserves_equiv`+`lemma_kill_fixes_low`) + `lemma_config_emb_free_in_h1`
+      (config family free in `h1_base` = F2 `lemma_config_emb_free` lifted through the retraction; embedded
+      product is a K_M word so triviality descends). REMAINING for A1 = the `betas=[0]++alphas` correspondence
+      (`lemma_a_words_eq_config_emb`/`_b_words_eq_basis_emb`, head LITERAL seq-equal) + the assembly
+      `lemma_recog_associations_isomorphic` (both columns free + F3 both ways). §4.2 sub-ladder updated.
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).
