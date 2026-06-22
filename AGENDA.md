@@ -234,9 +234,12 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       a-tower rebuilt, ψ on top) + the group-preservation iff `lemma_h3_II_group_preserving`
       (`equiv(h3_pres,·,·) ⟺ equiv(h3_II,·,·)`) via the flat splice `H+M` vs `H+family_II+M` discharged
       top-level by `lemma_same_group_iff` (the compositional route is impossible — `h2_II≠h2_pres` as
-      groups). **NEXT = C3.2** (b-augmented a-level recognition over `h3_II`: prove
-      `hnn_associations_isomorphic(φ_l over h3_II_upto(l-1))`, `tower_peel`-scale but literal Britton) →
-      C2 → C4 → C5. See `docs/brick5-completeness-plan.md` §2.2bis/§2.2ter / §4 C3.
+      groups). **C3.2a DONE** (`h3_ii.rs` 18/0): the a_words/b_words backbone — `lemma_phi_assoc_index`
+      (explicit per-position `φ_l` pairs: `t↦t_l, x↦xᵐ, d↦b_l·d, b_j↦b_j, p↦p`), `phi_l_data` HNN datum +
+      `lemma_phi_l_data_base`/`_valid` (`hnn_data_valid`, `k=n+4`, `base.num_gens=h2_num_gens+(l-1)`).
+      **NEXT = C3.2b** (von Dyck over `h3_II`: images satisfy each `B`-relator; the p/a_i-relators
+      consume family (II) — C3.1's payoff) → C3.2c (b-augmented `conj_scaling_trivial_iff`, the crux) →
+      C3.2d (tower lift) → C2 → C4 → C5. See `docs/brick5-c3.2-plan.md` §4 / `brick5-completeness-plan.md`.
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).
