@@ -149,7 +149,33 @@ Bottom-up. Each brick names the existing infra it reduces to.
   (`c_base..c_base+n`), hence over `h1_base.num_generators`, hence has **no stable letter** of any
   tower HNN (`p`, `a_i`, `k` all sit at indices `≥ h1_num_gens`). This is what lets the peel start.
   Pure index arithmetic over `layout.rs`. *(Verifiable immediately; good build-shakedown brick.)*
-- **C1 — the C predicate + `in_C`.** Define `in_C : spec_fn(Word)->bool` capturing `w ∈ ncl(S)` (NOT
+- **C1 — the C predicate + `in_C` — DONE** (`higman_completeness.rs` 3/0, 2026-06-21). Resolved
+  the co-design with C4 (peer-reviewed). Key outcomes:
+  - **`in_C(w)` = `w ∈ ncl(S)` over the k-HNN base `B = h3_upto(2n)`** — *exactly* what a virtual-iso
+    `britton_lemma_unconditional` outputs (Britton lands base-word-trivial-in-HNN at "trivial in the
+    base", and over the free-c base the honest version is "trivial mod ncl(S)"). Representation: the
+    explicit conjugate-product form `∃ factors. all_conj_S_factors(factors) ∧ concat_all(factors) ≡_B w`,
+    each factor a conjugate `g·r^{±1}·g⁻¹` of an S-relator `r = w_β(c)` (`(β,0)∈H₀`, `is_S_relator`),
+    conjugators `g` arbitrary `B`-words. Chosen over the finite-subset-of-S-adjoined form (which has a
+    relator-*ordering* wrinkle in H_mul: `add_relators(B, rs_a+rs_b)` is not an `extends_presentation`
+    superset of `add_relators(B, rs_b)`). The conjugate-product form makes the three closure props fall
+    out of `concat_all`/`equiv` directly.
+  - **Two structural decisions, both peer-confirmed (see §2.3 / Fork B):**
+    (i) **C4 is a direct virtual-iso descent, NOT a `lemma_property_ii` instantiation** — in the
+    faithfulness instantiation the `in_kp_subgroup` membership witness is the EMPTY factor list (since
+    `w_α(c) ≡ ε`), so the generic engine's `choose` over witnesses is a liability (it may pick a
+    non-empty `W`, reviving the pinch loop + the false base-descent). C4's input is a base word by
+    construction. (ii) **One predicate suffices** — `ncl_B(S) ∩ {pure c-words} = ncl_{F(c)}(S)` (the
+    b's commute with the c's so b-conjugators cancel; p/a/U don't enter pure c-words), so C5 is an
+    *unfolding* of `in_C` to "= 1 in C", not a bridge between two predicates.
+  - **Down-payment proved:** `lemma_in_C_empty` (H_id), `lemma_in_C_mul` (H_mul), `lemma_in_C_resp`
+    (H_resp) — the three subgroup-closure props C4 consumes as it accumulates the factor list.
+  - **Signature pinned:** `faithfulness_statement(mm,n,m,α)` (a `spec` predicate, no proof obligation
+    yet) states `h3_pres ⊢ w_α(c)=1 ⟹ in_C(w_α(c))` with the precise hypotheses (incl. `mm_terminal`
+    feeding `lemma_theorem1`, the circularity-breaker). The `proof fn lemma_C_faithful` lands at the
+    end of the Fork-B arc (no verifier-bypass stub before then).
+- ~~**C1 — the C predicate + `in_C`.**~~ *(original sketch, superseded by the DONE block above.)*
+  Define `in_C : spec_fn(Word)->bool` capturing `w ∈ ncl(S)` (NOT
   relators — `S` infinite). Template = `quotient.rs`'s finite normal-closure lemmas
   (`add_relator`/`lemma_normal_closure_contains_conjugates`: a relator's conjugates are identity),
   made **predicate-valued**: `in_C(w)` = `∃` a finite product of base-conjugates `cᵢ·rᵢ^{±}·cᵢ⁻¹` of
@@ -211,16 +237,19 @@ Bottom-up. Each brick names the existing infra it reduces to.
 This is a **multi-session arc**, comparable in size to all of E2 (the `ii_subset`/`kp_pinch`/
 `tower_peel`/`prop_v` cluster), and **harder than the brick5-plan routing suggested** — the generic
 engine does not apply at the k-level (§2.3), so C4 is **Fork B**: build the two non-iso Britton
-variants + thread them through a virtual-iso `kp_property_ii_core`. No `assume`/`admit`/`external_body`
-(standing rule). Sequence: **C0 DONE** → C1 (the `in_C` predicate + faithfulness theorem statement) →
+variants + thread them through a virtual-iso `kp_property_ii_core` — though note the C1 finding that
+C4 is now planned as a *direct* virtual-iso descent (not a `lemma_property_ii` reuse), so the "core" it
+threads is bespoke. No verifier bypasses (standing rule). Sequence: **C0 DONE** → **C1 DONE**
+(`in_C` + closure props + signature, `higman_completeness.rs` 3/0) →
 C3 (check whether φ_i iso holds *literally* at `h3_upto(l-1)` — likely yes, no c's — so a_i levels may
 use the existing `britton_lemma_unconditional` directly) → C2 (package the `free_basis.rs` p-level
 recognition) → C4 (the Fork-B non-iso k-engine — the crux) → C5 (assembly + free-product projection).
 
-**Most valuable next concrete step after C0 = C1:** pin down `in_C: spec_fn(Word)->bool` ("trivial in
-`C=⟨c;S⟩`", i.e. `∈ ncl(S)`; mirror `quotient.rs`'s finite `add_relators`/normal-closure-conjugate
-lemmas but predicate-valued over the `S`-predicate) and the exact faithfulness theorem signature, so
-C2–C5 have a fixed target. Shape `in_C` to satisfy the engine's `in_k` hypotheses by construction
-(`in_C(ε)`, H_mul, H_resp are structural; H_ab/H_ba are the deep §3 content for C4). Get this
-signature right *before* proving anything downstream. The easy closure props (`in_C(ε)`, H_mul,
-H_resp) are a safe first verifiable down-payment on C1.
+**Most valuable next concrete step after C1 = C3** (then C2, then the crux C4). C3 question: does the
+`φ_l` association iso hold *literally* over `h3_upto(l-1)` (no c's involved at the a-levels)? If yes,
+the a_i levels Britton-peel directly with the existing `britton_lemma_unconditional` — no virtual-iso
+machinery needed there, isolating the hard non-iso content to the single k-level (C4). Concretely:
+check `hnn_associations_isomorphic(phi_l_data)` for `phi_l_data = HNNData{ base: h3_upto(l-1),
+associations: phi_assoc(nk,n,m,l) }`, using the residue facts (`prop_v`/`tower_peel`, b-augmented).
+C2 then packages the `free_basis.rs` p-level recognition. C4 = the Fork-B direct virtual-iso k-descent
+(`faithfulness_statement` body), consuming the C1 closure props + C2/C3 isos + soundness/`lemma_theorem1`.
