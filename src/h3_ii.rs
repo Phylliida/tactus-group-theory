@@ -26,7 +26,12 @@ use crate::presentation_lemmas::*;
 use crate::machine_group::*;
 use crate::word_numbering::*;
 use crate::layout::*;
+use crate::hnn::*;
+use crate::quotient::*;
+use crate::h2::*;
 use crate::h3::*;
+use crate::base_swap::*;
+use crate::britton_infra::lemma_hnn_presentation_valid;
 use crate::higman_consequences::lemma_II;
 
 verus! {
@@ -154,6 +159,353 @@ pub proof fn lemma_family_II_relator_equiv_empty(mm: ModMachine, n: nat, m: nat,
     lemma_II(mm, n, m, beta);     // h3 ⊢ family_II_lhs ≡ family_II_rhs
     assert(equiv_in_presentation(h3, family_II_lhs(mm, n, beta), family_II_rhs(mm, n, m, beta)));
     lemma_equiv_to_relator(h3, family_II_lhs(mm, n, beta), family_II_rhs(mm, n, m, beta));
+}
+
+// ============================================================================
+// C3.1c — the bottom-augmented tower `h3_II` and the group-preservation iff.
+// ============================================================================
+//
+// Structure (the splice).  Both towers share the `h2_pres` relator prefix `H` and the SAME
+// a-relator/k-relator blocks (same stable-letter indices — the num_gen counts agree because
+// `add_relators` preserves the generator count).  `h3_II` just SPLICES `family_II` in right
+// after `H`:
+//     h3_pres.relators  ≃  H +              phi_blocks(2n) + Krel
+//     h3_II.relators    ≃  H + family_II +  phi_blocks(2n) + Krel
+// The compositional route (level-by-level base swap) is IMPOSSIBLE — `h2_II ≠ h2_pres` as
+// groups (family (II) is not derivable in `h2_pres` alone; it needs the `a_i`).  So the
+// group-equality is a genuinely TOP-LEVEL fact, discharged by `lemma_same_group_iff`
+// (base_swap) against the flat splice.
+
+// ----------------------------------------------------------------------------
+// `hnn_relators` depends on the base only through `base.num_generators`.
+// ----------------------------------------------------------------------------
+
+/// Two HNN data with the same base generator-count and the same associations have the same
+/// relators (the stable letter `Gen(base.num_generators)` and the association words agree).
+pub proof fn lemma_hnn_relators_eq(d1: HNNData, d2: HNNData)
+    requires
+        d1.base.num_generators == d2.base.num_generators,
+        d1.associations == d2.associations,
+    ensures
+        hnn_relators(d1) =~~= hnn_relators(d2),
+{
+    assert(stable_letter(d1) == stable_letter(d2));
+    assert(stable_letter_inv(d1) == stable_letter_inv(d2));
+    assert(hnn_relators(d1).len() == hnn_relators(d2).len());
+    assert forall|i: int| 0 <= i < hnn_relators(d1).len()
+        implies hnn_relators(d1)[i] =~~= hnn_relators(d2)[i] by {
+        assert(d1.associations[i] == d2.associations[i]);
+    }
+}
+
+// ----------------------------------------------------------------------------
+// The a-relator blocks `phi_blocks(l) = Φ₁ + … + Φ_l`, and the explicit relator list of
+// the canonical (non-augmented) tower `h3_upto`.
+// ----------------------------------------------------------------------------
+
+/// `Φ₁ + … + Φ_l` — the accumulated a-level HNN relators of the canonical tower.
+pub open spec fn phi_blocks(mm: ModMachine, n: nat, m: nat, l: nat) -> Seq<Word>
+    decreases l,
+{
+    if l == 0 {
+        Seq::<Word>::empty()
+    } else {
+        phi_blocks(mm, n, m, (l - 1) as nat)
+        + hnn_relators(HNNData {
+            base: h3_upto(mm, n, m, (l - 1) as nat),
+            associations: phi_assoc(g_m(mm).num_generators, n, m, l),
+        })
+    }
+}
+
+/// `h3_upto(l).relators ≃ h2_pres.relators + phi_blocks(l)`.
+pub proof fn lemma_h3_upto_relators(mm: ModMachine, n: nat, m: nat, l: nat)
+    ensures
+        h3_upto(mm, n, m, l).relators =~= h2_pres(mm, n).relators + phi_blocks(mm, n, m, l),
+    decreases l,
+{
+    if l == 0 {
+        assert(phi_blocks(mm, n, m, 0) =~= Seq::<Word>::empty());
+        assert(h2_pres(mm, n).relators + phi_blocks(mm, n, m, 0) =~= h2_pres(mm, n).relators);
+    } else {
+        lemma_h3_upto_relators(mm, n, m, (l - 1) as nat);
+        let data = HNNData {
+            base: h3_upto(mm, n, m, (l - 1) as nat),
+            associations: phi_assoc(g_m(mm).num_generators, n, m, l),
+        };
+        // h3_upto(l).relators = h3_upto(l-1).relators + hnn_relators(data)
+        assert(h3_upto(mm, n, m, l).relators
+            =~= h3_upto(mm, n, m, (l - 1) as nat).relators + hnn_relators(data));
+        assert(phi_blocks(mm, n, m, l) =~= phi_blocks(mm, n, m, (l - 1) as nat) + hnn_relators(data));
+    }
+}
+
+// ----------------------------------------------------------------------------
+// The bottom-augmented tower `h3_II`.  Family (II) is spliced into the a-tower BASE (at
+// `h2_II`), so each a-level's base carries it (what C3.2 needs); the k-level on top is `h3_II`.
+// ----------------------------------------------------------------------------
+
+/// `h2_II = h2_pres + family (II)` — the augmented bottom of the tower.
+pub open spec fn h2_II(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>) -> Presentation {
+    add_relators(h2_pres(mm, n), family_II(mm, n, m, alphas))
+}
+
+/// The augmented a-tower: `h2_II` with `a_1,…,a_l` added (same `φ_l` associations as `h3_upto`).
+pub open spec fn h3_II_upto(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, l: nat) -> Presentation
+    decreases l,
+{
+    if l == 0 {
+        h2_II(mm, n, m, alphas)
+    } else {
+        hnn_presentation(HNNData {
+            base: h3_II_upto(mm, n, m, alphas, (l - 1) as nat),
+            associations: phi_assoc(g_m(mm).num_generators, n, m, l),
+        })
+    }
+}
+
+/// `h3_II = HNN(h3_II_upto(2n); k ∣ ψ)` — the augmented Higman group (same `ψ` as `h3_pres`).
+pub open spec fn h3_II(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>) -> Presentation {
+    hnn_presentation(HNNData {
+        base: h3_II_upto(mm, n, m, alphas, (2 * n) as nat),
+        associations: psi_assoc(mm, n),
+    })
+}
+
+/// `h3_II_upto(l)` has the SAME generator count as `h3_upto(l)` (`add_relators` preserves it).
+pub proof fn lemma_h3_II_upto_num_generators(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, l: nat)
+    ensures
+        h3_II_upto(mm, n, m, alphas, l).num_generators
+            == h2_num_gens((4 + mm.quads.len()) as nat, n) + l,
+    decreases l,
+{
+    if l == 0 {
+        lemma_add_relators_relators(h2_pres(mm, n), family_II(mm, n, m, alphas));  // num_gen preserved
+        lemma_h2_num_generators(mm, n);
+    } else {
+        lemma_h3_II_upto_num_generators(mm, n, m, alphas, (l - 1) as nat);
+    }
+}
+
+/// `h3_II_upto(l)` is a valid presentation (mirror of `lemma_h3_upto_valid`).
+pub proof fn lemma_h3_II_upto_valid(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, l: nat)
+    requires
+        l <= 2 * n,
+        2 * n < m,
+        forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]),
+    ensures
+        presentation_valid(h3_II_upto(mm, n, m, alphas, l)),
+    decreases l,
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);                                  // nk = 4+|quads|
+    if l == 0 {
+        // h2_II = add_relators(h2_pres, family_II): valid since each relator word_valid over h2 gens.
+        lemma_h2_pres_valid(mm, n);
+        lemma_h2_num_generators(mm, n);                            // h2_pres.num = nk+2n+2
+        assert forall|i: int| 0 <= i < family_II(mm, n, m, alphas).len()
+            implies word_valid(#[trigger] family_II(mm, n, m, alphas)[i], h2_pres(mm, n).num_generators) by {
+            assert(family_II(mm, n, m, alphas)[i] == family_II_relator(mm, n, m, alphas[i]));
+            lemma_family_II_relator_valid(mm, n, m, alphas[i], h2_pres(mm, n).num_generators);
+        }
+        lemma_add_relators_valid(h2_pres(mm, n), family_II(mm, n, m, alphas));
+    } else {
+        let base = h3_II_upto(mm, n, m, alphas, (l - 1) as nat);
+        let data = HNNData { base, associations: phi_assoc(nk, n, m, l) };
+        lemma_h3_II_upto_valid(mm, n, m, alphas, (l - 1) as nat);          // presentation_valid(base)
+        lemma_h3_II_upto_num_generators(mm, n, m, alphas, (l - 1) as nat); // base.num = nk+2n+2+(l-1)
+        lemma_phi_assoc_valid(nk, n, m, l, base.num_generators);
+        lemma_hnn_data_valid_from(data, base.num_generators);
+        lemma_hnn_presentation_valid(data);
+    }
+}
+
+/// `h3_II_upto(l).relators ≃ h2_pres.relators + family_II + phi_blocks(l)` — the SPLICE: the
+/// augmented tower equals the canonical one with `family_II` inserted right after `h2_pres`.
+pub proof fn lemma_h3_II_upto_relators(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, l: nat)
+    ensures
+        h3_II_upto(mm, n, m, alphas, l).relators
+            =~= h2_pres(mm, n).relators + family_II(mm, n, m, alphas) + phi_blocks(mm, n, m, l),
+    decreases l,
+{
+    if l == 0 {
+        lemma_add_relators_relators(h2_pres(mm, n), family_II(mm, n, m, alphas));  // .relators = h2 + fii
+        assert(phi_blocks(mm, n, m, 0) =~= Seq::<Word>::empty());
+        assert(h2_pres(mm, n).relators + family_II(mm, n, m, alphas) + phi_blocks(mm, n, m, 0)
+            =~= h2_pres(mm, n).relators + family_II(mm, n, m, alphas));
+    } else {
+        lemma_h3_II_upto_relators(mm, n, m, alphas, (l - 1) as nat);
+        let nk = g_m(mm).num_generators;
+        let data_ii = HNNData {
+            base: h3_II_upto(mm, n, m, alphas, (l - 1) as nat),
+            associations: phi_assoc(nk, n, m, l),
+        };
+        let data = HNNData {
+            base: h3_upto(mm, n, m, (l - 1) as nat),
+            associations: phi_assoc(nk, n, m, l),
+        };
+        // Φ_l^II == Φ_l: same associations, and same base generator-count.
+        lemma_h3_II_upto_num_generators(mm, n, m, alphas, (l - 1) as nat);
+        lemma_h3_upto_num_generators(mm, n, m, (l - 1) as nat);
+        lemma_hnn_relators_eq(data_ii, data);
+        assert(hnn_relators(data_ii) == hnn_relators(data));
+        // unfold both sides
+        assert(h3_II_upto(mm, n, m, alphas, l).relators
+            =~= h3_II_upto(mm, n, m, alphas, (l - 1) as nat).relators + hnn_relators(data_ii));
+        assert(phi_blocks(mm, n, m, l) =~= phi_blocks(mm, n, m, (l - 1) as nat) + hnn_relators(data));
+        // (H + fii + pb(l-1)) + Φ_l = H + fii + (pb(l-1) + Φ_l)
+        assert(h2_pres(mm, n).relators + family_II(mm, n, m, alphas) + phi_blocks(mm, n, m, l)
+            =~= (h2_pres(mm, n).relators + family_II(mm, n, m, alphas) + phi_blocks(mm, n, m, (l - 1) as nat))
+                + hnn_relators(data));
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Top-level facts about `h3_II` and the group-preservation iff (the C3.1 headline).
+// ----------------------------------------------------------------------------
+
+/// `h3_II` and `h3_pres` have the same generator count.
+pub proof fn lemma_h3_II_num_generators(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>)
+    ensures
+        h3_II(mm, n, m, alphas).num_generators == h3_pres(mm, n, m).num_generators,
+        h3_II(mm, n, m, alphas).num_generators == h3_num_gens((4 + mm.quads.len()) as nat, n),
+{
+    lemma_h3_II_upto_num_generators(mm, n, m, alphas, (2 * n) as nat);  // = h2_num_gens + 2n
+    lemma_h3_num_generators(mm, n, m);                                  // h3_pres = h3_num_gens
+}
+
+/// `h3_II` is a valid presentation.
+pub proof fn lemma_h3_II_valid(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>)
+    requires
+        2 * n < m,
+        forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]),
+    ensures
+        presentation_valid(h3_II(mm, n, m, alphas)),
+{
+    let base = h3_II_upto(mm, n, m, alphas, (2 * n) as nat);
+    let data = HNNData { base, associations: psi_assoc(mm, n) };
+    lemma_h3_II_upto_valid(mm, n, m, alphas, (2 * n) as nat);
+    lemma_h3_II_upto_num_generators(mm, n, m, alphas, (2 * n) as nat);  // base.num = nk+4n+2
+    lemma_g_m_num_generators(mm);
+    lemma_psi_assoc_valid(mm, n, base.num_generators);                 // needs nk+2n+2 ≤ nk+4n+2
+    lemma_hnn_data_valid_from(data, base.num_generators);
+    lemma_hnn_presentation_valid(data);
+}
+
+/// **The group-preservation iff (C3.1 headline).** `h3_II` (family (II) spliced into the
+/// a-tower base) presents the SAME group as `h3_pres`: `equiv_in(h3_pres,·,·) ⟺
+/// equiv_in(h3_II,·,·)`. Discharged by `lemma_same_group_iff` (base_swap) against the flat
+/// splice `h3_pres ≃ H+M`, `h3_II ≃ H+family_II+M` — each augmenting relator is `≡_{h3_pres} ε`
+/// (lemma_II), and the shared relators are relators of both.
+pub proof fn lemma_h3_II_group_preserving(
+    mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, w1: Word, w2: Word,
+)
+    requires
+        2 * n < m,
+        forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]),
+    ensures
+        equiv_in_presentation(h3_pres(mm, n, m), w1, w2)
+            <==> equiv_in_presentation(h3_II(mm, n, m, alphas), w1, w2),
+{
+    let p = h3_pres(mm, n, m);
+    let q = h3_II(mm, n, m, alphas);
+    let hh = h2_pres(mm, n).relators;
+    let ff = family_II(mm, n, m, alphas);
+    let pb = phi_blocks(mm, n, m, (2 * n) as nat);
+    let psi_data = HNNData { base: h3_upto(mm, n, m, (2 * n) as nat), associations: psi_assoc(mm, n) };
+    let psi_data_ii =
+        HNNData { base: h3_II_upto(mm, n, m, alphas, (2 * n) as nat), associations: psi_assoc(mm, n) };
+    let krel = hnn_relators(psi_data);
+    let mm_blk = pb + krel;       // M = phi_blocks(2n) + Krel
+
+    // validity + num_gens
+    lemma_h3_pres_valid(mm, n, m);
+    lemma_h3_II_valid(mm, n, m, alphas);
+    lemma_h3_II_num_generators(mm, n, m, alphas);     // q.num == p.num
+    assert(q.num_generators == p.num_generators);
+
+    // K-relators agree (same num_gens, same ψ).
+    lemma_h3_II_upto_num_generators(mm, n, m, alphas, (2 * n) as nat);
+    lemma_h3_upto_num_generators(mm, n, m, (2 * n) as nat);
+    lemma_hnn_relators_eq(psi_data_ii, psi_data);
+    assert(hnn_relators(psi_data_ii) == krel);
+
+    // p.relators ≃ H + M
+    lemma_h3_upto_relators(mm, n, m, (2 * n) as nat);          // h3_upto(2n).relators ≃ H + pb
+    assert(p.relators =~= h3_upto(mm, n, m, (2 * n) as nat).relators + krel);
+    assert(p.relators =~= hh + mm_blk) by {
+        assert(p.relators =~= (hh + pb) + krel);
+        assert((hh + pb) + krel =~= hh + (pb + krel));
+    }
+    // q.relators ≃ H + F + M
+    lemma_h3_II_upto_relators(mm, n, m, alphas, (2 * n) as nat);   // ≃ H + F + pb
+    assert(q.relators =~= h3_II_upto(mm, n, m, alphas, (2 * n) as nat).relators + hnn_relators(psi_data_ii));
+    assert(q.relators =~= hh + ff + mm_blk) by {
+        assert(q.relators =~= (hh + ff + pb) + krel);
+        assert((hh + ff + pb) + krel =~= (hh + ff) + (pb + krel));
+        assert(hh + ff + mm_blk =~= (hh + ff) + mm_blk);
+    }
+
+    reveal(presentation_valid);     // unfold word_valid-of-relators below
+    let hl = hh.len() as int;
+    let fl = ff.len() as int;
+    let ml = mm_blk.len() as int;
+    // length facts from the seq equalities (=~= gives ==)
+    assert(p.relators.len() == hl + ml);
+    assert(q.relators.len() == hl + fl + ml);
+    assert((hh + ff).len() == hl + fl);
+
+    // (A) every q-relator is ≡_p ε.
+    assert forall|i: int| 0 <= i < q.relators.len()
+        implies word_valid(#[trigger] q.relators[i], p.num_generators)
+            && equiv_in_presentation(p, q.relators[i], empty_word()) by {
+        // word_valid from presentation_valid(q) (num_gens agree)
+        assert(word_valid(q.relators[i], q.num_generators));
+        // q.relators ≃ (hh+ff) + mm_blk
+        assert(q.relators[i] == ((hh + ff) + mm_blk)[i]);
+        if i < hl {
+            // H-block: a relator of p (p.relators ≃ hh + mm_blk, prefix hh)
+            assert(q.relators[i] == hh[i]);
+            assert(p.relators[i] == hh[i]);
+            lemma_relator_is_identity(p, i);
+        } else if i < hl + fl {
+            // family-II block
+            assert(q.relators[i] == ff[i - hl]);
+            assert(ff[i - hl] == family_II_relator(mm, n, m, alphas[i - hl]));
+            lemma_family_II_relator_equiv_empty(mm, n, m, alphas[i - hl]);
+        } else {
+            // M-block (shifted by fl): q.relators[i] == p.relators[i - fl]
+            assert(((hh + ff) + mm_blk)[i] == mm_blk[i - (hl + fl)]);   // i ≥ (hh+ff).len()
+            assert(p.relators[i - fl] == (hh + mm_blk)[i - fl]);
+            assert((hh + mm_blk)[i - fl] == mm_blk[(i - fl) - hl]);     // hl ≤ i-fl < hl+ml
+            assert((i - fl) - hl == i - (hl + fl));
+            assert(q.relators[i] == p.relators[i - fl]);
+            lemma_relator_is_identity(p, i - fl);
+        }
+    }
+
+    // (B) every p-relator is ≡_q ε.
+    assert forall|j: int| 0 <= j < p.relators.len()
+        implies word_valid(#[trigger] p.relators[j], q.num_generators)
+            && equiv_in_presentation(q, p.relators[j], empty_word()) by {
+        assert(word_valid(p.relators[j], p.num_generators));
+        assert(p.relators[j] == (hh + mm_blk)[j]);
+        if j < hl {
+            assert(p.relators[j] == hh[j]);
+            assert(q.relators[j] == hh[j]);
+            lemma_relator_is_identity(q, j);
+        } else {
+            // M-block: p.relators[j] == q.relators[j + fl]
+            assert((hh + mm_blk)[j] == mm_blk[j - hl]);                 // hl ≤ j < hl+ml
+            assert(q.relators[j + fl] == ((hh + ff) + mm_blk)[j + fl]);
+            assert(((hh + ff) + mm_blk)[j + fl] == mm_blk[(j + fl) - (hl + fl)]);  // j+fl ≥ hl+fl
+            assert((j + fl) - (hl + fl) == j - hl);
+            assert(p.relators[j] == q.relators[j + fl]);
+            lemma_relator_is_identity(q, j + fl);
+        }
+    }
+
+    lemma_same_group_iff(p, q, w1, w2);
 }
 
 } // verus!
