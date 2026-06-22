@@ -239,3 +239,10 @@ pub mod phi_l_iso;
 // map_a's instantiation. The forward unified HNN lifting lemma lands here next.
 #[cfg(verus_keep_ghost)]
 pub mod phi_l_lift;
+
+// phi_l_forward: Layer 2 / Brick 5, C3.2c / the C-arc — the FORWARD (faithful) direction of the
+// unified HNN lifting lemma (emb(map,w) ≡_{h2_II} ε ⟹ w ≡_{P_A} ε). map_a is a length-preserving
+// relabeling ⟹ same-index pinch descent; the real content is the intersection property. Starts
+// with generic leaves (free-family injectivity, concat_all distribution, cancellation).
+#[cfg(verus_keep_ghost)]
+pub mod phi_l_forward;
