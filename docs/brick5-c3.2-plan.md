@@ -108,7 +108,10 @@ through the a-tower by base-faithfulness (`lemma_single_hnn_base_faithful`, IH d
    relator of `B` via the splice — this is the payoff of C3.1). 
 3. **C3.2c — the b-augmented `conj_scaling_trivial_iff` over `h2_II`** (the crux). The forward
    faithful direction at the bottom of the tower. Port `lemma_psi_A_injective` to the
-   scaling-plus-`d↦b_l d` endomorphism, using the residue facts. THE real cost.
+   scaling-plus-`d↦b_l d` endomorphism, using the residue facts. THE real cost. **Detailed sub-lemma
+   ladder + the three template-breaks (scattered free-base gens / infinite non-trivial associations /
+   augmented endomorphism) in `docs/brick5-c3.2c-plan.md`** — start at A2 or B1, save the A1 residue
+   iso (the `prop_v`-scale content) for a focused push.
 4. **C3.2d — tower lift.** Thread C3.2c up `h3_II_upto` via base-faithfulness + the §2.2bis collapse
    (mirror `lemma_b_m_upto_faithful` / `lemma_vi_upto`, `decreases l`). Yields `lemma_phi_l_iso`.
    **Refined architecture (2026-06-22, after studying `lemma_b_m_upto_faithful`):** `lemma_phi_l_iso`
