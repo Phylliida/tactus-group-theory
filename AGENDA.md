@@ -297,11 +297,19 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       `lemma_free_family_extends`) seeded by `lemma_tx_is_free_family`. Closed forms pin the layout:
       `lemma_free_stable_tower_closed` (tower = `gp` + j gens, SAME relators), `lemma_free_stable_family_closed` +
       `lemma_txbd_family_layout` (`t,x` at `0,1`; `b_j` at `nk..nk+n-1`; `d` at `nk+n`; `nk=4+|quads|`),
-      `lemma_free_stable_tower_is_free_product`. **REMAINING = B3 (kill the `c`'s with a hom `h1_base →
-      K_M ∗ F(b) ∗ ⟨d⟩` + reindex `b,d` down past the dropped `c`-block, then `lemma_pullback_free` ⟹ `F` free
-      in `h1_base`) → B4 lift via A1 (`h1_base ↪ h2_II` faithful).** B3's kill-c hom + reindex is the next fresh
-      arc; A1 (the residue/p-conjugation iso, `prop_v`-scale) is the genuine remaining cost — see §4.2, do NOT
-      start at a session tail.
+      `lemma_free_stable_tower_is_free_product`.
+      **B3 COMPLETE 2026-06-22** (`f_free_h1.rs` 11/0, NEW module). `F = [t,x,b_1..b_n,d]` is FREE in
+      `h1_base` — `lemma_f_free_in_h1` (`is_free_family(h1_base(mm,n), f_h1_family(mm,n))`). The hom
+      `kill_c : h1_base → free_stable_tower(g_m,n+1)` kills the `c`-block (↦ε), fixes K_M, shifts `b,d` down by
+      `n` (`lemma_kill_c_hom_valid` — K_M relators fixed+trivial; each commutator `b_i c_j b_i⁻¹ c_j⁻¹ ↦
+      b_i' b_i'⁻¹ ≡ ε` via `lemma_kill_c_on_comm_relator` + the index-keyed `_on_comm_idx`). Then
+      `free_basis::lemma_pullback_free`: `comp_images(kill_c, f_h1_family) ==` B2's tower family
+      (`lemma_comp_is_b2_family`), so B2's freeness (`lemma_txbd_free_in_tower`) descends `w` to free-triviality.
+      `f_h1_family` = `[t,x]` + the literal `h1_base` b/d block `Gen(nk+n+i)` (`i=0..n`). **REMAINING = B4: lift
+      `F` free `h1_base ↪ h2_II` (= A1, the `prop_v`-scale residue/p-conjugation iso = `hnn_associations_isomorphic(recog_data)`).**
+      A1 is the genuine remaining cost — see §4.2; map its reuse of `prop_v`'s `lemma_accumulator_inv` /
+      `tower_peel` coordinate survival + the numbering identity `w_{αm+i}(b)=w_α(b)·b_i` first; do NOT start at a
+      session tail.
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).
