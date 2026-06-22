@@ -343,10 +343,13 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       `map_b` (φ_l), both chained through the abstract `P_A=HNN(F=free(n+3), p|family II over F)`; this avoids
       re-proving the pinch-descent twice. The crux = two faithful `P_A↪h2_II` embeddings (each = Britton-peel
       forward + von Dyck backward). DONE: **C-a** `lemma_phi_l_on_config_zero` (`φ_l(config(β,0))=config(mβ+l,0)`,
-      the digit-scaling word identity) + **C-b word core** `lemma_phi_l_on_family_II_rhs`
-      (`φ_l(family_II_rhs(β))=family_II_rhs(mβ+l)` via digit-scaling + b-block fixing `lemma_phi_l_fixes_w_b` +
-      `φ_l(d)=b_l·d` + numbering snoc `lemma_w_b_snoc`) + the general reusable `lemma_apply_embedding_fixes`.
-      **NEXT** (ordered, §5 checklist): C-b relator lift (`φ_l(family_II_relator_F(β))≡_{h2_II}ε`) → define
+      the digit-scaling word identity) + **C-b full word core** (`lemma_phi_l_on_family_II_rhs` +
+      `lemma_phi_l_on_family_II_lhs` ⟹ `lemma_phi_l_on_family_II_relator`: `φ_l(family_II_relator(β)) =~=
+      family_II_relator(mβ+l)`, so `mβ+l∈alphas` makes the image a LITERAL h2_II relator = von-Dyck-b's
+      homomorphism condition; via digit-scaling + b-block fixing `lemma_phi_l_fixes_w_b` + `φ_l(d)=b_l·d` +
+      numbering snoc `lemma_w_b_snoc`) + the general reusable `lemma_apply_embedding_fixes`.
+      **NEXT** (ordered, §5 checklist): C-b GROUP lift (`=~=` ⟹ `≡_{h2_II}ε` + von Dyck via
+      `lemma_emb_respects_source_equiv`) → define
       `pa_data` + its iso → **C-lift** (the deep Britton-peel, mirror `lemma_psi_A_injective`; the intersection
       property `ψ(F)∩AssocSub(h2_II)=ψ(AssocSub(P_A))` is the real content) → C-asm → C3.2d → C2/C4/C5.
 
