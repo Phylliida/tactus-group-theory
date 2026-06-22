@@ -293,4 +293,167 @@ pub proof fn lemma_add_derivable_relators_iff(
     }
 }
 
+// ----------------------------------------------------------------------------
+// The general mutual-derivability swap (C3.1 foundation, order-agnostic).
+//
+// Generalizes the `add_relators` reflecting machinery above: instead of `q` being
+// `add_relators(p, rs)` (so `q`'s relators are *literally* `p`'s plus `rs`, in order),
+// `q` is ANY presentation with `q.num_generators == p.num_generators` such that EVERY
+// `q`-relator is `≡_p ε`. The same step-by-step replay works — a `q`-relator
+// insert/delete only inserts/deletes a `≡_p ε` word, and free moves are
+// presentation-independent (they depend on `num_generators`, which agrees). This
+// dissolves all relator-*ordering* concerns: two presentations whose relators generate
+// the same normal closure are the same group, regardless of the order in which the
+// relators are listed. The Higman reroute needs this because `h3_II` (family-(II)
+// spliced into the a-tower base) and `h3_pres` share their relators up to a splice/shift,
+// not as an `extends_presentation` prefix.
+// ----------------------------------------------------------------------------
+
+/// A single step over `q` reflects to a `≡_p`-equivalence, when `p`/`q` share generators
+/// and every `q`-relator is `≡_p ε`. (Generalizes `lemma_step_reflects_to_base`: no
+/// `< np` original/added split — every relator index is handled uniformly as `≡_p ε`.)
+pub proof fn lemma_step_reflects_general(
+    p: Presentation, q: Presentation, w: Word, step: DerivationStep, w2: Word,
+)
+    requires
+        presentation_valid(p),
+        q.num_generators == p.num_generators,
+        forall|i: int| 0 <= i < q.relators.len() ==>
+            word_valid(#[trigger] q.relators[i], p.num_generators)
+            && equiv_in_presentation(p, q.relators[i], empty_word()),
+        apply_step(q, w, step) == Some(w2),
+    ensures
+        equiv_in_presentation(p, w, w2),
+{
+    match step {
+        DerivationStep::FreeReduce { position } => {
+            assert(apply_step(p, w, step) == Some(w2));     // presentation-independent
+            lemma_single_step_equiv(p, w, step, w2);
+        },
+        DerivationStep::FreeExpand { position, symbol } => {
+            assert(apply_step(p, w, step) == Some(w2));     // num_generators agrees
+            lemma_single_step_equiv(p, w, step, w2);
+        },
+        DerivationStep::RelatorInsert { position, relator_index, inverted } => {
+            assert(0 <= position <= w.len());
+            assert(0 <= relator_index < q.relators.len());
+            let r = get_relator(q, relator_index, inverted);
+            assert(w2 == w.subrange(0, position) + r + w.subrange(position, w.len() as int));
+            // r ≡_p ε  (and word_valid(r)), then flip to ε ≡_p r for insert.
+            if inverted {
+                assert(r == inverse_word(q.relators[relator_index as int]));
+                lemma_inv_equiv_empty(p, q.relators[relator_index as int]);
+                lemma_inverse_word_valid(q.relators[relator_index as int], p.num_generators);
+            } else {
+                assert(r == q.relators[relator_index as int]);
+            }
+            assert(word_valid(r, p.num_generators));
+            assert(equiv_in_presentation(p, r, empty_word()));
+            lemma_equiv_symmetric(p, r, empty_word());      // ε ≡ r
+            assert(w =~= w.subrange(0, position) + w.subrange(position, w.len() as int));
+            lemma_insert_eps_rev(p, w.subrange(0, position), r, w.subrange(position, w.len() as int));
+        },
+        DerivationStep::RelatorDelete { position, relator_index, inverted } => {
+            assert(0 <= relator_index < q.relators.len());
+            let r = get_relator(q, relator_index, inverted);
+            let rlen = r.len() as int;
+            assert(0 <= position && position + rlen <= w.len());
+            assert(w.subrange(position, position + rlen) == r);
+            assert(w2 == w.subrange(0, position) + w.subrange(position + rlen, w.len() as int));
+            if inverted {
+                assert(r == inverse_word(q.relators[relator_index as int]));
+                lemma_inv_equiv_empty(p, q.relators[relator_index as int]);
+            } else {
+                assert(r == q.relators[relator_index as int]);
+            }
+            assert(equiv_in_presentation(p, r, empty_word()));
+            // delete: w = A·r·B',  w2 = A·B'  (forward insert_eps)
+            assert(w =~= w.subrange(0, position) + r + w.subrange(position + rlen, w.len() as int)) by {
+                assert(w =~= w.subrange(0, position) + w.subrange(position, position + rlen)
+                    + w.subrange(position + rlen, w.len() as int));
+                assert(w.subrange(position, position + rlen) == r);
+            }
+            lemma_insert_eps(p, w.subrange(0, position), r, w.subrange(position + rlen, w.len() as int));
+        },
+    }
+}
+
+/// A derivation over `q` reflects to a `≡_p`-equivalence (induction over steps).
+pub proof fn lemma_derivation_reflects_general(
+    p: Presentation, q: Presentation, steps: Seq<DerivationStep>, w1: Word, w2: Word,
+)
+    requires
+        presentation_valid(p),
+        q.num_generators == p.num_generators,
+        forall|i: int| 0 <= i < q.relators.len() ==>
+            word_valid(#[trigger] q.relators[i], p.num_generators)
+            && equiv_in_presentation(p, q.relators[i], empty_word()),
+        derivation_produces(q, steps, w1) == Some(w2),
+    ensures
+        equiv_in_presentation(p, w1, w2),
+    decreases steps.len(),
+{
+    if steps.len() == 0 {
+        assert(w1 == w2);
+        lemma_equiv_refl(p, w1);
+    } else {
+        let step = steps.first();
+        let next = apply_step(q, w1, step).unwrap();
+        assert(apply_step(q, w1, step) == Some(next));
+        lemma_step_reflects_general(p, q, w1, step, next);       // w1 ≡_p next
+        lemma_derivation_reflects_general(p, q, steps.drop_first(), next, w2);  // next ≡_p w2
+        lemma_equiv_transitive(p, w1, next, w2);
+    }
+}
+
+/// **One direction of the swap.** If every `q`-relator is `≡_p ε`, any `q`-equivalence
+/// holds in `p`. (`p` and `q` share generators.)
+pub proof fn lemma_reflects_general(
+    p: Presentation, q: Presentation, w1: Word, w2: Word,
+)
+    requires
+        presentation_valid(p),
+        q.num_generators == p.num_generators,
+        forall|i: int| 0 <= i < q.relators.len() ==>
+            word_valid(#[trigger] q.relators[i], p.num_generators)
+            && equiv_in_presentation(p, q.relators[i], empty_word()),
+        equiv_in_presentation(q, w1, w2),
+    ensures
+        equiv_in_presentation(p, w1, w2),
+{
+    let d = choose|d: Derivation| derivation_valid(q, d, w1, w2);
+    assert(derivation_produces(q, d.steps, w1) == Some(w2));
+    lemma_derivation_reflects_general(p, q, d.steps, w1, w2);
+}
+
+/// **The general mutual-derivability swap (C3.1 foundation).** Two presentations with the
+/// same generators whose relators are mutually derivable present the SAME group:
+/// `equiv_in(p,·,·) ⟺ equiv_in(q,·,·)`. Order-agnostic — subsumes
+/// `lemma_add_derivable_relators_iff`.
+pub proof fn lemma_same_group_iff(
+    p: Presentation, q: Presentation, w1: Word, w2: Word,
+)
+    requires
+        presentation_valid(p),
+        presentation_valid(q),
+        q.num_generators == p.num_generators,
+        forall|i: int| 0 <= i < q.relators.len() ==>
+            word_valid(#[trigger] q.relators[i], p.num_generators)
+            && equiv_in_presentation(p, q.relators[i], empty_word()),
+        forall|j: int| 0 <= j < p.relators.len() ==>
+            word_valid(#[trigger] p.relators[j], q.num_generators)
+            && equiv_in_presentation(q, p.relators[j], empty_word()),
+    ensures
+        equiv_in_presentation(p, w1, w2) <==> equiv_in_presentation(q, w1, w2),
+{
+    if equiv_in_presentation(p, w1, w2) {
+        // p ⟹ q: reflect a p-derivation into q, using p-relators ≡_q ε.
+        lemma_reflects_general(q, p, w1, w2);
+    }
+    if equiv_in_presentation(q, w1, w2) {
+        // q ⟹ p: reflect a q-derivation into p, using q-relators ≡_p ε.
+        lemma_reflects_general(p, q, w1, w2);
+    }
+}
+
 } // verus!
