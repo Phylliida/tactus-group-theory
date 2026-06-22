@@ -8,17 +8,22 @@
 use vstd::prelude::*;
 use crate::symbol::*;
 use crate::word::*;
-use crate::machine_group::{ModMachine, g_m, config_word, lemma_g_m_num_generators,
+use crate::machine_group::{ModMachine, mod_machine_wf, g_m, config_word, lemma_g_m_num_generators,
     lemma_config_word_valid, lemma_word_valid_mono, lemma_config_word_zero};
 use crate::layout::{d_idx, b_base};
-use crate::benign::apply_embedding;
+use crate::benign::{apply_embedding, in_generated_subgroup};
 use crate::word_numbering::{w_b, w_c, numbers_word, lemma_w_c_valid};
-use crate::f_free::lemma_apply_embedding_agree_prefix;
-use crate::phi_l_maps::{a_words, a_words_F, lemma_a_words_fixes_config, lemma_a_words_on_pa_rhs};
-use crate::pa_data::{pa_data, pa_rhs, pa_assoc, pa_b_base};
+use crate::f_free::{is_free_family, lemma_apply_embedding_agree_prefix};
+use crate::higman_operations::free_group;
+use crate::h1::{h1_base, lemma_h1_base_valid};
+use crate::phi_l_maps::{a_words, a_words_F, lemma_a_words_fixes_config, lemma_a_words_on_pa_rhs,
+    lemma_map_a_faithful};
+use crate::phi_l_forward::lemma_intersection_property;
+use crate::pa_data::{pa_data, pa_rhs, pa_assoc, pa_b_base, lemma_pa_data_shape, lemma_pa_data_valid};
 use crate::h2::{p_assoc, td_word};
 use crate::h3::lemma_single_gen_valid;
 use crate::h3_ii::{recog_data, family_II_assoc, family_II_rhs, compose_embeddings};
+use crate::hnn::hnn_data_valid;
 use crate::f_free_a1::{betas, lemma_betas_index};
 
 verus! {
@@ -237,6 +242,82 @@ pub proof fn lemma_b_col_correspondence(mm: ModMachine, n: nat, m: nat, alphas: 
         assert(comp[k] == apply_embedding(a_words_F(mm, n), pcol[k]));
         assert(pcol[k] == pa_rhs(n, m, bet[k]));
     }
+}
+
+// ----------------------------------------------------------------------------
+// The per-side middle descent (intersection property + column correspondence packaged).
+// ----------------------------------------------------------------------------
+
+/// **a-side middle descent**: a pinch middle `u` (stable-free, over `n+3`) whose `a_words_F`-image
+/// lies in `recog`'s a-subgroup descends to `pa`'s a-subgroup over the free group.  = the
+/// intersection property at the a-column, with the column correspondence discharging its hypothesis.
+pub proof fn lemma_middle_descent_a(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, u: Word)
+    requires
+        mod_machine_wf(mm),
+        2 * n < m,
+        forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]),
+        word_valid(u, (n + 3) as nat),
+        in_generated_subgroup(h1_base(mm, n),
+            Seq::new(recog_data(mm, n, m, alphas).associations.len(),
+                     |k: int| recog_data(mm, n, m, alphas).associations[k].0),
+            apply_embedding(a_words_F(mm, n), u)),
+    ensures
+        in_generated_subgroup(pa_data(n, m, betas(alphas)).base,
+            Seq::new(pa_data(n, m, betas(alphas)).associations.len(),
+                     |k: int| pa_data(n, m, betas(alphas)).associations[k].0),
+            u),
+{
+    let awf = a_words_F(mm, n);
+    let pd = pa_data(n, m, betas(alphas));
+    let pcol = Seq::new(pd.associations.len(), |k: int| pd.associations[k].0);
+    lemma_h1_base_valid(mm, n);
+    lemma_pa_data_shape(n, m, betas(alphas));
+    lemma_pa_data_valid(n, m, betas(alphas));               // hnn_data_valid(pd): cols valid over n+3
+    lemma_map_a_faithful(mm, n);                            // is_free_family(h1_base, awf)
+    lemma_a_col_correspondence(mm, n, m, alphas);           // rd a-col == compose(awf, pcol)
+    assert(awf.len() == n + 3);
+    assert(pd.base == free_group((n + 3) as nat));
+    assert(pd.base.num_generators == n + 3);
+    assert(hnn_data_valid(pd));
+    assert forall|k: int| 0 <= k < pcol.len() implies word_valid(#[trigger] pcol[k], awf.len()) by {
+        assert(pcol[k] == pd.associations[k].0);
+    }
+    lemma_intersection_property(h1_base(mm, n), awf, pcol, u);
+}
+
+/// **b-side middle descent**: the mirror at `recog`/`pa`'s b-columns.
+pub proof fn lemma_middle_descent_b(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, u: Word)
+    requires
+        mod_machine_wf(mm),
+        2 * n < m,
+        forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]),
+        word_valid(u, (n + 3) as nat),
+        in_generated_subgroup(h1_base(mm, n),
+            Seq::new(recog_data(mm, n, m, alphas).associations.len(),
+                     |k: int| recog_data(mm, n, m, alphas).associations[k].1),
+            apply_embedding(a_words_F(mm, n), u)),
+    ensures
+        in_generated_subgroup(pa_data(n, m, betas(alphas)).base,
+            Seq::new(pa_data(n, m, betas(alphas)).associations.len(),
+                     |k: int| pa_data(n, m, betas(alphas)).associations[k].1),
+            u),
+{
+    let awf = a_words_F(mm, n);
+    let pd = pa_data(n, m, betas(alphas));
+    let pcol = Seq::new(pd.associations.len(), |k: int| pd.associations[k].1);
+    lemma_h1_base_valid(mm, n);
+    lemma_pa_data_shape(n, m, betas(alphas));
+    lemma_pa_data_valid(n, m, betas(alphas));
+    lemma_map_a_faithful(mm, n);
+    lemma_b_col_correspondence(mm, n, m, alphas);           // rd b-col == compose(awf, pcol)
+    assert(awf.len() == n + 3);
+    assert(pd.base == free_group((n + 3) as nat));
+    assert(pd.base.num_generators == n + 3);
+    assert(hnn_data_valid(pd));
+    assert forall|k: int| 0 <= k < pcol.len() implies word_valid(#[trigger] pcol[k], awf.len()) by {
+        assert(pcol[k] == pd.associations[k].1);
+    }
+    lemma_intersection_property(h1_base(mm, n), awf, pcol, u);
 }
 
 } // verus!
