@@ -219,6 +219,12 @@ pub mod pa_data;
 #[cfg(verus_keep_ghost)]
 pub mod free_family_perm;
 
+// phi_l_maps: Layer 2 / Brick 5, C3.2c / the C-arc — the F-part embeddings map_a/map_b of
+// P_A → h2_II. map_a's F-part a_words_F=[t,x,d,b_j] proven FREE in h1_base (lemma_map_a_faithful)
+// via B3 + lemma_free_family_permute (the Route-A reorder). See docs/brick5-c3.2c-plan.md §5.
+#[cfg(verus_keep_ghost)]
+pub mod phi_l_maps;
+
 // phi_l_iso: Layer 2 / Brick 5, C3.2c / the C-arc — the per-level iso crux
 // `lemma_phi_l_iso_at_h2II` (emb(a_words,w) ≡ ε ⟺ emb(b_words,w) ≡ ε over h2_II), via the
 // unified HNN lifting lemma (faithfulness lifts base→HNN under an association-preserving
