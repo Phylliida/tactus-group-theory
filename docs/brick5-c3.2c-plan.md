@@ -162,12 +162,70 @@ The original §3 A2 (`lemma_phi_scaling_injective_F`) and B2 (`lemma_finite_beta
 A2's injectivity is the base-descent tail of C-forward; B2 becomes the `requires alphas ⊇ betas(w)`
 side-condition baked into `h2_II`'s finite slice.
 
-## 4. First verified down-payment for the next session
+## 4. F1 — the route (DE-RISKED 2026-06-22) and first down-payment
 
-**B1 + B1.5 DONE** (`h3_ii.rs` 28/0). Next, take **F1** (`F = ⟨t,x,d,b_j⟩` free in `h2_II`) — the
-Route-B prerequisite; study `free_basis.rs`'s `lemma_basis_elt_free` + its base-descent machinery first,
-then adapt to the `{t,x,d,b_j}` family. F1 is the structural gate that makes the subgroup-A HNN
-presentation legitimate, after which the von Dyck p-conjugation checks become tractable. Save **A1** (the
-residue iso + p-conjugation iso) for a focused push — it is the genuine `prop_v`-scale content. Do NOT
-start A1 at a session tail; map its reuse of `prop_v`'s `lemma_accumulator_inv` / `tower_peel`'s
-coordinate survival + the numbering identity `w_{αm+i}(b)=w_α(b)·b_i` first.
+### 4.0 F1a DONE — `⟨t,x⟩` free in `K_M` (`f_free.rs` 1/0)
+`lemma_tx_free_in_g_m`: a word over `{t=Gen0, x=Gen1}` trivial in `K_M = g_m(mm)` is trivial in
+`pres_tx = free⟨t,x⟩`. Chain: `lemma_g_m_base_faithful` (g_m→base_A, in `free_basis.rs`) +
+the EXISTING `lemma_a_base_faithful` (base_A→pres_tx, Tietze bridge + peel the `y`-HNN layer
+`base_A = HNN(pres_tx, y | y⁻¹xy=x)`). **No retraction `K_M → ⟨t,x⟩` exists** (the machine relators
+are conjugacy relations among config words that can't be killed while fixing `t,x`); `⟨t,x⟩` is free
+in `K_M` but NOT a retract — established by the FAITHFUL embedding, not a homomorphism.
+
+### 4.1 The assembly route — CORRECTED
+Danielle's first instinct (a projection homomorphism `h1_base → Free(t,x,b_j,d)` collapsing `K_M` onto
+`Free(t,x)`) is IMPOSSIBLE — no such retraction exists (above). The available free-product machinery
+(`normal_form_free_product.rs`: `lemma_free_product_injective_left/right`, `lemma_free_product_reflects_left`,
+`fp_left/right_retraction`) is FACTOR-LEVEL ONLY (a word IN ONE factor, trivial in `G1∗G2` ⟹ trivial in
+that factor). There is NO spanning normal-form theorem (alternating-nontrivial-syllables ⟹ nontrivial)
+and no free-product associativity. So the spanning faithfulness of `F = ⟨t,x⟩*⟨b_j⟩*⟨d⟩` (which spans all
+three factors) is NOT off-the-shelf.
+
+**THE CLEAN ROUTE (verified sound 2026-06-22): "free family extends by a free stable letter".** Adding a
+free generator `s` to a group `G'` is exactly `HNN(G', s | NO associations)` — with `associations = []`
+(`k=0`): `hnn_associations_isomorphic` is VACUOUS (only the empty word is valid over 0 gens), and
+`has_pinch_at` reads `in_generated_subgroup(base, [], middle)` = `middle ≡_{G'} ε` (the trivial subgroup),
+so a `pinch` is exactly an adjacent `s … s⁻¹` whose between-part is trivial in `G'` — precisely free-generator
+behaviour. So `britton_lemma_full` (`britton_via_tower.rs:8678`: `w ≡ ε ∧ has_stable_letter ⟹ has_pinch`)
+APPLIES (iso vacuous). This reuses the project's strongest tool (Britton) instead of reinventing the AFP
+spanning normal form.
+
+**B1 (THE reusable meat) — `lemma_extend_free_by_stable`:**
+```
+requires
+  presentation_valid(gp),
+  (∀i) word_valid(gens[i], gp.num_generators),
+  // free-family hypothesis (higher-order precondition):
+  (∀u) word_valid(u, gens.len()) ∧ equiv_in(gp, apply_embedding(gens,u), ε)
+        ⟹ equiv_in(free_group(gens.len()), u, ε),
+  word_valid(w, gens.len()+1),
+  equiv_in(hnn_presentation(HNNData{base:gp, associations:[]}),
+           apply_embedding(gens.push(seq![Gen(gp.num_generators)]), w), ε)
+ensures equiv_in(free_group(gens.len()+1), w, ε)
+```
+Proof = induction (on `w.len()` or stable-count): if `w` has no `s`-symbol, `W` is a `gp`-word, descend by
+`lemma_free_product_injective_left` (`gp ∗ ⟨s⟩` = `hnn_presentation(empty-assoc)`; need a tiny bridge
+`hnn_presentation(empty-assoc) == free_product(gp, free_group(1))`) then the free-family hyp; else `W` has a
+stable letter, `britton_lemma_full` gives a pinch (adjacent `s … s⁻¹`, middle `≡_{gp} ε`), the middle is a
+`gens`-image of a `w`-subword so the free-family hyp makes that subword `≡_free ε`, free-reduce `w` at the
+matching `s/s⁻¹` and recurse. **The pinch-middle↔free-reduction match is the crux of B1.** Study `kp_pinch.rs`'s
+Britton-peel idiom (it does the analogous `K+p` peel) before writing.
+
+**B2 — iterate B1:** seed with F1a (`[t,x]` free in `K_M`), add `b_1,…,b_n`, then `d` ⟹ `[t,x,b_j,d]` free in
+`K_M ∗ F(b) ∗ ⟨d⟩` (= `free_product` chain; note `free_product(free_group(a),free_group(b)) == free_group(a+b)`
+definitionally, so the target free group assembles for free).
+
+**B3 — connect to `h1_base`:** `h1_base` carries the `c_j` + comm relators (`b_i c_j = c_j b_i`). Kill the `c`'s
+with a homomorphism `kill_c: h1_base → (K_M ∗ F(b) ∗ ⟨d⟩)` (valid: comm relator `b_i c_j b_i⁻¹ c_j⁻¹ ↦
+b_i b_i⁻¹ ≡ ε`; K_M relators fixed), then the pullback engine (`free_basis.rs:lemma_pullback_free`) reduces
+`F` free in `h1_base` to `F` free in `K_M ∗ F(b) ∗ ⟨d⟩` = B2. (Requires reindexing `b,d` down past the dropped
+`c`'s — fiddly but mechanical; or fold the `c`'s in as additional B1 free-stable-letters that `F` avoids.)
+
+**B4 — lift to `h2_II`:** `F` free in `h1_base` + `h1_base ↪ h2_II` faithful (= A1, the recog_data HNN validity)
+⟹ `F` free in `h2_II`. So F1-at-h2_II depends on A1; but von Dyck only needs the subgroup-`A` presentation,
+which uses `F` free in `h1_base` (B3) directly.
+
+### 4.2 Save A1 for a focused push
+**A1** (the residue iso + p-conjugation iso = `hnn_associations_isomorphic(recog_data)`) is the genuine
+`prop_v`-scale content. Do NOT start A1 at a session tail; map its reuse of `prop_v`'s `lemma_accumulator_inv`
+/ `tower_peel`'s coordinate survival + the numbering identity `w_{αm+i}(b)=w_α(b)·b_i` first.

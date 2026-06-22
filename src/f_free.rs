@@ -24,9 +24,50 @@ use vstd::prelude::*;
 use crate::word::*;
 use crate::presentation::*;
 use crate::machine_group::*;
+use crate::hnn::*;
+use crate::free_product::free_product;
+use crate::higman_operations::free_group;
 use crate::free_basis::lemma_g_m_base_faithful;
 
 verus! {
+
+// ----------------------------------------------------------------------------
+// Adding a free generator = HNN with NO associations.
+// ----------------------------------------------------------------------------
+
+/// The HNN datum that adjoins a single FREE stable letter to `gp` (no associations).  Its pinches
+/// are exactly adjacent `s … s⁻¹` pairs with a base-trivial middle (`in_generated_subgroup(gp, [], ·)`
+/// = `· ≡_{gp} ε`), and `hnn_associations_isomorphic` holds vacuously — so `britton_lemma_full`
+/// applies, the route by which "a free family extends by a free stable letter".
+pub open spec fn free_stable_data(gp: Presentation) -> HNNData {
+    HNNData { base: gp, associations: Seq::<(Word, Word)>::empty() }
+}
+
+/// **The bridge:** adjoining a free stable letter (the empty-association HNN) IS the free product
+/// `gp ∗ ⟨s⟩ = gp ∗ free_group(1)`, on the nose.  Both are
+/// `⟨gp.num_generators + 1 | gp.relators⟩` — the HNN side has no HNN relators (no associations) and
+/// the free-product side adjoins `free_group(1)`'s (empty, shifted) relators.
+pub proof fn lemma_free_stable_is_free_product(gp: Presentation)
+    ensures
+        hnn_presentation(free_stable_data(gp)) == free_product(gp, free_group(1)),
+{
+    let data = free_stable_data(gp);
+    let lhs = hnn_presentation(data);
+    let rhs = free_product(gp, free_group(1));
+    // HNN side: no associations ⟹ no HNN relators.
+    assert(data.associations.len() == 0);
+    assert(hnn_relators(data) =~= Seq::<Word>::empty());
+    assert(lhs.relators =~= gp.relators);
+    // free-product side: free_group(1) has empty relators, so the shifted block is empty.
+    assert(free_group(1).relators =~= Seq::<Word>::empty());
+    assert(crate::free_product::shift_relators(free_group(1).relators, gp.num_generators)
+        =~= Seq::<Word>::empty());
+    assert(rhs.relators =~= gp.relators);
+    // both: num_generators = gp.num_generators + 1, relators = gp.relators.
+    assert(lhs.num_generators == rhs.num_generators);
+    assert(lhs.relators =~= rhs.relators);
+    assert(lhs == rhs);
+}
 
 // ----------------------------------------------------------------------------
 // F1a — `⟨t,x⟩` is free in `K_M = g_m`.
