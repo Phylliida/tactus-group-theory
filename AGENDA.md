@@ -358,9 +358,12 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       iso is NOT needed (Britton runs over recog_data=TARGET, iso=A1 done). (3) **`phi_l_maps.rs` 4/0** —
       `lemma_map_a_faithful`: `a_words_F=[t,x,d,b_j]` free in h1_base (= ψ_a faithful) via permute(B3). map_a (full) =
       a_words_F.push([p]) = a_words. (4) **C-b group lift `phi_l_iso.rs` 10/0** — `lemma_phi_l_relator_equiv_empty`
-      (`φ_l(relator(β))≡_{h2_II}ε` when mβ+l∈alphas) + `lemma_family_II_relator_in_h2_II`. **NEXT** (§5 checklist):
-      **von-Dyck backwards** (easy half: `lemma_emb_respects_source_equiv`; KEY ATOM = `w_c`-relabel
-      `ae(a_words,w_c(3,…))=~=w_c(nk+n,…)`, a b-block-shift induction; map_b half = C-b group lift) → **C-lift forward**
+      (`φ_l(relator(β))≡_{h2_II}ε` when mβ+l∈alphas) + `lemma_family_II_relator_in_h2_II`. **ASSOCIATION-PRESERVATION DONE** (`phi_l_maps.rs` 10/0, +3 commits): `lemma_a_words_relabel_wc` (the
+      `w_c`-relabel b-block-shift induction = the hard atom) + `lemma_a_words_fixes_config` (a-column) +
+      `lemma_a_words_on_pa_rhs` (b-column → `family_II_rhs`); full map `a_words=a_words_F.push([p])` defined.
+      **NEXT** (§5 checklist): **von-Dyck backwards** (remaining wiring: `hnn_relator` assembly `ae(a_words,
+      hnn_relator(pa_data,j))=~=family_II_relator(γ)` + `family_II_relator(0)≡_{h2_II}ε` β=0 case +
+      `lemma_emb_respects_source_equiv`) → **C-lift forward**
       (the BOTTLENECK = deep Britton-peel, mirror `lemma_psi_A_injective`+`lemma_psi_A_pinch_descends`; base case via
       B4+ψ-faithful+`lemma_base_embeds_in_hnn`, step via `britton_lemma_full`+pinch-descent; **intersection property**
       `ψ(F)∩AssocSub(h2_II)=ψ(AssocSub(P_A))` is the real content in the spanning case; GENERIC reusable helpers
