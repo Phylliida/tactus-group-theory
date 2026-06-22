@@ -509,4 +509,145 @@ pub proof fn lemma_extend_stable_count_eq(gp: Presentation, gens: Seq<Word>, w: 
     }
 }
 
+// ----------------------------------------------------------------------------
+// Spanning: first-stable correspondence between `w` and `W = apply_embedding(s_emb, w)`.
+//
+// If `W`'s first stable letter (over the inner HNN) is at position `capL`, then `w` has a first
+// stable letter (over the outer HNN) at some position `l`, the stable-free prefixes correspond
+// (`s_emb(w[0..l]) = W[0..capL]`), and `w[l]` maps to exactly that stable letter.  Port of
+// `lemma_psi_F_spanning`, with the spanning case firing on the STABLE peeled symbol (image `[s]`)
+// and non-stable peels stripping a variable-length stable-free prefix.
+// ----------------------------------------------------------------------------
+
+pub proof fn lemma_extend_spanning(gp: Presentation, gens: Seq<Word>, w: Word, capL: int) -> (l: int)
+    requires
+        presentation_valid(gp),
+        forall|i: int| 0 <= i < gens.len() ==> word_valid(#[trigger] gens[i], gp.num_generators),
+        word_valid(w, (gens.len() + 1) as nat),
+        0 <= capL < apply_embedding(stable_emb(gp, gens), w).len(),
+        is_stable(free_stable_data(gp), apply_embedding(stable_emb(gp, gens), w)[capL]),
+        forall|k: int| 0 <= k < capL
+            ==> !is_stable(free_stable_data(gp), #[trigger] apply_embedding(stable_emb(gp, gens), w)[k]),
+    ensures
+        0 <= l < w.len(),
+        is_stable(free_stable_data(free_group(gens.len())), w[l]),
+        apply_embedding_symbol(stable_emb(gp, gens), w[l])
+            =~= seq![apply_embedding(stable_emb(gp, gens), w)[capL]],
+        forall|k: int| 0 <= k < l
+            ==> !is_stable(free_stable_data(free_group(gens.len())), #[trigger] w[k]),
+        apply_embedding(stable_emb(gp, gens), w.subrange(0, l))
+            =~= apply_embedding(stable_emb(gp, gens), w).subrange(0, capL),
+    decreases w.len(),
+{
+    let imgs = stable_emb(gp, gens);
+    let inner = free_stable_data(gp);
+    let outer = free_stable_data(free_group(gens.len()));
+    let W = apply_embedding(imgs, w);
+    lemma_stable_emb_index(gp, gens);
+    assert(outer.base.num_generators == gens.len());
+    assert(inner.base.num_generators == gp.num_generators);
+    // w is nonempty (W has an index capL).
+    assert(w.len() > 0) by {
+        if w.len() == 0 { assert(W =~= Seq::<Symbol>::empty()); }
+    }
+    let c = w[0];
+    let w2 = w.drop_first();
+    assert(w =~= seq![c] + w2);
+    assert(word_valid(w2, (gens.len() + 1) as nat)) by {
+        assert forall|k: int| 0 <= k < w2.len()
+            implies symbol_valid(#[trigger] w2[k], (gens.len() + 1) as nat)
+        by { assert(w2[k] == w[k + 1]); }
+    }
+    lemma_apply_embedding_concat(imgs, seq![c], w2);
+    let ec = apply_embedding(imgs, seq![c]);
+    let W2 = apply_embedding(imgs, w2);
+    assert(ec =~= apply_embedding_symbol(imgs, c)) by { reveal_with_fuel(apply_embedding, 2); }
+    assert(W =~= ec + W2);
+    assert(symbol_valid(c, (gens.len() + 1) as nat)) by { assert(c == w[0]); }
+    if is_stable(outer, c) {
+        // c is the outer stable letter ⟹ ec = [s^±], length 1, and W[0] = ec[0] is inner-stable.
+        assert(c == Symbol::Gen(gens.len()) || c == Symbol::Inv(gens.len()));
+        if c == Symbol::Gen(gens.len()) {
+            assert(ec =~= seq![Symbol::Gen(gp.num_generators)]);
+        } else {
+            assert(ec =~= inverse_word(seq![Symbol::Gen(gp.num_generators)]));
+            assert(ec =~= seq![Symbol::Inv(gp.num_generators)]) by { reveal_with_fuel(inverse_word, 2); }
+        }
+        assert(ec.len() == 1);
+        assert(is_stable(inner, ec[0]));
+        assert(W[0] == ec[0]);
+        // capL must be 0, else W[0] (= ec[0], inner-stable) would be required non-stable.
+        assert(capL == 0) by {
+            if capL > 0 { assert(!is_stable(inner, W[0])); }
+        }
+        assert(w.subrange(0, 0) =~= Seq::<Symbol>::empty());
+        assert(apply_embedding(imgs, w.subrange(0, 0)) =~= Seq::<Symbol>::empty());
+        assert(W.subrange(0, 0) =~= Seq::<Symbol>::empty());
+        assert(apply_embedding_symbol(imgs, w[0]) =~= ec);
+        assert(ec =~= seq![W[capL]]) by { assert(W[capL] == ec[0]); }
+        0int
+    } else {
+        // c non-stable over outer ⟹ ec is a stable-free `gp`-word of length M; strip it, recurse.
+        assert(generator_index(c) < gens.len());
+        // ec is stable-free over inner.
+        if c == Symbol::Gen(generator_index(c)) {
+            assert(ec =~= imgs[generator_index(c) as int]);
+            assert(imgs[generator_index(c) as int] == gens[generator_index(c) as int]);
+            lemma_word_valid_no_inner_stable(gp, gens[generator_index(c) as int]);
+        } else {
+            assert(c == Symbol::Inv(generator_index(c)));
+            assert(ec =~= inverse_word(imgs[generator_index(c) as int]));
+            assert(imgs[generator_index(c) as int] == gens[generator_index(c) as int]);
+            crate::word::lemma_inverse_word_valid(gens[generator_index(c) as int], gp.num_generators);
+            lemma_word_valid_no_inner_stable(gp, inverse_word(gens[generator_index(c) as int]));
+        }
+        let m = ec.len() as int;
+        assert(forall|k: int| 0 <= k < m ==> !is_stable(inner, #[trigger] ec[k]));
+        assert(forall|k: int| 0 <= k < m ==> W[k] == ec[k]);
+        // capL >= m, else W[capL] would be a (non-stable) ec position.
+        assert(capL >= m) by {
+            if capL < m { assert(W[capL] == ec[capL]); assert(!is_stable(inner, W[capL])); }
+        }
+        // first stable of W2 is at capL - m.
+        assert(forall|t: int| 0 <= t < W2.len() ==> #[trigger] W[m + t] == W2[t]);
+        assert(0 <= capL - m < W2.len());
+        assert(W2[capL - m] == W[capL]);
+        assert(is_stable(inner, W2[capL - m]));
+        assert forall|k: int| 0 <= k < capL - m implies !is_stable(inner, #[trigger] W2[k]) by {
+            assert(W2[k] == W[m + k]);
+        }
+        let l2 = lemma_extend_spanning(gp, gens, w2, capL - m);
+        let l = l2 + 1;
+        // reassemble for w.
+        assert(w[l] == w2[l2]);
+        assert(apply_embedding_symbol(imgs, w[l]) =~= seq![W2[capL - m]]);
+        assert(W2[capL - m] == W[capL]);
+        assert forall|k: int| 0 <= k < l implies !is_stable(outer, #[trigger] w[k]) by {
+            if k != 0 { assert(w[k] == w2[k - 1]); }
+        }
+        // prefix correspondence.
+        assert(w.subrange(0, l) =~= seq![c] + w2.subrange(0, l2)) by {
+            assert(w.subrange(0, l).len() == l);
+            assert forall|k: int| 0 <= k < l
+                implies w.subrange(0, l)[k] == (seq![c] + w2.subrange(0, l2))[k]
+            by {
+                if k == 0 { assert(w.subrange(0, l)[0] == c); }
+                else { assert(w.subrange(0, l)[k] == w[k]); assert(w[k] == w2[k - 1]); }
+            }
+        }
+        lemma_apply_embedding_concat(imgs, seq![c], w2.subrange(0, l2));
+        assert(apply_embedding(imgs, w.subrange(0, l)) =~= ec + apply_embedding(imgs, w2.subrange(0, l2)));
+        assert(W.subrange(0, capL) =~= ec + W2.subrange(0, capL - m)) by {
+            assert(W.subrange(0, capL).len() == capL);
+            assert forall|k: int| 0 <= k < capL
+                implies W.subrange(0, capL)[k] == (ec + W2.subrange(0, capL - m))[k]
+            by {
+                if k < m { assert(W.subrange(0, capL)[k] == W[k]); assert(W[k] == ec[k]); }
+                else { assert(W.subrange(0, capL)[k] == W[k]); assert(W[k] == W2[k - m]); }
+            }
+        }
+        l
+    }
+}
+
 } // verus!
