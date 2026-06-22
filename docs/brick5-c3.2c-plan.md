@@ -121,36 +121,53 @@ just `w` relabeled into the real generators — a word in the subgroup `⟨t,x,d
 `h2_II` gens (t↦config(l,0), x↦xᵐ, d↦b_l·d, b_j↦b_j, p↦p; non-stated gens y/machine/c_j ↦ themselves).
 So the crux = "subst faithful on `emb(a_words,w)`".
 
+**B1.5 DONE** (`h3_ii.rs` 28/0, 2026-06-22): the subst-factoring bridge.
+`emb(b_words,w) =~= apply_embedding(phi_l_subst, emb(a_words,w))`. Delivered `compose_embeddings` +
+`lemma_apply_embedding_compose` (general composition `f(g(w))=(f∘g)(w)`, reusing benign's
+`lemma_apply_embedding_concat`/`_inverse`), `phi_l_subst` (φ_l as the full h2-gen substitution),
+`lemma_phi_l_subst_on_a_words` (`compose(phi_l_subst, a_words) =~= b_words`), and the bridge
+`lemma_phi_l_factor_through_subst`. Both crux directions consume it.
+
+**ROUTING CORRECTION — von Dyck goes through the SUBGROUP, NOT subst-as-h2_II-endo (confirmed w/
+Danielle 2026-06-22).** The "subst respects every `h2_II` relator (incl. K_M machine relators)" reading
+is **Route A = a TRAP**: it would force proving `phi_l_subst` (t↦config(l,0), x↦xᵐ, fix machine gens) is
+an endomorphism of the whole machine group `G(M)` — since `subst(config(a,b)) = config(ma+l, b)`, the
+per-quad relators `r⁻¹ config(a,b) r = config(c,0)` would have to survive a digit-scaling, which is
+property-(iii)-scale work and conceptually the wrong altitude. **Route B (Cohen's actual route):** a map
+`φ: A → H` is a homomorphism iff it respects `A`'s OWN relations — the machine relators are relations of
+the ambient `H`, not of the subgroup `A`, so they never enter. `A = ⟨t,x,d,b_j,p⟩` is recognized as
+`HNN(F = free⟨t,x,d,b_j⟩, p | family II)`, so `A`'s only relations are the `p`-conjugations. Von Dyck =
+check `φ_l` (and `φ_l⁻¹`) respect those `p`-conjugations — the **family-(II) payoff** (the residue
+identity `w_{αm+i}(b)=w_α(b)·b_i` aligns the images). The d↦b_l·d augmentation lives entirely inside the
+`p`-conjugation check, not in any machine relator.
+
 **Corrected next-bricks (gating order):**
-1. **B1.5 — the subst-factoring bridge.** `emb(b_words,w) =~= apply_embedding(subst_images, emb(a_words,w))`
-   (`subst_images` = a length-`h2_num_gens` image list fixing non-stated gens). Needs an `apply_embedding`
-   composition lemma (`apply_embedding(f, apply_embedding(g,w)) =~= apply_embedding(f∘g, w)` with
-   `(f∘g)[i] = apply_embedding(f, g[i])`) + concat/inverse homomorphism helpers. **Check first** for
-   existing `lemma_apply_embedding_concat` / `_inverse` in `benign.rs`/`machine_group.rs`; build the
-   composition lemma if absent. Self-contained pure combinatorics; both directions consume it.
-2. **C1 — von Dyck (backward).** Via `lemma_emb_respects_source_equiv` with `src = h2_II`,
-   `images = subst_images`: check subst respects each `h2_II` relator. EASY: `comm_relators` (subst fixes
-   b,c). HARD: the K_M machine relators (config(l,0)/xᵐ must respect them — port the idea of
-   `lemma_psi_respects_relator`) + the p-relation + `family_II` (the latter two = the **C3.1 payoff**,
-   present as literal relators of `h2_II`). This is where family (II) is consumed.
-3. **A1 — the residue iso = `hnn_associations_isomorphic(recog_data)`.** The genuine `prop_v`-scale content
-   (`t_β ↦ t_β w_β(b) d` is a subgroup iso over `h1_base`). The focused multi-session push; map its reuse
-   of `prop_v`'s `lemma_accumulator_inv` + `tower_peel`'s coordinate survival first. **Do NOT start at a
-   session tail.**
-4. **C2 — forward (faithful).** Britton-peel `p` over `recog_data` (B1 gives `h2_II = hnn_presentation(recog_data)`,
-   so `britton_lemma_full` applies) using A1 as the iso precondition; descend to `h1_base`; then the
-   scaling-injectivity on `{t,x,d,b_j}`.
-5. **C3 — biconditional** = C1 + C2; package as `lemma_phi_l_iso_at_h2II`.
+1. **F1 — `F = ⟨t,x,d,b_j⟩` is free in `h2_II`** (the Route-B prerequisite). Relate to `free_basis.rs`
+   (`lemma_basis_elt_free` proved `{t_α w_α(b) d}` free; here we need `{t,x,d,b_j}` free — different
+   family, similar base-descent machinery). This is what makes "`A = HNN(F, p | family II)`" the actual
+   presentation of the subgroup `A` (so `A`'s only relations are the p-conjugations).
+2. **A1 — the residue/p-conjugation iso = `hnn_associations_isomorphic(recog_data)`** AND the φ_l
+   p-conjugation checks. The genuine `prop_v`-scale content (`t_β ↦ t_β w_β(b) d` is a subgroup iso over
+   `h1_base`; the von Dyck p-relations are its by-product). Reuse `prop_v`'s `lemma_accumulator_inv` +
+   `tower_peel`'s coordinate survival; the numbering identity `w_{αm+i}(b)=w_α(b)·b_i`
+   (`word_numbering.rs`). **Do NOT start at a session tail.**
+3. **C-forward (faithful).** Britton-peel `p` over `recog_data` (B1 gives `h2_II = hnn_presentation(recog_data)`,
+   so `britton_lemma_full` applies) using A1 as the iso precondition; descend to `h1_base`.
+4. **C-backward (von Dyck).** Via the subgroup-A presentation (F1 + the p-conjugation checks); the
+   family-(II) payoff. NOTE the bridge B1.5 still helps frame the image, but the homomorphism check is
+   over `A`'s relations, NOT over `h2_II`'s.
+5. **C3 — biconditional** = forward + backward; package as `lemma_phi_l_iso_at_h2II`.
 
 The original §3 A2 (`lemma_phi_scaling_injective_F`) and B2 (`lemma_finite_beta_suffices`) are subsumed:
-A2's injectivity is now the base-descent tail of C2 (no free `F` to inject into); B2 becomes the
-`requires alphas ⊇ betas(w)` side-condition baked into `h2_II`'s finite slice.
+A2's injectivity is the base-descent tail of C-forward; B2 becomes the `requires alphas ⊇ betas(w)`
+side-condition baked into `h2_II`'s finite slice.
 
 ## 4. First verified down-payment for the next session
 
-**B1 is DONE** (`h3_ii.rs` 25/0). Next, take **B1.5 (the subst-factoring bridge)** — self-contained,
-unblocks BOTH crux directions, and surfaces whether the `apply_embedding` composition infra already
-exists. Then **C1 (von Dyck)**, which is tractable for the easy relators and isolates exactly the
-machine-relator-respect obligation. Save **A1** (the residue iso) for a focused push — it is the genuine
-`prop_v`-scale content and should be budgeted as such. Do NOT start A1 at a session tail; map its reuse
-of `prop_v`'s `lemma_accumulator_inv` / `tower_peel`'s coordinate survival first.
+**B1 + B1.5 DONE** (`h3_ii.rs` 28/0). Next, take **F1** (`F = ⟨t,x,d,b_j⟩` free in `h2_II`) — the
+Route-B prerequisite; study `free_basis.rs`'s `lemma_basis_elt_free` + its base-descent machinery first,
+then adapt to the `{t,x,d,b_j}` family. F1 is the structural gate that makes the subgroup-A HNN
+presentation legitimate, after which the von Dyck p-conjugation checks become tractable. Save **A1** (the
+residue iso + p-conjugation iso) for a focused push — it is the genuine `prop_v`-scale content. Do NOT
+start A1 at a session tail; map its reuse of `prop_v`'s `lemma_accumulator_inv` / `tower_peel`'s
+coordinate survival + the numbering identity `w_{αm+i}(b)=w_α(b)·b_i` first.
