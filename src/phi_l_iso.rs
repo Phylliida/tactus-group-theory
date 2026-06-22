@@ -19,12 +19,12 @@ use crate::word::*;
 use crate::machine_group::{ModMachine, g_m, config_word, symbol_power, lemma_g_m_num_generators,
     lemma_inverse_word_sympower, lemma_symbol_power_merge, lemma_apply_embedding_sympower,
     word_power, lemma_word_power_symbol};
-use crate::benign::{apply_embedding, apply_embedding_symbol, lemma_apply_embedding_concat};
+use crate::benign::{apply_embedding, apply_embedding_symbol, lemma_apply_embedding_concat,
+    lemma_apply_embedding_inverse};
 use crate::word_numbering::{w_b, w_c, alphabet_letter, numbers_word, lemma_w_b_snoc,
     lemma_w_c_gens_in_block};
-use crate::layout::{b_base, d_idx, h2_num_gens};
-use crate::h1::h_w_b;
-use crate::h3_ii::{phi_l_subst, family_II_rhs};
+use crate::layout::{b_base, d_idx, p_idx, h2_num_gens};
+use crate::h3_ii::{phi_l_subst, family_II_lhs, family_II_rhs, family_II_relator};
 
 verus! {
 
@@ -248,6 +248,82 @@ pub proof fn lemma_phi_l_on_family_II_rhs(mm: ModMachine, n: nat, m: nat, l: nat
     assert(bl_seq =~= seq![bl]);
     assert(family_II_rhs(mm, n, m, m * beta + l) == (cfg2 + w_b(bb, n, m, m * beta + l)) + dw);
     assert(seq![bl, Symbol::Gen(d)] =~= seq![bl] + dw);
+}
+
+/// **The family-(II) LHS under `φ_l`**: `φ_l(p⁻¹ t_β p) =~= p⁻¹ t_{mβ+l} p`, i.e.
+/// `apply_embedding(φ_l, family_II_lhs(β)) =~= family_II_lhs(mβ+l)`.  `φ_l` fixes `p`
+/// (`p_idx` is not `0`/`1`/`d_idx`), so this is just the digit-scaling identity (C-a)
+/// wrapped in `p⁻¹ · _ · p`.  Precondition-free (like C-a).
+pub proof fn lemma_phi_l_on_family_II_lhs(mm: ModMachine, n: nat, m: nat, l: nat, beta: nat)
+    ensures
+        apply_embedding(phi_l_subst(g_m(mm).num_generators, n, m, l),
+            family_II_lhs(mm, n, beta))
+            =~= family_II_lhs(mm, n, m * beta + l),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);                       // nk ≥ 4 ⟹ p_idx ∉ {0,1,d_idx}
+    let subst = phi_l_subst(nk, n, m, l);
+    let pp = p_idx(nk, n);                              // = nk + 2n + 1
+    let ip: Word = seq![Symbol::Inv(pp)];
+    let gp: Word = seq![Symbol::Gen(pp)];
+    let cfg = config_word(beta, 0);
+
+    // family_II_lhs(β) = (ip + cfg) + gp; distribute apply_embedding.
+    assert(family_II_lhs(mm, n, beta) == (ip + cfg) + gp);
+    lemma_apply_embedding_concat(subst, ip + cfg, gp);
+    lemma_apply_embedding_concat(subst, ip, cfg);
+
+    // φ_l fixes p:  subst[pp] = [Gen(pp)]  (pp ≠ 0,1,d_idx).
+    assert(pp != 0 && pp != 1 && pp != d_idx(nk, n));
+    assert(pp < h2_num_gens(nk, n));
+    assert(subst[pp as int] == seq![Symbol::Gen(pp)]);
+    reveal_with_fuel(apply_embedding, 2);
+    lemma_concat_empty_right(subst[pp as int]);
+    assert(apply_embedding(subst, gp) =~= gp);          // φ_l(p) = p
+    lemma_concat_empty_right(inverse_word(subst[pp as int]));
+    reveal_with_fuel(inverse_word, 2);
+    assert(apply_embedding(subst, ip) =~= ip);          // φ_l(p⁻¹) = p⁻¹
+
+    // φ_l(cfg) =~= config(mβ+l,0).
+    lemma_phi_l_on_config_zero(mm, n, m, l, beta);
+
+    assert(apply_embedding(subst, family_II_lhs(mm, n, beta))
+        =~= (ip + config_word(m * beta + l, 0)) + gp);
+    assert(family_II_lhs(mm, n, m * beta + l) == (ip + config_word(m * beta + l, 0)) + gp);
+}
+
+/// **von-Dyck-`b` word core**: `φ_l(family_II_relator(β)) =~= family_II_relator(mβ+l)`.
+/// `family_II_relator = lhs · rhs⁻¹`; `φ_l` distributes (`apply_embedding` over concat / inverse),
+/// landing on `lhs(mβ+l) · rhs(mβ+l)⁻¹`.  So when `mβ+l ∈ alphas` (the finite slice), the image is a
+/// LITERAL `h2_II` relator (`≡ ε`) — the homomorphism (von Dyck) condition for `map_b`'s `p`-relations.
+pub proof fn lemma_phi_l_on_family_II_relator(mm: ModMachine, n: nat, m: nat, l: nat, beta: nat)
+    requires
+        numbers_word(n, m, beta),
+        2 * n < m,
+        1 <= l <= 2 * n,
+    ensures
+        apply_embedding(phi_l_subst(g_m(mm).num_generators, n, m, l),
+            family_II_relator(mm, n, m, beta))
+            =~= family_II_relator(mm, n, m, m * beta + l),
+{
+    let nk = g_m(mm).num_generators;
+    let subst = phi_l_subst(nk, n, m, l);
+    let lhs = family_II_lhs(mm, n, beta);
+    let rhs = family_II_rhs(mm, n, m, beta);
+
+    // family_II_relator(β) = lhs + inverse_word(rhs); distribute.
+    assert(family_II_relator(mm, n, m, beta) == lhs + inverse_word(rhs));
+    lemma_apply_embedding_concat(subst, lhs, inverse_word(rhs));
+
+    lemma_phi_l_on_family_II_lhs(mm, n, m, l, beta);    // φ_l(lhs) =~= lhs(mβ+l)
+    lemma_phi_l_on_family_II_rhs(mm, n, m, l, beta);    // φ_l(rhs) =~= rhs(mβ+l)
+    lemma_apply_embedding_inverse(subst, rhs);          // φ_l(rhs⁻¹) =~= φ_l(rhs)⁻¹
+    // inverse_word respects =~=: φ_l(rhs)⁻¹ =~= rhs(mβ+l)⁻¹.
+    assert(inverse_word(apply_embedding(subst, rhs))
+        =~= inverse_word(family_II_rhs(mm, n, m, m * beta + l)));
+
+    assert(family_II_relator(mm, n, m, m * beta + l)
+        == family_II_lhs(mm, n, m * beta + l) + inverse_word(family_II_rhs(mm, n, m, m * beta + l)));
 }
 
 } // verus!
