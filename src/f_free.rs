@@ -650,4 +650,175 @@ pub proof fn lemma_extend_spanning(gp: Presentation, gens: Seq<Word>, w: Word, c
     }
 }
 
+// ----------------------------------------------------------------------------
+// Descent: a pinch in `W = apply_embedding(s_emb, w)` (inner HNN) descends to a pinch in `w` (outer
+// HNN).  The free-family hypothesis converts the pinch middle's `gp`-triviality into the
+// free-triviality required by the outer pinch.  Port of `lemma_psi_F_pinch_descends`.
+// ----------------------------------------------------------------------------
+
+pub proof fn lemma_extend_pinch_descends(gp: Presentation, gens: Seq<Word>, w: Word)
+    requires
+        presentation_valid(gp),
+        forall|i: int| 0 <= i < gens.len() ==> word_valid(#[trigger] gens[i], gp.num_generators),
+        forall|u: Word| (#[trigger] word_valid(u, gens.len())
+            && equiv_in_presentation(gp, apply_embedding(gens, u), empty_word()))
+            ==> equiv_in_presentation(free_group(gens.len()), u, empty_word()),
+        word_valid(w, (gens.len() + 1) as nat),
+        has_pinch(free_stable_data(gp), apply_embedding(stable_emb(gp, gens), w)),
+    ensures
+        has_pinch(free_stable_data(free_group(gens.len())), w),
+    decreases w.len(),
+{
+    let imgs = stable_emb(gp, gens);
+    let inner = free_stable_data(gp);
+    let outer = free_stable_data(free_group(gens.len()));
+    let W = apply_embedding(imgs, w);
+    lemma_stable_emb_index(gp, gens);
+    lemma_free_group_valid(gens.len());
+    assert(outer.base.num_generators == gens.len());
+    assert(inner.base.num_generators == gp.num_generators);
+    let ij: (int, int) = choose|i: int, j: int| has_pinch_at(inner, W, i, j);
+    let bi = ij.0;
+    let bj = ij.1;
+    assert(has_pinch_at(inner, W, bi, bj));
+    assert(has_adjacent_opposite_at(inner, W, bi, bj));
+    assert(w.len() > 0) by {
+        if w.len() == 0 { assert(W =~= Seq::<Symbol>::empty()); }
+    }
+    let c = w[0];
+    let w2 = w.drop_first();
+    assert(w =~= seq![c] + w2);
+    assert(word_valid(w2, (gens.len() + 1) as nat)) by {
+        assert forall|k: int| 0 <= k < w2.len()
+            implies symbol_valid(#[trigger] w2[k], (gens.len() + 1) as nat)
+        by { assert(w2[k] == w[k + 1]); }
+    }
+    lemma_apply_embedding_concat(imgs, seq![c], w2);
+    let ec = apply_embedding(imgs, seq![c]);
+    let W2 = apply_embedding(imgs, w2);
+    assert(ec =~= apply_embedding_symbol(imgs, c)) by { reveal_with_fuel(apply_embedding, 2); }
+    assert(W =~= ec + W2);
+    assert(symbol_valid(c, (gens.len() + 1) as nat)) by { assert(c == w[0]); }
+    // the inner empty-association generator lists are empty.
+    assert(Seq::new(0, |k: int| inner.associations[k].0) =~= Seq::<Word>::empty());
+    assert(Seq::new(0, |k: int| inner.associations[k].1) =~= Seq::<Word>::empty());
+    if is_stable(outer, c) {
+        // c is the outer stable letter ⟹ ec = [s^±], length 1.
+        assert(c == Symbol::Gen(gens.len()) || c == Symbol::Inv(gens.len()));
+        if c == Symbol::Gen(gens.len()) {
+            assert(ec =~= seq![Symbol::Gen(gp.num_generators)]);
+        } else {
+            assert(ec =~= inverse_word(seq![Symbol::Gen(gp.num_generators)]));
+            assert(ec =~= seq![Symbol::Inv(gp.num_generators)]) by { reveal_with_fuel(inverse_word, 2); }
+        }
+        assert(ec.len() == 1);
+        assert(W[0] == ec[0]);
+        if bi == 0 {
+            // spanning case: W[0] is the left endpoint, W[bj] the first stable of W2.
+            assert(forall|t: int| 0 <= t < W2.len() ==> #[trigger] W[1 + t] == W2[t]);
+            // W2[0..bj-1] non-stable, W2[bj-1] stable.
+            assert(0 <= bj - 1 < W2.len());
+            assert(W2[bj - 1] == W[bj]);
+            assert(is_stable(inner, W2[bj - 1]));
+            assert forall|k: int| 0 <= k < bj - 1 implies !is_stable(inner, #[trigger] W2[k]) by {
+                assert(W2[k] == W[k + 1]);
+            }
+            let l2 = lemma_extend_spanning(gp, gens, w2, bj - 1);
+            let l = l2 + 1;
+            // --- opposite endpoints: w[0] != w[l] ---
+            assert(apply_embedding_symbol(imgs, c) =~= seq![W[0]]) by { assert(ec[0] == W[0]); }
+            assert(apply_embedding_symbol(imgs, w2[l2]) =~= seq![W2[bj - 1]]);
+            assert(W2[bj - 1] == W[bj]);
+            assert(W[0] != W[bj]);
+            assert(w[l] == w2[l2]);
+            assert(w[0] != w[l]) by {
+                if w[0] == w[l] {
+                    assert(apply_embedding_symbol(imgs, c) =~= apply_embedding_symbol(imgs, w2[l2]));
+                    assert(seq![W[0]] =~= seq![W[bj]]);
+                    assert(W[0] == W[bj]);
+                }
+            }
+            // --- non-stable strictly between 0 and l ---
+            assert forall|k: int| 0 < k < l implies !is_stable(outer, #[trigger] w[k]) by {
+                assert(w[k] == w2[k - 1]);
+            }
+            // --- the middle is free-trivial ---
+            let mid = w.subrange(1, l);
+            assert(mid =~= w2.subrange(0, l2)) by {
+                assert(mid.len() == l2);
+                assert forall|k: int| 0 <= k < l2 implies mid[k] == w2.subrange(0, l2)[k]
+                by { assert(mid[k] == w[k + 1]); assert(w[k + 1] == w2[k]); }
+            }
+            // mid valid over gens.len() (non-stable over outer + valid over gens.len()+1).
+            assert(word_valid(mid, gens.len())) by {
+                assert forall|k: int| 0 <= k < mid.len() implies symbol_valid(#[trigger] mid[k], gens.len())
+                by {
+                    assert(mid[k] == w2[k]);
+                    assert(!is_stable(outer, w2[k]));
+                    assert(symbol_valid(w2[k], (gens.len() + 1) as nat));
+                }
+            }
+            // s_emb agrees with gens on the (non-stable) middle.
+            lemma_apply_embedding_agree_prefix(imgs, gens, mid, gens.len());
+            assert(apply_embedding(imgs, mid) =~= apply_embedding(gens, mid));
+            // s_emb(mid) = W2[0..bj-1] = W[1..bj] (the pinch middle).
+            assert(apply_embedding(imgs, mid) =~= W2.subrange(0, bj - 1));
+            let pinch_mid = W.subrange(bi + 1, bj);   // = W.subrange(1, bj)
+            assert(pinch_mid =~= W2.subrange(0, bj - 1)) by {
+                assert(pinch_mid.len() == bj - 1);
+                assert forall|k: int| 0 <= k < bj - 1 implies pinch_mid[k] == W2.subrange(0, bj - 1)[k]
+                by { assert(pinch_mid[k] == W[k + 1]); assert(W[k + 1] == W2[k]); }
+            }
+            // pinch_mid ∈ trivial subgroup of gp ⟹ pinch_mid ≡ ε ⟹ s_emb(mid) ≡ ε.
+            assert(in_generated_subgroup(gp, Seq::<Word>::empty(), pinch_mid));
+            lemma_in_empty_subgroup_trivial(gp, pinch_mid);
+            assert(equiv_in_presentation(gp, apply_embedding(gens, mid), empty_word()));
+            // free-family hypothesis ⟹ mid ≡ ε in free_group(gens.len()).
+            assert(equiv_in_presentation(free_group(gens.len()), mid, empty_word()));
+            lemma_trivial_in_empty_subgroup(free_group(gens.len()), mid);
+            assert(in_generated_subgroup(free_group(gens.len()), Seq::<Word>::empty(), mid));
+            // --- assemble the outer pinch at (0, l) ---
+            assert(Seq::new(0, |k: int| outer.associations[k].0) =~= Seq::<Word>::empty());
+            assert(Seq::new(0, |k: int| outer.associations[k].1) =~= Seq::<Word>::empty());
+            assert(w.subrange(1int, l) =~= mid);
+            assert(has_adjacent_opposite_at(outer, w, 0, l)) by {
+                assert(is_stable(outer, w[0]));
+                assert(is_stable(outer, w[l]));
+            }
+            assert(has_pinch_at(outer, w, 0, l));
+            assert(has_pinch(outer, w)) by { assert(has_pinch_at(outer, w, 0, l)); }
+        } else {
+            // I ≥ 1: strip the single stable prefix [s^±], recurse on w2, re-prepend c.
+            lemma_strip_prefix_preserves_pinch(inner, ec, W2, bi, bj);
+            lemma_extend_pinch_descends(gp, gens, w2);
+            lemma_prepend_preserves_pinch(outer, c, w2);
+        }
+    } else {
+        // c non-stable over outer ⟹ ec is a stable-free `gp`-word of length M; strip it, recurse.
+        assert(generator_index(c) < gens.len());
+        if c == Symbol::Gen(generator_index(c)) {
+            assert(ec =~= imgs[generator_index(c) as int]);
+            assert(imgs[generator_index(c) as int] == gens[generator_index(c) as int]);
+            lemma_word_valid_no_inner_stable(gp, gens[generator_index(c) as int]);
+        } else {
+            assert(c == Symbol::Inv(generator_index(c)));
+            assert(ec =~= inverse_word(imgs[generator_index(c) as int]));
+            assert(imgs[generator_index(c) as int] == gens[generator_index(c) as int]);
+            crate::word::lemma_inverse_word_valid(gens[generator_index(c) as int], gp.num_generators);
+            lemma_word_valid_no_inner_stable(gp, inverse_word(gens[generator_index(c) as int]));
+        }
+        let m = ec.len() as int;
+        assert(forall|k: int| 0 <= k < m ==> !is_stable(inner, #[trigger] ec[k]));
+        assert(forall|k: int| 0 <= k < m ==> W[k] == ec[k]);
+        // bi ≥ m, else W[bi] would be a (non-stable) ec position.
+        assert(is_stable(inner, W[bi]));
+        assert(bi >= m) by {
+            if bi < m { assert(W[bi] == ec[bi]); assert(!is_stable(inner, W[bi])); }
+        }
+        lemma_strip_prefix_preserves_pinch(inner, ec, W2, bi, bj);
+        lemma_extend_pinch_descends(gp, gens, w2);
+        lemma_prepend_preserves_pinch(outer, c, w2);
+    }
+}
+
 } // verus!
