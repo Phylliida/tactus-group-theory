@@ -821,4 +821,118 @@ pub proof fn lemma_extend_pinch_descends(gp: Presentation, gens: Seq<Word>, w: W
     }
 }
 
+// ----------------------------------------------------------------------------
+// B1 — the main inductive lemma.  A free family `gens` in `gp` extends by a free stable letter:
+// a word `w` whose stable-extended embedding is trivial in `gp ∗ ⟨s⟩` is itself trivial in the free
+// group `free_group(gens.len()+1)`.  Length induction; base case (no stable letter) delegates to
+// `lemma_extend_free_no_stable`, the step uses Britton + descent + pinch-out + IH.  Port of
+// `lemma_psi_F_injective`.
+// ----------------------------------------------------------------------------
+
+pub proof fn lemma_extend_free_by_stable(gp: Presentation, gens: Seq<Word>, w: Word)
+    requires
+        presentation_valid(gp),
+        forall|i: int| 0 <= i < gens.len() ==> word_valid(#[trigger] gens[i], gp.num_generators),
+        forall|u: Word| (#[trigger] word_valid(u, gens.len())
+            && equiv_in_presentation(gp, apply_embedding(gens, u), empty_word()))
+            ==> equiv_in_presentation(free_group(gens.len()), u, empty_word()),
+        word_valid(w, (gens.len() + 1) as nat),
+        equiv_in_presentation(hnn_presentation(free_stable_data(gp)),
+            apply_embedding(stable_emb(gp, gens), w), empty_word()),
+    ensures
+        equiv_in_presentation(free_group((gens.len() + 1) as nat), w, empty_word()),
+    decreases w.len(),
+{
+    let imgs = stable_emb(gp, gens);
+    let inner = free_stable_data(gp);
+    let outer = free_stable_data(free_group(gens.len()));
+    let hp = hnn_presentation(inner);
+    let W = apply_embedding(imgs, w);
+    lemma_stable_emb_index(gp, gens);
+    lemma_free_group_valid(gens.len());
+    lemma_free_group_valid((gens.len() + 1) as nat);
+    assert(outer.base.num_generators == gens.len());
+    assert(hp.num_generators == gp.num_generators + 1);
+    // images valid over the inner HNN's generator count (gp.num_generators + 1).
+    assert forall|i: int| 0 <= i < imgs.len()
+        implies word_valid(#[trigger] imgs[i], (gp.num_generators + 1) as nat)
+    by {
+        if i < gens.len() {
+            assert(imgs[i] == gens[i]);
+            lemma_word_valid_mono(gens[i], gp.num_generators, (gp.num_generators + 1) as nat);
+        } else {
+            assert(imgs[i] == seq![Symbol::Gen(gp.num_generators)]);
+        }
+    }
+    lemma_apply_embedding_valid(imgs, w, (gp.num_generators + 1) as nat);
+    assert(word_valid(W, (gp.num_generators + 1) as nat));
+    if stable_count(outer, w) == 0 {
+        // base case: w has no outer stable letter ⟹ it is valid over gens.len().
+        assert(!has_stable_letter(outer, w)) by {
+            if has_stable_letter(outer, w) { lemma_has_stable_implies_count(outer, w); }
+        }
+        assert(word_valid(w, gens.len())) by {
+            assert forall|k: int| 0 <= k < w.len() implies symbol_valid(#[trigger] w[k], gens.len())
+            by {
+                assert(!is_stable(outer, w[k]));
+                assert(symbol_valid(w[k], (gens.len() + 1) as nat));
+                match w[k] {
+                    Symbol::Gen(idx) => { assert(idx != gens.len()); },
+                    Symbol::Inv(idx) => { assert(idx != gens.len()); },
+                }
+            }
+        }
+        lemma_extend_free_no_stable(gp, gens, w);
+    } else {
+        // step: W has a stable letter, is trivial, hence has a pinch.
+        lemma_extend_stable_count_eq(gp, gens, w);
+        assert(stable_count(inner, W) >= 1);
+        lemma_stable_count_pos_has_stable(inner, W);
+        lemma_free_stable_data_valid(gp);
+        lemma_free_stable_data_isomorphic(gp);
+        lemma_hnn_presentation_valid(inner);
+        if !has_pinch(inner, W) {
+            lemma_no_pinch_stable_nontrivial(inner, W);   // contradicts W ≡ ε
+        }
+        assert(has_pinch(inner, W));
+        // descend the pinch to w.
+        lemma_extend_pinch_descends(gp, gens, w);
+        let ij: (int, int) = choose|i: int, j: int| has_pinch_at(outer, w, i, j);
+        let pi = ij.0;
+        let pj = ij.1;
+        assert(has_pinch_at(outer, w, pi, pj));
+        assert(has_adjacent_opposite_at(outer, w, pi, pj));
+        let wshort: Word = w.subrange(0, pi) + w.subrange(pj + 1, w.len() as int);
+        // pinch out: w ≡ wshort in hnn_presentation(outer) = free_group(gens.len()+1).
+        lemma_free_stable_pinch_out(free_group(gens.len()), w, pi, pj);
+        lemma_free_stable_of_free_group(gens.len());
+        assert(equiv_in_presentation(free_group((gens.len() + 1) as nat), w, wshort));
+        // wshort is strictly shorter and valid.
+        assert(wshort.len() < w.len()) by {
+            assert(w.subrange(0, pi).len() == pi);
+            assert(w.subrange(pj + 1, w.len() as int).len() == w.len() - (pj + 1));
+        }
+        assert(word_valid(w.subrange(0, pi), (gens.len() + 1) as nat)) by {
+            assert forall|k: int| 0 <= k < w.subrange(0, pi).len()
+                implies symbol_valid(#[trigger] w.subrange(0, pi)[k], (gens.len() + 1) as nat)
+            by { assert(w.subrange(0, pi)[k] == w[k]); }
+        }
+        assert(word_valid(w.subrange(pj + 1, w.len() as int), (gens.len() + 1) as nat)) by {
+            assert forall|k: int| 0 <= k < w.subrange(pj + 1, w.len() as int).len()
+                implies symbol_valid(#[trigger] w.subrange(pj + 1, w.len() as int)[k], (gens.len() + 1) as nat)
+            by { assert(w.subrange(pj + 1, w.len() as int)[k] == w[k + pj + 1]); }
+        }
+        crate::word::lemma_concat_word_valid(w.subrange(0, pi),
+            w.subrange(pj + 1, w.len() as int), (gens.len() + 1) as nat);
+        // W_short ≡ ε: s_emb respects the (relator-free) source equivalence w ≡ wshort.
+        let wshort_emb = apply_embedding(imgs, wshort);
+        lemma_emb_respects_source_equiv(free_group((gens.len() + 1) as nat), hp, imgs, w, wshort);
+        lemma_equiv_symmetric(hp, W, wshort_emb);
+        lemma_equiv_transitive(hp, wshort_emb, W, empty_word());
+        // inductive hypothesis on wshort, then close.
+        lemma_extend_free_by_stable(gp, gens, wshort);
+        lemma_equiv_transitive(free_group((gens.len() + 1) as nat), w, wshort, empty_word());
+    }
+}
+
 } // verus!
