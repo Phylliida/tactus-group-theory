@@ -16,8 +16,11 @@ use crate::f_free::is_free_family;
 use crate::f_free_h1::{f_h1_family, lemma_f_free_in_h1};
 use crate::free_family_perm::{permute_family, lemma_free_family_permute};
 use crate::benign::{apply_embedding, apply_embedding_symbol, lemma_apply_embedding_concat};
-use crate::word_numbering::{w_c, alphabet_letter, numbers_word};
-use crate::pa_data::pa_b_base;
+use crate::word_numbering::{w_b, w_c, alphabet_letter, numbers_word};
+use crate::pa_data::{pa_b_base, pa_rhs};
+use crate::machine_group::{config_word, symbol_power, lemma_symbol_power_valid};
+use crate::phi_l_iso::{lemma_apply_embedding_fixes, lemma_config_zero_form};
+use crate::h3_ii::family_II_rhs;
 
 verus! {
 
@@ -279,6 +282,105 @@ pub proof fn lemma_a_words_relabel_wc(mm: ModMachine, n: nat, m: nat, gamma: nat
         assert(w_c(bb, n, m, gamma) =~= preB + letterB);
         assert(letterB =~= seq![alphabet_letter(bb, n, d)]);
     }
+}
+
+// ----------------------------------------------------------------------------
+// The association-preservation column translations: `a_words` carries `P_A`'s columns onto
+// `recog_data`'s (= `h2_II`'s family-(II) columns).
+// ----------------------------------------------------------------------------
+
+/// `a_words`'s first three entries: `[0]=t, [1]=x, [2]=d` (= `Gen(d_idx)`), and `|a_words|=n+4`.
+proof fn lemma_a_words_head(mm: ModMachine, n: nat)
+    ensures
+        a_words(mm, n)[0] == seq![Symbol::Gen(0)],
+        a_words(mm, n)[1] == seq![Symbol::Gen(1)],
+        a_words(mm, n)[2] == seq![Symbol::Gen(d_idx(g_m(mm).num_generators, n))],
+        a_words(mm, n).len() == n + 4,
+{
+    let nk = g_m(mm).num_generators;
+    let head = seq![seq![Symbol::Gen(0)], seq![Symbol::Gen(1)], seq![Symbol::Gen(d_idx(nk, n))]];
+    let tail = Seq::new(n, |j: int| seq![Symbol::Gen(b_idx(nk, n, (j + 1) as nat))]);
+    assert(a_words_F(mm, n) == head + tail);
+    assert(a_words_F(mm, n).len() == n + 3);
+    assert((head + tail)[0] == head[0]);
+    assert((head + tail)[1] == head[1]);
+    assert((head + tail)[2] == head[2]);
+}
+
+/// **`a_words` fixes a config word** `config(γ,0)` (it uses only gens `{0,1}`, which `a_words` maps
+/// to themselves).  So `apply_embedding(a_words, config(γ,0)) =~= config(γ,0)` — the a-column of `P_A`
+/// maps to `recog_data`'s a-column unchanged.
+proof fn lemma_a_words_fixes_config(mm: ModMachine, n: nat, gamma: nat)
+    ensures
+        apply_embedding(a_words(mm, n), config_word(gamma, 0)) =~= config_word(gamma, 0),
+{
+    let aw = a_words(mm, n);
+    let cfg = config_word(gamma, 0);
+    lemma_a_words_head(mm, n);                              // aw[0]=[Gen0], aw[1]=[Gen1]
+    // cfg uses only gens {0,1} at s=0:  cfg =~= Inv(1)^γ + [Gen0] + Gen(1)^γ, valid over 2.
+    lemma_config_zero_form(gamma);
+    let i1 = symbol_power(Symbol::Inv(1), gamma);
+    let g1 = symbol_power(Symbol::Gen(1), gamma);
+    assert(cfg =~= (i1 + seq![Symbol::Gen(0)]) + g1);
+    lemma_symbol_power_valid(Symbol::Inv(1), gamma, 2);
+    lemma_symbol_power_valid(Symbol::Gen(1), gamma, 2);
+    assert(word_valid(seq![Symbol::Gen(0)], 2));
+    lemma_concat_word_valid(i1, seq![Symbol::Gen(0)], 2);
+    lemma_concat_word_valid(i1 + seq![Symbol::Gen(0)], g1, 2);
+    assert(word_valid(cfg, 2));
+    // per-symbol fix: every symbol of cfg (gen-index < 2) is fixed by a_words.
+    assert forall|i: int| 0 <= i < cfg.len()
+        implies apply_embedding_symbol(aw, #[trigger] cfg[i]) =~= seq![cfg[i]] by {
+        assert(symbol_valid(cfg[i], 2));
+        match cfg[i] {
+            Symbol::Gen(gg) => {
+                assert(gg < 2);
+                assert(aw[gg as int] =~= seq![Symbol::Gen(gg)]);   // gg ∈ {0,1}
+                assert(apply_embedding_symbol(aw, cfg[i]) == aw[gg as int]);
+            },
+            Symbol::Inv(gg) => {
+                assert(gg < 2);
+                assert(aw[gg as int] =~= seq![Symbol::Gen(gg)]);
+                assert(apply_embedding_symbol(aw, cfg[i]) =~= inverse_word(aw[gg as int]));
+                reveal_with_fuel(inverse_word, 2);
+            },
+        }
+    }
+    lemma_apply_embedding_fixes(aw, cfg);
+}
+
+/// **The b-column translation**: `apply_embedding(a_words, pa_rhs(γ)) =~= family_II_rhs(γ)`.
+/// `pa_rhs(γ) = config(γ,0)·w_c(3,n,m,γ)·[Gen2]`; `a_words` fixes the config, relabels the F-b-block
+/// `w_c(3,…)` onto the h2-b-block `w_γ(b) = w_c(nk+n,…)` (the `w_c`-relabel), and maps `d=Gen2 ↦
+/// Gen(d_idx)`.  So `P_A`'s b-column maps onto `recog_data`'s b-column = `family_II_rhs = basis_elt`.
+pub proof fn lemma_a_words_on_pa_rhs(mm: ModMachine, n: nat, m: nat, gamma: nat)
+    requires
+        numbers_word(n, m, gamma),
+        2 * n < m,
+    ensures
+        apply_embedding(a_words(mm, n), pa_rhs(n, m, gamma)) =~= family_II_rhs(mm, n, m, gamma),
+{
+    let nk = g_m(mm).num_generators;
+    let aw = a_words(mm, n);
+    let bb = b_base(nk, n);
+    let cfg = config_word(gamma, 0);
+    let wc3 = w_c(pa_b_base(), n, m, gamma);
+    let d2: Word = seq![Symbol::Gen(2)];
+    // pa_rhs = (cfg + wc3) + [Gen2]; distribute apply_embedding.
+    assert(pa_rhs(n, m, gamma) == (cfg + wc3) + d2);
+    lemma_apply_embedding_concat(aw, cfg + wc3, d2);
+    lemma_apply_embedding_concat(aw, cfg, wc3);
+    // the three pieces.
+    lemma_a_words_fixes_config(mm, n, gamma);              // ae(cfg) =~= cfg
+    lemma_a_words_relabel_wc(mm, n, m, gamma);             // ae(wc3) =~= w_c(bb, γ)
+    lemma_a_words_head(mm, n);                             // aw[2] = [Gen(d_idx)]
+    reveal_with_fuel(apply_embedding, 2);
+    lemma_concat_empty_right(aw[2]);
+    assert(apply_embedding(aw, d2) =~= aw[2]);             // ae([Gen2]) = aw[2] = [Gen(d_idx)]
+    // family_II_rhs = config + w_b(bb,…) + [Gen(d_idx)];  w_b = w_c.
+    assert(w_b(bb, n, m, gamma) == w_c(bb, n, m, gamma));
+    assert(family_II_rhs(mm, n, m, gamma)
+        == (cfg + w_b(bb, n, m, gamma)) + seq![Symbol::Gen(d_idx(nk, n))]);
 }
 
 } // verus!
