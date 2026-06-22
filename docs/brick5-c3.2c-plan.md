@@ -248,7 +248,49 @@ needed). **NEXT = B4 (lift `h1_base ↪ h2_II` = A1, §4.2).**
 ⟹ `F` free in `h2_II`. So F1-at-h2_II depends on A1; but von Dyck only needs the subgroup-`A` presentation,
 which uses `F` free in `h1_base` (B3) directly.
 
-### 4.2 Save A1 for a focused push
-**A1** (the residue iso + p-conjugation iso = `hnn_associations_isomorphic(recog_data)`) is the genuine
-`prop_v`-scale content. Do NOT start A1 at a session tail; map its reuse of `prop_v`'s `lemma_accumulator_inv`
-/ `tower_peel`'s coordinate survival + the numbering identity `w_{αm+i}(b)=w_α(b)·b_i` first.
+### 4.2 A1 — REFRAMED & DE-RISKED (2026-06-22, peer-confirmed). NOT `prop_v`-scale after all.
+**A1 = `hnn_associations_isomorphic(recog_data(mm,n,m,alphas))`.** The earlier "genuine `prop_v`-scale
+residue iso, hardest brick" estimate was PESSIMISTIC. Recon (2026-06-22) collapses A1 to an assembly of two
+**already-proven** freeness lemmas through F3. The companion model independently confirmed the logic sound.
+
+**The key observation.** `recog_data.associations = p_assoc ++ family_II_assoc`, so its two columns are:
+- `a_words` (`.0`) = `[t] ++ [config(αᵢ,0)]`  (`p_assoc[0].0 = seq![Gen0]`; `family_II_assoc[i].0 = config(αᵢ,0)`).
+- `b_words` (`.1`) = `[td] ++ [config(αᵢ,0)·w_{αᵢ}(b)·d]`  (`p_assoc[0].1 = td_word`; `family_II_assoc[i].1 = family_II_rhs(αᵢ) = basis_elt(αᵢ)`).
+
+**The `p_assoc` head IS the α=0 case** (VERIFIED concretely): `config_word(0,0) =~= seq![Gen0]`
+(`lemma_config_word_zero`), and `w_b(_,_,_,0) = ε` (the `α==0` base case of `w_c`), so `basis_elt(0) =
+config(0,0)·ε·d = [Gen0, Gen(d_idx)] = td_word`. Hence with **`betas = seq![0] + alphas`**:
+`a_words ≡ config_emb(betas)` and `b_words = basis_emb(betas)` entry-wise (head up to the `config_word(0,0)` ≡).
+
+**The iso reduces to "both columns are free families" + F3** (peer-confirmed valid):
+`apply_embedding(a_words,w) ≡_{h1} ε ⟹ (a free) w ≡_free ε ⟹ (F3 on b) apply_embedding(b_words,w) ≡_{h1} ε`,
+and symmetric. So `hnn_associations_isomorphic(recog_data)` follows from:
+1. **`config_emb(betas)` free in `h1_base`.** `lemma_config_emb_free` already gives it free in `K_M = g_m`;
+   LIFT to `h1_base` via the **`kill_hom` retraction** (`free_basis::kill_hom` is identity on the K_M block ⟹
+   `K_M` faithfully embeds in `h1_base`: a K_M word `≡_{h1} ε` ⟹ `apply_hom(kill_hom,·) ≡_{g_m} ε` ⟹ (kill_hom
+   fixes low) `≡_{g_m} ε`). This retraction lemma is the one genuinely-new (but SHORT) piece.
+2. **`basis_emb(betas)` free in `h1_base`.** ALREADY PROVEN — `lemma_basis_elt_free` (`free_basis.rs` 29/0),
+   the headline free-basis lemma. Reused verbatim.
+3. **F3 = `free_basis::lemma_free_to_embedding`** (a free-trivial `w` maps to `ε` under any valid embedding) —
+   both directions.
+4. **`betas.no_duplicates()`** side-condition (`0 ∉ alphas ∧ alphas.no_duplicates()`) so neither column has a
+   repeated generator — needed by `lemma_config_emb_free`/`lemma_basis_elt_free` (both `require no_duplicates`).
+   The `α=0`/`p_assoc` "overlap" is NOT a problem: `betas = [0]++alphas` unifies the special case into the
+   family; just carry `0 ∉ alphas` (true in the C3.2c context where `alphas` are the β's `w` touches, all > 0).
+
+**Concrete A1 sub-ladder for the next session (a NEW module, e.g. `f_free_a1.rs` / extend `h3_ii.rs`):**
+- `lemma_km_faithful_in_h1` — the `kill_hom` retraction: `word_valid(w, nk) ∧ w ≡_{h1_base} ε ⟹ w ≡_{g_m} ε`
+  (reuse `free_basis::{kill_hom, lemma_kill_hom_valid, lemma_kill_fixes_low}` + `lemma_hom_preserves_equiv`).
+- `lemma_config_emb_free_in_h1` — config family free in `h1_base` (= `lemma_config_emb_free` + the retraction).
+- `lemma_a_words_eq_config_emb` / `lemma_b_words_eq_basis_emb` — the `betas=[0]++alphas` correspondence
+  (head via `lemma_config_word_zero` + `w_b`-zero; tail definitional). Then `apply_embedding` congruence
+  (`benign`) lifts the per-entry ≡ to the whole embedding so the iso transports.
+- `lemma_recog_associations_isomorphic` — assemble 1+2+3 into `hnn_associations_isomorphic(recog_data)`.
+  (Mind the entry-wise ≡ vs `=`: a_words[0] ≡ config_emb(betas)[0] but maybe not literal — push through
+  `equiv_in_presentation` congruence, NOT seq equality, when transporting the iso.)
+
+Once A1 lands, **B4** is immediate (`lemma_recog_data_valid` + A1 ⟹ `hnn_data` valid+iso ⟹ Britton over
+`recog_data` applies to `h2_II`; F free `h1_base ↪ h2_II`), and the C-forward Britton peel + C-backward von
+Dyck (the family-(II) payoff) follow per §3b. The old `prop_v`/`tower_peel`/`lemma_accumulator_inv` reuse
+that this section used to anticipate is **NOT needed** — that machinery was already spent inside
+`lemma_basis_elt_free`, which A1 now consumes wholesale. **A1 is a clean focused arc, not a multi-session crux.**

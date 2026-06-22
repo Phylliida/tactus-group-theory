@@ -305,11 +305,17 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       b_i' b_i'⁻¹ ≡ ε` via `lemma_kill_c_on_comm_relator` + the index-keyed `_on_comm_idx`). Then
       `free_basis::lemma_pullback_free`: `comp_images(kill_c, f_h1_family) ==` B2's tower family
       (`lemma_comp_is_b2_family`), so B2's freeness (`lemma_txbd_free_in_tower`) descends `w` to free-triviality.
-      `f_h1_family` = `[t,x]` + the literal `h1_base` b/d block `Gen(nk+n+i)` (`i=0..n`). **REMAINING = B4: lift
-      `F` free `h1_base ↪ h2_II` (= A1, the `prop_v`-scale residue/p-conjugation iso = `hnn_associations_isomorphic(recog_data)`).**
-      A1 is the genuine remaining cost — see §4.2; map its reuse of `prop_v`'s `lemma_accumulator_inv` /
-      `tower_peel` coordinate survival + the numbering identity `w_{αm+i}(b)=w_α(b)·b_i` first; do NOT start at a
-      session tail.
+      `f_h1_family` = `[t,x]` + the literal `h1_base` b/d block `Gen(nk+n+i)` (`i=0..n`). **REMAINING = A1 =
+      `hnn_associations_isomorphic(recog_data)`, then B4 (lift `h1_base ↪ h2_II`).** **A1 REFRAMED & DE-RISKED
+      2026-06-22 (peer-confirmed, `docs/brick5-c3.2c-plan.md` §4.2 rewritten): NOT `prop_v`-scale after all.**
+      `recog_data`'s two association columns are `config_emb(betas)` / `basis_emb(betas)` with `betas=[0]++alphas`
+      (the `p_assoc` head `(t,td)` IS the α=0 case — VERIFIED: `config_word(0,0)=[Gen0]`, `w_b(_,0)=ε`). Both
+      columns are **already-proven free families** (`lemma_config_emb_free` lifted to `h1_base` via the `kill_hom`
+      retraction; `lemma_basis_elt_free` = the 29/0 headline, free in `h1_base` directly), so the HNN iso = both
+      free + F3 (`lemma_free_to_embedding`) both ways, side-condition `betas.no_duplicates()`. The only new piece
+      is the SHORT `kill_hom`-retraction lemma (K_M faithful in `h1_base`). `prop_v`/`tower_peel`/
+      `lemma_accumulator_inv` are NOT needed (already spent inside `lemma_basis_elt_free`). A1 is a clean focused
+      arc; §4.2 has the concrete sub-ladder.
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).
