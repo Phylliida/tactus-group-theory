@@ -366,10 +366,15 @@ Proof = the Britton-peel induction on `w.len()` (mirror `lemma_psi_A_injective`)
 - [x] **C-b word core (`phi_l_iso.rs` 6/0)** — `lemma_phi_l_on_family_II_rhs`: `φ_l(family_II_rhs(β)) =~=
   family_II_rhs(mβ+l)`. C-a + b-block fixing (`lemma_phi_l_fixes_w_b` via `lemma_w_c_gens_in_block` + the
   general `lemma_apply_embedding_fixes`) + `φ_l(d)=b_l·d` + numbering snoc `lemma_w_b_snoc`.
-- [ ] **C-b relator lift** — `φ_l(family_II_relator_F(β)) ≡_{h2_II} ε` for `mβ+l ∈ alphas`: the image is
-  `family_II_relator(mβ+l)`, a literal `h2_II` relator (via the C-b word core for the RHS + the LHS half
-  `φ_l(p⁻¹ t_β p) = p⁻¹ t_{mβ+l} p`, immediate from C-a + `φ_l(p)=p`). Then assemble von Dyck `b` via
-  `lemma_emb_respects_source_equiv` over `pa_data`. (von Dyck `a` = `lemma_family_II_relator_equiv_empty`, done.)
+- [x] **C-b relator word core (`phi_l_iso.rs` 8/0)** — `lemma_phi_l_on_family_II_relator`:
+  `φ_l(family_II_relator(β)) =~= family_II_relator(mβ+l)` (LHS half `lemma_phi_l_on_family_II_lhs` =
+  C-a + φ_l fixes p; combine via `apply_embedding` over concat/inverse). So when `mβ+l ∈ alphas` the
+  image is a LITERAL `h2_II` relator (`≡ ε`).
+- [ ] **C-b group lift** — turn the `=~=` word identity into `φ_l(family_II_relator_F(β)) ≡_{h2_II} ε` and
+  assemble von Dyck `b` via `lemma_emb_respects_source_equiv` over `pa_data` (needs `pa_data` defined first).
+  Note the index gap: the above is over `h2_II`-indexing (`family_II_relator`); the `pa_data` route needs the
+  abstract-`F`-indexed relator `family_II_relator_F` and `emb(b_words, ·)` — relate the two via the inclusion.
+  (von Dyck `a` = `lemma_family_II_relator_equiv_empty`, already proven.)
 - [ ] **C-P_A — define `pa_data` + validity + iso** (`hnn_associations_isomorphic(pa_data)`): the iso over free `F`
   follows from A1 (iso over `h1_base`) + F-faithfulness (B3) by translating columns through the inclusion.
 - [ ] **C-lift — the unified HNN lifting lemma** (the Britton-peel; the deep multi-step core). Mirror
