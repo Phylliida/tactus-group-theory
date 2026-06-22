@@ -328,9 +328,15 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       (`lemma_betas_{index,numbers_word,no_duplicates}`, `numbers_word(n,m,0)=true`); (4) the iff assembly
       (forward `config_emb` free ⟹ `w` free ⟹ `lemma_free_to_basis_elt`; backward `lemma_basis_elt_free` ⟹
       `w` free ⟹ `lemma_free_to_embedding`). The de-risking held: the once-"hardest brick" was a clean ~190-line
-      arc consuming the already-spent `lemma_basis_elt_free` machinery wholesale. **NEXT = B4** (`lemma_recog_data_valid`
-      + A1 ⟹ Britton over `recog_data` applies to `h2_II`) → C-forward (Britton peel) + C-backward (von Dyck,
-      the family-(II) payoff) → C3 biconditional `lemma_phi_l_iso_at_h2II` → C3.2d/C2/C4/C5.
+      arc consuming the already-spent `lemma_basis_elt_free` machinery wholesale.
+      **B4 DONE 2026-06-22** (`f_free_a1.rs` 10/0, both first-try): A1's payoff. `lemma_h1_faithful_in_h2_II`
+      (the reusable `h1_base ↪ h2_II` faithfulness = `lemma_single_hnn_base_faithful(recog_data,·)` with A1 +
+      `lemma_recog_data_valid` discharging its preconditions + `lemma_recog_presentation` routing onto `h2_II`)
+      + `lemma_f_free_in_h2_II` (`F=[t,x,b_j,d]` free in `h2_II`, compose B3 with the faithfulness). **NEXT =
+      the C-forward / C-backward / C3 arc** — the substantial remaining work (a `tower_peel`-sized Britton-peel,
+      best as a fresh arc). C-forward = Britton-peel `p` over `recog_data` (now valid via A1) to descend
+      `emb(a_words,w)≡_{h2_II}ε`; C-backward = von Dyck over A's p-conjugations (family-(II) payoff, B3-based);
+      C3 = biconditional `lemma_phi_l_iso_at_h2II` → C3.2d (`decreases l` induction) → C2/C4/C5.
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).

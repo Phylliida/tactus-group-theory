@@ -306,3 +306,18 @@ Once A1 lands, **B4** is immediate (`lemma_recog_data_valid` + A1 ⟹ `hnn_data`
 Dyck (the family-(II) payoff) follow per §3b. The old `prop_v`/`tower_peel`/`lemma_accumulator_inv` reuse
 that this section used to anticipate is **NOT needed** — that machinery was already spent inside
 `lemma_basis_elt_free`, which A1 now consumes wholesale. **A1 is a clean focused arc, not a multi-session crux.**
+
+**B4 DONE 2026-06-22** (`f_free_a1.rs` 10/0): A1's direct payoff, both first-try.
+- **`lemma_h1_faithful_in_h2_II`** — the reusable `h1_base ↪ h2_II` faithfulness (a `h1_base`-word trivial in
+  `h2_II` is trivial in `h1_base`). = `lemma_single_hnn_base_faithful(recog_data, ·)` with A1 + `lemma_recog_data_valid`
+  discharging its two preconditions, and `lemma_recog_presentation` (`hnn_presentation(recog_data)==h2_II`)
+  routing the conclusion onto `h2_II`. This is the descent-to-base step the C-forward Britton peel leans on.
+- **`lemma_f_free_in_h2_II`** — `F=[t,x,b_j,d]` free in `h2_II` (compose B3 `lemma_f_free_in_h1` with the
+  faithfulness above): the embedded product is a `h1_base`-word, its `h2_II`-triviality descends, B3 closes it.
+
+**NEXT = the C-forward / C-backward / C3 arc** (the substantial remaining work — a Britton-peel proof,
+"`tower_peel`-sized", best as a fresh arc). C-forward: Britton-peel `p` over `recog_data` (now valid via A1)
+to analyze `emb(a_words,w) ≡_{h2_II} ε` and descend; C-backward: von Dyck over `A`'s p-conjugations (the
+family-(II) payoff, using `F` free in `h1_base` = B3 to make `A=HNN(F,p|family II)` the genuine subgroup
+presentation); C3: biconditional `lemma_phi_l_iso_at_h2II`. Then C3.2d (`decreases l` faithfulness induction,
+mirror `lemma_b_m_upto_faithful`) → C2(p-level)/C4(Fork-B k-engine)/C5.
