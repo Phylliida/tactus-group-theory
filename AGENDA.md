@@ -237,9 +237,16 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       groups). **C3.2a DONE** (`h3_ii.rs` 18/0): the a_words/b_words backbone — `lemma_phi_assoc_index`
       (explicit per-position `φ_l` pairs: `t↦t_l, x↦xᵐ, d↦b_l·d, b_j↦b_j, p↦p`), `phi_l_data` HNN datum +
       `lemma_phi_l_data_base`/`_valid` (`hnn_data_valid`, `k=n+4`, `base.num_gens=h2_num_gens+(l-1)`).
-      **NEXT = C3.2b** (von Dyck over `h3_II`: images satisfy each `B`-relator; the p/a_i-relators
-      consume family (II) — C3.1's payoff) → C3.2c (b-augmented `conj_scaling_trivial_iff`, the crux) →
-      C3.2d (tower lift) → C2 → C4 → C5. See `docs/brick5-c3.2-plan.md` §4 / `brick5-completeness-plan.md`.
+      **C3.2d INFRA DONE** (`h3_ii.rs` 20/0): the crux-independent collapse halves —
+      `lemma_phi_l_emb_h2_valid` (both `φ_l` embeddings are `h2`-words, never touch an `a_i`/`k` letter ⟹
+      can descend the a-tower) + `lemma_h2II_equiv_lifts_to_tower` (easy bottom→top, `lemma_base_embeds_in_hnn`
+      up the tower). Studying `lemma_b_m_upto_faithful` clarified the architecture: `lemma_phi_l_iso` IS the
+      single `decreases l` faithfulness induction (mirror `lemma_b_m_upto_faithful`, `base_A→h2_II`) that
+      builds each φ-step iso INLINE from IH-descent + the bottom crux — so **C3.2c is the single gating
+      item** (C3.2b/d are inline pieces that can't close without it; no `assume`-pin allowed).
+      **NEXT = C3.2c** (the standalone b-augmented `conj_scaling_trivial_iff` over `h2_II`: Cohen Prop-1.34
+      recognition consuming `h2_II`'s literal family-(II) relators + the `prop_v`/`tower_peel` residue facts;
+      a focused multi-session push) → C2 → C4 → C5. See `docs/brick5-c3.2-plan.md` §4.
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).

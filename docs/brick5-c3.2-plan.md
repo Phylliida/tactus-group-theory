@@ -111,6 +111,20 @@ through the a-tower by base-faithfulness (`lemma_single_hnn_base_faithful`, IH d
    scaling-plus-`d↦b_l d` endomorphism, using the residue facts. THE real cost.
 4. **C3.2d — tower lift.** Thread C3.2c up `h3_II_upto` via base-faithfulness + the §2.2bis collapse
    (mirror `lemma_b_m_upto_faithful` / `lemma_vi_upto`, `decreases l`). Yields `lemma_phi_l_iso`.
+   **Refined architecture (2026-06-22, after studying `lemma_b_m_upto_faithful`):** `lemma_phi_l_iso`
+   is NOT a separate "collapse then crux"; it IS the single `decreases l` faithfulness induction
+   `lemma_h3_II_upto_faithful` that *builds each φ-step iso inline* from (IH = lower-tower
+   faithfulness, to DESCEND `emb(a/b,w)` to `h2_II`) + (the bottom crux C3.2c, the standalone
+   b-augmented `conj_scaling_trivial_iff` over `h2_II`, reused at every level), then
+   `lemma_single_hnn_base_faithful` descends one level + recursion. Exactly `lemma_b_m_upto_faithful`
+   with `base_A → h2_II` and `conj_scaling_trivial_iff → C3.2c`. **The induction CANNOT close until
+   C3.2c exists** (it's the inline bottom fact) — so the crux is genuinely the gating item; no
+   `assume`-pinned skeleton is possible (standing rule). **C3.2d INFRA DONE** (`h3_ii.rs` 20/0,
+   crux-independent halves landed first): `lemma_phi_l_emb_h2_valid` (both embeddings are `h2`-words
+   — never touch an `a_i`/`k` letter, so they CAN descend the a-tower) + `lemma_h2II_equiv_lifts_to_tower`
+   (the EASY collapse direction, bottom→top, `lemma_base_embeds_in_hnn` iterated up the tower).
+   Remaining for C3.2d = the HARD direction (top→bottom, the faithfulness induction proper) which is
+   the inline-iso construction gated on C3.2c.
 
 Then C2 (package `free_basis.rs` as the p-level/A₊ recognition) → C4 (Fork-B k-engine, consuming the
 C3.2 a-isos + C2; transport back to `h3_pres` via `lemma_h3_II_group_preserving`) → C5.
@@ -121,7 +135,15 @@ C3.2 a-isos + C2; transport back to `h3_pres` via `lemma_h3_II_group_preserving`
 
 C3.2 is comparable to a `tower_peel`/`prop_v` sub-arc (multi-session). The C3.1 foundation
 (`lemma_same_group_iff`, `h3_II`, group-preservation) is in place and verified, so C3.2 can be built
-and transported cleanly. No verifier bypasses (standing rule). **C3.2a is DONE** (structural backbone
-verified first-try, de-risked the setup). **NEXT = C3.2b** (von Dyck over `h3_II`, where C3.1's
-family-(II) splice first pays off — the images satisfy each `B`-relator), saving the C3.2c residue
-crux for a focused push.
+and transported cleanly. No verifier bypasses (standing rule).
+
+**Progress (2026-06-22, `h3_ii.rs` 20/0):** **C3.2a DONE** (a_words/b_words backbone) + **C3.2d INFRA
+DONE** (the crux-independent collapse halves: `lemma_phi_l_emb_h2_valid`, `lemma_h2II_equiv_lifts_to_tower`).
+Studying `lemma_b_m_upto_faithful` clarified that **C3.2c (the bottom crux) is the single gating item**:
+the tower lift (C3.2d) and the von Dyck half (C3.2b) are both *inline pieces of the faithfulness
+induction whose bottom fact IS C3.2c* — none can close without it, and no `assume`-pinned skeleton is
+allowed. **NEXT = C3.2c**: the standalone b-augmented `conj_scaling_trivial_iff` over `h2_II`
+(`emb(a_words,w) ≡_{h2_II} ε ⟺ emb(b_words,w) ≡_{h2_II} ε`), Cohen Prop-1.34 recognition consuming
+the literal family-(II) relators of `h2_II` (von Dyck half) + the residue facts (forward/faithful
+half, `prop_v`/`tower_peel` territory ported to the b-augmented subgroup). A focused multi-session
+push; budget it like a `prop_v` sub-arc.
