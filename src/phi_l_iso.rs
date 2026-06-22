@@ -16,6 +16,7 @@
 use vstd::prelude::*;
 use crate::symbol::*;
 use crate::word::*;
+use crate::presentation::equiv_in_presentation;
 use crate::machine_group::{ModMachine, g_m, config_word, symbol_power, lemma_g_m_num_generators,
     lemma_inverse_word_sympower, lemma_symbol_power_merge, lemma_apply_embedding_sympower,
     word_power, lemma_word_power_symbol};
@@ -24,7 +25,10 @@ use crate::benign::{apply_embedding, apply_embedding_symbol, lemma_apply_embeddi
 use crate::word_numbering::{w_b, w_c, alphabet_letter, numbers_word, lemma_w_b_snoc,
     lemma_w_c_gens_in_block};
 use crate::layout::{b_base, d_idx, p_idx, h2_num_gens};
-use crate::h3_ii::{phi_l_subst, family_II_lhs, family_II_rhs, family_II_relator};
+use crate::h2::h2_pres;
+use crate::h3_ii::{phi_l_subst, family_II_lhs, family_II_rhs, family_II_relator, family_II, h2_II};
+use crate::base_swap::lemma_add_relators_relators;
+use crate::presentation_lemmas::lemma_relator_is_identity;
 
 verus! {
 
@@ -324,6 +328,57 @@ pub proof fn lemma_phi_l_on_family_II_relator(mm: ModMachine, n: nat, m: nat, l:
 
     assert(family_II_relator(mm, n, m, m * beta + l)
         == family_II_lhs(mm, n, m * beta + l) + inverse_word(family_II_rhs(mm, n, m, m * beta + l)));
+}
+
+/// **A family-(II) relator present in the finite augmentation is trivial in `h2_II`.** `h2_II =
+/// add_relators(h2_pres, family_II(alphas))`, so `family_II_relator(alphas[k])` is literally
+/// `h2_II.relators[|h2_pres.relators| + k]` — a relator, hence `≡_{h2_II} ε`.
+pub proof fn lemma_family_II_relator_in_h2_II(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, k: int)
+    requires
+        0 <= k < alphas.len(),
+    ensures
+        equiv_in_presentation(h2_II(mm, n, m, alphas),
+            family_II_relator(mm, n, m, alphas[k]), empty_word()),
+{
+    let h2ii = h2_II(mm, n, m, alphas);
+    let fam = family_II(mm, n, m, alphas);
+    let base_len = h2_pres(mm, n).relators.len() as int;
+    let j = base_len + k;
+    lemma_add_relators_relators(h2_pres(mm, n), fam);          // h2ii.relators == h2_pres.relators + fam
+    assert(h2ii.relators =~= h2_pres(mm, n).relators + fam);
+    assert(fam.len() == alphas.len());
+    assert(0 <= j < h2ii.relators.len());
+    assert(h2ii.relators[j] == fam[k]) by {
+        assert((h2_pres(mm, n).relators + fam)[j] == fam[k]);
+    }
+    assert(fam[k] == family_II_relator(mm, n, m, alphas[k]));
+    lemma_relator_is_identity(h2ii, j);                        // ≡(h2ii, h2ii.relators[j], ε)
+}
+
+/// **C-b group lift (von-Dyck-`b`)**: `φ_l(family_II_relator(β)) ≡_{h2_II} ε` whenever the image
+/// index `mβ+l` lies in the finite augmentation `alphas`.  Combines the word identity
+/// (`lemma_phi_l_on_family_II_relator`: `φ_l(relator(β)) =~= relator(mβ+l)`) with the relator
+/// triviality (`lemma_family_II_relator_in_h2_II`).  This is the homomorphism condition that lets
+/// `map_b` respect `P_A`'s family-(II) `p`-conjugations (the von Dyck `⟸` half for `map_b`).
+pub proof fn lemma_phi_l_relator_equiv_empty(mm: ModMachine, n: nat, m: nat, l: nat,
+    alphas: Seq<nat>, beta: nat, k: int)
+    requires
+        numbers_word(n, m, beta),
+        2 * n < m,
+        1 <= l <= 2 * n,
+        0 <= k < alphas.len(),
+        alphas[k] == m * beta + l,
+    ensures
+        equiv_in_presentation(h2_II(mm, n, m, alphas),
+            apply_embedding(phi_l_subst(g_m(mm).num_generators, n, m, l),
+                family_II_relator(mm, n, m, beta)),
+            empty_word()),
+{
+    lemma_phi_l_on_family_II_relator(mm, n, m, l, beta);       // φ_l(relator(β)) =~= relator(mβ+l)
+    lemma_family_II_relator_in_h2_II(mm, n, m, alphas, k);     // relator(alphas[k]=mβ+l) ≡_{h2_II} ε
+    assert(apply_embedding(phi_l_subst(g_m(mm).num_generators, n, m, l),
+        family_II_relator(mm, n, m, beta)) =~= family_II_relator(mm, n, m, m * beta + l));
+    assert(family_II_relator(mm, n, m, alphas[k]) == family_II_relator(mm, n, m, m * beta + l));
 }
 
 } // verus!
