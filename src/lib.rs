@@ -177,6 +177,13 @@ pub mod h3_ii;
 #[cfg(verus_keep_ghost)]
 pub mod f_free;
 
+// f_free_tower: Layer 2 / Brick 5, C3.2c / F1, B2 — iterate f_free's single free-stable-letter step
+// into the H₁ free basis. `[t,x,b_j,d]` is free in the (n+1)-fold empty-association HNN tower over
+// K_M, i.e. K_M ∗ F(b) ∗ ⟨d⟩. Seed = F1a (lemma_tx_is_free_family); the tower induction is
+// lemma_free_stable_tower_extends. Closed forms pin the generator layout for the B3 h1_base bridge.
+#[cfg(verus_keep_ghost)]
+pub mod f_free_tower;
+
 // higman_completeness: Layer 2 / Brick 5 COMPLETENESS — the `C ↪ H₃` faithful direction.
 // Owns the `in_C` predicate (C1: `w ∈ ncl(S)` over the k-HNN base h3_upto(2n)) + its three
 // subgroup-closure props, and (in progress) the Fork-B virtual-iso k-descent (C4) + assembly
