@@ -390,17 +390,28 @@ Proof = the Britton-peel induction on `w.len()` (mirror `lemma_psi_A_injective`)
   (`free_family_perm.rs` 4/0, NEW — free families invariant under generator reordering, via F3 +
   relabeling embeddings) with `pa_sigma` moving `d` from last to index 2.  This is the `ψ_a` hypothesis of
   the lifting lemma. **map_a (full) = `a_words_F.push([Gen(p_idx)])` = `a_words`** (the `p ↦ p` extension).
-- [ ] **von-Dyck backwards (the easy half of C-lift)** — `w ≡_{P_A} ε ⟹ emb(map,w) ≡_{h2_II} ε`, both maps,
+- **von-Dyck backwards (the easy half of C-lift)** — `w ≡_{P_A} ε ⟹ emb(map,w) ≡_{h2_II} ε`, both maps,
   via `lemma_emb_respects_source_equiv(hnn_presentation(pa_data), h2_II, map, w, ε)`.  The discharge needs the
-  **association-preservation**: `apply_embedding(map_a, hnn_relator(pa_data,j)) =~= hnn_relator(recog_data,j)`
-  (= `family_II_relator(betas[j])`), which is `≡_{h2_II} ε` since `hnn_presentation(recog_data)==h2_II`
-  (`lemma_recog_presentation`) makes it a literal `h2_II` relator (`lemma_relator_is_identity` — NO `β=0`
-  special case this way; the head is just `j=0`).  The KEY ATOM is the **`w_c`-relabel** lemma
-  `apply_embedding(a_words, w_c(3,n,m,γ)) =~= w_c(nk+n,n,m,γ)` (induction on `γ` over `w_c`'s recursion; the
-  digit sub-step `apply_embedding(a_words,[alphabet_letter(3,n,d)]) = [alphabet_letter(nk+n,n,d)]` is a b-block
-  shift `Gen(3+j)↦Gen(nk+n+j)`).  For map_b: `apply_embedding(b_words, hnn_relator(pa_data,j))` →
-  `φ_l(family_II_relator(betas[j]))` = the C-b group lift (`lemma_phi_l_relator_equiv_empty`), `≡_{h2_II} ε`
-  when `m·betas[j]+l ∈ alphas`.
+  **association-preservation**: `apply_embedding(map_a, hnn_relator(pa_data,j)) =~= family_II_relator(gammas[j])`
+  (= `hnn_relator(recog_data,j)`), which is `≡_{h2_II} ε`.
+  - [x] **`w_c`-relabel — DONE** (`phi_l_maps.rs` 7/0): `lemma_a_words_relabel_wc`
+    (`apply_embedding(a_words, w_c(3,n,m,γ)) =~= w_c(nk+n,n,m,γ)`; induction on `γ`, digit sub-step
+    `lemma_a_words_on_alpha_letter` = b-block shift `Gen(3+j)↦Gen(nk+n+j)` + `lemma_a_words_bblock`).  Full
+    map `a_words = a_words_F.push([Gen(p_idx)])` also defined here.
+  - [x] **column translations — DONE** (`phi_l_maps.rs` 10/0): `lemma_a_words_fixes_config` (a-column:
+    `a_words` fixes `config(γ,0)`) + `lemma_a_words_on_pa_rhs` (b-column: `ae(a_words, pa_rhs(γ)) =~=
+    family_II_rhs(γ)`, via relabel + config-fix + `d=Gen2 ↦ Gen(d_idx)`) + `lemma_a_words_head` support.
+  - [ ] **REMAINING**: (i) the `hnn_relator` assembly `ae(a_words, hnn_relator(pa_data,j)) =~=
+    family_II_relator(gammas[j])` (peel `hnn_relator = [Inv(n+3)]+a_col+[Gen(n+3)]+inverse(b_col)`; `a_words`
+    on `Gen(n+3)/Inv(n+3) = p ↦ Gen(p_idx)`, on `a_col=config` via fixes_config, on `inverse(b_col=pa_rhs)`
+    via `on_pa_rhs` + `lemma_apply_embedding_inverse`); (ii) **`family_II_relator(0) ≡_{h2_II} ε`** (the
+    `γ=0` / `p_assoc` head case: `family_II_relator(0) = p⁻¹tp(td)⁻¹` = the `h2_pres` p-relator, a prefix
+    relator of `h2_II`; needs unfolding `h2_pres`/`h2_data`/`p_assoc` in `h2.rs` + `lemma_config_word_zero`
+    + `w_c(_,0)=ε`); for `γ∈alphas` it's `lemma_family_II_relator_in_h2_II` (DONE, `phi_l_iso.rs`); (iii) the
+    `lemma_emb_respects_source_equiv` wiring (validity preconds + `src.relators[j]=hnn_relator(pa_data,j)`).
+    For **map_b**: the b-side column translations are the C-b word cores (`lemma_phi_l_on_family_II_rhs` etc.,
+    DONE); the relator triviality is the C-b group lift (`lemma_phi_l_relator_equiv_empty`, DONE) `≡_{h2_II} ε`
+    when `m·γ+l ∈ alphas`.
 - [ ] **C-lift forward — the unified HNN lifting lemma** (the deep Britton-peel, the BOTTLENECK). Mirror
   `lemma_psi_A_injective` (`machine_group.rs:6265`) + `lemma_psi_A_pinch_descends` (`:5893`):
   `emb(map,w) ≡_{h2_II} ε ⟹ w ≡_{P_A} ε`, `decreases w.len()`.  Recognize `h2_II = hnn_presentation(recog_data)`
