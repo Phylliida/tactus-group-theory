@@ -28,6 +28,7 @@ use crate::word_numbering::*;
 use crate::layout::*;
 use crate::hnn::*;
 use crate::quotient::*;
+use crate::h1::*;
 use crate::h2::*;
 use crate::h3::*;
 use crate::base_swap::*;
@@ -705,6 +706,240 @@ pub proof fn lemma_h2II_equiv_lifts_to_tower(
         // h3_II_upto(l) == hnn_presentation(data); IH gives equiv in data.base.
         lemma_base_embeds_in_hnn(data, w1, w2);
     }
+}
+
+// ============================================================================
+// C3.2c — B1: the recognition datum (`h2_II` as a single `p`-HNN over `h1_base`).
+//
+// The machine-group crux recognizes the WHOLE `base_A` as `a_as_hnn = HNN(free⟨t,x⟩, y)`
+// (NOT a subgroup), which is what lets Britton's lemma apply to `base_A`. We do the exact
+// analog: recognize the WHOLE `h2_II` as a single `p`-HNN over `h1_base`.
+//
+// `h2_pres = HNN(h1_base, p | p⁻¹ t p = td)` carries only the α=0 p-relation; `h2_II` adds the
+// finite family-(II) relators `(p⁻¹ t_β p)·(t_β w_β(b) d)⁻¹` (β∈alphas). Those are EXACTLY extra
+// `p`-conjugation relations, so folding them into the HNN association list gives a datum whose
+// HNN presentation IS `h2_II` literally (`lemma_recog_presentation`). Then Britton over this
+// recognition applies directly to `h2_II`, with the residue iso (A1) as the
+// `hnn_associations_isomorphic` precondition. The base `h1_base` is NOT free — but Britton needs
+// only the iso condition, never a free base (the "free-base fallacy", confirmed 2026-06-22).
+// ============================================================================
+
+/// **The family-(II) association pairs** `(t_β, t_β w_β(b) d)` for β ∈ `alphas` — the
+/// `p`-conjugations `p⁻¹ t_β p = t_β w_β(b) d` realized by `family_II`'s relators, in
+/// association-pair form. Neither side touches `p`, so each is valid over `h1_base`'s generators.
+pub open spec fn family_II_assoc(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>) -> Seq<(Word, Word)> {
+    Seq::new(alphas.len(), |i: int| (config_word(alphas[i], 0), family_II_rhs(mm, n, m, alphas[i])))
+}
+
+/// **B1 — the recognition datum.** `h2_II` recognized as a single `p`-HNN over `h1_base`: base
+/// `h1_base`, stable letter `p = Gen(h1_num_gens) = Gen(p_idx)`, associations `p_assoc`
+/// (`p⁻¹ t p = td`) ++ the finite family-(II) slice. `hnn_presentation(recog_data) == h2_II`
+/// (`lemma_recog_presentation`), so Britton over this HNN applies directly to `h2_II`.
+pub open spec fn recog_data(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>) -> HNNData {
+    HNNData {
+        base: h1_base(mm, n),
+        associations: p_assoc(g_m(mm).num_generators, n) + family_II_assoc(mm, n, m, alphas),
+    }
+}
+
+/// `family_II_rhs = t_β·w_β(b)·d` is valid over `h1`'s generators (`nk+2n+1`): config uses gens
+/// 0–2, the b-block sits at `nk+n..nk+2n`, and `d` at `nk+2n` — all `< nk+2n+1`. (Unlike the
+/// LHS, the rhs never uses `p`, so `h1_num_gens` suffices — this is why the association pair
+/// lives over the H₁ base, not over H₂.)
+pub proof fn lemma_family_II_rhs_valid_h1(mm: ModMachine, n: nat, m: nat, beta: nat, ng: nat)
+    requires
+        numbers_word(n, m, beta),
+        2 * n < m,
+        (g_m(mm).num_generators + 2 * n + 1) as nat <= ng,
+    ensures
+        word_valid(family_II_rhs(mm, n, m, beta), ng),
+{
+    let nk = g_m(mm).num_generators;
+    let d = d_idx(nk, n);                              // nk + 2n
+    let bb = b_base(nk, n);                            // nk + n
+    let cfg = config_word(beta, 0);
+    let wb = w_b(bb, n, m, beta);
+    lemma_config_word_valid(beta, 0);                 // word_valid(cfg, 3)
+    lemma_word_valid_mono(cfg, 3, ng);                // 3 ≤ ng
+    lemma_w_c_valid(bb, n, m, beta, ng);              // word_valid(w_b, ng): bb + n = nk+2n ≤ ng
+    lemma_single_gen_valid(d, ng);                    // [d], d = nk+2n < ng
+    lemma_concat_word_valid(cfg, wb, ng);
+    lemma_concat_word_valid(cfg + wb, seq![Symbol::Gen(d)], ng);
+    assert(family_II_rhs(mm, n, m, beta) =~= (cfg + wb) + seq![Symbol::Gen(d)]);
+}
+
+/// **`recog_data` is a valid HNN datum.** Base `h1_base` valid + every association word valid
+/// over `h1_num_gens = nk+2n+1`: `p_assoc`'s `(t, td)` (d = nk+2n < ng), and each family-(II)
+/// pair `(t_β, t_β w_β(b) d)` (`lemma_family_II_rhs_valid_h1`). Analog of `lemma_a_as_hnn_valid`.
+pub proof fn lemma_recog_data_valid(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>)
+    requires
+        2 * n < m,
+        forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]),
+    ensures
+        hnn_data_valid(recog_data(mm, n, m, alphas)),
+{
+    let nk = g_m(mm).num_generators;
+    let ng = h1_num_gens(nk, n);                       // = nk + 2n + 1
+    let data = recog_data(mm, n, m, alphas);
+    let pa = p_assoc(nk, n);
+    let fa = family_II_assoc(mm, n, m, alphas);
+
+    lemma_g_m_num_generators(mm);                      // nk = 4 + |quads|
+    lemma_h1_base_valid(mm, n);                        // presentation_valid(base)
+    lemma_h1_base_num_generators(mm, n);              // base.num_generators == ng
+    assert(data.base.num_generators == ng);
+
+    // assocs_valid(p_assoc, ng):  (t, td), with d = nk+2n < ng.
+    assert(assocs_valid(pa, ng)) by {
+        assert forall|i: int| #![trigger pa[i]] 0 <= i < pa.len() implies
+            word_valid(pa[i].0, ng) && word_valid(pa[i].1, ng) by {
+            assert(pa[0] == (seq![Symbol::Gen(0)], td_word(nk, n)));
+            lemma_single_gen_valid(0, ng);
+            assert(d_idx(nk, n) < ng);                 // nk+2n < nk+2n+1
+            lemma_pair_word_valid(Symbol::Gen(0), Symbol::Gen(d_idx(nk, n)), ng);
+            assert(td_word(nk, n) == seq![Symbol::Gen(0), Symbol::Gen(d_idx(nk, n))]);
+        }
+    }
+    // assocs_valid(family_II_assoc, ng):  (t_β, t_β w_β(b) d).
+    assert(assocs_valid(fa, ng)) by {
+        assert forall|i: int| #![trigger fa[i]] 0 <= i < fa.len() implies
+            word_valid(fa[i].0, ng) && word_valid(fa[i].1, ng) by {
+            assert(fa[i] == (config_word(alphas[i], 0), family_II_rhs(mm, n, m, alphas[i])));
+            lemma_config_word_valid(alphas[i], 0);
+            lemma_word_valid_mono(config_word(alphas[i], 0), 3, ng);
+            lemma_family_II_rhs_valid_h1(mm, n, m, alphas[i], ng);
+        }
+    }
+    lemma_assocs_valid_concat(pa, fa, ng);             // assocs_valid(pa + fa, ng)
+    assert(data.associations =~= pa + fa);
+    lemma_hnn_data_valid_from(data, ng);
+}
+
+/// The `(1+j)`-th HNN relator of `recog_data` is exactly `family_II_relator(alphas[j])` — the
+/// family-(II) association `(t_β, t_β w_β(b) d)` becomes `p⁻¹ t_β p (t_β w_β(b) d)⁻¹` =
+/// `family_II_lhs · (family_II_rhs)⁻¹`. (The stable letter is `p = Gen(h1_num_gens) = Gen(p_idx)`.)
+proof fn lemma_recog_relator_is_family(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, j: int)
+    requires
+        0 <= j < alphas.len(),
+    ensures
+        hnn_relator(recog_data(mm, n, m, alphas), j + 1)
+            =~= family_II_relator(mm, n, m, alphas[j]),
+{
+    let nk = g_m(mm).num_generators;
+    let data = recog_data(mm, n, m, alphas);
+    let pa = p_assoc(nk, n);
+    let fa = family_II_assoc(mm, n, m, alphas);
+    let beta = alphas[j];
+    let cfg = config_word(beta, 0);
+    let rhs = family_II_rhs(mm, n, m, beta);
+
+    lemma_g_m_num_generators(mm);
+    lemma_h1_base_num_generators(mm, n);              // h1_base.num = h1_num_gens = nk+2n+1 = p_idx
+    let p = p_idx(nk, n);
+    assert(data.base.num_generators == p);
+    assert(stable_letter(data) == Symbol::Gen(p));
+    assert(stable_letter_inv(data) == Symbol::Inv(p));
+
+    // data.associations[j+1] = fa[j] = (cfg, rhs)   (p_assoc has length 1)
+    assert(data.associations =~= pa + fa);
+    assert(pa.len() == 1);
+    assert(data.associations[j + 1] == fa[j]);
+    assert(fa[j] == (cfg, rhs));
+
+    // bridge the Seq::new(1,…) stable-letter words to the seq![…] forms of family_II_lhs
+    assert(Seq::new(1, |_q: int| stable_letter_inv(data)) =~= seq![Symbol::Inv(p)]);
+    assert(Seq::new(1, |_q: int| stable_letter(data)) =~= seq![Symbol::Gen(p)]);
+    // family_II_lhs(β) = [p⁻¹] + cfg + [p] ;  family_II_relator(β) = family_II_lhs(β) + (rhs)⁻¹
+    assert(family_II_lhs(mm, n, beta) =~= seq![Symbol::Inv(p)] + cfg + seq![Symbol::Gen(p)]);
+    // hnn_relator(data, j+1) = [p⁻¹] + cfg + [p] + (rhs)⁻¹  — same expression.
+}
+
+/// `hnn_relators(recog_data) =~= hnn_relators(h2_data) ++ family_II` — the per-association
+/// relator split: index 0 is the original `p⁻¹ t p (td)⁻¹` (the `h2_data` p-relation), and
+/// index `1+j` is `family_II_relator(alphas[j])`. This is the heart of the recognition identity.
+proof fn lemma_recog_hnn_relators_split(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>)
+    ensures
+        hnn_relators(recog_data(mm, n, m, alphas))
+            =~= hnn_relators(h2_data(mm, n)) + family_II(mm, n, m, alphas),
+{
+    let nk = g_m(mm).num_generators;
+    let data = recog_data(mm, n, m, alphas);
+    let h2d = h2_data(mm, n);
+    let pa = p_assoc(nk, n);
+    let fa = family_II_assoc(mm, n, m, alphas);
+    let hr = hnn_relators(data);
+    let target = hnn_relators(h2d) + family_II(mm, n, m, alphas);
+
+    lemma_g_m_num_generators(mm);
+    lemma_h1_base_num_generators(mm, n);
+    // data.base = h1_base = h2d.base ⟹ same stable letter.
+    assert(data.base.num_generators == h2d.base.num_generators);
+
+    // lengths:  recog has 1 + |alphas| associations;  target has 1 + |alphas| relators.
+    assert(data.associations =~= pa + fa);
+    assert(pa.len() == 1);
+    assert(data.associations.len() == 1 + alphas.len());
+    assert(hr.len() == 1 + alphas.len());
+    assert(hnn_relators(h2d).len() == 1);
+    assert(target.len() == 1 + alphas.len());
+
+    assert forall|i: int| 0 <= i < hr.len() implies hr[i] =~= target[i] by {
+        if i == 0 {
+            // both associations[0] = p_assoc[0] = (t, td); same stable letter ⟹ same relator.
+            assert(data.associations[0] == pa[0]);
+            assert(h2d.associations[0] == pa[0]);
+            assert(hr[0] == hnn_relator(data, 0));
+            assert(target[0] == hnn_relator(h2d, 0));
+            assert(hnn_relator(data, 0) =~= hnn_relator(h2d, 0));
+        } else {
+            let jj = i - 1;
+            assert(hr[i] == hnn_relator(data, i));
+            lemma_recog_relator_is_family(mm, n, m, alphas, jj);   // hnn_relator(data, jj+1) = family_II_relator
+            assert(target[i] == family_II(mm, n, m, alphas)[jj]);  // i ≥ 1 ⟹ target[i] in family_II block
+            assert(family_II(mm, n, m, alphas)[jj] == family_II_relator(mm, n, m, alphas[jj]));
+        }
+    }
+}
+
+/// **The recognition identity (B1 headline).** `hnn_presentation(recog_data) == h2_II`: the
+/// augmented `p`-HNN over `h1_base` IS `h2_II` as a literal presentation (same generator count
+/// `nk+2n+2`, same relator sequence `h1_base.relators ++ hnn_relators(h2_data) ++ family_II`).
+/// Analog of `lemma_a_as_hnn_presentation`. This is what lets Britton over `recog_data` discharge
+/// the C3.2c iff directly on `h2_II`.
+pub proof fn lemma_recog_presentation(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>)
+    ensures
+        hnn_presentation(recog_data(mm, n, m, alphas)) == h2_II(mm, n, m, alphas),
+{
+    let nk = g_m(mm).num_generators;
+    let data = recog_data(mm, n, m, alphas);
+    let lhs = hnn_presentation(data);
+    let rhs = h2_II(mm, n, m, alphas);
+    let h2d = h2_data(mm, n);
+    let hh = h1_base(mm, n).relators;
+    let ff = family_II(mm, n, m, alphas);
+
+    lemma_g_m_num_generators(mm);
+    lemma_h1_base_num_generators(mm, n);              // h1_base.num = nk+2n+1
+    lemma_h2_num_generators(mm, n);                   // h2_pres.num = nk+2n+2
+    lemma_add_relators_relators(h2_pres(mm, n), ff);  // h2_II.{num = h2_pres.num, relators = h2_pres + ff}
+
+    // --- num_generators:  lhs = h1_base.num + 1 = nk+2n+2 = h2_pres.num = rhs.num ---
+    assert(lhs.num_generators == rhs.num_generators);
+
+    // --- relators ---
+    // h2_pres.relators = h1_base.relators + hnn_relators(h2_data)
+    assert(h2_pres(mm, n).relators =~= hh + hnn_relators(h2d));
+    // rhs.relators = h2_pres.relators + ff  ≃  (hh + hnn_relators(h2d)) + ff
+    assert(rhs.relators =~= h2_pres(mm, n).relators + ff);
+    // lhs.relators = h1_base.relators + hnn_relators(recog_data)  ≃  hh + (hnn_relators(h2d) + ff)
+    assert(lhs.relators =~= hh + hnn_relators(data));
+    lemma_recog_hnn_relators_split(mm, n, m, alphas);  // hnn_relators(data) ≃ hnn_relators(h2d) + ff
+    assert(lhs.relators =~= rhs.relators) by {
+        assert(lhs.relators =~= hh + (hnn_relators(h2d) + ff));
+        assert(rhs.relators =~= (hh + hnn_relators(h2d)) + ff);
+        assert(hh + (hnn_relators(h2d) + ff) =~= (hh + hnn_relators(h2d)) + ff);
+    }
+    assert(lhs == rhs);
 }
 
 } // verus!
