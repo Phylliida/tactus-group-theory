@@ -16,10 +16,15 @@
 use vstd::prelude::*;
 use crate::symbol::*;
 use crate::word::*;
-use crate::machine_group::{ModMachine, g_m, config_word, symbol_power, lemma_inverse_word_sympower,
-    lemma_symbol_power_merge, lemma_apply_embedding_sympower, word_power, lemma_word_power_symbol};
+use crate::machine_group::{ModMachine, g_m, config_word, symbol_power, lemma_g_m_num_generators,
+    lemma_inverse_word_sympower, lemma_symbol_power_merge, lemma_apply_embedding_sympower,
+    word_power, lemma_word_power_symbol};
 use crate::benign::{apply_embedding, apply_embedding_symbol, lemma_apply_embedding_concat};
-use crate::h3_ii::phi_l_subst;
+use crate::word_numbering::{w_b, w_c, alphabet_letter, numbers_word, lemma_w_b_snoc,
+    lemma_w_c_gens_in_block};
+use crate::layout::{b_base, d_idx, h2_num_gens};
+use crate::h1::h_w_b;
+use crate::h3_ii::{phi_l_subst, family_II_rhs};
 
 verus! {
 
@@ -121,6 +126,128 @@ pub proof fn lemma_phi_l_on_config_zero(mm: ModMachine, n: nat, m: nat, l: nat, 
     assert(apply_embedding(subst, config_word(beta, 0))
         =~= symbol_power(Symbol::Inv(1), m * beta + l) + seq![Symbol::Gen(0)]
             + symbol_power(Symbol::Gen(1), m * beta + l));
+}
+
+/// **A substitution that fixes every symbol of `w` leaves `w` unchanged.** If
+/// `apply_embedding_symbol(imgs, s) =~= [s]` for each symbol `s` of `w`, then
+/// `apply_embedding(imgs, w) =~= w`.  (Induction on `w`, port of `lemma_apply_embedding_identity2`.)
+pub proof fn lemma_apply_embedding_fixes(imgs: Seq<Word>, w: Word)
+    requires
+        forall|i: int| 0 <= i < w.len()
+            ==> apply_embedding_symbol(imgs, #[trigger] w[i]) =~= seq![w[i]],
+    ensures
+        apply_embedding(imgs, w) =~= w,
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        assert(apply_embedding(imgs, w) =~= empty_word());
+    } else {
+        let s = w.first();
+        let rest = w.drop_first();
+        assert(w =~= seq![s] + rest);
+        assert forall|i: int| 0 <= i < rest.len()
+            implies apply_embedding_symbol(imgs, #[trigger] rest[i]) =~= seq![rest[i]] by {
+            assert(rest[i] == w[i + 1]);
+        }
+        lemma_apply_embedding_fixes(imgs, rest);
+        assert(apply_embedding_symbol(imgs, s) =~= seq![s]) by { assert(w[0] == s); }
+        assert(apply_embedding(imgs, w)
+            =~= concat(apply_embedding_symbol(imgs, s), apply_embedding(imgs, rest)));
+    }
+}
+
+/// **`φ_l` fixes `w_β(b)`.** Its symbols all live in the b-block `[b_base, b_base+n)`
+/// (`lemma_w_c_gens_in_block`, since `w_b := w_c` at `b_base`), and `phi_l_subst` maps every
+/// b-block generator to itself (the identity branch — the b-block avoids `0`, `1`, `d_idx`).
+pub proof fn lemma_phi_l_fixes_w_b(mm: ModMachine, n: nat, m: nat, l: nat, beta: nat)
+    requires
+        numbers_word(n, m, beta),
+        2 * n < m,
+        1 <= n,
+    ensures
+        apply_embedding(phi_l_subst(g_m(mm).num_generators, n, m, l),
+            w_b(b_base(g_m(mm).num_generators, n), n, m, beta))
+            =~= w_b(b_base(g_m(mm).num_generators, n), n, m, beta),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);                       // nk == 4 + |quads| ≥ 4
+    let subst = phi_l_subst(nk, n, m, l);
+    let bb = b_base(nk, n);                             // = nk + n
+    let wb = w_b(bb, n, m, beta);
+    assert(wb == w_c(bb, n, m, beta));                  // w_b := w_c (open spec)
+    lemma_w_c_gens_in_block(bb, n, m, beta);            // each symbol's index ∈ [bb, bb+n)
+    assert forall|i: int| 0 <= i < wb.len()
+        implies apply_embedding_symbol(subst, #[trigger] wb[i]) =~= seq![wb[i]] by {
+        let g = generator_index(wb[i]);
+        assert(bb <= g < bb + n);                       // gens_in_block on w_c
+        assert(g != 0 && g != 1 && g != d_idx(nk, n));  // bb=nk+n≥5; bb+n-1<nk+2n=d_idx
+        assert(g < h2_num_gens(nk, n));                 // g < nk+2n < nk+2n+2
+        assert(subst[g as int] == seq![Symbol::Gen(g)]);
+        match wb[i] {
+            Symbol::Gen(gg) => {
+                assert(gg == g);
+                assert(apply_embedding_symbol(subst, wb[i]) == subst[gg as int]);
+            },
+            Symbol::Inv(gg) => {
+                assert(gg == g);
+                assert(apply_embedding_symbol(subst, wb[i]) =~= inverse_word(subst[gg as int]));
+                reveal_with_fuel(inverse_word, 2);
+            },
+        }
+    }
+    lemma_apply_embedding_fixes(subst, wb);
+}
+
+/// **The family-(II) RHS payoff**: `φ_l(t_β · w_β(b) · d) =~= t_{mβ+l} · w_{mβ+l}(b) · d`,
+/// i.e. `apply_embedding(φ_l, family_II_rhs(β)) =~= family_II_rhs(mβ+l)`.  Combines the
+/// digit-scaling identity (`φ_l(t_β)=t_{mβ+l}`), the b-block fixing (`φ_l` fixes `w_β(b)`),
+/// `φ_l(d) = b_l·d`, and the numbering snoc (`w_{mβ+l}(b) = w_β(b)·b_l`).  This is exactly why
+/// `φ_l` carries the family-(II) relation for `β` onto the one for `mβ+l` (von-Dyck-`b`).
+pub proof fn lemma_phi_l_on_family_II_rhs(mm: ModMachine, n: nat, m: nat, l: nat, beta: nat)
+    requires
+        numbers_word(n, m, beta),
+        2 * n < m,
+        1 <= l <= 2 * n,
+    ensures
+        apply_embedding(phi_l_subst(g_m(mm).num_generators, n, m, l),
+            family_II_rhs(mm, n, m, beta))
+            =~= family_II_rhs(mm, n, m, m * beta + l),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let subst = phi_l_subst(nk, n, m, l);
+    let bb = b_base(nk, n);
+    let d = d_idx(nk, n);
+    let cfg = config_word(beta, 0);
+    let wb = w_b(bb, n, m, beta);
+    let dw: Word = seq![Symbol::Gen(d)];
+
+    // family_II_rhs(β) = (cfg + wb) + [d]; distribute apply_embedding.
+    assert(family_II_rhs(mm, n, m, beta) == (cfg + wb) + dw);
+    lemma_apply_embedding_concat(subst, cfg + wb, dw);
+    lemma_apply_embedding_concat(subst, cfg, wb);
+
+    // The three φ_l images.
+    lemma_phi_l_on_config_zero(mm, n, m, l, beta);      // φ_l(cfg) =~= config(mβ+l,0)
+    lemma_phi_l_fixes_w_b(mm, n, m, l, beta);           // φ_l(wb) =~= wb
+    reveal_with_fuel(apply_embedding, 2);
+    lemma_concat_empty_right(subst[d as int]);
+    assert(apply_embedding(subst, dw) =~= subst[d as int]);   // φ_l(d) = subst[d] = b_l·d
+    let bl = alphabet_letter(bb, n, l);
+    assert(subst[d as int] == seq![bl, Symbol::Gen(d)]);
+
+    let cfg2 = config_word(m * beta + l, 0);
+    assert(apply_embedding(subst, family_II_rhs(mm, n, m, beta))
+        =~= (cfg2 + wb) + seq![bl, Symbol::Gen(d)]);
+
+    // Target side: w_{mβ+l}(b) = w_β(b) · b_l  (numbering snoc).  snoc yields `β·m+l`; bridge to `m·β+l`.
+    lemma_w_b_snoc(bb, n, m, beta, l);
+    assert(beta * m + l == m * beta + l) by (nonlinear_arith);
+    let bl_seq = Seq::new(1, |_k: int| alphabet_letter(bb, n, l));
+    assert(w_b(bb, n, m, m * beta + l) =~= wb + bl_seq);
+    assert(bl_seq =~= seq![bl]);
+    assert(family_II_rhs(mm, n, m, m * beta + l) == (cfg2 + w_b(bb, n, m, m * beta + l)) + dw);
+    assert(seq![bl, Symbol::Gen(d)] =~= seq![bl] + dw);
 }
 
 } // verus!
