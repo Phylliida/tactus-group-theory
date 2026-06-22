@@ -265,6 +265,16 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       (the residue + p-conjugation iso, `prop_v`-scale focused push) → C-forward (Britton peel over
       recog_data) + C-backward (von Dyck over A's p-conjugations, the family-(II) payoff) → C3 →
       C2(p-level)/C4/C5. See `docs/brick5-c3.2c-plan.md` §3b (sharpened ladder, Route-B corrected).
+      **F1 STARTED 2026-06-22** (`f_free.rs` 6/0, `docs/brick5-c3.2c-plan.md` §4 rewritten). **Route
+      corrected**: NO retraction `K_M→⟨t,x⟩` exists (machine relators are config-conjugacy relations) —
+      the projection-hom idea is impossible; `⟨t,x⟩` is free in K_M but not a retract. **Clean route
+      (verified sound): "a free family extends by a free stable letter" = HNN with EMPTY associations**
+      (pinch = adjacent `s…s⁻¹` with base-trivial middle; iso vacuous ⟹ `britton_lemma_full` applies,
+      reusing Britton not an AFP spanning NF). DONE: `lemma_tx_free_in_g_m` (F1a, ⟨t,x⟩ free in K_M),
+      `lemma_free_stable_is_free_product` (bridge), `lemma_apply_embedding_agree_prefix`,
+      `lemma_free_group_equiv_mono`, `lemma_extend_free_no_stable` (B1 BASE CASE). **REMAINING B1 = the
+      inductive pinch case** (template = `lemma_psi_F_injective`/`_pinch_descends`/`_spanning`, ported
+      cross-presentation; the W↔w position correspondence) → B2 iterate → B3 kill_c→h1_base → B4 lift via A1.
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).
