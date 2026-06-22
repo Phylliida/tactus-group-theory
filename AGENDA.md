@@ -221,9 +221,16 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       (`lemma_in_C_empty`/`_mul`/`_resp`) + the pinned `faithfulness_statement` signature. Co-design w/
       C4 resolved (peer-reviewed): **C4 = a DIRECT virtual-iso descent, NOT a `lemma_property_ii` reuse**
       (faithfulness's membership witness is the empty factor list, so the engine's `choose` is a
-      liability); **one predicate** suffices (`ncl_B(S)∩c-words = ncl_{F(c)}(S)`, b commutes c). **NEXT =
-      C3** (do the `φ_l` a-level isos hold *literally* over `h3_upto(l-1)`? — likely yes, no c's, so they
-      Britton-peel directly, isolating the non-iso content to the single k-level C4), then C2, then C4.
+      liability); **one predicate** suffices (`ncl_B(S)∩c-words = ncl_{F(c)}(S)`, b commutes c).
+      **C3-LITERAL REFUTED (2026-06-21, w/ Danielle):** the `φ_l` a-level iso does NOT hold over the
+      literal `h3_upto(l-1)` — the a-levels are as "virtual" as the k-level (proof: base-swap collapse
+      to `h2_pres` via `lemma_single_hnn_base_faithful` + an `l=1` Britton witness; root cause =
+      Approach-(b) base lacks family (II), only derivable via the `a_i` in `lemma_IIa`/`lemma_II`).
+      **REROUTE = finite family-(II) augmentation** `h3_II` (group-preserving via `lemma_II`), which
+      makes the a-levels *literal* isos again and re-isolates virtuality to the single k-level (C4 stays
+      the surgical Fork-B engine). **NEXT = C3.0** (reflecting base-swap lemma, fork-independent) → C3.1
+      (`h3_II` + group-preservation) → C3.2 (b-augmented a-level recognition over `h3_II`, `tower_peel`-
+      scale but literal Britton) → C2 → C4 → C5. See `docs/brick5-completeness-plan.md` §2.2bis/§2.2ter.
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).

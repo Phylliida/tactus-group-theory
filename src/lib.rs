@@ -19,6 +19,13 @@ pub mod quotient;
 #[cfg(verus_keep_ghost)]
 pub mod benign;
 
+// base_swap: the *reflecting* base-swap — adding relators that are already consequences of a
+// presentation does not change the group. Foundation stone for the Brick-5 completeness reroute
+// (C3.0): augment the Britton base with finite family-(II) relators (group-preserving via
+// lemma_II), making the a-levels literal isos. See docs/brick5-completeness-plan.md §2.2ter.
+#[cfg(verus_keep_ghost)]
+pub mod base_swap;
+
 #[cfg(verus_keep_ghost)]
 pub mod hnn;
 
