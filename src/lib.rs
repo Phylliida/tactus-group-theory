@@ -162,6 +162,13 @@ pub mod free_basis;
 #[cfg(verus_keep_ghost)]
 pub mod higman_consequences;
 
+// h3_ii: Layer 2 / Brick 5 COMPLETENESS, C3.1 — the finite family-(II) augmentation. Builds the
+// augmenting relator words (family_II), proves each ≡_{h3_pres} ε (lemma_II → relator form), and
+// (C3.1c) the bottom-augmented tower h3_II + the group-preservation iff via base_swap's
+// lemma_same_group_iff. See docs/brick5-completeness-plan.md §2.2ter / §4 C3.1.
+#[cfg(verus_keep_ghost)]
+pub mod h3_ii;
+
 // higman_completeness: Layer 2 / Brick 5 COMPLETENESS — the `C ↪ H₃` faithful direction.
 // Owns the `in_C` predicate (C1: `w ∈ ncl(S)` over the k-HNN base h3_upto(2n)) + its three
 // subgroup-closure props, and (in progress) the Fork-B virtual-iso k-descent (C4) + assembly
