@@ -278,16 +278,27 @@ and symmetric. So `hnn_associations_isomorphic(recog_data)` follows from:
    The `α=0`/`p_assoc` "overlap" is NOT a problem: `betas = [0]++alphas` unifies the special case into the
    family; just carry `0 ∉ alphas` (true in the C3.2c context where `alphas` are the β's `w` touches, all > 0).
 
-**Concrete A1 sub-ladder for the next session (a NEW module, e.g. `f_free_a1.rs` / extend `h3_ii.rs`):**
-- `lemma_km_faithful_in_h1` — the `kill_hom` retraction: `word_valid(w, nk) ∧ w ≡_{h1_base} ε ⟹ w ≡_{g_m} ε`
-  (reuse `free_basis::{kill_hom, lemma_kill_hom_valid, lemma_kill_fixes_low}` + `lemma_hom_preserves_equiv`).
-- `lemma_config_emb_free_in_h1` — config family free in `h1_base` (= `lemma_config_emb_free` + the retraction).
-- `lemma_a_words_eq_config_emb` / `lemma_b_words_eq_basis_emb` — the `betas=[0]++alphas` correspondence
-  (head via `lemma_config_word_zero` + `w_b`-zero; tail definitional). Then `apply_embedding` congruence
-  (`benign`) lifts the per-entry ≡ to the whole embedding so the iso transports.
-- `lemma_recog_associations_isomorphic` — assemble 1+2+3 into `hnn_associations_isomorphic(recog_data)`.
-  (Mind the entry-wise ≡ vs `=`: a_words[0] ≡ config_emb(betas)[0] but maybe not literal — push through
-  `equiv_in_presentation` congruence, NOT seq equality, when transporting the iso.)
+**Concrete A1 sub-ladder (NEW module `f_free_a1.rs`):**
+- [x] **`lemma_km_faithful_in_h1` — DONE** (`f_free_a1.rs` 2/0, 2026-06-22): the `kill_hom` retraction:
+  `word_valid(w, nk) ∧ w ≡_{h1_base} ε ⟹ w ≡_{g_m} ε`. Three lines: `lemma_kill_hom_valid` (valid hom)
+  → `lemma_hom_preserves_equiv` (`φ(w) ≡_{g_m} φ(ε)=ε`) → `lemma_kill_fixes_low` (`φ(w) =~= w`, since `w`
+  is a low/K_M word). The "genuinely-new" piece — and it was short, as predicted.
+- [x] **`lemma_config_emb_free_in_h1` — DONE** (`f_free_a1.rs`, same commit): config family free in
+  `h1_base`. The embedded product `apply_embedding(config_emb,w)` is a `K_M`-word (config words on gens
+  0–2 < nk, `lemma_config_word_valid` + `lemma_word_valid_mono` + `lemma_apply_embedding_valid`), so
+  triviality in `h1_base` descends to `g_m` via rung 1, where `lemma_config_emb_free` (F2) closes it.
+- [ ] `lemma_a_words_eq_config_emb` / `lemma_b_words_eq_basis_emb` — the `betas=[0]++alphas` correspondence
+  (head via `lemma_config_word_zero` + `w_b`-zero; tail definitional — `family_II_rhs(β) == basis_elt(β)`
+  since `h_w_b = w_b(b_base…)`). Then `apply_embedding` congruence (`benign`) lifts the per-entry `=~=`
+  to the whole embedding so the iso transports. **NOTE the head entries are LITERAL seq-equal**
+  (`config_word(0,0) =~= [Gen0]`; `basis_elt(0) =~= td_word`), so the transport is `=~=`/`==`, not just
+  `≡` — cleaner than feared. Side-condition needed: `numbers_word(n,m,0)` for `basis_emb([0]++alphas)`
+  (check `lemma_basis_elt_valid`/`numbers_word` admit `0`).
+- [ ] `lemma_recog_associations_isomorphic` — assemble: for `w` valid over `betas.len()`,
+  `apply_embedding(a_words,w) ≡_{h1} ε ⟺ apply_embedding(b_words,w) ≡_{h1} ε`. Forward:
+  rung 2 (`config_emb` free) ⟹ `w ≡_free ε` ⟹ `lemma_free_to_basis_elt` ⟹ b-side trivial. Backward:
+  `lemma_basis_elt_free` ⟹ `w ≡_free ε` ⟹ `lemma_free_to_embedding(config_emb)` ⟹ a-side trivial.
+  (Both columns transported by the `=~=` head/tail correspondence above.)
 
 Once A1 lands, **B4** is immediate (`lemma_recog_data_valid` + A1 ⟹ `hnn_data` valid+iso ⟹ Britton over
 `recog_data` applies to `h2_II`; F free `h1_base ↪ h2_II`), and the C-forward Britton peel + C-backward von
