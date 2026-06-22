@@ -10,11 +10,14 @@ use vstd::prelude::*;
 use crate::symbol::*;
 use crate::word::*;
 use crate::machine_group::{ModMachine, mod_machine_wf, g_m, lemma_g_m_num_generators};
-use crate::layout::{b_idx, d_idx};
+use crate::layout::{b_base, b_idx, d_idx, p_idx};
 use crate::h1::h1_base;
 use crate::f_free::is_free_family;
 use crate::f_free_h1::{f_h1_family, lemma_f_free_in_h1};
 use crate::free_family_perm::{permute_family, lemma_free_family_permute};
+use crate::benign::{apply_embedding, apply_embedding_symbol, lemma_apply_embedding_concat};
+use crate::word_numbering::{w_c, alphabet_letter, numbers_word};
+use crate::pa_data::pa_b_base;
 
 verus! {
 
@@ -155,6 +158,127 @@ pub proof fn lemma_map_a_faithful(mm: ModMachine, n: nat)
     // the permuted family IS a_words_F.
     lemma_permute_f_h1_is_a_words_F(mm, n);
     assert(permute_family(f_h1_family(mm, n), pa_sigma(n)) =~= a_words_F(mm, n));
+}
+
+// ----------------------------------------------------------------------------
+// The full map `map_a = a_words` (ψ_a extended by `p ↦ p`) and the `w_c`-relabel.
+// ----------------------------------------------------------------------------
+
+/// **`map_a` (full)** — the inclusion `P_A ↪ h2_II`: `a_words_F` (the F-part) extended with the
+/// stable letter `p ↦ Gen(p_idx)`.  This is `phi_assoc.0`, the crux's `a_words` list (`n+4` entries).
+pub open spec fn a_words(mm: ModMachine, n: nat) -> Seq<Word> {
+    a_words_F(mm, n).push(seq![Symbol::Gen(p_idx(g_m(mm).num_generators, n))])
+}
+
+/// `a_words` on a b-block index `[3, n+2]` is the literal `b`-generator (the F-b-gen `Gen(2+d)`
+/// maps to the h2-b-gen `Gen(b_base+d-1) = Gen(nk+n+d-1)`).  A shift by `nk+n-3` on the b-block.
+proof fn lemma_a_words_bblock(mm: ModMachine, n: nat, k: int)
+    requires
+        3 <= k < n + 3,
+    ensures
+        a_words(mm, n)[k] == seq![Symbol::Gen((g_m(mm).num_generators + n + (k - 3)) as nat)],
+{
+    let nk = g_m(mm).num_generators;
+    let awf = a_words_F(mm, n);
+    let head = seq![seq![Symbol::Gen(0)], seq![Symbol::Gen(1)], seq![Symbol::Gen(d_idx(nk, n))]];
+    let tail = Seq::new(n, |j: int| seq![Symbol::Gen(b_idx(nk, n, (j + 1) as nat))]);
+    assert(awf == head + tail);
+    assert(head.len() == 3);
+    assert(awf.len() == n + 3);
+    // a_words[k] = awf[k] for k < n+3 (push only adds index n+3).
+    assert(a_words(mm, n)[k] == awf[k]);
+    // awf[k] = tail[k-3] (k ≥ 3 = head.len()).
+    assert(awf[k] == tail[k - 3]);
+    assert(tail[k - 3] == seq![Symbol::Gen(b_idx(nk, n, ((k - 3) + 1) as nat))]);
+    assert(b_idx(nk, n, ((k - 3) + 1) as nat) == nk + n + (k - 3));
+}
+
+/// **The digit relabel**: `apply_embedding(a_words, [alphabet_letter(3,n,d)]) =~=
+/// [alphabet_letter(nk+n,n,d)]` for `1 ≤ d ≤ 2n`.  The F-b-block letter for digit `d` maps to the
+/// h2-b-block letter for `d` (both `+` for `d≤n`, both `⁻¹` for `d>n`; the b-block shift `+nk+n-3`).
+proof fn lemma_a_words_on_alpha_letter(mm: ModMachine, n: nat, d: nat)
+    requires
+        1 <= d <= 2 * n,
+    ensures
+        apply_embedding(a_words(mm, n), seq![alphabet_letter(pa_b_base(), n, d)])
+            =~= seq![alphabet_letter(b_base(g_m(mm).num_generators, n), n, d)],
+{
+    let nk = g_m(mm).num_generators;
+    let aw = a_words(mm, n);
+    let bb = b_base(nk, n);                                  // nk + n
+    reveal_with_fuel(apply_embedding, 2);
+    if d <= n {
+        // al(3,n,d) = Gen(3+d-1) = Gen(d+2);  k = d+2 ∈ [3, n+2].
+        let k = (d + 2) as int;
+        assert(alphabet_letter(pa_b_base(), n, d) == Symbol::Gen((pa_b_base() + d - 1) as nat));
+        assert((pa_b_base() + d - 1) as nat == k as nat);   // 3 + d - 1 = d + 2
+        assert(3 <= k < n + 3);
+        lemma_a_words_bblock(mm, n, k);
+        assert(aw[k] == seq![Symbol::Gen((nk + n + (k - 3)) as nat)]);
+        assert((nk + n + (k - 3)) as nat == (bb + d - 1) as nat);   // k-3 = d-1
+        lemma_concat_empty_right(aw[k]);
+        assert(apply_embedding(aw, seq![Symbol::Gen((d + 2) as nat)]) =~= aw[k]);
+        assert(alphabet_letter(bb, n, d) == Symbol::Gen((bb + d - 1) as nat));
+    } else {
+        // al(3,n,d) = Inv(3+(d-n)-1) = Inv(d-n+2);  k = d-n+2 ∈ [3, n+2].
+        let e = (d - n) as nat;                             // 1 ≤ e ≤ n
+        let k = (e + 2) as int;
+        assert(alphabet_letter(pa_b_base(), n, d) == Symbol::Inv((pa_b_base() + e - 1) as nat));
+        assert((pa_b_base() + e - 1) as nat == k as nat);
+        assert(3 <= k < n + 3);
+        lemma_a_words_bblock(mm, n, k);
+        assert(aw[k] == seq![Symbol::Gen((nk + n + (k - 3)) as nat)]);
+        assert((nk + n + (k - 3)) as nat == (bb + e - 1) as nat);   // k-3 = e-1
+        assert(apply_embedding_symbol(aw, Symbol::Inv((e + 2) as nat)) =~= inverse_word(aw[k]));
+        reveal_with_fuel(inverse_word, 2);
+        lemma_concat_empty_right(inverse_word(aw[k]));
+        assert(apply_embedding(aw, seq![Symbol::Inv((e + 2) as nat)]) =~= inverse_word(aw[k]));
+        assert(inverse_word(aw[k]) =~= seq![Symbol::Inv((bb + e - 1) as nat)]);
+        assert(alphabet_letter(bb, n, d) == Symbol::Inv((bb + (d - n) - 1) as nat));
+    }
+}
+
+/// **The `w_c`-relabel (the key atom)**: `apply_embedding(a_words, w_c(3,n,m,γ)) =~= w_c(nk+n,n,m,γ)`.
+/// The map `a_words` shifts the F-b-block `[3,n+2]` onto the h2-b-block `[nk+n, nk+2n-1]`, so it
+/// carries the F-indexed b-substitution `w_γ(b)` onto the h2-indexed one.  Induction on `γ` over
+/// `w_c`'s digit recursion (each digit `∈ [1,2n]` by `numbers_word`).
+pub proof fn lemma_a_words_relabel_wc(mm: ModMachine, n: nat, m: nat, gamma: nat)
+    requires
+        numbers_word(n, m, gamma),
+        2 * n < m,
+    ensures
+        apply_embedding(a_words(mm, n), w_c(pa_b_base(), n, m, gamma))
+            =~= w_c(b_base(g_m(mm).num_generators, n), n, m, gamma),
+    decreases gamma,
+{
+    let nk = g_m(mm).num_generators;
+    let aw = a_words(mm, n);
+    let bb = b_base(nk, n);
+    if gamma == 0 || m <= 1 {
+        assert(w_c(pa_b_base(), n, m, gamma) =~= empty_word());
+        assert(w_c(bb, n, m, gamma) =~= empty_word());
+        assert(apply_embedding(aw, empty_word()) =~= empty_word());
+    } else {
+        // numbers_word(γ): digit γ%m ∈ [1,2n], and γ/m numbers a word.
+        let d = (gamma % m) as nat;
+        assert(1 <= d <= 2 * n);
+        assert(numbers_word(n, m, (gamma / m) as nat));
+        // w_c(3,γ) = w_c(3,γ/m) + [al(3,n,d)]; distribute apply_embedding.
+        let pre3 = w_c(pa_b_base(), n, m, (gamma / m) as nat);
+        let letter3: Word = Seq::new(1, |_i: int| alphabet_letter(pa_b_base(), n, d));
+        assert(w_c(pa_b_base(), n, m, gamma) =~= pre3 + letter3);
+        lemma_apply_embedding_concat(aw, pre3, letter3);
+        // IH on the prefix.
+        lemma_a_words_relabel_wc(mm, n, m, (gamma / m) as nat);
+        // digit relabel.
+        assert(letter3 =~= seq![alphabet_letter(pa_b_base(), n, d)]);
+        lemma_a_words_on_alpha_letter(mm, n, d);
+        // target: w_c(nk+n,γ) = w_c(nk+n,γ/m) + [al(nk+n,n,d)].
+        let preB = w_c(bb, n, m, (gamma / m) as nat);
+        let letterB: Word = Seq::new(1, |_i: int| alphabet_letter(bb, n, d));
+        assert(w_c(bb, n, m, gamma) =~= preB + letterB);
+        assert(letterB =~= seq![alphabet_letter(bb, n, d)]);
+    }
 }
 
 } // verus!
