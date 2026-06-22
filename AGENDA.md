@@ -288,10 +288,20 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       `lemma_word_valid_no_inner_stable`, `lemma_trivial_in_empty_subgroup`. **PACKAGED** as `is_free_family`
       + `lemma_free_family_extends` (`is_free_family(gp,gens) ⟹ is_free_family(gp ∗ ⟨s⟩, gens.push([s]))`), the
       iterable B2 interface. **B2 SEED done** (`lemma_tx_is_free_family`: `[t,x]` free in `K_M` in `is_free_family`
-      form, via F1a + `pres_tx==free_group(2)`). **REMAINING = B2 tower induction (iterate
-      `lemma_free_family_extends` over the b_j then d ⟹ `[t,x,b_j,d]` free in `K_M ∗ F(b) ∗ ⟨d⟩`, an iterated
-      empty-assoc HNN tower) → B3 kill_c→h1_base → B4 lift via A1.** B2's tower induction + h1_base connection is
-      a fresh arc (best not started at a session tail).
+      form, via F1a + `pres_tx==free_group(2)`).
+      **B2 TOWER INDUCTION COMPLETE 2026-06-22** (`f_free_tower.rs` 9/0, NEW module). `free_stable_tower(gp,j)`
+      = the j-fold empty-assoc HNN over `gp`; `free_stable_family(gp,gens,j)` = `gens` + the j adjoined top
+      generators. **Headline `lemma_txbd_free_in_tower`**: `[t,x,b_1..b_n,d] = free_stable_family(g_m(mm),[t,x],n+1)`
+      is a FREE family in `free_stable_tower(g_m(mm),n+1)`, AND that tower `== free_product(g_m(mm),free_group(n+1))`
+      = `K_M ∗ F(b) ∗ ⟨d⟩`. Proof = `lemma_free_stable_tower_extends` (induction on j, each step the single-letter
+      `lemma_free_family_extends`) seeded by `lemma_tx_is_free_family`. Closed forms pin the layout:
+      `lemma_free_stable_tower_closed` (tower = `gp` + j gens, SAME relators), `lemma_free_stable_family_closed` +
+      `lemma_txbd_family_layout` (`t,x` at `0,1`; `b_j` at `nk..nk+n-1`; `d` at `nk+n`; `nk=4+|quads|`),
+      `lemma_free_stable_tower_is_free_product`. **REMAINING = B3 (kill the `c`'s with a hom `h1_base →
+      K_M ∗ F(b) ∗ ⟨d⟩` + reindex `b,d` down past the dropped `c`-block, then `lemma_pullback_free` ⟹ `F` free
+      in `h1_base`) → B4 lift via A1 (`h1_base ↪ h2_II` faithful).** B3's kill-c hom + reindex is the next fresh
+      arc; A1 (the residue/p-conjugation iso, `prop_v`-scale) is the genuine remaining cost — see §4.2, do NOT
+      start at a session tail.
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).

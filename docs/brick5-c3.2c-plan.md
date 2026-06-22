@@ -221,9 +221,14 @@ factor-1 analog of `lemma_psi_F_stable_count_scales`), `lemma_free_stable_data_v
 `lemma_word_valid_no_inner_stable`, `lemma_trivial_in_empty_subgroup`. (The free-product route via
 `lemma_free_product_injective_left` is used only in the base case `lemma_extend_free_no_stable`.)
 
-**B2 — iterate B1:** seed with F1a (`[t,x]` free in `K_M`), add `b_1,…,b_n`, then `d` ⟹ `[t,x,b_j,d]` free in
-`K_M ∗ F(b) ∗ ⟨d⟩` (= `free_product` chain; note `free_product(free_group(a),free_group(b)) == free_group(a+b)`
-definitionally, so the target free group assembles for free).
+**B2 — iterate B1 — DONE (2026-06-22, `f_free_tower.rs` 9/0, NEW module).** Seed F1a (`[t,x]` free in `K_M`),
+add `b_1,…,b_n`, then `d` ⟹ `[t,x,b_j,d]` free in `K_M ∗ F(b) ∗ ⟨d⟩`. Spec fns `free_stable_tower(gp,j)` (j-fold
+empty-assoc HNN over `gp`) + `free_stable_family(gp,gens,j)` (gens + the j adjoined top gens); the induction is
+`lemma_free_stable_tower_extends` (decreases j, each step `lemma_free_family_extends`). Headline
+`lemma_txbd_free_in_tower`: `is_free_family(free_stable_tower(g_m,n+1), free_stable_family(g_m,[t,x],n+1))` AND
+`free_stable_tower(g_m,n+1) == free_product(g_m, free_group(n+1))`. Closed forms — `lemma_free_stable_tower_closed`
+(tower = gp + j gens, SAME relators), `lemma_free_stable_family_closed` / `lemma_txbd_family_layout` (`t,x`@`0,1`,
+`b_j`@`nk..nk+n-1`, `d`@`nk+n`), `lemma_free_stable_tower_is_free_product` — pin the layout the B3 bridge consumes.
 
 **B3 — connect to `h1_base`:** `h1_base` carries the `c_j` + comm relators (`b_i c_j = c_j b_i`). Kill the `c`'s
 with a homomorphism `kill_c: h1_base → (K_M ∗ F(b) ∗ ⟨d⟩)` (valid: comm relator `b_i c_j b_i⁻¹ c_j⁻¹ ↦
