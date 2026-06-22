@@ -508,4 +508,18 @@ pub proof fn lemma_h3_II_group_preserving(
     lemma_same_group_iff(p, q, w1, w2);
 }
 
+// ============================================================================
+// C3.2 — structural seeds (the b-augmented a-level recognition; see docs/brick5-c3.2-plan.md).
+// ============================================================================
+
+/// `phi_assoc` has `n + 4` association pairs — the stated gens `t, x, d, b_1..b_n, p`. The `k`
+/// of `hnn_associations_isomorphic` for the a-level iso (C3.2).
+pub proof fn lemma_phi_assoc_len(nk: nat, n: nat, m: nat, l: nat)
+    ensures
+        phi_assoc(nk, n, m, l).len() == n + 4,
+{
+    // phi_assoc = [t↦t_l, x↦xᵐ, d↦b_l d] (3) + phi_bblock (n) + [p↦p] (1)
+    assert(phi_bblock(nk, n).len() == n);
+}
+
 } // verus!
