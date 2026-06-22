@@ -205,6 +205,13 @@ pub mod higman_completeness;
 #[cfg(verus_keep_ghost)]
 pub mod f_free_a1;
 
+// pa_data: Layer 2 / Brick 5, C3.2c / the C-arc — the abstract source presentation
+// `P_A = HNN(F=free_group(n+3), p | family II over F)`. F-indexing matches the a_words order
+// [t=0,x=1,d=2,b_j=2+j,p=n+3]. Pins the definition + validity; both crux directions route through
+// `w ≡_{P_A} ε`. See docs/brick5-c3.2c-plan.md §5.
+#[cfg(verus_keep_ghost)]
+pub mod pa_data;
+
 // free_family_perm: Layer 2 / Brick 5, C3.2c / the C-arc — free-family permutation invariance
 // (`lemma_free_family_permute`): reordering a free family's generator list preserves freeness,
 // via F3 + relabeling embeddings. The "permute once, early" tool (Route A) that turns B3's
