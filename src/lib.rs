@@ -246,3 +246,9 @@ pub mod phi_l_lift;
 // with generic leaves (free-family injectivity, concat_all distribution, cancellation).
 #[cfg(verus_keep_ghost)]
 pub mod phi_l_forward;
+
+// phi_l_pinch: Layer 2 / Brick 5, C3.2c / the C-arc — map_a's forward Britton-peel assembly:
+// the column correspondence (recog columns = a_words_F-images of pa columns), the same-index
+// pinch descent, and the forward injectivity. Wires phi_l_forward's generic leaves to recog_data.
+#[cfg(verus_keep_ghost)]
+pub mod phi_l_pinch;
