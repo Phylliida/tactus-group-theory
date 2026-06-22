@@ -31,6 +31,7 @@ use crate::quotient::*;
 use crate::h2::*;
 use crate::h3::*;
 use crate::base_swap::*;
+use crate::benign::{apply_embedding, lemma_apply_embedding_valid};
 use crate::britton_infra::lemma_hnn_presentation_valid;
 use crate::higman_consequences::lemma_II;
 
@@ -632,6 +633,78 @@ pub proof fn lemma_phi_l_data_valid(mm: ModMachine, n: nat, m: nat, alphas: Seq<
     // associations valid over base.num_generators (≥ nk + 2n + 2)
     lemma_phi_assoc_valid(nk, n, m, l, base.num_generators);
     lemma_hnn_data_valid_from(data, base.num_generators);
+}
+
+// ============================================================================
+// C3.2d infrastructure — the base-swap collapse prerequisites (no dependence on
+// the deep bottom crux). See docs/brick5-c3.2-plan.md §2.2bis / §4 C3.2d.
+//
+// The full a-level iso `lemma_phi_l_iso` mirrors `lemma_b_m_upto_faithful` (machine_group.rs):
+// a `decreases l` induction building each φ-step iso inline from the IH (lower-tower
+// faithfulness) + the bottom crux (b-augmented `conj_scaling_trivial_iff` over `h2_II` = C3.2c),
+// then `lemma_single_hnn_base_faithful` descends one level.  The two facts below are the
+// crux-INDEPENDENT halves: (1) both embeddings are `h2`-words (so they CAN descend the a-tower);
+// (2) the EASY collapse direction — `h2_II`-triviality lifts to every a-tower level.
+// ============================================================================
+
+/// **Both `φ_l` embeddings are `h2`-words.** For any `w` valid over the `k = n+4` association
+/// slots, `emb(a_words, w)` and `emb(b_words, w)` are valid over `h2_num_gens(nk, n) = nk+2n+2`
+/// — i.e. they touch only `t, x, d, b_j, p` and NEVER an `a_i`/`k` stable letter (those sit at
+/// indices `≥ h2_num_gens`).  This is what lets the collapse descend them down the a-tower
+/// (`lemma_single_hnn_base_faithful` needs the word valid over the base's generators).
+pub proof fn lemma_phi_l_emb_h2_valid(nk: nat, n: nat, m: nat, l: nat, w: Word)
+    requires
+        1 <= l <= 2 * n,
+        word_valid(w, (n + 4) as nat),
+    ensures
+        word_valid(
+            apply_embedding(Seq::new((n + 4) as nat, |i: int| phi_assoc(nk, n, m, l)[i].0), w),
+            h2_num_gens(nk, n)),
+        word_valid(
+            apply_embedding(Seq::new((n + 4) as nat, |i: int| phi_assoc(nk, n, m, l)[i].1), w),
+            h2_num_gens(nk, n)),
+{
+    let ng = h2_num_gens(nk, n);                            // = nk + 2n + 2
+    let a_words = Seq::new((n + 4) as nat, |i: int| phi_assoc(nk, n, m, l)[i].0);
+    let b_words = Seq::new((n + 4) as nat, |i: int| phi_assoc(nk, n, m, l)[i].1);
+    lemma_phi_assoc_len(nk, n, m, l);                       // phi_assoc.len() == n + 4
+    lemma_phi_assoc_valid(nk, n, m, l, ng);                 // assocs_valid(phi_assoc, ng), since ng = nk+2n+2
+    assert(a_words.len() == n + 4);
+    assert(b_words.len() == n + 4);
+    assert forall|i: int| 0 <= i < a_words.len() implies word_valid(#[trigger] a_words[i], ng) by {
+        assert(a_words[i] == phi_assoc(nk, n, m, l)[i].0);  // fires assocs_valid trigger on phi_assoc[i]
+    }
+    assert forall|i: int| 0 <= i < b_words.len() implies word_valid(#[trigger] b_words[i], ng) by {
+        assert(b_words[i] == phi_assoc(nk, n, m, l)[i].1);
+    }
+    lemma_apply_embedding_valid(a_words, w, ng);
+    lemma_apply_embedding_valid(b_words, w, ng);
+}
+
+/// **The EASY collapse direction (bottom → top).** Anything trivial in the augmented bottom
+/// `h2_II` stays trivial all the way up the a-tower `h3_II_upto(l)`.  Pure HNN base-embedding
+/// (`lemma_base_embeds_in_hnn`) iterated up the tower — no faithfulness / iso needed.  The HARD
+/// direction (top → bottom) is the crux-gated half threaded through C3.2c/d.
+pub proof fn lemma_h2II_equiv_lifts_to_tower(
+    mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, l: nat, w1: Word, w2: Word,
+)
+    requires
+        equiv_in_presentation(h2_II(mm, n, m, alphas), w1, w2),
+    ensures
+        equiv_in_presentation(h3_II_upto(mm, n, m, alphas, l), w1, w2),
+    decreases l,
+{
+    if l == 0 {
+        assert(h3_II_upto(mm, n, m, alphas, 0) == h2_II(mm, n, m, alphas));
+    } else {
+        lemma_h2II_equiv_lifts_to_tower(mm, n, m, alphas, (l - 1) as nat, w1, w2);
+        let data = HNNData {
+            base: h3_II_upto(mm, n, m, alphas, (l - 1) as nat),
+            associations: phi_assoc(g_m(mm).num_generators, n, m, l),
+        };
+        // h3_II_upto(l) == hnn_presentation(data); IH gives equiv in data.base.
+        lemma_base_embeds_in_hnn(data, w1, w2);
+    }
 }
 
 } // verus!
