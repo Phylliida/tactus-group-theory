@@ -361,11 +361,15 @@ Proof = the Britton-peel induction on `w.len()` (mirror `lemma_psi_A_injective`)
   numbering identities** (this brick).
 
 ### Concrete bricks (ordered)
-- [x] **C-a (this module, `phi_l_iso.rs`)** — `lemma_phi_l_on_config_zero`: `φ_l(config(β,0)) =~= config(mβ+l,0)`
+- [x] **C-a (`phi_l_iso.rs` 2/0)** — `lemma_phi_l_on_config_zero`: `φ_l(config(β,0)) =~= config(mβ+l,0)`
   (the digit-scaling word identity; von-Dyck-b's algebraic core). `lemma_config_zero_form` support.
-- [ ] **C-b — von Dyck `b` at the relator level**: `φ_l(family_II_relator_F(β)) ≡_{h2_II} ε` for `mβ+l ∈ alphas`,
-  via C-a + the numbering identity `lemma_w_b_snoc` (`w_{mβ+l}(b)=w_β(b)·b_l`) ⟹ the image is `family_II_relator(mβ+l)`,
-  a literal `h2_II` relator. (von Dyck `a` = `lemma_family_II_relator_equiv_empty`, already proven.)
+- [x] **C-b word core (`phi_l_iso.rs` 6/0)** — `lemma_phi_l_on_family_II_rhs`: `φ_l(family_II_rhs(β)) =~=
+  family_II_rhs(mβ+l)`. C-a + b-block fixing (`lemma_phi_l_fixes_w_b` via `lemma_w_c_gens_in_block` + the
+  general `lemma_apply_embedding_fixes`) + `φ_l(d)=b_l·d` + numbering snoc `lemma_w_b_snoc`.
+- [ ] **C-b relator lift** — `φ_l(family_II_relator_F(β)) ≡_{h2_II} ε` for `mβ+l ∈ alphas`: the image is
+  `family_II_relator(mβ+l)`, a literal `h2_II` relator (via the C-b word core for the RHS + the LHS half
+  `φ_l(p⁻¹ t_β p) = p⁻¹ t_{mβ+l} p`, immediate from C-a + `φ_l(p)=p`). Then assemble von Dyck `b` via
+  `lemma_emb_respects_source_equiv` over `pa_data`. (von Dyck `a` = `lemma_family_II_relator_equiv_empty`, done.)
 - [ ] **C-P_A — define `pa_data` + validity + iso** (`hnn_associations_isomorphic(pa_data)`): the iso over free `F`
   follows from A1 (iso over `h1_base`) + F-faithfulness (B3) by translating columns through the inclusion.
 - [ ] **C-lift — the unified HNN lifting lemma** (the Britton-peel; the deep multi-step core). Mirror
