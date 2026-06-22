@@ -205,6 +205,13 @@ pub mod higman_completeness;
 #[cfg(verus_keep_ghost)]
 pub mod f_free_a1;
 
+// free_family_perm: Layer 2 / Brick 5, C3.2c / the C-arc — free-family permutation invariance
+// (`lemma_free_family_permute`): reordering a free family's generator list preserves freeness,
+// via F3 + relabeling embeddings. The "permute once, early" tool (Route A) that turns B3's
+// `[t,x,b_j,d]` h1_base-freeness into the C-arc `a_words` order `[t,x,d,b_j]`.
+#[cfg(verus_keep_ghost)]
+pub mod free_family_perm;
+
 // phi_l_iso: Layer 2 / Brick 5, C3.2c / the C-arc — the per-level iso crux
 // `lemma_phi_l_iso_at_h2II` (emb(a_words,w) ≡ ε ⟺ emb(b_words,w) ≡ ε over h2_II), via the
 // unified HNN lifting lemma (faithfulness lifts base→HNN under an association-preserving
