@@ -310,7 +310,7 @@ proof fn lemma_a_words_head(mm: ModMachine, n: nat)
 /// **`a_words` fixes a config word** `config(γ,0)` (it uses only gens `{0,1}`, which `a_words` maps
 /// to themselves).  So `apply_embedding(a_words, config(γ,0)) =~= config(γ,0)` — the a-column of `P_A`
 /// maps to `recog_data`'s a-column unchanged.
-proof fn lemma_a_words_fixes_config(mm: ModMachine, n: nat, gamma: nat)
+pub proof fn lemma_a_words_fixes_config(mm: ModMachine, n: nat, gamma: nat)
     ensures
         apply_embedding(a_words(mm, n), config_word(gamma, 0)) =~= config_word(gamma, 0),
 {

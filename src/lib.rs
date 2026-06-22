@@ -232,3 +232,10 @@ pub mod phi_l_maps;
 // φ_l(config(β,0)) = config(mβ+l,0). See docs/brick5-c3.2c-plan.md §5.
 #[cfg(verus_keep_ghost)]
 pub mod phi_l_iso;
+
+// phi_l_lift: Layer 2 / Brick 5, C3.2c / the C-arc — the von-Dyck-backward halves of the two
+// faithful P_A → h2_II embeddings (generic `lemma_pa_von_dyck_backward` via
+// `lemma_emb_respects_source_equiv`, P_A's free base ⟹ relators = the p-conjugations), plus
+// map_a's instantiation. The forward unified HNN lifting lemma lands here next.
+#[cfg(verus_keep_ghost)]
+pub mod phi_l_lift;
