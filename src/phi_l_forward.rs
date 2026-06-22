@@ -19,15 +19,17 @@ use crate::presentation::{Presentation, equiv_in_presentation, presentation_vali
     lemma_equiv_transitive, lemma_equiv_symmetric};
 use crate::presentation_lemmas::{lemma_equiv_concat_left, lemma_equiv_concat_right,
     lemma_word_inverse_right, lemma_word_inverse_left};
-use crate::benign::{apply_embedding, apply_embedding_symbol, concat_all,
+use crate::benign::{apply_embedding, apply_embedding_symbol, concat_all, in_generated_subgroup,
     lemma_apply_embedding_concat, lemma_apply_embedding_inverse, lemma_apply_embedding_valid};
 use crate::higman_operations::{free_group, lemma_free_group_valid};
 use crate::f_free::is_free_family;
-use crate::machine_group::{ModMachine, g_m, lemma_g_m_num_generators};
+use crate::machine_group::{ModMachine, g_m, lemma_g_m_num_generators,
+    lemma_apply_embedding_in_subgroup, lemma_in_subgroup_respects_equiv};
 use crate::layout::{p_idx, d_idx, b_idx};
 use crate::h3::phi_assoc;
-use crate::h3_ii::lemma_phi_assoc_index;
+use crate::h3_ii::{lemma_phi_assoc_index, compose_embeddings, lemma_apply_embedding_compose};
 use crate::phi_l_maps::{a_words, lemma_a_words_is_phi_col0};
+use crate::normal_form_afp_textbook::lemma_subgroup_to_k_word;
 
 verus! {
 
@@ -400,6 +402,61 @@ pub proof fn lemma_free_family_injective(gp: Presentation, gens: Seq<Word>, u: W
 
     // cancellation ⟹ u ≡_free v.
     lemma_cancel_inverse_to_equiv(fg, u, v);
+}
+
+// ----------------------------------------------------------------------------
+// F4 — the intersection property (the heart of the pinch descent).
+// ----------------------------------------------------------------------------
+
+/// **The intersection property (generic)**: if the recog gens are `ψ`-images of the `pa` gens
+/// (`recog_gens = compose_embeddings(ψ, pa_gens)` = the column correspondence), `ψ` is a free family
+/// in `gp`, and `ψ(u) ∈ ⟨recog_gens⟩` in `gp`, then `u ∈ ⟨pa_gens⟩` in the free group.  This is
+/// `ψ(F) ∩ AssocSub(gp) = ψ(AssocSub(free))` — exactly the descent the spanning pinch case needs.
+///
+/// Route: pull `ψ(u)` back to a preimage word `h` over the recog gens (`lemma_subgroup_to_k_word`);
+/// `apply_embedding(recog_gens, h) = ψ(apply_embedding(pa_gens, h))` (composition); injectivity of
+/// `ψ` (`lemma_free_family_injective`) descends `apply_embedding(pa_gens, h) ≡_{free} u`; and that
+/// embedded product is visibly a `⟨pa_gens⟩`-member, transported to `u` by equiv-respect.
+pub proof fn lemma_intersection_property(
+    gp: Presentation, psi: Seq<Word>, pa_gens: Seq<Word>, u: Word)
+    requires
+        presentation_valid(gp),
+        is_free_family(gp, psi),
+        word_valid(u, psi.len()),
+        forall|k: int| 0 <= k < pa_gens.len() ==> word_valid(#[trigger] pa_gens[k], psi.len()),
+        in_generated_subgroup(gp, compose_embeddings(psi, pa_gens), apply_embedding(psi, u)),
+    ensures
+        in_generated_subgroup(free_group(psi.len()), pa_gens, u),
+{
+    let k = psi.len();
+    let fg = free_group(k);
+    lemma_free_group_valid(k);
+    let recog_gens = compose_embeddings(psi, pa_gens);
+    let psi_u = apply_embedding(psi, u);
+    assert(recog_gens.len() == pa_gens.len());
+
+    // pull back ψ(u) to a preimage word over the recog gens.
+    lemma_subgroup_to_k_word(gp, recog_gens, psi_u);
+    let h = choose|h: Word| word_valid(h, recog_gens.len())
+        && equiv_in_presentation(gp, apply_embedding(recog_gens, h), psi_u);
+    assert(word_valid(h, recog_gens.len())
+        && equiv_in_presentation(gp, apply_embedding(recog_gens, h), psi_u));
+    assert(word_valid(h, pa_gens.len()));
+
+    // apply_embedding(recog_gens, h) = ψ(apply_embedding(pa_gens, h)).
+    lemma_apply_embedding_compose(psi, pa_gens, h);
+    let ph = apply_embedding(pa_gens, h);
+    assert(apply_embedding(recog_gens, h) =~= apply_embedding(psi, ph));
+
+    // so ψ(ph) ≡_{gp} ψ(u);  injectivity ⟹ ph ≡_{free} u.
+    lemma_apply_embedding_valid(pa_gens, h, k);                  // ph valid over k
+    assert(equiv_in_presentation(gp, apply_embedding(psi, ph), apply_embedding(psi, u)));
+    lemma_free_family_injective(gp, psi, ph, u);
+    assert(equiv_in_presentation(fg, ph, u));
+
+    // ph ∈ ⟨pa_gens⟩, and ph ≡_{free} u ⟹ u ∈ ⟨pa_gens⟩.
+    lemma_apply_embedding_in_subgroup(fg, pa_gens, h);
+    lemma_in_subgroup_respects_equiv(fg, pa_gens, ph, u);
 }
 
 } // verus!
