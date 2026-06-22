@@ -29,8 +29,16 @@ use crate::machine_group::{ModMachine, mod_machine_wf, g_m, lemma_g_m_num_genera
 use crate::h1::h1_base;
 use crate::benign::{apply_embedding, lemma_apply_embedding_valid};
 use crate::free_basis::{kill_hom, lemma_kill_hom_valid, lemma_kill_fixes_low, config_emb,
-    lemma_config_emb_free};
+    lemma_config_emb_free, basis_emb, basis_elt, lemma_basis_elt_free, lemma_free_to_basis_elt,
+    lemma_free_to_embedding};
+use crate::machine_group::lemma_config_word_zero;
 use crate::higman_operations::free_group;
+use crate::hnn::{HNNData, hnn_associations_isomorphic};
+use crate::h2::{p_assoc, td_word};
+use crate::h3_ii::{recog_data, family_II_assoc, family_II_rhs};
+use crate::h1::{h_w_b, lemma_h1_base_valid, lemma_h1_base_num_generators};
+use crate::layout::{b_base, d_idx, h1_num_gens};
+use crate::word_numbering::{numbers_word, w_b, w_c};
 
 verus! {
 
@@ -96,6 +104,224 @@ pub proof fn lemma_config_emb_free_in_h1(mm: ModMachine, n: nat, alphas: Seq<nat
     lemma_km_faithful_in_h1(mm, n, apply_embedding(emb, w));
     // F2: the config family is free in g_m ⟹ w ≡_free ε.
     lemma_config_emb_free(mm, alphas, w);
+}
+
+// ----------------------------------------------------------------------------
+// A1, rung 3 — the `betas = [0] ++ alphas` index family and column correspondence.
+// ----------------------------------------------------------------------------
+
+/// `betas(alphas) = [0] ++ alphas`. The `p_assoc` head `(t, td)` IS the `α = 0` case of the
+/// family-(II) associations, so prepending `0` unifies the two recognition columns into a single
+/// `config_emb` / `basis_emb` over `betas`.
+pub open spec fn betas(alphas: Seq<nat>) -> Seq<nat> {
+    seq![0nat] + alphas
+}
+
+/// Index facts: `|betas| = |alphas| + 1`, `betas[0] = 0`, `betas[i+1] = alphas[i]`.
+pub proof fn lemma_betas_index(alphas: Seq<nat>)
+    ensures
+        betas(alphas).len() == alphas.len() + 1,
+        betas(alphas)[0] == 0,
+        forall|i: int| 0 <= i < alphas.len() ==> #[trigger] betas(alphas)[i + 1] == alphas[i],
+{
+    let b = betas(alphas);
+    assert(b[0] == 0);
+    assert forall|i: int| 0 <= i < alphas.len() implies #[trigger] b[i + 1] == alphas[i] by {
+        assert(b[i + 1] == alphas[i]);
+    }
+}
+
+/// `betas` numbers words (each digit ok): `0 ∈ I` trivially, and the `alphas` carry the hypothesis.
+proof fn lemma_betas_numbers_word(n: nat, m: nat, alphas: Seq<nat>)
+    requires forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]),
+    ensures forall|i: int| 0 <= i < betas(alphas).len() ==> numbers_word(n, m, #[trigger] betas(alphas)[i]),
+{
+    let b = betas(alphas);
+    lemma_betas_index(alphas);
+    assert forall|i: int| 0 <= i < b.len() implies numbers_word(n, m, #[trigger] b[i]) by {
+        if i == 0 {
+            assert(b[0] == 0);            // numbers_word(n,m,0) == true
+        } else {
+            assert(b[i] == alphas[i - 1]);
+        }
+    }
+}
+
+/// `betas` has no duplicates when `0 ∉ alphas` and `alphas` is distinct.
+proof fn lemma_betas_no_duplicates(alphas: Seq<nat>)
+    requires !alphas.contains(0nat), alphas.no_duplicates(),
+    ensures betas(alphas).no_duplicates(),
+{
+    let b = betas(alphas);
+    lemma_betas_index(alphas);
+    assert forall|i: int, j: int| 0 <= i < j < b.len() implies b[i] != b[j] by {
+        if i == 0 {
+            // b[0] = 0, b[j] = alphas[j-1] (j ≥ 1); 0 ∉ alphas ⟹ b[j] != 0.
+            assert(b[j] == alphas[j - 1]);
+            if b[j] == 0 {
+                assert(alphas[j - 1] == 0nat);
+                assert(alphas.contains(0nat));      // witness k = j-1
+            }
+        } else {
+            // i, j ≥ 1: b[i] = alphas[i-1], b[j] = alphas[j-1], distinct by no_duplicates.
+            assert(b[i] == alphas[i - 1]);
+            assert(b[j] == alphas[j - 1]);
+        }
+    }
+}
+
+/// The `.0` recognition column IS `config_emb(betas)` (entrywise seq-equal): head
+/// `t = [Gen0] =~= config_word(0,0)` (`lemma_config_word_zero`), tail `config_word(αᵢ,0)` definitional.
+proof fn lemma_a_col_eq_config_emb(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>)
+    ensures
+        Seq::new(recog_data(mm, n, m, alphas).associations.len(),
+                 |i: int| recog_data(mm, n, m, alphas).associations[i].0)
+        =~= config_emb(betas(alphas)),
+{
+    let nk = g_m(mm).num_generators;
+    let data = recog_data(mm, n, m, alphas);
+    let pa = p_assoc(nk, n);
+    let fa = family_II_assoc(mm, n, m, alphas);
+    let acol = Seq::new(data.associations.len(), |i: int| data.associations[i].0);
+    let ce = config_emb(betas(alphas));
+    lemma_betas_index(alphas);
+    lemma_config_word_zero();                          // config_word(0,0) =~= [Gen0]
+    assert(data.associations =~= pa + fa);
+    assert(pa.len() == 1);
+    assert(data.associations.len() == 1 + alphas.len());
+    assert forall|j: int| 0 <= j < acol.len() implies acol[j] =~= ce[j] by {
+        if j == 0 {
+            assert(data.associations[0] == pa[0]);
+            assert(pa[0] == (seq![Symbol::Gen(0)], td_word(nk, n)));
+            assert(acol[0] == seq![Symbol::Gen(0)]);
+            assert(ce[0] == config_word(betas(alphas)[0], 0));
+            assert(betas(alphas)[0] == 0);
+        } else {
+            let i = j - 1;
+            assert(data.associations[j] == fa[i]);
+            assert(fa[i] == (config_word(alphas[i], 0), family_II_rhs(mm, n, m, alphas[i])));
+            assert(acol[j] == config_word(alphas[i], 0));
+            assert(ce[j] == config_word(betas(alphas)[j], 0));
+            assert(betas(alphas)[j] == alphas[i]);
+        }
+    }
+}
+
+/// The `.1` recognition column IS `basis_emb(betas)` (entrywise seq-equal): head
+/// `td =~= basis_elt(0)` (`config_word(0,0)=[Gen0]`, `w_b(_,0)=ε`), tail
+/// `family_II_rhs(αᵢ) == basis_elt(αᵢ)` (since `h_w_b = w_b(b_base…)` definitionally).
+proof fn lemma_b_col_eq_basis_emb(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>)
+    ensures
+        Seq::new(recog_data(mm, n, m, alphas).associations.len(),
+                 |i: int| recog_data(mm, n, m, alphas).associations[i].1)
+        =~= basis_emb(mm, n, m, betas(alphas)),
+{
+    let nk = g_m(mm).num_generators;
+    let data = recog_data(mm, n, m, alphas);
+    let pa = p_assoc(nk, n);
+    let fa = family_II_assoc(mm, n, m, alphas);
+    let bcol = Seq::new(data.associations.len(), |i: int| data.associations[i].1);
+    let be = basis_emb(mm, n, m, betas(alphas));
+    lemma_betas_index(alphas);
+    lemma_config_word_zero();                          // config_word(0,0) =~= [Gen0]
+    assert(data.associations =~= pa + fa);
+    assert(pa.len() == 1);
+    assert(data.associations.len() == 1 + alphas.len());
+    // head: td =~= basis_elt(0)
+    assert(w_c(b_base(nk, n), n, m, 0) =~= empty_word());     // α = 0 base case of w_c
+    assert(h_w_b(nk, n, m, 0) =~= empty_word());              // = w_b(b_base,…,0) = w_c(…,0)
+    assert(basis_elt(mm, n, m, 0) =~= td_word(nk, n));        // [Gen0] + ε + [d]  =~=  [Gen0, d]
+    assert forall|j: int| 0 <= j < bcol.len() implies bcol[j] =~= be[j] by {
+        if j == 0 {
+            assert(data.associations[0] == pa[0]);
+            assert(pa[0] == (seq![Symbol::Gen(0)], td_word(nk, n)));
+            assert(bcol[0] == td_word(nk, n));
+            assert(be[0] == basis_elt(mm, n, m, betas(alphas)[0]));
+            assert(betas(alphas)[0] == 0);
+        } else {
+            let i = j - 1;
+            assert(data.associations[j] == fa[i]);
+            assert(fa[i] == (config_word(alphas[i], 0), family_II_rhs(mm, n, m, alphas[i])));
+            assert(bcol[j] == family_II_rhs(mm, n, m, alphas[i]));
+            // family_II_rhs(α) == basis_elt(α): both = config(α,0) + w_b(b_base,…,α) + [d].
+            assert(h_w_b(nk, n, m, alphas[i]) == w_b(b_base(nk, n), n, m, alphas[i]));
+            assert(family_II_rhs(mm, n, m, alphas[i]) =~= basis_elt(mm, n, m, alphas[i]));
+            assert(be[j] == basis_elt(mm, n, m, betas(alphas)[j]));
+            assert(betas(alphas)[j] == alphas[i]);
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// A1 — the recognition-datum association isomorphism.
+// ----------------------------------------------------------------------------
+
+/// **A1 — `hnn_associations_isomorphic(recog_data)`.** The recognition datum's two columns are
+/// `config_emb(betas)` and `basis_emb(betas)`, both ALREADY-PROVEN free families in `h1_base`
+/// (`lemma_config_emb_free_in_h1` / `lemma_basis_elt_free`). So for any `w` over `|betas|` letters,
+/// `apply_embedding(a_words, w) ≡ ε  ⟺  w ≡_free ε  ⟺  apply_embedding(b_words, w) ≡ ε` — the iff
+/// transports through F3 (`lemma_free_to_basis_elt` / `lemma_free_to_embedding`) in each direction.
+/// This is the `hnn_associations_isomorphic` precondition that Britton over `recog_data` consumes
+/// (the "free-base fallacy": Britton needs only this iso, never a free base).
+pub proof fn lemma_recog_associations_isomorphic(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>)
+    requires
+        mod_machine_wf(mm),
+        2 * n < m,
+        !alphas.contains(0nat),
+        alphas.no_duplicates(),
+        forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]),
+    ensures
+        hnn_associations_isomorphic(recog_data(mm, n, m, alphas)),
+{
+    let data = recog_data(mm, n, m, alphas);
+    let bb = betas(alphas);
+    let k = data.associations.len();
+    let a_words = Seq::new(k, |i: int| data.associations[i].0);
+    let b_words = Seq::new(k, |i: int| data.associations[i].1);
+
+    lemma_betas_index(alphas);
+    assert(k == bb.len());
+    assert(data.base == h1_base(mm, n));
+    lemma_h1_base_valid(mm, n);
+    lemma_h1_base_num_generators(mm, n);               // base.num_generators == h1_num_gens(nk,n)
+
+    // side conditions on betas
+    lemma_betas_no_duplicates(alphas);
+    lemma_betas_numbers_word(n, m, alphas);
+
+    // columns ARE config_emb / basis_emb over betas
+    lemma_a_col_eq_config_emb(mm, n, m, alphas);
+    lemma_b_col_eq_basis_emb(mm, n, m, alphas);
+    assert(a_words =~= config_emb(bb));
+    assert(b_words =~= basis_emb(mm, n, m, bb));
+
+    // config_emb words are valid over the base's generators (for F3 backward).
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);                      // nk ≥ 4
+    assert forall|i: int| 0 <= i < config_emb(bb).len() implies
+        word_valid(#[trigger] config_emb(bb)[i], data.base.num_generators) by {
+        assert(config_emb(bb)[i] == config_word(bb[i], 0));
+        lemma_config_word_valid(bb[i], 0);             // word_valid(·, 3)
+        lemma_word_valid_mono(config_emb(bb)[i], 3, data.base.num_generators);
+    }
+
+    assert forall|w: Word| word_valid(w, k as nat) implies (
+        equiv_in_presentation(data.base, apply_embedding(a_words, w), empty_word())
+        <==>
+        equiv_in_presentation(data.base, apply_embedding(b_words, w), empty_word())
+    ) by {
+        assert(word_valid(w, bb.len()));               // k == bb.len()
+        if equiv_in_presentation(data.base, apply_embedding(a_words, w), empty_word()) {
+            // a-side trivial ⟹ w free (config family free in h1) ⟹ b-side trivial (F3 on basis).
+            lemma_config_emb_free_in_h1(mm, n, bb, w);
+            lemma_free_to_basis_elt(mm, n, m, bb, w);
+        }
+        if equiv_in_presentation(data.base, apply_embedding(b_words, w), empty_word()) {
+            // b-side trivial ⟹ w free (basis family free in h1) ⟹ a-side trivial (F3 on config).
+            lemma_basis_elt_free(mm, n, m, bb, w);
+            lemma_free_to_embedding(config_emb(bb), data.base, w);
+        }
+    }
 }
 
 } // verus!

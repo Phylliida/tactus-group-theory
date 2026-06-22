@@ -287,18 +287,19 @@ and symmetric. So `hnn_associations_isomorphic(recog_data)` follows from:
   `h1_base`. The embedded product `apply_embedding(config_emb,w)` is a `K_M`-word (config words on gens
   0–2 < nk, `lemma_config_word_valid` + `lemma_word_valid_mono` + `lemma_apply_embedding_valid`), so
   triviality in `h1_base` descends to `g_m` via rung 1, where `lemma_config_emb_free` (F2) closes it.
-- [ ] `lemma_a_words_eq_config_emb` / `lemma_b_words_eq_basis_emb` — the `betas=[0]++alphas` correspondence
-  (head via `lemma_config_word_zero` + `w_b`-zero; tail definitional — `family_II_rhs(β) == basis_elt(β)`
-  since `h_w_b = w_b(b_base…)`). Then `apply_embedding` congruence (`benign`) lifts the per-entry `=~=`
-  to the whole embedding so the iso transports. **NOTE the head entries are LITERAL seq-equal**
-  (`config_word(0,0) =~= [Gen0]`; `basis_elt(0) =~= td_word`), so the transport is `=~=`/`==`, not just
-  `≡` — cleaner than feared. Side-condition needed: `numbers_word(n,m,0)` for `basis_emb([0]++alphas)`
-  (check `lemma_basis_elt_valid`/`numbers_word` admit `0`).
-- [ ] `lemma_recog_associations_isomorphic` — assemble: for `w` valid over `betas.len()`,
-  `apply_embedding(a_words,w) ≡_{h1} ε ⟺ apply_embedding(b_words,w) ≡_{h1} ε`. Forward:
-  rung 2 (`config_emb` free) ⟹ `w ≡_free ε` ⟹ `lemma_free_to_basis_elt` ⟹ b-side trivial. Backward:
-  `lemma_basis_elt_free` ⟹ `w ≡_free ε` ⟹ `lemma_free_to_embedding(config_emb)` ⟹ a-side trivial.
-  (Both columns transported by the `=~=` head/tail correspondence above.)
+- [x] **`lemma_a_col_eq_config_emb` / `lemma_b_col_eq_basis_emb` — DONE** (`f_free_a1.rs`, 2026-06-22):
+  the `betas=[0]++alphas` correspondence. Both columns are LITERAL seq-equal (`=~=`) to
+  `config_emb(betas)` / `basis_emb(betas)`: head via `lemma_config_word_zero` (`config_word(0,0) =~=
+  [Gen0]`) + `w_c(_,0)=ε` (so `basis_elt(0) =~= td_word`); tail `family_II_rhs(αᵢ) == basis_elt(αᵢ)`
+  since `h_w_b = w_b(b_base…)` definitionally. Side facts also done: `betas` index (`lemma_betas_index`),
+  `numbers_word(n,m,0)=true` so betas all number words (`lemma_betas_numbers_word`), and
+  `betas.no_duplicates()` from `0∉alphas ∧ alphas.no_duplicates()` (`lemma_betas_no_duplicates`).
+- [x] **`lemma_recog_associations_isomorphic` — DONE** (`f_free_a1.rs` 8/0, 2026-06-22): assembled. For
+  `w` valid over `betas.len()`, `apply_embedding(a_words,w) ≡_{h1} ε ⟺ apply_embedding(b_words,w)
+  ≡_{h1} ε`. Forward: rung 2 (`lemma_config_emb_free_in_h1`) ⟹ `w ≡_free ε` ⟹ `lemma_free_to_basis_elt`
+  ⟹ b-side trivial. Backward: `lemma_basis_elt_free` ⟹ `w ≡_free ε` ⟹ `lemma_free_to_embedding(config_emb)`
+  ⟹ a-side trivial. **A1 IS COMPLETE — `hnn_associations_isomorphic(recog_data)` holds.** The "hardest
+  brick" was, as the de-risking predicted, a clean ~190-line focused arc that verified first try.
 
 Once A1 lands, **B4** is immediate (`lemma_recog_data_valid` + A1 ⟹ `hnn_data` valid+iso ⟹ Britton over
 `recog_data` applies to `h2_II`; F free `h1_base ↪ h2_II`), and the C-forward Britton peel + C-backward von

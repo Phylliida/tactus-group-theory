@@ -316,13 +316,21 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       is the SHORT `kill_hom`-retraction lemma (K_M faithful in `h1_base`). `prop_v`/`tower_peel`/
       `lemma_accumulator_inv` are NOT needed (already spent inside `lemma_basis_elt_free`). A1 is a clean focused
       arc; §4.2 has the concrete sub-ladder.
-      **A1 RUNGS 1+2 DONE 2026-06-22** (`f_free_a1.rs` 2/0, NEW module): `lemma_km_faithful_in_h1` (the SHORT
-      genuinely-new `kill_hom` retraction — `K_M`-word trivial in `h1_base` ⟹ trivial in `g_m`, via
-      `lemma_kill_hom_valid`+`lemma_hom_preserves_equiv`+`lemma_kill_fixes_low`) + `lemma_config_emb_free_in_h1`
-      (config family free in `h1_base` = F2 `lemma_config_emb_free` lifted through the retraction; embedded
-      product is a K_M word so triviality descends). REMAINING for A1 = the `betas=[0]++alphas` correspondence
-      (`lemma_a_words_eq_config_emb`/`_b_words_eq_basis_emb`, head LITERAL seq-equal) + the assembly
-      `lemma_recog_associations_isomorphic` (both columns free + F3 both ways). §4.2 sub-ladder updated.
+      **A1 COMPLETE 2026-06-22** (`f_free_a1.rs` 8/0, NEW module — verified FIRST TRY).
+      `lemma_recog_associations_isomorphic`: `hnn_associations_isomorphic(recog_data(mm,n,m,alphas))` holds
+      (side-conditions `mod_machine_wf`, `2n<m`, `0∉alphas`, `alphas.no_duplicates()`, all `alphas` number
+      words). Rungs: (1) `lemma_km_faithful_in_h1` — the SHORT genuinely-new `kill_hom` retraction (`K_M`-word
+      trivial in `h1_base` ⟹ trivial in `g_m`, via `lemma_kill_hom_valid`+`lemma_hom_preserves_equiv`+
+      `lemma_kill_fixes_low`); (2) `lemma_config_emb_free_in_h1` (config family free in `h1_base` = F2 lifted
+      through the retraction); (3) the `betas=[0]++alphas` column correspondence (`lemma_a_col_eq_config_emb`/
+      `_b_col_eq_basis_emb`, LITERAL seq-equal — `config_word(0,0)=[Gen0]`, `basis_elt(0)=td_word` via
+      `w_c(_,0)=ε`, `family_II_rhs(αᵢ)=basis_elt(αᵢ)` via `h_w_b=w_b(b_base…)`) + the side facts
+      (`lemma_betas_{index,numbers_word,no_duplicates}`, `numbers_word(n,m,0)=true`); (4) the iff assembly
+      (forward `config_emb` free ⟹ `w` free ⟹ `lemma_free_to_basis_elt`; backward `lemma_basis_elt_free` ⟹
+      `w` free ⟹ `lemma_free_to_embedding`). The de-risking held: the once-"hardest brick" was a clean ~190-line
+      arc consuming the already-spent `lemma_basis_elt_free` machinery wholesale. **NEXT = B4** (`lemma_recog_data_valid`
+      + A1 ⟹ Britton over `recog_data` applies to `h2_II`) → C-forward (Britton peel) + C-backward (von Dyck,
+      the family-(II) payoff) → C3 biconditional `lemma_phi_l_iso_at_h2II` → C3.2d/C2/C4/C5.
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).
