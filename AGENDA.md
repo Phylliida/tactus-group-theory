@@ -244,9 +244,19 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       single `decreases l` faithfulness induction (mirror `lemma_b_m_upto_faithful`, `base_A→h2_II`) that
       builds each φ-step iso INLINE from IH-descent + the bottom crux — so **C3.2c is the single gating
       item** (C3.2b/d are inline pieces that can't close without it; no `assume`-pin allowed).
-      **NEXT = C3.2c** (the standalone b-augmented `conj_scaling_trivial_iff` over `h2_II`: Cohen Prop-1.34
-      recognition consuming `h2_II`'s literal family-(II) relators + the `prop_v`/`tower_peel` residue facts;
-      a focused multi-session push) → C2 → C4 → C5. See `docs/brick5-c3.2-plan.md` §4.
+      **C3.2c B1 DONE** (`h3_ii.rs` 25/0, 2026-06-22): **the recognition datum `recog_data`** —
+      recognize the WHOLE `h2_II` as a single `p`-HNN over `h1_base` (NOT a subgroup over free `F`; the
+      scattered-gen worry evaporates). `h2_II = h2_pres + family_II`, and family (II) are exactly extra
+      `p`-conjugation associations, so `recog_data = HNN(h1_base, p | p_assoc ++ family_II_assoc)` and
+      **`hnn_presentation(recog_data) == h2_II` LITERALLY** (`lemma_recog_presentation`, the analog of
+      `lemma_a_as_hnn_presentation`) ⟹ Britton over `recog_data` applies directly to `h2_II`. Co-design
+      w/ Danielle: the **"free-base fallacy"** — Britton needs ONLY the iso condition (A1), never a free
+      base; non-freeness of `h1_base` bites in exactly one place (the A1 residue iso). The C3.2c crux now
+      reframes cleanly as **"φ_l is a faithful endomorphism over `h2_II`"** (`emb(b_words,w) =
+      subst(emb(a_words,w))`), mirroring `lemma_conj_scaling_trivial_iff` with `base_A→h2_II`. **NEXT =
+      B1.5** (the subst-factoring bridge, `apply_embedding` composition) → **C1** (von Dyck/backward, the
+      family-(II) payoff) → **A1** (residue iso, the `prop_v`-scale focused push) → **C2** (forward Britton
+      peel) → C3 → C2(p-level)/C4/C5. See `docs/brick5-c3.2c-plan.md` §3b (sharpened ladder).
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).
