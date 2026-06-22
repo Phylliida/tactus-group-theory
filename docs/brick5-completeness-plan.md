@@ -253,19 +253,30 @@ Bottom-up. Each brick names the existing infra it reduces to.
   (`hnn_associations_isomorphic(phi_l_data)` over `h3_upto(l-1)`) is **FALSE** — do not attempt it.
   The rerouted C3 is: prove the a-level iso **over the finite family-(II)-augmented base `h3_II`**,
   where it *does* hold literally. Sub-steps:
-  - **C3.0 — the reflecting base-swap lemma (foundation, build first, fork-independent).**
-    `equiv_in_presentation(add_relators(p, rs), w1, w2) ∧ (∀i. rs[i] ≡_p ε) ⟹
-     equiv_in_presentation(p, w1, w2)`. Plus the wrapper that fuses it with the existing forward
-    direction (`lemma_add_relators_preserves_equiv`) into `equiv_in(h3_pres,·,·) ⟺ equiv_in(h3_II,·,·)`
-    once each augmenting relator is shown `≡_{h3_pres} ε` by `lemma_II`. *(In `quotient.rs` /
-    a new `base_swap.rs`; pure presentation theory, no Higman specifics.)*
-  - **C3.1 — define `h3_II` + group-preservation.** The finite family-(II) augmentation of
-    `h3_upto(2n)` (or `h3_pres`); discharge each relator's `≡_{h3_pres} ε` via `lemma_II`; conclude the
-    swap with C3.0.
-  - **C3.2 — the b-augmented a-level recognition over `h3_II`.** `A ≅ A_i` via the stated gens, now a
-    *literal* `britton_lemma_unconditional`/`lemma_property_ii` argument (the iso is real over `h3_II`).
-    Reduce to the residue facts (`prop_v`/`tower_peel`) **b-augmented** — this is the genuine
-    `tower_peel`-scale work, but standard (no virtual machinery). This is the real cost of C3.
+  - **C3.0 — the reflecting base-swap lemma — DONE** (`base_swap.rs` 13/0). Built the reflecting
+    direction `equiv_in(add_relators(p,rs),·,·) ∧ (∀i. rs[i] ≡_p ε) ⟹ equiv_in(p,·,·)`
+    (`lemma_add_relators_reflects_equiv`) + the iff `lemma_add_derivable_relators_iff`. **GENERALIZED**
+    to the order-agnostic mutual-derivability swap **`lemma_same_group_iff(p, q, w1, w2)`**: any two
+    presentations with `q.num_generators == p.num_generators` whose relators are mutually `≡`-derivable
+    present the same group. This is what dissolves the relator-*splice/shift* between `h3_II` and
+    `h3_pres` (they are NOT in an `extends_presentation` prefix relation). Pure presentation theory.
+  - **C3.1 — `h3_II` + group-preservation — DONE** (`h3_ii.rs` 14/0). `h3_II` = the BOTTOM-augmented
+    tower: `h2_II = add_relators(h2_pres, family_II)`, a-tower rebuilt on top (same `φ_l`), `k` (ψ) on
+    top — so each a-level base carries family (II) (what C3.2 needs). Group-preservation
+    `equiv_in(h3_pres,·,·) ⟺ equiv_in(h3_II,·,·)` (`lemma_h3_II_group_preserving`) via the flat splice
+    `h3_pres ≃ H + M`, `h3_II ≃ H + family_II + M` (`M = phi_blocks(2n)+Krel`), discharged at the TOP
+    level by `lemma_same_group_iff`. **The compositional (level-by-level) route is IMPOSSIBLE** —
+    `h2_II ≠ h2_pres` as groups (family (II) needs the `a_i`), so the group-equality is genuinely
+    top-level. `family_II_relator = (p⁻¹ t_β p)·(t_β w_β(b) d)⁻¹`, each `≡_{h3_pres} ε` by `lemma_II`.
+    Structural support: `lemma_hnn_relators_eq` (Krel/Φ_l agree across same-num_gen bases),
+    `lemma_h3_upto_relators` / `lemma_h3_II_upto_relators` (the splice), tower num_gen/valid mirrors.
+  - **C3.2 — the b-augmented a-level recognition over `h3_II` — NEXT (the real cost of C3).**
+    `A ≅ A_i` via the stated gens, now a *literal* `britton_lemma_unconditional`/`lemma_property_ii`
+    argument (the iso is real over `h3_II`): prove
+    `hnn_associations_isomorphic(HNNData{ base: h3_II_upto(l-1), associations: phi_assoc(..l) })` for
+    each `l`. Reduce to the residue facts (`prop_v`/`tower_peel`) **b-augmented** — `tower_peel`-scale
+    but standard (no virtual machinery). Co-design with C4: the family-(II) `alphas` C3.2 needs are the
+    β's appearing in the φ_l iso witnesses (the C3.1 lemmas leave `alphas` open for exactly this).
 - **C4 — k-level decode via a NON-ISO pinch engine (THE crux; Fork B, see §2.3).** **Cannot** call
   `lemma_property_ii` (its `hnn_associations_isomorphic(psi_data)` precondition is false, §2.2/§2.3).
   Instead build a **"virtual-iso" pinch-decode**: a variant of the `kp_pinch` machinery whose iso
@@ -311,15 +322,17 @@ family-(II) augmentation** (`h3_II`, group-preserving via `lemma_II`), which re-
 content to the k-level (so C4 stays the *surgical* single-level Fork-B engine) at the cost of a real
 b-augmented a-level recognition over `h3_II` (C3.2). No verifier bypasses (standing rule). Sequence:
 **C0 DONE** → **C1 DONE** (`in_C` + closure props + signature, `higman_completeness.rs` 3/0) →
-**C3.0** (reflecting base-swap lemma — fork-independent, build first) → **C3.1** (`h3_II` +
-group-preservation) → **C3.2** (b-augmented a-level recognition over `h3_II`) → C2 (package the
-`free_basis.rs` p-level recognition) → C4 (the surgical Fork-B k-engine) → C5 (assembly).
+**C3.0 DONE** (`base_swap.rs` 13/0: reflecting swap + `lemma_same_group_iff`) → **C3.1 DONE**
+(`h3_ii.rs` 14/0: `h3_II` bottom-augmented tower + `lemma_h3_II_group_preserving`) → **C3.2 NEXT**
+(b-augmented a-level recognition over `h3_II`) → C2 (package the `free_basis.rs` p-level recognition)
+→ C4 (the surgical Fork-B k-engine) → C5 (assembly).
 
-**Most valuable next concrete step after C1 = C3.0**, the reflecting base-swap lemma
-(`equiv_in(add_relators(p,rs),·,·) ∧ ∀i.rs[i]≡_p ε ⟹ equiv_in(p,·,·)`). It is pure presentation
-theory (no Higman specifics), fork-independent, and the formal heart of the group-preservation swap
-that the whole reroute rests on. Its forward partner exists (`lemma_add_relators_preserves_equiv`).
-Then C3.1 defines `h3_II` and discharges each augmenting relator via `lemma_II`; C3.2 is the genuine
-`tower_peel`-scale b-augmented recognition (now a *literal* Britton argument over `h3_II`). C2 packages
-`free_basis.rs`; C4 = the Fork-B k-descent (`faithfulness_statement` body), consuming C1 closure props
-+ C2/C3 isos + soundness/`lemma_theorem1`.
+**Most valuable next concrete step = C3.2**, the b-augmented a-level recognition: prove
+`hnn_associations_isomorphic(HNNData{ base: h3_II_upto(l-1), associations: phi_assoc(..l) })`. The
+foundation (`lemma_same_group_iff`, `h3_II`, group-preservation) is in place. C3.2 is the genuine
+`tower_peel`-scale work — now a *literal* Britton argument over `h3_II` (the iso is real because the
+base carries family (II)), reducing to the b-augmented residue facts (`prop_v`/`tower_peel`).
+Co-design with C4: the concrete `alphas` (which β's of family (II) to splice) = the β's the φ_l iso
+witnesses touch; the C3.1 lemmas keep `alphas` open for exactly this. C2 packages `free_basis.rs`;
+C4 = the Fork-B k-descent (`faithfulness_statement` body), consuming C1 closure props + C2/C3 isos +
+soundness/`lemma_theorem1`, then transporting back to `h3_pres` via `lemma_h3_II_group_preserving`.

@@ -228,9 +228,15 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       Approach-(b) base lacks family (II), only derivable via the `a_i` in `lemma_IIa`/`lemma_II`).
       **REROUTE = finite family-(II) augmentation** `h3_II` (group-preserving via `lemma_II`), which
       makes the a-levels *literal* isos again and re-isolates virtuality to the single k-level (C4 stays
-      the surgical Fork-B engine). **NEXT = C3.0** (reflecting base-swap lemma, fork-independent) → C3.1
-      (`h3_II` + group-preservation) → C3.2 (b-augmented a-level recognition over `h3_II`, `tower_peel`-
-      scale but literal Britton) → C2 → C4 → C5. See `docs/brick5-completeness-plan.md` §2.2bis/§2.2ter.
+      the surgical Fork-B engine). **C3.0 DONE** (`base_swap.rs` 13/0): reflecting base-swap + the
+      order-agnostic `lemma_same_group_iff` (mutual relator-derivability ⟹ same group). **C3.1 DONE**
+      (`h3_ii.rs` 14/0): `h3_II` = bottom-augmented tower (`h2_II=add_relators(h2_pres,family_II)`,
+      a-tower rebuilt, ψ on top) + the group-preservation iff `lemma_h3_II_group_preserving`
+      (`equiv(h3_pres,·,·) ⟺ equiv(h3_II,·,·)`) via the flat splice `H+M` vs `H+family_II+M` discharged
+      top-level by `lemma_same_group_iff` (the compositional route is impossible — `h2_II≠h2_pres` as
+      groups). **NEXT = C3.2** (b-augmented a-level recognition over `h3_II`: prove
+      `hnn_associations_isomorphic(φ_l over h3_II_upto(l-1))`, `tower_peel`-scale but literal Britton) →
+      C2 → C4 → C5. See `docs/brick5-completeness-plan.md` §2.2bis/§2.2ter / §4 C3.
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).
