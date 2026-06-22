@@ -348,10 +348,25 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       family_II_relator(mβ+l)`, so `mβ+l∈alphas` makes the image a LITERAL h2_II relator = von-Dyck-b's
       homomorphism condition; via digit-scaling + b-block fixing `lemma_phi_l_fixes_w_b` + `φ_l(d)=b_l·d` +
       numbering snoc `lemma_w_b_snoc`) + the general reusable `lemma_apply_embedding_fixes`.
-      **NEXT** (ordered, §5 checklist): C-b GROUP lift (`=~=` ⟹ `≡_{h2_II}ε` + von Dyck via
-      `lemma_emb_respects_source_equiv`) → define
-      `pa_data` + its iso → **C-lift** (the deep Britton-peel, mirror `lemma_psi_A_injective`; the intersection
-      property `ψ(F)∩AssocSub(h2_II)=ψ(AssocSub(P_A))` is the real content) → C-asm → C3.2d → C2/C4/C5.
+      **C-ARC SETUP COMPLETE 2026-06-22 (session 2)** — the lifting lemma's inputs are all built; only the
+      Britton-peel itself (the bottleneck) + von-Dyck backwards remain. DONE this session (4 commits, all clean):
+      (1) **`free_family_perm.rs` 4/0** — `lemma_free_family_permute` (free families invariant under generator
+      reordering, via F3 + relabeling embeddings; Route-A "permute once" tool). (2) **`pa_data.rs` 2/0** —
+      `pa_data(n,m,gammas)=HNN(free(n+3),p|family II over F)` + validity. **CORRECTION: over `gammas=betas(alphas)
+      =[0]++alphas`, NOT `alphas`** (recog_data's assoc subgroups are over betas — A1 columns = config/basis_emb(betas),
+      the α=0 head = p_assoc; P_A must match for the pinch to descend index-for-index). The `hnn_associations_isomorphic(pa_data)`
+      iso is NOT needed (Britton runs over recog_data=TARGET, iso=A1 done). (3) **`phi_l_maps.rs` 4/0** —
+      `lemma_map_a_faithful`: `a_words_F=[t,x,d,b_j]` free in h1_base (= ψ_a faithful) via permute(B3). map_a (full) =
+      a_words_F.push([p]) = a_words. (4) **C-b group lift `phi_l_iso.rs` 10/0** — `lemma_phi_l_relator_equiv_empty`
+      (`φ_l(relator(β))≡_{h2_II}ε` when mβ+l∈alphas) + `lemma_family_II_relator_in_h2_II`. **NEXT** (§5 checklist):
+      **von-Dyck backwards** (easy half: `lemma_emb_respects_source_equiv`; KEY ATOM = `w_c`-relabel
+      `ae(a_words,w_c(3,…))=~=w_c(nk+n,…)`, a b-block-shift induction; map_b half = C-b group lift) → **C-lift forward**
+      (the BOTTLENECK = deep Britton-peel, mirror `lemma_psi_A_injective`+`lemma_psi_A_pinch_descends`; base case via
+      B4+ψ-faithful+`lemma_base_embeds_in_hnn`, step via `britton_lemma_full`+pinch-descent; **intersection property**
+      `ψ(F)∩AssocSub(h2_II)=ψ(AssocSub(P_A))` is the real content in the spanning case; GENERIC reusable helpers
+      `lemma_strip_prefix_preserves_pinch`/`_prepend_preserves_pinch`/`lemma_base_embeds_in_hnn` confirmed; **map_b
+      faithful = ψ_a faithful + φ_l-injective-on-FREE-F**, a real simplification since map_b=ψ_a∘φ_l and φ_l-injectivity
+      over free F avoids the K_M machine relators) → C-asm → C3.2d → C2/C4/C5.
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).

@@ -370,20 +370,60 @@ Proof = the Britton-peel induction on `w.len()` (mirror `lemma_psi_A_injective`)
   `φ_l(family_II_relator(β)) =~= family_II_relator(mβ+l)` (LHS half `lemma_phi_l_on_family_II_lhs` =
   C-a + φ_l fixes p; combine via `apply_embedding` over concat/inverse). So when `mβ+l ∈ alphas` the
   image is a LITERAL `h2_II` relator (`≡ ε`).
-- [ ] **C-b group lift** — turn the `=~=` word identity into `φ_l(family_II_relator_F(β)) ≡_{h2_II} ε` and
-  assemble von Dyck `b` via `lemma_emb_respects_source_equiv` over `pa_data` (needs `pa_data` defined first).
-  Note the index gap: the above is over `h2_II`-indexing (`family_II_relator`); the `pa_data` route needs the
-  abstract-`F`-indexed relator `family_II_relator_F` and `emb(b_words, ·)` — relate the two via the inclusion.
-  (von Dyck `a` = `lemma_family_II_relator_equiv_empty`, already proven.)
-- [ ] **C-P_A — define `pa_data` + validity + iso** (`hnn_associations_isomorphic(pa_data)`): the iso over free `F`
-  follows from A1 (iso over `h1_base`) + F-faithfulness (B3) by translating columns through the inclusion.
-- [ ] **C-lift — the unified HNN lifting lemma** (the Britton-peel; the deep multi-step core). Mirror
-  `lemma_psi_A_injective`; the intersection property is the crux.
+- [x] **C-b group lift — DONE** (`phi_l_iso.rs` 10/0, 2026-06-22): `lemma_phi_l_relator_equiv_empty`
+  (`φ_l(family_II_relator(β)) ≡_{h2_II} ε` when `mβ+l ∈ alphas`) + support `lemma_family_II_relator_in_h2_II`
+  (a relator in the finite augmentation is trivial in `h2_II = add_relators(h2_pres, family_II(alphas))`, via
+  `lemma_add_relators_relators` + `lemma_relator_is_identity`).  This is von-Dyck-b's homomorphism condition
+  in `h2_II`-indexing; the `pa_data`-routed assembly (below) consumes it.
+- [x] **C-P_A — define `pa_data` + validity — DONE** (`pa_data.rs` 2/0, 2026-06-22). `pa_data(n,m,gammas)
+  = HNN(free_group(n+3), p | family II over F)`, F-indexed `[t=0,x=1,d=2,b_j=2+j,p=n+3]`; associations
+  `(config(γ,0), config(γ,0)·w_c(3,n,m,γ)·[Gen2])`.  `lemma_pa_data_valid` + `lemma_pa_data_shape`.
+  **CORRECTION (this session): `gammas = betas(alphas) = [0]++alphas`, NOT `alphas`** — `recog_data`'s
+  associated subgroups are over `betas` (A1: columns = `config_emb(betas)`/`basis_emb(betas)`, the `α=0`
+  head = the `p_assoc` relation `p⁻¹tp=td`).  For the lifting lemma's pinch to descend index-for-index, `P_A`
+  must match `recog_data`, so it is over `betas`; the `β=0` case (`config(0,0)=t`, `w_0(b)=ε`) recovers the
+  `(t,td)` head.  **The iso `hnn_associations_isomorphic(pa_data)` is NOT needed** — Britton in the lifting
+  lemma runs over `recog_data` (TARGET, iso = A1 done), never over `pa_data`.
+- [x] **map_a faithful — DONE** (`phi_l_maps.rs` 4/0, 2026-06-22). `lemma_map_a_faithful`:
+  `a_words_F = [t,x,d,b_j]` (the F-part of `a_words`, the literal inclusion) is FREE in `h1_base`.
+  Route A: B3 (`lemma_f_free_in_h1`, `[t,x,b_j,d]`) + **`free_family_perm::lemma_free_family_permute`**
+  (`free_family_perm.rs` 4/0, NEW — free families invariant under generator reordering, via F3 +
+  relabeling embeddings) with `pa_sigma` moving `d` from last to index 2.  This is the `ψ_a` hypothesis of
+  the lifting lemma. **map_a (full) = `a_words_F.push([Gen(p_idx)])` = `a_words`** (the `p ↦ p` extension).
+- [ ] **von-Dyck backwards (the easy half of C-lift)** — `w ≡_{P_A} ε ⟹ emb(map,w) ≡_{h2_II} ε`, both maps,
+  via `lemma_emb_respects_source_equiv(hnn_presentation(pa_data), h2_II, map, w, ε)`.  The discharge needs the
+  **association-preservation**: `apply_embedding(map_a, hnn_relator(pa_data,j)) =~= hnn_relator(recog_data,j)`
+  (= `family_II_relator(betas[j])`), which is `≡_{h2_II} ε` since `hnn_presentation(recog_data)==h2_II`
+  (`lemma_recog_presentation`) makes it a literal `h2_II` relator (`lemma_relator_is_identity` — NO `β=0`
+  special case this way; the head is just `j=0`).  The KEY ATOM is the **`w_c`-relabel** lemma
+  `apply_embedding(a_words, w_c(3,n,m,γ)) =~= w_c(nk+n,n,m,γ)` (induction on `γ` over `w_c`'s recursion; the
+  digit sub-step `apply_embedding(a_words,[alphabet_letter(3,n,d)]) = [alphabet_letter(nk+n,n,d)]` is a b-block
+  shift `Gen(3+j)↦Gen(nk+n+j)`).  For map_b: `apply_embedding(b_words, hnn_relator(pa_data,j))` →
+  `φ_l(family_II_relator(betas[j]))` = the C-b group lift (`lemma_phi_l_relator_equiv_empty`), `≡_{h2_II} ε`
+  when `m·betas[j]+l ∈ alphas`.
+- [ ] **C-lift forward — the unified HNN lifting lemma** (the deep Britton-peel, the BOTTLENECK). Mirror
+  `lemma_psi_A_injective` (`machine_group.rs:6265`) + `lemma_psi_A_pinch_descends` (`:5893`):
+  `emb(map,w) ≡_{h2_II} ε ⟹ w ≡_{P_A} ε`, `decreases w.len()`.  Recognize `h2_II = hnn_presentation(recog_data)`
+  (B1), peel `p`-stable letters.  **Base case** (`stable_count(pa_data,w)==0`, w an F-word): `emb(ψ,w)≡_{h2_II}ε`
+  ⟹ (B4 `lemma_h1_faithful_in_h2_II`) `≡_{h1_base}ε` ⟹ (ψ faithful = map_a/map_b free) `w≡_{free(n+3)}ε` ⟹
+  (`lemma_base_embeds_in_hnn`) `w≡_{P_A}ε`.  **Step case**: `britton_lemma_full(recog_data, emb(map,w))` ⟹
+  has_pinch ⟹ **the pinch descends to a pinch in `w` over `pa_data`** (mirror `lemma_psi_A_pinch_descends`)
+  ⟹ pinch out, recurse.  **The intersection property is the real content**, living in the spanning case of
+  pinch-descent: the pinch middle `ψ(w-mid) ∈ AssocSub(h2_II)=⟨recog cols⟩` ⟹ (ψ-faithful + F-freeness +
+  column translation) `w-mid ∈ AssocSub(P_A)=⟨pa cols⟩`.  Reuse the GENERIC helpers
+  `lemma_strip_prefix_preserves_pinch`/`lemma_prepend_preserves_pinch` (check they're generic over HNNData
+  — the template instantiates them at `a_as_hnn`).  **map_b faithful = ψ_a faithful + φ_l-injective-on-free-F**
+  (a real simplification: `map_b = ψ_a ∘ φ_l`, `emb(b_words,w)=ψ_a(φ_l(w))≡_{h1}ε ⟹ (ψ_a faithful) φ_l(w)≡_F ε
+  ⟹ (φ_l inj on free F) w≡_F ε`; the φ_l-injectivity is a `lemma_psi_A_injective`-style peel over the FREE
+  group `F`, NOT over h1_base — much cleaner; the K_M machine relators never enter since `F` is free).
 - [ ] **C-asm — `lemma_phi_l_iso_at_h2II`**: instantiate C-lift at map_a, map_b; chain through `w ≡_{P_A} ε`.
+  Bookkeeping: relate `a_words`/`b_words` (= `phi_assoc` columns, the crux's literal lists) to
+  `a_words_F.push([p])` / `b_words_F.push([p])` (the map forms).
 - [ ] **C3.2d** — `decreases l` outer induction (mirror `lemma_b_m_upto_faithful`): build `hnn_associations_isomorphic(phi_l_data)`
   at each level from C-asm (bottom crux over `h2_II`) + IH-descent (`lemma_single_hnn_base_faithful` +
   `lemma_h2II_equiv_lifts_to_tower`) → C2/C4/C5.
 
-**Finite-slice side condition** (`alphas`): von-Dyck-b needs `mβ+l ∈ alphas` for each `β` that `w`'s relators
-touch (so the image relation is present in the finite augmentation). Bake this into the crux's `requires`
-(`alphas` closed enough under `β ↦ mβ+l`); C4 picks the concrete finite set.
+**Finite-slice side condition** (`alphas`): von-Dyck-b needs `m·γ+l ∈ alphas` for each `γ ∈ betas` that `w`'s
+relators touch (so the image relation is present in the finite augmentation).  NOTE the `γ=0` case gives
+**`l ∈ alphas`** (since `m·0+l = l`).  Bake `{l} ∪ {m·α+l : α∈alphas} ⊆ alphas` into the crux's `requires`;
+C4 picks the concrete finite set.
