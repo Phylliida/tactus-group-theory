@@ -21,7 +21,8 @@ lemma_phi_l_iso(mm, n, m, alphas, l):
             })
 ```
 
-Unfolding `hnn_associations_isomorphic` (`hnn.rs:74`): with `k = phi_assoc.len() = n + 3` and
+Unfolding `hnn_associations_isomorphic` (`hnn.rs:74`): with `k = phi_assoc.len() = n + 4` (3 head
+pairs `t,x,d` + `n` b-block pairs + 1 `p` tail; `phi_assoc` in `h3.rs:109`) and
 
 - `a_words` (stated gens) `= [t, x, d, b_1, …, b_n, p]`
 - `b_words` (images)      `= [t_l = config(l,0), xᵐ, b_l·d, b_1, …, b_n, p]`
@@ -92,7 +93,7 @@ through the a-tower by base-faithfulness (`lemma_single_hnn_base_faithful`, IH d
 
 ## 4. Brick decomposition (proposed)
 
-1. **C3.2a — structural setup.** Define `lemma_phi_l_iso`'s `a_words`/`b_words`, `k = n+3`, validity
+1. **C3.2a — structural setup.** Define `lemma_phi_l_iso`'s `a_words`/`b_words`, `k = n+4`, validity
    over `B.num_generators` (mirror `lemma_phi_assoc_valid`). Reduce the iso to the per-`w`
    biconditional. *(Small; good shakedown.)*
 2. **C3.2b — backward (von Dyck) over `h3_II`.** Images satisfy each `B`-relator. The h2/φ_{<l}
