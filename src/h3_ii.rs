@@ -522,4 +522,116 @@ pub proof fn lemma_phi_assoc_len(nk: nat, n: nat, m: nat, l: nat)
     assert(phi_bblock(nk, n).len() == n);
 }
 
+/// **The explicit a_words/b_words of `φ_l`, by position** — the structural backbone of the
+/// a-level iso (C3.2). `phi_assoc = head(3) + phi_bblock(n) + tail(1)`, so the `i`-th stated
+/// gen ↦ image pair is:
+///   `0 ↦ (t, t_l = config(l,0))`,  `1 ↦ (x, xᵐ)`,  `2 ↦ (d, b_l·d)`,
+///   `3+j ↦ (b_{j+1}, b_{j+1})` for `0 ≤ j < n`,  `n+3 ↦ (p, p)`.
+/// The crux (C3.2c) states the per-`w` biconditional against exactly these forms.
+pub proof fn lemma_phi_assoc_index(nk: nat, n: nat, m: nat, l: nat)
+    ensures
+        phi_assoc(nk, n, m, l).len() == n + 4,
+        phi_assoc(nk, n, m, l)[0] == (seq![Symbol::Gen(0)], config_word(l, 0)),
+        phi_assoc(nk, n, m, l)[1] == (seq![Symbol::Gen(1)], symbol_power(Symbol::Gen(1), m)),
+        phi_assoc(nk, n, m, l)[2]
+            == (seq![Symbol::Gen(d_idx(nk, n))],
+                seq![alphabet_letter(b_base(nk, n), n, l), Symbol::Gen(d_idx(nk, n))]),
+        forall|j: int| 0 <= j < n ==> #[trigger] phi_assoc(nk, n, m, l)[3 + j]
+            == (seq![Symbol::Gen(b_idx(nk, n, (j + 1) as nat))],
+                seq![Symbol::Gen(b_idx(nk, n, (j + 1) as nat))]),
+        phi_assoc(nk, n, m, l)[(n + 3) as int]
+            == (seq![Symbol::Gen(p_idx(nk, n))], seq![Symbol::Gen(p_idx(nk, n))]),
+{
+    let d = d_idx(nk, n);
+    let p = p_idx(nk, n);
+    let bb = b_base(nk, n);
+    let head: Seq<(Word, Word)> = seq![
+        (seq![Symbol::Gen(0)], config_word(l, 0)),
+        (seq![Symbol::Gen(1)], symbol_power(Symbol::Gen(1), m)),
+        (seq![Symbol::Gen(d)], seq![alphabet_letter(bb, n, l), Symbol::Gen(d)]),
+    ];
+    let bblk = phi_bblock(nk, n);
+    let tail: Seq<(Word, Word)> = seq![ (seq![Symbol::Gen(p)], seq![Symbol::Gen(p)]) ];
+    // phi_assoc is definitionally head + phi_bblock + tail.
+    assert(phi_assoc(nk, n, m, l) == (head + bblk) + tail);
+    assert(head.len() == 3);
+    assert(bblk.len() == n);
+    assert(tail.len() == 1);
+    lemma_phi_assoc_len(nk, n, m, l);
+
+    // head indices 0,1,2  (i < 3 ≤ 3 + n = (head+bblk).len())
+    assert(((head + bblk) + tail)[0] == (head + bblk)[0]);
+    assert((head + bblk)[0] == head[0]);
+    assert(((head + bblk) + tail)[1] == (head + bblk)[1]);
+    assert((head + bblk)[1] == head[1]);
+    assert(((head + bblk) + tail)[2] == (head + bblk)[2]);
+    assert((head + bblk)[2] == head[2]);
+
+    // b-block indices 3+j  (3 ≤ 3+j < 3+n)
+    assert forall|j: int| 0 <= j < n implies #[trigger] phi_assoc(nk, n, m, l)[3 + j]
+        == (seq![Symbol::Gen(b_idx(nk, n, (j + 1) as nat))],
+            seq![Symbol::Gen(b_idx(nk, n, (j + 1) as nat))]) by {
+        assert(((head + bblk) + tail)[3 + j] == (head + bblk)[3 + j]);
+        assert((head + bblk)[3 + j] == bblk[j]);
+        assert(bblk[j] == (seq![Symbol::Gen(b_idx(nk, n, (j + 1) as nat))],
+            seq![Symbol::Gen(b_idx(nk, n, (j + 1) as nat))]));
+    }
+
+    // tail index n+3  (= (head+bblk).len())
+    assert(((head + bblk) + tail)[(n + 3) as int] == tail[0]);
+}
+
+// ----------------------------------------------------------------------------
+// The a-level HNN data `phi_l_data` and its basic structural facts.
+// ----------------------------------------------------------------------------
+
+/// The HNN data for the a-level association `φ_l` over the family-(II)-augmented base
+/// `h3_II_upto(l-1)`. `hnn_associations_isomorphic(phi_l_data(..))` is the C3.2 goal
+/// (`lemma_phi_l_iso`); C3.2b/c/d discharge it.
+pub open spec fn phi_l_data(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, l: nat) -> HNNData {
+    HNNData {
+        base: h3_II_upto(mm, n, m, alphas, (l - 1) as nat),
+        associations: phi_assoc(g_m(mm).num_generators, n, m, l),
+    }
+}
+
+/// The base generator-count of `phi_l_data` is `h2_num_gens + (l-1)` (so `≥ nk + 2n + 2` for
+/// `l ≥ 1`), and there are `k = n + 4` associations.
+pub proof fn lemma_phi_l_data_base(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, l: nat)
+    requires
+        1 <= l <= 2 * n,
+    ensures
+        phi_l_data(mm, n, m, alphas, l).base.num_generators
+            == h2_num_gens((4 + mm.quads.len()) as nat, n) + (l - 1),
+        phi_l_data(mm, n, m, alphas, l).associations.len() == n + 4,
+{
+    lemma_h3_II_upto_num_generators(mm, n, m, alphas, (l - 1) as nat);
+    lemma_phi_assoc_len(g_m(mm).num_generators, n, m, l);
+}
+
+/// **`phi_l_data` is a valid HNN datum** — base valid (`lemma_h3_II_upto_valid`) and every
+/// association word valid over `base.num_generators` (`lemma_phi_assoc_valid`, since
+/// `base.num_generators = nk + 2n + 2 + (l-1) ≥ nk + 2n + 2`). This is what C3.2b (von Dyck)
+/// and the eventual Britton instantiation consume.
+pub proof fn lemma_phi_l_data_valid(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, l: nat)
+    requires
+        1 <= l <= 2 * n,
+        2 * n < m,
+        forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]),
+    ensures
+        hnn_data_valid(phi_l_data(mm, n, m, alphas, l)),
+{
+    let nk = g_m(mm).num_generators;
+    let data = phi_l_data(mm, n, m, alphas, l);
+    let base = data.base;
+    lemma_g_m_num_generators(mm);                                   // nk = 4 + |quads|
+    // base valid + num_gens
+    lemma_h3_II_upto_valid(mm, n, m, alphas, (l - 1) as nat);
+    lemma_h3_II_upto_num_generators(mm, n, m, alphas, (l - 1) as nat);
+    assert(base.num_generators == h2_num_gens(nk, n) + (l - 1));    // = nk + 2n + 2 + (l-1)
+    // associations valid over base.num_generators (≥ nk + 2n + 2)
+    lemma_phi_assoc_valid(nk, n, m, l, base.num_generators);
+    lemma_hnn_data_valid_from(data, base.num_generators);
+}
+
 } // verus!

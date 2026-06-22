@@ -93,9 +93,16 @@ through the a-tower by base-faithfulness (`lemma_single_hnn_base_faithful`, IH d
 
 ## 4. Brick decomposition (proposed)
 
-1. **C3.2a — structural setup.** Define `lemma_phi_l_iso`'s `a_words`/`b_words`, `k = n+4`, validity
-   over `B.num_generators` (mirror `lemma_phi_assoc_valid`). Reduce the iso to the per-`w`
-   biconditional. *(Small; good shakedown.)*
+1. **C3.2a — structural setup. DONE** (`h3_ii.rs` 18/0, 2026-06-22). The a_words/b_words backbone:
+   - `lemma_phi_assoc_index` — the **explicit position characterization** of `phi_assoc(nk,n,m,l)`:
+     `0↦(t,t_l=config(l,0))`, `1↦(x,xᵐ)`, `2↦(d,b_l·d)`, `3+j↦(b_{j+1},b_{j+1})` (`0≤j<n`),
+     `n+3↦(p,p)`. This is what the crux (C3.2c) states the per-`w` biconditional against.
+   - `phi_l_data(mm,n,m,alphas,l)` — the HNN datum `{base: h3_II_upto(l-1), associations: phi_assoc}`;
+     `lemma_phi_l_data_base` (`base.num_generators = h2_num_gens + (l-1) ≥ nk+2n+2`, `k=n+4`).
+   - `lemma_phi_l_data_valid` — `hnn_data_valid(phi_l_data(..))` (base valid + assocs valid over
+     `base.num_generators`); the von Dyck (C3.2b) / Britton-instantiation prerequisite.
+   The "reduce to the per-`w` biconditional" is `hnn_associations_isomorphic`'s definition itself
+   (`a_words[i]==phi_assoc[i].0` via `Seq::new`); C3.2c+d discharge the forall.
 2. **C3.2b — backward (von Dyck) over `h3_II`.** Images satisfy each `B`-relator. The h2/φ_{<l}
    relators: routine. The p-relator + a_i-relators: consume **family (II)** (`lemma_II` is already a
    relator of `B` via the splice — this is the payoff of C3.1). 
@@ -114,6 +121,7 @@ C3.2 a-isos + C2; transport back to `h3_pres` via `lemma_h3_II_group_preserving`
 
 C3.2 is comparable to a `tower_peel`/`prop_v` sub-arc (multi-session). The C3.1 foundation
 (`lemma_same_group_iff`, `h3_II`, group-preservation) is in place and verified, so C3.2 can be built
-and transported cleanly. No verifier bypasses (standing rule). Start with C3.2a (structural,
-de-risks the setup), then C3.2b (where C3.1's family-(II) splice first pays off), saving the C3.2c
-residue crux for a focused push.
+and transported cleanly. No verifier bypasses (standing rule). **C3.2a is DONE** (structural backbone
+verified first-try, de-risked the setup). **NEXT = C3.2b** (von Dyck over `h3_II`, where C3.1's
+family-(II) splice first pays off — the images satisfy each `B`-relator), saving the C3.2c residue
+crux for a focused push.
