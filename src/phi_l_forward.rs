@@ -19,12 +19,263 @@ use crate::presentation::{Presentation, equiv_in_presentation, presentation_vali
     lemma_equiv_transitive, lemma_equiv_symmetric};
 use crate::presentation_lemmas::{lemma_equiv_concat_left, lemma_equiv_concat_right,
     lemma_word_inverse_right, lemma_word_inverse_left};
-use crate::benign::{apply_embedding, concat_all, lemma_apply_embedding_concat,
-    lemma_apply_embedding_inverse, lemma_apply_embedding_valid};
+use crate::benign::{apply_embedding, apply_embedding_symbol, concat_all,
+    lemma_apply_embedding_concat, lemma_apply_embedding_inverse, lemma_apply_embedding_valid};
 use crate::higman_operations::{free_group, lemma_free_group_valid};
 use crate::f_free::is_free_family;
+use crate::machine_group::{ModMachine, g_m, lemma_g_m_num_generators};
+use crate::layout::{p_idx, d_idx, b_idx};
+use crate::h3::phi_assoc;
+use crate::h3_ii::lemma_phi_assoc_index;
+use crate::phi_l_maps::{a_words, lemma_a_words_is_phi_col0};
 
 verus! {
+
+// ----------------------------------------------------------------------------
+// F2 — the length-preserving relabel (single-generator images).
+// ----------------------------------------------------------------------------
+
+/// The relabel target of symbol `s` under a single-generator image list `imgs` (each `imgs[i] =
+/// [Gen(gᵢ)]`): `Gen(i) ↦ imgs[i][0] = Gen(gᵢ)`, `Inv(i) ↦ inverse_symbol(imgs[i][0]) = Inv(gᵢ)`.
+pub open spec fn relabel_symbol(imgs: Seq<Word>, s: Symbol) -> Symbol {
+    match s {
+        Symbol::Gen(i) => imgs[i as int][0],
+        Symbol::Inv(i) => inverse_symbol(imgs[i as int][0]),
+    }
+}
+
+/// **Single-gen images ⟹ length-preserving relabel**: if every `imgs[i] = [Gen(gᵢ)]`, then for a
+/// valid `w`, `apply_embedding(imgs, w)` has the SAME length as `w` and is the per-symbol relabel
+/// `apply_embedding(imgs, w)[k] = relabel_symbol(imgs, w[k])`.  This is why `map_a` (whose images
+/// are all single generators) gives a same-index pinch descent — no run/spanning analysis.
+pub proof fn lemma_single_gen_relabel(imgs: Seq<Word>, w: Word)
+    requires
+        word_valid(w, imgs.len()),
+        forall|i: int| 0 <= i < imgs.len() ==>
+            exists|g: nat| #[trigger] imgs[i] == seq![Symbol::Gen(g)],
+    ensures
+        apply_embedding(imgs, w).len() == w.len(),
+        forall|k: int| 0 <= k < w.len() ==>
+            #[trigger] apply_embedding(imgs, w)[k] == relabel_symbol(imgs, w[k]),
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        assert(apply_embedding(imgs, w) =~= empty_word());
+    } else {
+        let s = w.first();
+        let rest = w.drop_first();
+        assert(w =~= seq![s] + rest);
+        assert(word_valid(rest, imgs.len())) by {
+            assert forall|k: int| 0 <= k < rest.len()
+                implies symbol_valid(#[trigger] rest[k], imgs.len()) by { assert(rest[k] == w[k + 1]); }
+        }
+        lemma_single_gen_relabel(imgs, rest);
+        reveal_with_fuel(apply_embedding, 2);
+        let es = apply_embedding_symbol(imgs, s);
+        assert(symbol_valid(s, imgs.len()));
+        let g = generator_index(s);
+        assert(0 <= g < imgs.len());
+        let gg = choose|gg: nat| imgs[g as int] == seq![Symbol::Gen(gg)];
+        assert(imgs[g as int] == seq![Symbol::Gen(gg)]);
+        // es is the single relabeled symbol.
+        assert(es =~= seq![relabel_symbol(imgs, s)]) by {
+            match s {
+                Symbol::Gen(i) => {
+                    assert(i == g);
+                    assert(es == imgs[i as int]);
+                    assert(relabel_symbol(imgs, s) == imgs[i as int][0]);
+                },
+                Symbol::Inv(i) => {
+                    assert(i == g);
+                    assert(es =~= inverse_word(imgs[i as int]));
+                    reveal_with_fuel(inverse_word, 2);
+                    assert(imgs[i as int][0] == Symbol::Gen(gg));
+                    assert(relabel_symbol(imgs, s) == inverse_symbol(Symbol::Gen(gg)));
+                },
+            }
+        }
+        assert(es.len() == 1);
+        assert(apply_embedding(imgs, w) =~= es + apply_embedding(imgs, rest));
+        // length and per-symbol.
+        assert(apply_embedding(imgs, w).len() == w.len());
+        assert forall|k: int| 0 <= k < w.len()
+            implies #[trigger] apply_embedding(imgs, w)[k] == relabel_symbol(imgs, w[k]) by {
+            if k == 0 {
+                assert(apply_embedding(imgs, w)[0] == es[0]);
+                assert(w[0] == s);
+            } else {
+                assert(apply_embedding(imgs, w)[k] == apply_embedding(imgs, rest)[k - 1]);
+                assert(rest[k - 1] == w[k]);
+            }
+        }
+    }
+}
+
+/// **Subrange commutes with single-gen relabel**: for single-gen `imgs`,
+/// `apply_embedding(imgs, w).subrange(a,b) =~= apply_embedding(imgs, w.subrange(a,b))`.  The
+/// pinch-descent uses it to identify the image pinch's middle with the relabel of `w`'s middle.
+pub proof fn lemma_single_gen_relabel_subrange(imgs: Seq<Word>, w: Word, a: int, b: int)
+    requires
+        word_valid(w, imgs.len()),
+        forall|i: int| 0 <= i < imgs.len() ==>
+            exists|g: nat| #[trigger] imgs[i] == seq![Symbol::Gen(g)],
+        0 <= a <= b <= w.len(),
+    ensures
+        apply_embedding(imgs, w).subrange(a, b) =~= apply_embedding(imgs, w.subrange(a, b)),
+{
+    let pw = apply_embedding(imgs, w);
+    let sub = w.subrange(a, b);
+    lemma_single_gen_relabel(imgs, w);
+    assert(word_valid(sub, imgs.len())) by {
+        assert forall|k: int| 0 <= k < sub.len() implies symbol_valid(#[trigger] sub[k], imgs.len())
+        by { assert(sub[k] == w[a + k]); }
+    }
+    lemma_single_gen_relabel(imgs, sub);
+    let lhs = pw.subrange(a, b);
+    let rhs = apply_embedding(imgs, sub);
+    assert(lhs.len() == b - a);
+    assert(rhs.len() == b - a);
+    assert forall|k: int| 0 <= k < b - a implies lhs[k] == rhs[k] by {
+        assert(lhs[k] == pw[a + k]);
+        assert(pw[a + k] == relabel_symbol(imgs, w[a + k]));
+        assert(sub[k] == w[a + k]);
+        assert(rhs[k] == relabel_symbol(imgs, sub[k]));
+    }
+}
+
+// ----------------------------------------------------------------------------
+// a_words-specific relabel facts (single-gen images, stable-letter correspondence).
+// ----------------------------------------------------------------------------
+
+/// Single-generator words are equal iff their indices are: `[Gen(a)] == [Gen(b)] ⟺ a == b`.
+proof fn lemma_gen_word_inj(a: nat, b: nat)
+    ensures
+        (seq![Symbol::Gen(a)] == seq![Symbol::Gen(b)]) <==> (a == b),
+{
+    if seq![Symbol::Gen(a)] == seq![Symbol::Gen(b)] {
+        assert(seq![Symbol::Gen(a)][0] == seq![Symbol::Gen(b)][0]);
+    }
+}
+
+/// `a_words[i]` is a single generator `[Gen(gᵢ)]`, and `gᵢ == p_idx` (the recog/h2_II stable
+/// letter) IFF `i == n+3` (the `P_A` stable letter index).  Via the `phi_assoc` `.0` column:
+/// `gᵢ ∈ {0, 1, d_idx} ∪ [b_base, b_base+n)` for `i ≤ n+2`, all `< p_idx`.
+pub proof fn lemma_a_words_entry(mm: ModMachine, n: nat, i: int)
+    requires
+        0 <= i < n + 4,
+    ensures
+        exists|g: nat| a_words(mm, n)[i] == seq![Symbol::Gen(g)],
+        a_words(mm, n)[i] == seq![Symbol::Gen(p_idx(g_m(mm).num_generators, n))] <==> i == n + 3,
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);                          // nk = 4 + |quads| ≥ 4
+    lemma_a_words_is_phi_col0(mm, n, 1, 1);
+    let col0 = Seq::new((n + 4) as nat, |k: int| phi_assoc(nk, n, 1, 1)[k].0);
+    assert(a_words(mm, n) == col0);
+    lemma_phi_assoc_index(nk, n, 1, 1);
+    assert(a_words(mm, n)[i] == phi_assoc(nk, n, 1, 1)[i].0);
+    let p = p_idx(nk, n);                                  // nk + 2n + 1 ≥ 5
+    assert(nk >= 4);
+    assert(p == nk + 2 * n + 1);
+    // gᵢ — the generator index of a_words[i].
+    let gi: nat =
+        if i == 0 { 0 }
+        else if i == 1 { 1 }
+        else if i == 2 { d_idx(nk, n) }
+        else if i < n + 3 { b_idx(nk, n, (i - 2) as nat) }
+        else { p };
+    if i == 0 {
+        assert(a_words(mm, n)[i] == seq![Symbol::Gen(gi)]);
+        assert(gi != p);
+    } else if i == 1 {
+        assert(a_words(mm, n)[i] == seq![Symbol::Gen(gi)]);
+        assert(gi != p);
+    } else if i == 2 {
+        assert(a_words(mm, n)[i] == seq![Symbol::Gen(gi)]);
+        assert(gi == d_idx(nk, n) && d_idx(nk, n) == nk + 2 * n);
+        assert(gi != p);                                   // nk+2n != nk+2n+1
+    } else if i < n + 3 {
+        let j = i - 3;
+        assert(0 <= j < n);
+        assert(i == 3 + j);
+        assert(phi_assoc(nk, n, 1, 1)[3 + j]
+            == (seq![Symbol::Gen(b_idx(nk, n, (j + 1) as nat))],
+                seq![Symbol::Gen(b_idx(nk, n, (j + 1) as nat))]));
+        assert((i - 2) as nat == (j + 1) as nat);
+        assert(a_words(mm, n)[i] == seq![Symbol::Gen(gi)]);
+        assert(gi == b_idx(nk, n, (j + 1) as nat) && b_idx(nk, n, (j + 1) as nat) == nk + n + j);
+        assert(gi != p);                                   // nk+n+j ≤ nk+2n-1 < nk+2n+1
+    } else {
+        assert(i == n + 3);
+        assert(a_words(mm, n)[i] == seq![Symbol::Gen(gi)]);
+        assert(gi == p);
+    }
+    assert(gi == p <==> i == n + 3);
+    lemma_gen_word_inj(gi, p);                              // [Gen(gi)]==[Gen(p)] ⟺ gi==p
+}
+
+/// `a_words` has length `n+4` and all single-generator images — the precondition of
+/// `lemma_single_gen_relabel`/`_subrange` at `imgs = a_words`.
+pub proof fn lemma_a_words_single_gen(mm: ModMachine, n: nat)
+    ensures
+        a_words(mm, n).len() == n + 4,
+        forall|i: int| 0 <= i < a_words(mm, n).len() ==>
+            exists|g: nat| #[trigger] a_words(mm, n)[i] == seq![Symbol::Gen(g)],
+{
+    lemma_g_m_num_generators(mm);
+    lemma_a_words_is_phi_col0(mm, n, 1, 1);
+    assert(a_words(mm, n).len() == n + 4);
+    assert forall|i: int| 0 <= i < a_words(mm, n).len()
+        implies exists|g: nat| #[trigger] a_words(mm, n)[i] == seq![Symbol::Gen(g)] by {
+        lemma_a_words_entry(mm, n, i);
+    }
+}
+
+/// **The relabel preserves the stable letter exactly**: under `ρ = relabel_symbol(a_words, ·)`, a
+/// symbol relabels to the recog stable letter `Gen(p_idx)` / `Inv(p_idx)` IFF it IS the `P_A`
+/// stable letter `Gen(n+3)` / `Inv(n+3)`.  (Gen/Inv orientation preserved; F-gens ↦ non-stable.)
+/// This transfers `has_adjacent_opposite_at` between `recog_data` and `pa_data` at the same indices.
+pub proof fn lemma_a_words_relabel_sym(mm: ModMachine, n: nat, s: Symbol)
+    requires
+        symbol_valid(s, (n + 4) as nat),
+    ensures
+        (relabel_symbol(a_words(mm, n), s) == Symbol::Gen(p_idx(g_m(mm).num_generators, n))
+            <==> s == Symbol::Gen((n + 3) as nat)),
+        (relabel_symbol(a_words(mm, n), s) == Symbol::Inv(p_idx(g_m(mm).num_generators, n))
+            <==> s == Symbol::Inv((n + 3) as nat)),
+{
+    let nk = g_m(mm).num_generators;
+    let p = p_idx(nk, n);
+    let i = generator_index(s);
+    assert(0 <= i < n + 4);
+    lemma_a_words_entry(mm, n, i as int);
+    let g = choose|g: nat| a_words(mm, n)[i as int] == seq![Symbol::Gen(g)];
+    assert(a_words(mm, n)[i as int] == seq![Symbol::Gen(g)]);
+    assert(a_words(mm, n)[i as int][0] == Symbol::Gen(g));
+    // g == p  ⟺  i == n+3.
+    assert(g == p <==> i == n + 3) by {
+        if g == p {
+            assert(a_words(mm, n)[i as int] == seq![Symbol::Gen(p)]);
+        }
+        if i == n + 3 {
+            assert(a_words(mm, n)[i as int] == seq![Symbol::Gen(p)]);
+            assert(seq![Symbol::Gen(g)] == seq![Symbol::Gen(p)]);
+        }
+    }
+    match s {
+        Symbol::Gen(ii) => {
+            assert(ii == i);
+            assert(relabel_symbol(a_words(mm, n), s) == a_words(mm, n)[i as int][0]);
+            assert(relabel_symbol(a_words(mm, n), s) == Symbol::Gen(g));
+        },
+        Symbol::Inv(ii) => {
+            assert(ii == i);
+            assert(relabel_symbol(a_words(mm, n), s) == inverse_symbol(a_words(mm, n)[i as int][0]));
+            assert(inverse_symbol(Symbol::Gen(g)) == Symbol::Inv(g));
+            assert(relabel_symbol(a_words(mm, n), s) == Symbol::Inv(g));
+        },
+    }
+}
 
 /// **`apply_embedding` distributes over `concat_all`**: `apply_embedding(imgs, concat_all(fs)) =~=
 /// concat_all(fs.map(apply_embedding(imgs, ·)))`.  (Induction on `fs`, mirror
