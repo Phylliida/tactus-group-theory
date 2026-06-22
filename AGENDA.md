@@ -285,8 +285,13 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       the stable gen maps to ONE stable letter (spanning fires on the stable peel), non-stable gens map to
       arbitrary stable-free runs (peeling strips a variable-length prefix). Support: `lemma_extend_stable_count_eq`
       (inner count of W = outer count of w, factor 1), `lemma_free_stable_{data_valid,data_isomorphic,of_free_group}`,
-      `lemma_word_valid_no_inner_stable`, `lemma_trivial_in_empty_subgroup`. **REMAINING = B2 iterate (seed
-      F1a, add b_j then d ⟹ `[t,x,b_j,d]` free in `K_M ∗ F(b) ∗ ⟨d⟩`) → B3 kill_c→h1_base → B4 lift via A1.**
+      `lemma_word_valid_no_inner_stable`, `lemma_trivial_in_empty_subgroup`. **PACKAGED** as `is_free_family`
+      + `lemma_free_family_extends` (`is_free_family(gp,gens) ⟹ is_free_family(gp ∗ ⟨s⟩, gens.push([s]))`), the
+      iterable B2 interface. **B2 SEED done** (`lemma_tx_is_free_family`: `[t,x]` free in `K_M` in `is_free_family`
+      form, via F1a + `pres_tx==free_group(2)`). **REMAINING = B2 tower induction (iterate
+      `lemma_free_family_extends` over the b_j then d ⟹ `[t,x,b_j,d]` free in `K_M ∗ F(b) ∗ ⟨d⟩`, an iterated
+      empty-assoc HNN tower) → B3 kill_c→h1_base → B4 lift via A1.** B2's tower induction + h1_base connection is
+      a fresh arc (best not started at a session tail).
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).
