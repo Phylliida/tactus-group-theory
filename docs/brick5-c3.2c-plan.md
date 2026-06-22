@@ -230,11 +230,19 @@ empty-assoc HNN over `gp`) + `free_stable_family(gp,gens,j)` (gens + the j adjoi
 (tower = gp + j gens, SAME relators), `lemma_free_stable_family_closed` / `lemma_txbd_family_layout` (`t,x`@`0,1`,
 `b_j`@`nk..nk+n-1`, `d`@`nk+n`), `lemma_free_stable_tower_is_free_product` — pin the layout the B3 bridge consumes.
 
-**B3 — connect to `h1_base`:** `h1_base` carries the `c_j` + comm relators (`b_i c_j = c_j b_i`). Kill the `c`'s
-with a homomorphism `kill_c: h1_base → (K_M ∗ F(b) ∗ ⟨d⟩)` (valid: comm relator `b_i c_j b_i⁻¹ c_j⁻¹ ↦
-b_i b_i⁻¹ ≡ ε`; K_M relators fixed), then the pullback engine (`free_basis.rs:lemma_pullback_free`) reduces
-`F` free in `h1_base` to `F` free in `K_M ∗ F(b) ∗ ⟨d⟩` = B2. (Requires reindexing `b,d` down past the dropped
-`c`'s — fiddly but mechanical; or fold the `c`'s in as additional B1 free-stable-letters that `F` avoids.)
+**B3 — connect to `h1_base` — DONE (2026-06-22, `f_free_h1.rs` 11/0, NEW module).** `h1_base` carries the
+`c_j` + comm relators (`b_i c_j = c_j b_i`). The homomorphism `kill_c : h1_base → free_stable_tower(g_m,n+1)`
+(= `K_M ∗ F(b) ∗ ⟨d⟩`) kills the `c`-block (↦ε), fixes K_M, and shifts `b,d` DOWN by `n` past the dropped
+`c`-block. Valid (`lemma_kill_c_hom_valid`): K_M relators fixed (`lemma_kill_c_fixes_low`) and trivial in the
+target (= g_m relators, `lemma_relator_is_identity`); each commutator `b_i c_j b_i⁻¹ c_j⁻¹ ↦ b_i' b_i'⁻¹ ≡ ε`
+(`lemma_kill_c_on_comm_relator`: c's vanish, leaving a cancelling pair — the index recovery isolated in
+`lemma_kill_c_on_comm_idx` for a clean nonlinear-`n*n` context). Then the pullback engine
+(`free_basis::lemma_pullback_free`): `comp_images(kill_c, f_h1_family) ==` B2's tower family
+(`lemma_comp_is_b2_family`, each appended `Gen(nk+n+i) ↦ Gen(nk+i) = free_stable_letter(nk,i)`), so B2's
+freeness (`lemma_txbd_free_in_tower`) descends any source relation to free-triviality. Headline =
+`lemma_f_free_in_h1` (`is_free_family(h1_base(mm,n), f_h1_family(mm,n))`), where `f_h1_family = [t,x]` + the
+literal h1 b/d block `Gen(nk+n+i)`, `i=0..n`. The reindex was clean (no fold-c-as-stable-letters fallback
+needed). **NEXT = B4 (lift `h1_base ↪ h2_II` = A1, §4.2).**
 
 **B4 — lift to `h2_II`:** `F` free in `h1_base` + `h1_base ↪ h2_II` faithful (= A1, the recog_data HNN validity)
 ⟹ `F` free in `h2_II`. So F1-at-h2_II depends on A1; but von Dyck only needs the subgroup-`A` presentation,

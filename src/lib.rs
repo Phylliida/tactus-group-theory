@@ -184,6 +184,13 @@ pub mod f_free;
 #[cfg(verus_keep_ghost)]
 pub mod f_free_tower;
 
+// f_free_h1: Layer 2 / Brick 5, C3.2c / F1, B3 — lift the B2 free family to h1_base. The
+// homomorphism kill_c: h1_base → K_M ∗ F(b) ∗ ⟨d⟩ (kill c's, fix K_M, shift b/d down by n) is valid
+// (commutators map to cancelling pairs), so the free_basis pullback engine reduces "F free in
+// h1_base" to B2. Next: B4 (lift via A1, the prop_v-scale residue/p-conjugation iso).
+#[cfg(verus_keep_ghost)]
+pub mod f_free_h1;
+
 // higman_completeness: Layer 2 / Brick 5 COMPLETENESS — the `C ↪ H₃` faithful direction.
 // Owns the `in_C` predicate (C1: `w ∈ ncl(S)` over the k-HNN base h3_upto(2n)) + its three
 // subgroup-closure props, and (in progress) the Fork-B virtual-iso k-descent (C4) + assembly
