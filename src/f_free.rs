@@ -984,4 +984,79 @@ pub proof fn lemma_free_family_extends(gp: Presentation, gens: Seq<Word>)
     }
 }
 
+// ----------------------------------------------------------------------------
+// B2 seed: `[t, x]` is a free family in `K_M` (F1a in `is_free_family` form).
+// ----------------------------------------------------------------------------
+
+/// `pres_tx` (the free group on `t, x`) is literally `free_group(2)`.
+pub proof fn lemma_pres_tx_is_free_group_2()
+    ensures
+        pres_tx() == free_group(2),
+{
+    assert(pres_tx().num_generators == free_group(2).num_generators);
+    assert(pres_tx().relators =~= free_group(2).relators);
+}
+
+/// Applying the identity images `[[t], [x]]` to a word over `{t, x}` returns the word unchanged.
+pub proof fn lemma_apply_embedding_identity2(w: Word)
+    requires
+        word_valid(w, 2),
+    ensures
+        apply_embedding(seq![seq![Symbol::Gen(0)], seq![Symbol::Gen(1)]], w) =~= w,
+    decreases w.len(),
+{
+    let imgs = seq![seq![Symbol::Gen(0)], seq![Symbol::Gen(1)]];
+    if w.len() == 0 {
+        assert(apply_embedding(imgs, w) =~= Seq::<Symbol>::empty());
+    } else {
+        let s = w.first();
+        let rest = w.drop_first();
+        assert(w =~= seq![s] + rest);
+        assert(symbol_valid(s, 2)) by { assert(w[0] == s); }
+        assert(word_valid(rest, 2)) by {
+            assert forall|k: int| 0 <= k < rest.len() implies symbol_valid(#[trigger] rest[k], 2)
+            by { assert(rest[k] == w[k + 1]); }
+        }
+        assert(apply_embedding_symbol(imgs, s) =~= seq![s]) by {
+            match s {
+                Symbol::Gen(i) => { assert(i < 2); },
+                Symbol::Inv(i) => { assert(i < 2); reveal_with_fuel(inverse_word, 2); },
+            }
+        }
+        lemma_apply_embedding_identity2(rest);
+        assert(apply_embedding(imgs, w)
+            =~= concat(apply_embedding_symbol(imgs, s), apply_embedding(imgs, rest)));
+    }
+}
+
+/// **B2 seed.** `[t = Gen(0), x = Gen(1)]` is a free family in `K_M = g_m(mm)` — F1a (`lemma_tx_free_in_g_m`)
+/// repackaged in `is_free_family` form, ready to feed `lemma_free_family_extends`.
+pub proof fn lemma_tx_is_free_family(mm: ModMachine)
+    requires
+        mod_machine_wf(mm),
+    ensures
+        is_free_family(g_m(mm), seq![seq![Symbol::Gen(0)], seq![Symbol::Gen(1)]]),
+{
+    let gens = seq![seq![Symbol::Gen(0)], seq![Symbol::Gen(1)]];
+    lemma_g_m_num_generators(mm);
+    assert(g_m(mm).num_generators >= 2);
+    // (1) the two images are valid over g_m's generator count.
+    assert forall|i: int| 0 <= i < gens.len()
+        implies word_valid(#[trigger] gens[i], g_m(mm).num_generators)
+    by {
+        if i == 0 { assert(gens[0] =~= seq![Symbol::Gen(0)]); }
+        else { assert(i == 1); assert(gens[1] =~= seq![Symbol::Gen(1)]); }
+    }
+    // (2) the free-family implication: F1a after identity-embedding + pres_tx = free_group(2).
+    lemma_pres_tx_is_free_group_2();
+    assert forall|w: Word| (#[trigger] word_valid(w, gens.len())
+        && equiv_in_presentation(g_m(mm), apply_embedding(gens, w), empty_word()))
+        implies equiv_in_presentation(free_group(gens.len()), w, empty_word())
+    by {
+        assert(gens.len() == 2);
+        lemma_apply_embedding_identity2(w);
+        lemma_tx_free_in_g_m(mm, w);
+    }
+}
+
 } // verus!
