@@ -321,3 +321,60 @@ to analyze `emb(a_words,w) ≡_{h2_II} ε` and descend; C-backward: von Dyck ove
 family-(II) payoff, using `F` free in `h1_base` = B3 to make `A=HNN(F,p|family II)` the genuine subgroup
 presentation); C3: biconditional `lemma_phi_l_iso_at_h2II`. Then C3.2d (`decreases l` faithfulness induction,
 mirror `lemma_b_m_upto_faithful`) → C2(p-level)/C4(Fork-B k-engine)/C5.
+
+## 5. The C-arc — `lemma_phi_l_iso_at_h2II` via a UNIFIED HNN lifting lemma (design locked 2026-06-22, w/ Danielle)
+
+The crux is the biconditional, over `h2_II`, for every `w` valid over `n+4`:
+```
+emb(a_words, w) ≡ ε   ⟺   emb(b_words, w) ≡ ε
+```
+with `a_words = [t,x,d,b_j,p]` (literal generators), `b_words = φ_l(a_words) = [t_l, xᵐ, b_l·d, b_j, p]`,
+and (B1.5) `emb(b_words,w) = φ_l(emb(a_words,w))`.
+
+**Decision (Danielle's review): Option A — abstract presentation + ONE unified lifting lemma**, NOT two
+separate inline Britton inductions. Build the abstract `P_A = HNN(F = free_group(n+3), p | family II over F)`
+(generators `t=0, x=1, d=2, b_j=2+j, p=n+3`; the family-II associations are F-words since `config(β,0)=x⁻ᵝtxᵝ`
+uses `t,x` and `w_β(b)·d` uses `b_j,d`). Then both directions chain through `w ≡_{P_A} ε`:
+```
+emb(a_words,w) ≡_{h2_II} ε  ⟺ (map_a faithful) w ≡_{P_A} ε  ⟺ (map_b faithful) emb(b_words,w) ≡_{h2_II} ε
+```
+So the crux = **two faithful embeddings of `P_A` into `h2_II`** (`map_a` = inclusion, `map_b` = φ_l), each a
+biconditional `emb(map, w) ≡_{h2_II} ε ⟺ w ≡_{P_A} ε`.
+
+### The unified lifting lemma (the deep core, the "tower_peel-sized" Britton-peel)
+Prove ONCE (parametric over the base-map ψ: F → h1_base):
+> If ψ: F → h1_base is a faithful embedding, ψ preserves the family-II associations (sends `P_A`'s
+> association subgroups into `h2_II`'s, matching the recog_data columns), and the **intersection
+> property** ψ(F) ∩ AssocSub(h2_II) = ψ(AssocSub(P_A)) holds, THEN the induced map
+> `P_A = HNN(F,p|·) → h2_II = HNN(h1_base,p|·)` is a faithful embedding.
+
+Proof = the Britton-peel induction on `w.len()` (mirror `lemma_psi_A_injective`): peel `p`-stable letters of
+`emb(map,w)`; a pinch `p⁻¹·ψ(mid)·p` forces `ψ(mid) ∈ AssocSub(h2_II)`, so by the intersection property
+`mid ∈ AssocSub(P_A)` ⟹ `w` had a pinch; pinch out, recurse. The base case (no `p`) = `single_hnn_base_faithful`
++ F-freeness (B3). **The intersection property is the real content** and is where the iso A1 + F-freeness enter.
+
+### Instantiation
+- **map_a** (ψ_a = inclusion `F ↪ h1_base`): faithful = B3 (`lemma_f_free_in_h1`/`lemma_f_free_in_h2_II`);
+  preserves associations trivially (the F-words ARE recog_data's columns).
+- **map_b** (ψ_b = φ_l restricted to F: `t↦t_l, x↦xᵐ, d↦b_l·d, b_j↦b_j`): faithful = φ_l injective on F (the
+  digit-scaling endo, `lemma_psi_A_injective`-style); preserves associations via the **digit-scaling +
+  numbering identities** (this brick).
+
+### Concrete bricks (ordered)
+- [x] **C-a (this module, `phi_l_iso.rs`)** — `lemma_phi_l_on_config_zero`: `φ_l(config(β,0)) =~= config(mβ+l,0)`
+  (the digit-scaling word identity; von-Dyck-b's algebraic core). `lemma_config_zero_form` support.
+- [ ] **C-b — von Dyck `b` at the relator level**: `φ_l(family_II_relator_F(β)) ≡_{h2_II} ε` for `mβ+l ∈ alphas`,
+  via C-a + the numbering identity `lemma_w_b_snoc` (`w_{mβ+l}(b)=w_β(b)·b_l`) ⟹ the image is `family_II_relator(mβ+l)`,
+  a literal `h2_II` relator. (von Dyck `a` = `lemma_family_II_relator_equiv_empty`, already proven.)
+- [ ] **C-P_A — define `pa_data` + validity + iso** (`hnn_associations_isomorphic(pa_data)`): the iso over free `F`
+  follows from A1 (iso over `h1_base`) + F-faithfulness (B3) by translating columns through the inclusion.
+- [ ] **C-lift — the unified HNN lifting lemma** (the Britton-peel; the deep multi-step core). Mirror
+  `lemma_psi_A_injective`; the intersection property is the crux.
+- [ ] **C-asm — `lemma_phi_l_iso_at_h2II`**: instantiate C-lift at map_a, map_b; chain through `w ≡_{P_A} ε`.
+- [ ] **C3.2d** — `decreases l` outer induction (mirror `lemma_b_m_upto_faithful`): build `hnn_associations_isomorphic(phi_l_data)`
+  at each level from C-asm (bottom crux over `h2_II`) + IH-descent (`lemma_single_hnn_base_faithful` +
+  `lemma_h2II_equiv_lifts_to_tower`) → C2/C4/C5.
+
+**Finite-slice side condition** (`alphas`): von-Dyck-b needs `mβ+l ∈ alphas` for each `β` that `w`'s relators
+touch (so the image relation is present in the finite augmentation). Bake this into the crux's `requires`
+(`alphas` closed enough under `β ↦ mβ+l`); C4 picks the concrete finite set.
