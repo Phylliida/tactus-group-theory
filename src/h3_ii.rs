@@ -32,7 +32,8 @@ use crate::h1::*;
 use crate::h2::*;
 use crate::h3::*;
 use crate::base_swap::*;
-use crate::benign::{apply_embedding, lemma_apply_embedding_valid};
+use crate::benign::{apply_embedding, apply_embedding_symbol, lemma_apply_embedding_valid,
+    lemma_apply_embedding_concat, lemma_apply_embedding_inverse};
 use crate::britton_infra::lemma_hnn_presentation_valid;
 use crate::higman_consequences::lemma_II;
 
@@ -940,6 +941,201 @@ pub proof fn lemma_recog_presentation(mm: ModMachine, n: nat, m: nat, alphas: Se
         assert(hh + (hnn_relators(h2d) + ff) =~= (hh + hnn_relators(h2d)) + ff);
     }
     assert(lhs == rhs);
+}
+
+// ============================================================================
+// C3.2c — B1.5: the subst-factoring bridge.
+//
+// The crux iff `emb(a_words,w) ≡_{h2_II} ε ⟺ emb(b_words,w) ≡_{h2_II} ε` is really "φ_l is a
+// faithful endomorphism over h2_II": `a_words = [t,x,d,b_j,p]` is the identity-ish embedding, so
+// `emb(a_words,w)` is `w` relabeled into the real generators, and `emb(b_words,w)` is its φ_l image.
+// We make that precise: `emb(b_words,w) = φ_l(emb(a_words,w))`, where φ_l is the full substitution
+// `phi_l_subst` on ALL h2_II generators. Both the von Dyck (backward) and Britton (forward)
+// directions reduce the crux to this single substitution. Built on the general `apply_embedding`
+// composition lemma (also added here).
+// ============================================================================
+
+/// Image-list composition: `(f ∘ g)[i] = apply_embedding(f, g[i])`.
+pub open spec fn compose_embeddings(f: Seq<Word>, g: Seq<Word>) -> Seq<Word> {
+    Seq::new(g.len(), |i: int| apply_embedding(f, g[i]))
+}
+
+/// **`apply_embedding` composes**: `f(g(w)) = (f∘g)(w)` for any `w` valid over `g`'s slots.
+/// Pure combinatorics (induction on `w`, reusing `lemma_apply_embedding_concat` /`_inverse`).
+pub proof fn lemma_apply_embedding_compose(f: Seq<Word>, g: Seq<Word>, w: Word)
+    requires
+        word_valid(w, g.len()),
+    ensures
+        apply_embedding(f, apply_embedding(g, w))
+            =~= apply_embedding(compose_embeddings(f, g), w),
+    decreases w.len(),
+{
+    let fg = compose_embeddings(f, g);
+    if w.len() == 0 {
+        assert(apply_embedding(g, w) =~= empty_word());
+        assert(apply_embedding(f, empty_word()) =~= empty_word());
+        assert(apply_embedding(fg, w) =~= empty_word());
+    } else {
+        let sym = w.first();
+        let rest = w.drop_first();
+        assert(symbol_valid(sym, g.len())) by { assert(sym == w[0]); }
+        assert(word_valid(rest, g.len())) by {
+            assert forall|i: int| 0 <= i < rest.len() implies symbol_valid(#[trigger] rest[i], g.len()) by {
+                assert(rest[i] == w[i + 1]);
+            }
+        }
+        lemma_apply_embedding_compose(f, g, rest);                              // IH
+        // apply_embedding(g, w) = concat(apply_embedding_symbol(g, sym), apply_embedding(g, rest))
+        let aes_g = apply_embedding_symbol(g, sym);
+        assert(apply_embedding(g, w) =~= concat(aes_g, apply_embedding(g, rest)));
+        lemma_apply_embedding_concat(f, aes_g, apply_embedding(g, rest));
+        // per-symbol:  apply_embedding(f, apply_embedding_symbol(g, sym)) =~= apply_embedding_symbol(fg, sym)
+        match sym {
+            Symbol::Gen(i) => {
+                assert(i < g.len());                                           // from symbol_valid(sym, g.len())
+                assert(apply_embedding_symbol(g, sym) == g[i as int]);
+                assert(apply_embedding_symbol(fg, sym) == fg[i as int]);
+                assert(fg[i as int] == apply_embedding(f, g[i as int]));
+            },
+            Symbol::Inv(i) => {
+                assert(i < g.len());
+                assert(apply_embedding_symbol(g, sym) =~= inverse_word(g[i as int]));
+                lemma_apply_embedding_inverse(f, g[i as int]);
+                assert(apply_embedding_symbol(fg, sym) =~= inverse_word(fg[i as int]));
+                assert(fg[i as int] == apply_embedding(f, g[i as int]));
+            },
+        }
+        // RHS: apply_embedding(fg, w) = concat(apply_embedding_symbol(fg, sym), apply_embedding(fg, rest))
+        assert(apply_embedding(fg, w)
+            =~= concat(apply_embedding_symbol(fg, sym), apply_embedding(fg, rest)));
+    }
+}
+
+/// **`phi_l_subst` — the φ_l endomorphism as a full substitution on `h2_II`'s generators**
+/// (length `h2_num_gens = nk+2n+2`): `t↦config(l,0)`, `x↦xᵐ`, `d↦b_l·d`, and EVERY other generator
+/// (the literal `b_j`, `p`, and the non-stated `y`/machine/`c_j`) ↦ itself. So `b_j↦b_j` and `p↦p`
+/// fall out of the identity branch — exactly matching `phi_assoc`'s b-block and `p`-tail.
+pub open spec fn phi_l_subst(nk: nat, n: nat, m: nat, l: nat) -> Seq<Word> {
+    Seq::new(h2_num_gens(nk, n), |g: int| {
+        if g == 0 {
+            config_word(l, 0)                                                  // t ↦ t_l
+        } else if g == 1 {
+            symbol_power(Symbol::Gen(1), m)                                    // x ↦ xᵐ
+        } else if g == d_idx(nk, n) {
+            seq![alphabet_letter(b_base(nk, n), n, l), Symbol::Gen(d_idx(nk, n))]  // d ↦ b_l·d
+        } else {
+            seq![Symbol::Gen(g as nat)]                                        // everything else ↦ itself
+        }
+    })
+}
+
+/// `compose_embeddings(phi_l_subst, a_words) =~= b_words` — applying the substitution to each
+/// stated generator yields its `φ_l` image. The per-position check against `lemma_phi_assoc_index`.
+proof fn lemma_phi_l_subst_on_a_words(mm: ModMachine, n: nat, m: nat, l: nat)
+    requires
+        1 <= l <= 2 * n,
+    ensures
+        compose_embeddings(
+            phi_l_subst(g_m(mm).num_generators, n, m, l),
+            Seq::new((n + 4) as nat, |i: int| phi_assoc(g_m(mm).num_generators, n, m, l)[i].0))
+        =~= Seq::new((n + 4) as nat, |i: int| phi_assoc(g_m(mm).num_generators, n, m, l)[i].1),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);                       // nk = 4 + |quads| ≥ 4
+    let subst = phi_l_subst(nk, n, m, l);
+    let a_words = Seq::new((n + 4) as nat, |i: int| phi_assoc(nk, n, m, l)[i].0);
+    let b_words = Seq::new((n + 4) as nat, |i: int| phi_assoc(nk, n, m, l)[i].1);
+    let fg = compose_embeddings(subst, a_words);
+    lemma_phi_assoc_index(nk, n, m, l);
+    let d = d_idx(nk, n);                               // nk + 2n
+    let bb = b_base(nk, n);                             // nk + n
+    let pp = p_idx(nk, n);                              // nk + 2n + 1
+    assert(fg.len() == n + 4);
+    assert(b_words.len() == n + 4);
+    // For each slot, apply_embedding(subst, a_words[i]) = subst[index] = b_words[i].
+    assert forall|i: int| 0 <= i < n + 4 implies fg[i] =~= b_words[i] by {
+        assert(fg[i] == apply_embedding(subst, a_words[i]));
+        assert(a_words[i] == phi_assoc(nk, n, m, l)[i].0);
+        if i == 0 {
+            // a_words[0] = [Gen(0)] ;  subst[0] = config(l,0) = b_words[0]
+            assert(a_words[0] == seq![Symbol::Gen(0)]);
+            reveal_with_fuel(apply_embedding, 2);
+            lemma_concat_empty_right(subst[0]);
+            assert(apply_embedding(subst, seq![Symbol::Gen(0)]) =~= subst[0]);
+            assert(subst[0] == config_word(l, 0));
+            assert(b_words[0] == config_word(l, 0));
+        } else if i == 1 {
+            assert(a_words[1] == seq![Symbol::Gen(1)]);
+            reveal_with_fuel(apply_embedding, 2);
+            lemma_concat_empty_right(subst[1]);
+            assert(apply_embedding(subst, seq![Symbol::Gen(1)]) =~= subst[1]);
+            assert(subst[1] == symbol_power(Symbol::Gen(1), m));
+            assert(b_words[1] == symbol_power(Symbol::Gen(1), m));
+        } else if i == 2 {
+            assert(a_words[2] == seq![Symbol::Gen(d)]);
+            reveal_with_fuel(apply_embedding, 2);
+            lemma_concat_empty_right(subst[d as int]);
+            assert(apply_embedding(subst, seq![Symbol::Gen(d)]) =~= subst[d as int]);
+            // d = nk+2n, distinct from 0 and 1 (n ≥ 1 ⟹ d ≥ nk+2 ≥ 2)
+            assert(subst[d as int] == seq![alphabet_letter(bb, n, l), Symbol::Gen(d)]);
+            assert(b_words[2] == (seq![Symbol::Gen(d)], seq![alphabet_letter(bb, n, l), Symbol::Gen(d)]).1);
+        } else if i < n + 3 {
+            // b-block: i = 3 + j, 0 ≤ j < n ;  a_words[i] = [Gen(b_idx(j+1))], identity image.
+            let j = i - 3;
+            assert(a_words[i] == seq![Symbol::Gen(b_idx(nk, n, (j + 1) as nat))]);
+            let bj = b_idx(nk, n, (j + 1) as nat);                            // nk + n + j ∈ [nk+n, nk+2n-1]
+            assert(bj == nk + n + j);
+            assert(bj != 0 && bj != 1 && bj != d);                            // n ≥ 1, nk ≥ 4
+            reveal_with_fuel(apply_embedding, 2);
+            lemma_concat_empty_right(subst[bj as int]);
+            assert(apply_embedding(subst, seq![Symbol::Gen(bj)]) =~= subst[bj as int]);
+            assert(subst[bj as int] == seq![Symbol::Gen(bj)]);
+            assert(b_words[i] == seq![Symbol::Gen(bj)]);
+        } else {
+            // p-tail: i = n + 3 ;  a_words[i] = [Gen(p_idx)], identity image.
+            assert(i == n + 3);
+            assert(a_words[i] == seq![Symbol::Gen(pp)]);
+            assert(pp == nk + 2 * n + 1);
+            assert(pp != 0 && pp != 1 && pp != d);                            // pp = d + 1
+            reveal_with_fuel(apply_embedding, 2);
+            lemma_concat_empty_right(subst[pp as int]);
+            assert(apply_embedding(subst, seq![Symbol::Gen(pp)]) =~= subst[pp as int]);
+            assert(subst[pp as int] == seq![Symbol::Gen(pp)]);
+            assert(b_words[i] == seq![Symbol::Gen(pp)]);
+        }
+    }
+}
+
+/// **B1.5 — the subst-factoring bridge.** `emb(b_words, w) = φ_l(emb(a_words, w))`: the b-side
+/// embedding is `phi_l_subst` applied to the a-side embedding. This reduces the C3.2c crux to "φ_l
+/// faithful on `emb(a_words,w)`" — both directions (von Dyck backward, Britton forward) consume it.
+pub proof fn lemma_phi_l_factor_through_subst(mm: ModMachine, n: nat, m: nat, l: nat, w: Word)
+    requires
+        1 <= l <= 2 * n,
+        word_valid(w, (n + 4) as nat),
+    ensures
+        apply_embedding(
+            Seq::new((n + 4) as nat, |i: int| phi_assoc(g_m(mm).num_generators, n, m, l)[i].1), w)
+        =~= apply_embedding(
+            phi_l_subst(g_m(mm).num_generators, n, m, l),
+            apply_embedding(
+                Seq::new((n + 4) as nat, |i: int| phi_assoc(g_m(mm).num_generators, n, m, l)[i].0), w)),
+{
+    let nk = g_m(mm).num_generators;
+    let subst = phi_l_subst(nk, n, m, l);
+    let a_words = Seq::new((n + 4) as nat, |i: int| phi_assoc(nk, n, m, l)[i].0);
+    let b_words = Seq::new((n + 4) as nat, |i: int| phi_assoc(nk, n, m, l)[i].1);
+    lemma_phi_assoc_len(nk, n, m, l);
+    assert(a_words.len() == n + 4);
+    assert(word_valid(w, a_words.len()));
+    // f(g(w)) = (f∘g)(w),  with f = subst, g = a_words
+    lemma_apply_embedding_compose(subst, a_words, w);
+    // (subst ∘ a_words) =~= b_words
+    lemma_phi_l_subst_on_a_words(mm, n, m, l);
+    // apply_embedding is congruent in its image list when the lists are extensionally equal
+    assert(apply_embedding(compose_embeddings(subst, a_words), w) == apply_embedding(b_words, w)) by {
+        assert(compose_embeddings(subst, a_words) =~= b_words);
+    }
 }
 
 } // verus!
