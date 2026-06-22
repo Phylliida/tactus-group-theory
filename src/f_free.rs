@@ -26,7 +26,11 @@ use crate::word::*;
 use crate::presentation::*;
 use crate::machine_group::*;
 use crate::hnn::*;
-use crate::benign::{apply_embedding, apply_embedding_symbol, lemma_apply_embedding_valid};
+use crate::britton_via_tower::{is_stable, has_stable_letter, has_pinch, has_pinch_at,
+    has_adjacent_opposite_at, stable_count, lemma_stable_count_concat, lemma_stable_count_no_stable,
+    lemma_has_stable_implies_count, lemma_delete_equiv_empty};
+use crate::benign::{apply_embedding, apply_embedding_symbol, lemma_apply_embedding_valid,
+    lemma_apply_embedding_concat, in_generated_subgroup};
 use crate::free_product::free_product;
 use crate::higman_operations::{free_group, lemma_free_group_valid};
 use crate::normal_form_free_product::lemma_free_product_injective_left;
@@ -249,6 +253,260 @@ pub proof fn lemma_tx_free_in_g_m(mm: ModMachine, w: Word)
     lemma_g_m_base_faithful(mm, w);
     // base_A → pres_tx (Tietze bridge + peel the y-HNN layer): exactly `lemma_a_base_faithful`.
     lemma_a_base_faithful(w);
+}
+
+// ----------------------------------------------------------------------------
+// B1 — the inductive (pinch) case: `lemma_extend_free_by_stable`.
+//
+// Port of `machine_group::lemma_psi_F_injective` / `_pinch_descends` / `_spanning` into the
+// cross-presentation setting.  The embedding `s_emb = gens.push([s])` differs from `ψ_F`:
+//   • a NON-stable source gen `i < gens.len()` maps to `gens[i]` — a stable-FREE `gp`-word of
+//     arbitrary length (vs `ψ_F`'s `t ↦ t`, length 1);
+//   • the stable source gen `gens.len()` maps to `[s]` — exactly ONE stable letter (vs `ψ_F`'s
+//     `x ↦ xᵖ`, a run of length `p`).
+// So the "run" and "length-1" roles are swapped: the spanning case fires when the peeled symbol is
+// the stable letter, and peeling a non-stable symbol strips a variable-length stable-free prefix.
+// ----------------------------------------------------------------------------
+
+/// The stable-extended embedding: each free-family generator keeps its image, the new (stable)
+/// generator `Gen(gp.num_generators)` maps to the single stable letter `[Gen(gp.num_generators)]`.
+pub open spec fn stable_emb(gp: Presentation, gens: Seq<Word>) -> Seq<Word> {
+    gens.push(seq![Symbol::Gen(gp.num_generators)])
+}
+
+/// Index facts for `stable_emb` (Seq::push).
+pub proof fn lemma_stable_emb_index(gp: Presentation, gens: Seq<Word>)
+    ensures
+        stable_emb(gp, gens).len() == gens.len() + 1,
+        forall|i: int| 0 <= i < gens.len() ==> stable_emb(gp, gens)[i] == gens[i],
+        stable_emb(gp, gens)[gens.len() as int] == seq![Symbol::Gen(gp.num_generators)],
+{
+}
+
+/// The empty-association HNN is `hnn_data_valid` whenever the base is valid.
+pub proof fn lemma_free_stable_data_valid(gp: Presentation)
+    requires
+        presentation_valid(gp),
+    ensures
+        hnn_data_valid(free_stable_data(gp)),
+{
+    assert(free_stable_data(gp).associations.len() == 0);
+}
+
+/// The empty-association HNN is (vacuously) association-isomorphic: only the empty word is valid
+/// over `0` generators, and both embedded sides are then `ε`.
+pub proof fn lemma_free_stable_data_isomorphic(gp: Presentation)
+    ensures
+        hnn_associations_isomorphic(free_stable_data(gp)),
+{
+    let data = free_stable_data(gp);
+    let k = data.associations.len();
+    assert(k == 0);
+    let a_words = Seq::new(k, |i: int| data.associations[i].0);
+    let b_words = Seq::new(k, |i: int| data.associations[i].1);
+    assert forall|w: Word| word_valid(w, k as nat) implies (
+        equiv_in_presentation(data.base, apply_embedding(a_words, w), empty_word())
+        <==>
+        equiv_in_presentation(data.base, apply_embedding(b_words, w), empty_word())
+    ) by {
+        assert(w.len() == 0) by {
+            if w.len() > 0 { assert(symbol_valid(w[0], 0)); }
+        }
+        assert(w =~= empty_word());
+        assert(apply_embedding(a_words, w) =~= empty_word());
+        assert(apply_embedding(b_words, w) =~= empty_word());
+    }
+}
+
+/// A word valid over `gp.num_generators` has NO inner stable letter (its symbols all have index
+/// `< gp.num_generators`, while the stable letter sits at index `gp.num_generators`).
+pub proof fn lemma_word_valid_no_inner_stable(gp: Presentation, v: Word)
+    requires
+        word_valid(v, gp.num_generators),
+    ensures
+        forall|k: int| 0 <= k < v.len() ==> !is_stable(free_stable_data(gp), #[trigger] v[k]),
+{
+    assert forall|k: int| 0 <= k < v.len() implies !is_stable(free_stable_data(gp), v[k]) by {
+        assert(symbol_valid(v[k], gp.num_generators));
+    }
+}
+
+/// Reverse of `lemma_in_empty_subgroup_trivial`: a word `≡ ε` lies in the trivial subgroup.
+pub proof fn lemma_trivial_in_empty_subgroup(p: Presentation, w: Word)
+    requires
+        presentation_valid(p),
+        word_valid(w, p.num_generators),
+        equiv_in_presentation(p, w, empty_word()),
+    ensures
+        in_generated_subgroup(p, Seq::<Word>::empty(), w),
+{
+    let factors = Seq::<Word>::empty();
+    assert(crate::benign::factors_from_generators(Seq::<Word>::empty(), factors));
+    assert(crate::benign::concat_all(factors) =~= empty_word());
+    lemma_equiv_symmetric(p, w, empty_word());
+    assert(equiv_in_presentation(p, crate::benign::concat_all(factors), w));
+}
+
+/// **Generic pinch-out** for the empty-association HNN: deleting a pinch `s·u·s⁻¹` (with `u ≡ ε` in
+/// the base, since the associated subgroup is trivial) shrinks the word by an `≡`-step.  This is
+/// `lemma_pinch_out` generalized from the fixed `pres_t`/`pres_tx` to an arbitrary base `gp`.
+pub proof fn lemma_free_stable_pinch_out(gp: Presentation, w: Word, i: int, j: int)
+    requires
+        presentation_valid(gp),
+        has_pinch_at(free_stable_data(gp), w, i, j),
+    ensures
+        equiv_in_presentation(hnn_presentation(free_stable_data(gp)),
+            w, w.subrange(0, i) + w.subrange(j + 1, w.len() as int)),
+{
+    let data = free_stable_data(gp);
+    let hp = hnn_presentation(data);
+    let u = w.subrange(i + 1, j);
+    let mid = w.subrange(i, j + 1);
+    let si = w[i];
+    let sj = w[j];
+    // both associated-subgroup generator lists are empty
+    assert(Seq::new(0, |k: int| data.associations[k].0) =~= Seq::<Word>::empty());
+    assert(Seq::new(0, |k: int| data.associations[k].1) =~= Seq::<Word>::empty());
+    // the pinch middle lies in the trivial subgroup ⟹ u ≡ ε
+    assert(in_generated_subgroup(gp, Seq::<Word>::empty(), u));
+    assert(is_inverse_pair(si, sj));
+    lemma_in_empty_subgroup_trivial(gp, u);
+    lemma_base_embeds_in_hnn(data, u, empty_word());     // u ≡ ε in hp
+    // mid = [si] · (u · [sj]) ≡ [si] · [sj] ≡ ε
+    assert(mid =~= concat(seq![si], concat(u, seq![sj])));
+    lemma_delete_equiv_empty(hp, seq![si], u, seq![sj]);
+    assert(concat(seq![si], seq![sj]) =~= seq![si, sj]);
+    lemma_cancel_pair_equiv_empty(hp, si, sj);
+    lemma_equiv_transitive(hp, mid, concat(seq![si], seq![sj]), empty_word());
+    // w = w[0..i] · (mid · w[j+1..])  ⟹  w ≡ w[0..i] · w[j+1..]
+    assert(w =~= concat(w.subrange(0, i), concat(mid, w.subrange(j + 1, w.len() as int))));
+    lemma_delete_equiv_empty(hp,
+        w.subrange(0, i), mid, w.subrange(j + 1, w.len() as int));
+    assert(w.subrange(0, i) + w.subrange(j + 1, w.len() as int)
+        =~= concat(w.subrange(0, i), w.subrange(j + 1, w.len() as int)));
+}
+
+/// Adjoining a free stable letter to a FREE group is again a free group: the empty-association HNN
+/// over `free_group(k)` is exactly `free_group(k+1)`.  (Analog of `lemma_f_as_hnn_presentation`.)
+pub proof fn lemma_free_stable_of_free_group(k: nat)
+    ensures
+        hnn_presentation(free_stable_data(free_group(k))) == free_group((k + 1) as nat),
+{
+    let data = free_stable_data(free_group(k));
+    let lhs = hnn_presentation(data);
+    let rhs = free_group((k + 1) as nat);
+    assert(data.associations.len() == 0);
+    assert(hnn_relators(data) =~= Seq::<Word>::empty());
+    assert(free_group(k).relators =~= Seq::<Word>::empty());
+    assert(lhs.relators =~= Seq::<Word>::empty());
+    assert(rhs.relators =~= Seq::<Word>::empty());
+    assert(lhs.num_generators == rhs.num_generators);
+    assert(lhs.relators =~= rhs.relators);
+    assert(lhs == rhs);
+}
+
+// ----------------------------------------------------------------------------
+// Stable-count correspondence: W = apply_embedding(s_emb, w) has the same number of (inner) stable
+// letters as w has (outer) stable letters — the stable gen maps to ONE stable letter, non-stable
+// gens map to stable-free words.  (Analog of `lemma_psi_F_stable_count_scales`, factor 1.)
+// ----------------------------------------------------------------------------
+
+/// Per-symbol contribution: `s_emb` applied to a single symbol contributes 1 inner stable letter
+/// iff the symbol was the outer stable letter, else 0.
+pub proof fn lemma_extend_emb_symbol_stable_count(gp: Presentation, gens: Seq<Word>, s: Symbol)
+    requires
+        forall|i: int| 0 <= i < gens.len() ==> word_valid(#[trigger] gens[i], gp.num_generators),
+        symbol_valid(s, (gens.len() + 1) as nat),
+    ensures
+        stable_count(free_stable_data(gp), apply_embedding(stable_emb(gp, gens), seq![s]))
+            == (if is_stable(free_stable_data(free_group(gens.len())), s) { 1nat } else { 0nat }),
+{
+    let inner = free_stable_data(gp);
+    let outer = free_stable_data(free_group(gens.len()));
+    let imgs = stable_emb(gp, gens);
+    lemma_stable_emb_index(gp, gens);
+    reveal_with_fuel(apply_embedding, 2);
+    assert(apply_embedding(imgs, seq![s]) =~= apply_embedding_symbol(imgs, s));
+    let g = gens.len() as int;
+    // outer stable letter sits at index gens.len().
+    assert(outer.base.num_generators == gens.len());
+    match s {
+        Symbol::Gen(idx) => {
+            if idx == gens.len() {
+                assert(is_stable(outer, s));
+                assert(apply_embedding_symbol(imgs, s) =~= imgs[g]);
+                assert(imgs[g] =~= seq![Symbol::Gen(gp.num_generators)]);
+                assert(is_stable(inner, Symbol::Gen(gp.num_generators)));
+                reveal_with_fuel(stable_count, 2);
+            } else {
+                assert(idx < gens.len());
+                assert(!is_stable(outer, s));
+                assert(apply_embedding_symbol(imgs, s) =~= imgs[idx as int]);
+                assert(imgs[idx as int] == gens[idx as int]);
+                lemma_word_valid_no_inner_stable(gp, gens[idx as int]);
+                lemma_stable_count_no_stable(inner, gens[idx as int]);
+            }
+        }
+        Symbol::Inv(idx) => {
+            if idx == gens.len() {
+                assert(is_stable(outer, s));
+                assert(apply_embedding_symbol(imgs, s) =~= inverse_word(imgs[g]));
+                assert(imgs[g] =~= seq![Symbol::Gen(gp.num_generators)]);
+                assert(inverse_word(imgs[g]) =~= seq![Symbol::Inv(gp.num_generators)]) by {
+                    reveal_with_fuel(inverse_word, 2);
+                }
+                assert(is_stable(inner, Symbol::Inv(gp.num_generators)));
+                reveal_with_fuel(stable_count, 2);
+            } else {
+                assert(idx < gens.len());
+                assert(!is_stable(outer, s));
+                assert(apply_embedding_symbol(imgs, s) =~= inverse_word(imgs[idx as int]));
+                assert(imgs[idx as int] == gens[idx as int]);
+                crate::word::lemma_inverse_word_valid(gens[idx as int], gp.num_generators);
+                lemma_word_valid_no_inner_stable(gp, inverse_word(gens[idx as int]));
+                lemma_stable_count_no_stable(inner, inverse_word(gens[idx as int]));
+            }
+        }
+    }
+}
+
+/// The inner stable count of `W = apply_embedding(s_emb, w)` equals the outer stable count of `w`.
+pub proof fn lemma_extend_stable_count_eq(gp: Presentation, gens: Seq<Word>, w: Word)
+    requires
+        forall|i: int| 0 <= i < gens.len() ==> word_valid(#[trigger] gens[i], gp.num_generators),
+        word_valid(w, (gens.len() + 1) as nat),
+    ensures
+        stable_count(free_stable_data(gp), apply_embedding(stable_emb(gp, gens), w))
+            == stable_count(free_stable_data(free_group(gens.len())), w),
+    decreases w.len(),
+{
+    let inner = free_stable_data(gp);
+    let outer = free_stable_data(free_group(gens.len()));
+    let imgs = stable_emb(gp, gens);
+    if w.len() == 0 {
+        assert(apply_embedding(imgs, w) =~= Seq::<Symbol>::empty());
+    } else {
+        let last = w.last();
+        let pre = w.drop_last();
+        assert(w =~= pre + seq![last]);
+        assert(word_valid(pre, (gens.len() + 1) as nat)) by {
+            assert forall|k: int| 0 <= k < pre.len()
+                implies symbol_valid(#[trigger] pre[k], (gens.len() + 1) as nat)
+            by { assert(pre[k] == w[k]); }
+        }
+        assert(symbol_valid(last, (gens.len() + 1) as nat));
+        lemma_apply_embedding_concat(imgs, pre, seq![last]);
+        assert(apply_embedding(imgs, w)
+            =~= apply_embedding(imgs, pre) + apply_embedding(imgs, seq![last]));
+        lemma_stable_count_concat(inner,
+            apply_embedding(imgs, pre), apply_embedding(imgs, seq![last]));
+        lemma_extend_emb_symbol_stable_count(gp, gens, last);
+        lemma_extend_stable_count_eq(gp, gens, pre);
+        let inc: nat = if is_stable(outer, last) { 1nat } else { 0nat };
+        assert(stable_count(outer, w) == stable_count(outer, pre) + inc) by {
+            reveal_with_fuel(stable_count, 2);
+        }
+    }
 }
 
 } // verus!
