@@ -169,6 +169,14 @@ pub mod higman_consequences;
 #[cfg(verus_keep_ghost)]
 pub mod h3_ii;
 
+// f_free: Layer 2 / Brick 5 COMPLETENESS, C3.2c / F1 — the free subgroup F=⟨t,x,d,b_j⟩ of h2_II.
+// The Route-B prerequisite (docs/brick5-c3.2c-plan.md §3b): F free in h1_base (mirror of the free-
+// product structure K_M ∗ (F(c)×F(b)) ∗ ⟨d⟩) makes A=⟨t,x,d,b_j,p⟩=HNN(F free, p | family II) a
+// legitimate presentation, so von Dyck reduces to "φ_l respects the p-conjugations". F1a (⟨t,x⟩
+// free in K_M) built; the free-product assembly follows.
+#[cfg(verus_keep_ghost)]
+pub mod f_free;
+
 // higman_completeness: Layer 2 / Brick 5 COMPLETENESS — the `C ↪ H₃` faithful direction.
 // Owns the `in_C` predicate (C1: `w ∈ ncl(S)` over the k-HNN base h3_upto(2n)) + its three
 // subgroup-closure props, and (in progress) the Fork-B virtual-iso k-descent (C4) + assembly
