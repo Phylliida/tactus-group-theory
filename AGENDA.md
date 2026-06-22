@@ -213,10 +213,17 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       `h3_with_S` Presentation ⟹ must use the **`kp_pinch` predicate engine**, not `britton` on a
       finite presentation; (2) the ψ (k-level) association is **non-iso in `h3_pres`** (free c's),
       refuted by exactly the `w_α(c)` family-(II) witnesses — adding `S` repairs it, so the predicate
-      engine is mandatory. Bricks C0–C5; the crux C4 is a `tower_peel`-sized `lemma_property_ii`
-      instantiation bottoming at `lemma_theorem1`. **C0 done**: `lemma_w_c_valid_h1`,
-      `lemma_w_c_valid_h3_base` (`w_α(c)` is a base word of the k-HNN). **NEXT = C1** (the `in_C`
-      predicate + faithfulness theorem signature).
+      engine is mandatory. Bricks C0–C5; the crux C4 is a `tower_peel`-sized virtual-iso k-descent
+      bottoming at `lemma_theorem1`. **C0 done**: `lemma_w_c_valid_h1`, `lemma_w_c_valid_h3_base`
+      (`w_α(c)` is a base word of the k-HNN). **C1 done** (`higman_completeness.rs` 3/0): the **`in_C`
+      predicate** = `w ∈ ncl(S)` over the k-HNN base `h3_upto(2n)` (explicit conjugate-product form;
+      exactly the virtual-iso `britton_lemma_unconditional` output) + its 3 subgroup-closure props
+      (`lemma_in_C_empty`/`_mul`/`_resp`) + the pinned `faithfulness_statement` signature. Co-design w/
+      C4 resolved (peer-reviewed): **C4 = a DIRECT virtual-iso descent, NOT a `lemma_property_ii` reuse**
+      (faithfulness's membership witness is the empty factor list, so the engine's `choose` is a
+      liability); **one predicate** suffices (`ncl_B(S)∩c-words = ncl_{F(c)}(S)`, b commutes c). **NEXT =
+      C3** (do the `φ_l` a-level isos hold *literally* over `h3_upto(l-1)`? — likely yes, no c's, so they
+      Britton-peel directly, isolating the non-iso content to the single k-level C4), then C2, then C4.
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).

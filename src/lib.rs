@@ -154,3 +154,10 @@ pub mod free_basis;
 // arc (see docs/brick5-plan.md: h3_pres = h3_with_S + benign/kp_pinch).
 #[cfg(verus_keep_ghost)]
 pub mod higman_consequences;
+
+// higman_completeness: Layer 2 / Brick 5 COMPLETENESS — the `C ↪ H₃` faithful direction.
+// Owns the `in_C` predicate (C1: `w ∈ ncl(S)` over the k-HNN base h3_upto(2n)) + its three
+// subgroup-closure props, and (in progress) the Fork-B virtual-iso k-descent (C4) + assembly
+// (C5). See docs/brick5-completeness-plan.md.
+#[cfg(verus_keep_ghost)]
+pub mod higman_completeness;
