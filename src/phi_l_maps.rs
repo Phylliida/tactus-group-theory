@@ -20,7 +20,8 @@ use crate::word_numbering::{w_b, w_c, alphabet_letter, numbers_word};
 use crate::pa_data::{pa_b_base, pa_rhs};
 use crate::machine_group::{config_word, symbol_power, lemma_symbol_power_valid};
 use crate::phi_l_iso::{lemma_apply_embedding_fixes, lemma_config_zero_form};
-use crate::h3_ii::family_II_rhs;
+use crate::h3_ii::{family_II_rhs, lemma_phi_assoc_index};
+use crate::h3::phi_assoc;
 
 verus! {
 
@@ -381,6 +382,47 @@ pub proof fn lemma_a_words_on_pa_rhs(mm: ModMachine, n: nat, m: nat, gamma: nat)
     assert(w_b(bb, n, m, gamma) == w_c(bb, n, m, gamma));
     assert(family_II_rhs(mm, n, m, gamma)
         == (cfg + w_b(bb, n, m, gamma)) + seq![Symbol::Gen(d_idx(nk, n))]);
+}
+
+/// **`a_words` IS the `.0` column of `phi_assoc`** — `a_words(mm,n) =~= Seq::new(n+4, |i|
+/// phi_assoc(nk,n,m,l)[i].0)` (the literal generators `[t,x,d,b_j,p]`, independent of `l`).  Bridges
+/// the named `a_words` to the crux's `hnn_associations_isomorphic` unfolding (which uses the column).
+pub proof fn lemma_a_words_is_phi_col0(mm: ModMachine, n: nat, m: nat, l: nat)
+    ensures
+        a_words(mm, n)
+            =~= Seq::new((n + 4) as nat, |i: int| phi_assoc(g_m(mm).num_generators, n, m, l)[i].0),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let aw = a_words(mm, n);
+    let col0 = Seq::new((n + 4) as nat, |i: int| phi_assoc(nk, n, m, l)[i].0);
+    lemma_phi_assoc_index(nk, n, m, l);
+    lemma_a_words_head(mm, n);                              // aw[0],aw[1],aw[2], len==n+4
+    assert(aw.len() == n + 4);
+    assert(col0.len() == n + 4);
+    // a_words[n+3] = [Gen(p_idx)] (the push entry).
+    assert(aw[(n + 3) as int] == seq![Symbol::Gen(p_idx(nk, n))]) by {
+        let head = seq![seq![Symbol::Gen(0)], seq![Symbol::Gen(1)], seq![Symbol::Gen(d_idx(nk, n))]];
+        let tail = Seq::new(n, |j: int| seq![Symbol::Gen(b_idx(nk, n, (j + 1) as nat))]);
+        assert(a_words_F(mm, n) == head + tail);
+        assert(a_words_F(mm, n).len() == n + 3);
+        assert(aw == a_words_F(mm, n).push(seq![Symbol::Gen(p_idx(nk, n))]));
+    }
+    assert forall|i: int| 0 <= i < n + 4 implies aw[i] =~= col0[i] by {
+        assert(col0[i] == phi_assoc(nk, n, m, l)[i].0);
+        if i == 0 {
+        } else if i == 1 {
+        } else if i == 2 {
+        } else if i < n + 3 {
+            lemma_a_words_bblock(mm, n, i);                 // aw[i] = [Gen(nk+n+(i-3))]
+            let j = i - 3;
+            assert(col0[i] == seq![Symbol::Gen(b_idx(nk, n, (j + 1) as nat))]);
+            assert(b_idx(nk, n, (j + 1) as nat) == nk + n + (i - 3));
+        } else {
+            assert(i == n + 3);
+            assert(col0[(n + 3) as int] == seq![Symbol::Gen(p_idx(nk, n))]);
+        }
+    }
 }
 
 } // verus!
