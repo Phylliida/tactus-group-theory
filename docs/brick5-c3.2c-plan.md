@@ -190,7 +190,7 @@ behaviour. So `britton_lemma_full` (`britton_via_tower.rs:8678`: `w ≡ ε ∧ h
 APPLIES (iso vacuous). This reuses the project's strongest tool (Britton) instead of reinventing the AFP
 spanning normal form.
 
-**B1 (THE reusable meat) — `lemma_extend_free_by_stable`:**
+**B1 (THE reusable meat) — `lemma_extend_free_by_stable` — DONE (2026-06-22, `f_free.rs` 18/0):**
 ```
 requires
   presentation_valid(gp),
@@ -199,17 +199,27 @@ requires
   (∀u) word_valid(u, gens.len()) ∧ equiv_in(gp, apply_embedding(gens,u), ε)
         ⟹ equiv_in(free_group(gens.len()), u, ε),
   word_valid(w, gens.len()+1),
-  equiv_in(hnn_presentation(HNNData{base:gp, associations:[]}),
-           apply_embedding(gens.push(seq![Gen(gp.num_generators)]), w), ε)
+  equiv_in(hnn_presentation(free_stable_data(gp)),
+           apply_embedding(stable_emb(gp,gens), w), ε)        // stable_emb = gens.push([Gen(gp.num_generators)])
 ensures equiv_in(free_group(gens.len()+1), w, ε)
 ```
-Proof = induction (on `w.len()` or stable-count): if `w` has no `s`-symbol, `W` is a `gp`-word, descend by
-`lemma_free_product_injective_left` (`gp ∗ ⟨s⟩` = `hnn_presentation(empty-assoc)`; need a tiny bridge
-`hnn_presentation(empty-assoc) == free_product(gp, free_group(1))`) then the free-family hyp; else `W` has a
-stable letter, `britton_lemma_full` gives a pinch (adjacent `s … s⁻¹`, middle `≡_{gp} ε`), the middle is a
-`gens`-image of a `w`-subword so the free-family hyp makes that subword `≡_free ε`, free-reduce `w` at the
-matching `s/s⁻¹` and recurse. **The pinch-middle↔free-reduction match is the crux of B1.** Study `kp_pinch.rs`'s
-Britton-peel idiom (it does the analogous `K+p` peel) before writing.
+Proof = length induction (port of `lemma_psi_F_injective`): base case (`stable_count(outer,w)==0` ⟹ `w` valid
+over `gens.len()`) delegates to `lemma_extend_free_no_stable`; the step (`W` has a stable letter, is trivial)
+calls `britton_lemma_full` (iso VACUOUS over empty associations) → `lemma_extend_pinch_descends` (a pinch in `W`
+descends to a pinch in `w`, port of `_pinch_descends`) → `lemma_free_stable_pinch_out` (generic empty-assoc
+pinch-out: `w ≡ wshort` in `hnn_presentation(outer) == free_group(gens.len()+1)`, the latter by
+`lemma_free_stable_of_free_group`) → `lemma_emb_respects_source_equiv` (relator-free source ⟹ `W_short ≡ ε`) →
+IH. **The pinch-middle↔free-reduction match** is realised inside `_pinch_descends`'s spanning case: the pinch
+middle `W[1..J] ≡_{gp} ε`, which via the prefix correspondence (`lemma_extend_spanning`) equals
+`apply_embedding(gens, w2[0..l]) ≡_{gp} ε`, so the free-family hyp gives `w2[0..l] ≡_free ε` — exactly the
+outer pinch's trivial-middle condition. **The W↔w position correspondence** is `lemma_extend_spanning` (port of
+`_spanning`); note the RUN-ROLES are SWAPPED vs `ψ_F`: there the stable gen `x↦xᵖ` is a run and `t↦t` is length-1,
+here the stable gen `s↦[s]` is length-1 (so the spanning case fires when the STABLE letter is peeled) and the
+non-stable gens `↦gens[i]` are arbitrary stable-free runs (so a non-stable peel strips a variable-length prefix).
+Support lemmas: `lemma_extend_stable_count_eq` (inner stable count of `W` = outer stable count of `w`, the
+factor-1 analog of `lemma_psi_F_stable_count_scales`), `lemma_free_stable_data_valid/_isomorphic`,
+`lemma_word_valid_no_inner_stable`, `lemma_trivial_in_empty_subgroup`. (The free-product route via
+`lemma_free_product_injective_left` is used only in the base case `lemma_extend_free_no_stable`.)
 
 **B2 — iterate B1:** seed with F1a (`[t,x]` free in `K_M`), add `b_1,…,b_n`, then `d` ⟹ `[t,x,b_j,d]` free in
 `K_M ∗ F(b) ∗ ⟨d⟩` (= `free_product` chain; note `free_product(free_group(a),free_group(b)) == free_group(a+b)`

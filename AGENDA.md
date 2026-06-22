@@ -272,9 +272,21 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       (pinch = adjacent `s…s⁻¹` with base-trivial middle; iso vacuous ⟹ `britton_lemma_full` applies,
       reusing Britton not an AFP spanning NF). DONE: `lemma_tx_free_in_g_m` (F1a, ⟨t,x⟩ free in K_M),
       `lemma_free_stable_is_free_product` (bridge), `lemma_apply_embedding_agree_prefix`,
-      `lemma_free_group_equiv_mono`, `lemma_extend_free_no_stable` (B1 BASE CASE). **REMAINING B1 = the
-      inductive pinch case** (template = `lemma_psi_F_injective`/`_pinch_descends`/`_spanning`, ported
-      cross-presentation; the W↔w position correspondence) → B2 iterate → B3 kill_c→h1_base → B4 lift via A1.
+      `lemma_free_group_equiv_mono`, `lemma_extend_free_no_stable` (B1 BASE CASE).
+      **B1 COMPLETE 2026-06-22** (`f_free.rs` 18/0, `lemma_extend_free_by_stable` = THE reusable meat):
+      a free family `gens` in `gp` extends by a free stable letter — `w` whose stable-extended embedding
+      `apply_embedding(gens.push([s]), w)` is trivial in `gp ∗ ⟨s⟩` is itself trivial in
+      `free_group(gens.len()+1)`. Length induction (port of `lemma_psi_F_injective`): base case
+      delegates to `lemma_extend_free_no_stable`; the step uses `britton_lemma_full` (iso vacuous over
+      empty associations) → `lemma_extend_pinch_descends` (pinch in `W` descends to pinch in `w`, port of
+      `_pinch_descends`, threading the free-family hyp to convert the pinch middle's `gp`-triviality into
+      free-triviality) → `lemma_free_stable_pinch_out` (generic pinch-out) → IH. The W↔w position
+      correspondence is `lemma_extend_spanning` (port of `_spanning`), with the run-roles SWAPPED vs ψ_F:
+      the stable gen maps to ONE stable letter (spanning fires on the stable peel), non-stable gens map to
+      arbitrary stable-free runs (peeling strips a variable-length prefix). Support: `lemma_extend_stable_count_eq`
+      (inner count of W = outer count of w, factor 1), `lemma_free_stable_{data_valid,data_isomorphic,of_free_group}`,
+      `lemma_word_valid_no_inner_stable`, `lemma_trivial_in_empty_subgroup`. **REMAINING = B2 iterate (seed
+      F1a, add b_j then d ⟹ `[t,x,b_j,d]` free in `K_M ∗ F(b) ∗ ⟨d⟩`) → B3 kill_c→h1_base → B4 lift via A1.**
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).
