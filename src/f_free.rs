@@ -935,4 +935,53 @@ pub proof fn lemma_extend_free_by_stable(gp: Presentation, gens: Seq<Word>, w: W
     }
 }
 
+// ----------------------------------------------------------------------------
+// B1 packaged: the `is_free_family` predicate and the "extends by a free stable letter" step, the
+// clean interface B2 (iterate) consumes.
+// ----------------------------------------------------------------------------
+
+/// `gens` is a FREE family in `gp`: each image is a valid `gp`-word, and a word over the family that
+/// embeds to the identity in `gp` was already the identity in the abstract free group on the family.
+pub open spec fn is_free_family(gp: Presentation, gens: Seq<Word>) -> bool {
+    (forall|i: int| 0 <= i < gens.len() ==> word_valid(#[trigger] gens[i], gp.num_generators))
+    && (forall|w: Word| (#[trigger] word_valid(w, gens.len())
+        && equiv_in_presentation(gp, apply_embedding(gens, w), empty_word()))
+        ==> equiv_in_presentation(free_group(gens.len()), w, empty_word()))
+}
+
+/// **B1, packaged.** A free family in `gp` extends by a free stable letter: `stable_emb(gp, gens)`
+/// (the family plus the new generator `Gen(gp.num_generators)`) is free in `gp ∗ ⟨s⟩ =
+/// hnn_presentation(free_stable_data(gp))`.  Iterating this builds `K_M ∗ F(b) ∗ ⟨d⟩`'s free basis.
+pub proof fn lemma_free_family_extends(gp: Presentation, gens: Seq<Word>)
+    requires
+        presentation_valid(gp),
+        is_free_family(gp, gens),
+    ensures
+        is_free_family(hnn_presentation(free_stable_data(gp)), stable_emb(gp, gens)),
+{
+    let imgs = stable_emb(gp, gens);
+    let hp = hnn_presentation(free_stable_data(gp));
+    lemma_stable_emb_index(gp, gens);
+    assert(hp.num_generators == gp.num_generators + 1);
+    // (1) the extended family's images are valid over the extended generator count.
+    assert forall|i: int| 0 <= i < imgs.len()
+        implies word_valid(#[trigger] imgs[i], hp.num_generators)
+    by {
+        if i < gens.len() {
+            assert(imgs[i] == gens[i]);
+            lemma_word_valid_mono(gens[i], gp.num_generators, hp.num_generators);
+        } else {
+            assert(imgs[i] == seq![Symbol::Gen(gp.num_generators)]);
+        }
+    }
+    // (2) the free-family implication for the extended family is exactly B1.
+    assert forall|w: Word| (#[trigger] word_valid(w, imgs.len())
+        && equiv_in_presentation(hp, apply_embedding(imgs, w), empty_word()))
+        implies equiv_in_presentation(free_group(imgs.len()), w, empty_word())
+    by {
+        assert(imgs.len() == gens.len() + 1);
+        lemma_extend_free_by_stable(gp, gens, w);
+    }
+}
+
 } // verus!
