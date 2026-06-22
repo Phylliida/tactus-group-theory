@@ -33,47 +33,53 @@ pub open spec fn pa_rhs(n: nat, m: nat, beta: nat) -> Word {
     config_word(beta, 0) + w_c(pa_b_base(), n, m, beta) + seq![Symbol::Gen(2)]
 }
 
-/// The F-indexed family-(II) association pairs `(t_β, t_β w_β(b) d)`, one per `β ∈ alphas`.
-pub open spec fn pa_assoc(n: nat, m: nat, alphas: Seq<nat>) -> Seq<(Word, Word)> {
-    Seq::new(alphas.len(), |i: int| (config_word(alphas[i], 0), pa_rhs(n, m, alphas[i])))
+/// The F-indexed family-(II) association pairs `(t_β, t_β w_β(b) d)`, one per `β ∈ gammas`.
+pub open spec fn pa_assoc(n: nat, m: nat, gammas: Seq<nat>) -> Seq<(Word, Word)> {
+    Seq::new(gammas.len(), |i: int| (config_word(gammas[i], 0), pa_rhs(n, m, gammas[i])))
 }
 
 /// **`P_A = HNN(F = free_group(n+3), p | family II over F)`.**  Base = the free group on the
 /// `n+3` F-generators `[t,x,d,b_1..b_n]`; stable letter `p = Gen(n+3)`; associations the F-indexed
-/// family-(II) `p`-conjugations.
-pub open spec fn pa_data(n: nat, m: nat, alphas: Seq<nat>) -> HNNData {
+/// family-(II) `p`-conjugations over `gammas`.
+///
+/// **At the crux, `gammas = betas(alphas) = [0] ++ alphas`** (NOT `alphas`): `recog_data`'s
+/// associated subgroups are over `betas` (A1: its columns are `config_emb(betas)`/`basis_emb(betas)`,
+/// the `α=0` head being the `p_assoc` relation `p⁻¹tp=td`).  For the lifting lemma's pinch to descend
+/// index-for-index, `P_A`'s associations must match `recog_data`'s, so `P_A` is over `betas` too —
+/// the `β=0` case `config(0,0)=t`, `w_0(b)=ε` recovers the `(t, td)` head.
+pub open spec fn pa_data(n: nat, m: nat, gammas: Seq<nat>) -> HNNData {
     HNNData {
         base: free_group((n + 3) as nat),
-        associations: pa_assoc(n, m, alphas),
+        associations: pa_assoc(n, m, gammas),
     }
 }
 
-/// Structural facts: base has `n+3` generators, and there are `|alphas|` associations.
-pub proof fn lemma_pa_data_shape(n: nat, m: nat, alphas: Seq<nat>)
+/// Structural facts: base has `n+3` generators, and there are `|gammas|` associations.
+pub proof fn lemma_pa_data_shape(n: nat, m: nat, gammas: Seq<nat>)
     ensures
-        pa_data(n, m, alphas).base.num_generators == n + 3,
-        pa_data(n, m, alphas).associations.len() == alphas.len(),
+        pa_data(n, m, gammas).base.num_generators == n + 3,
+        pa_data(n, m, gammas).associations.len() == gammas.len(),
 {
 }
 
 /// **`P_A` is a valid HNN datum.**  Base `free_group(n+3)` valid; each association word valid over
 /// `n+3`: `config(β,0)` uses gens `{0,1} ⊂ [0,n+3)`, the b-substitution `w_c(3,n,m,β)` uses the
 /// F-b-block `[3, n+3)`, and `d = Gen(2) < n+3`.
-pub proof fn lemma_pa_data_valid(n: nat, m: nat, alphas: Seq<nat>)
+pub proof fn lemma_pa_data_valid(n: nat, m: nat, gammas: Seq<nat>)
     requires
         2 * n < m,
-        forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]),
+        forall|i: int| 0 <= i < gammas.len() ==> numbers_word(n, m, #[trigger] gammas[i]),
     ensures
-        hnn_data_valid(pa_data(n, m, alphas)),
+        hnn_data_valid(pa_data(n, m, gammas)),
 {
     let ng = (n + 3) as nat;
-    let data = pa_data(n, m, alphas);
+    let data = pa_data(n, m, gammas);
     lemma_free_group_valid(ng);                            // presentation_valid(base)
     assert(data.base.num_generators == ng);
-    let assocs = pa_assoc(n, m, alphas);
+    let assocs = pa_assoc(n, m, gammas);
     assert forall|i: int| #![trigger assocs[i]] 0 <= i < assocs.len() implies
         word_valid(assocs[i].0, ng) && word_valid(assocs[i].1, ng) by {
-        let beta = alphas[i];
+        let beta = gammas[i];
         assert(assocs[i] == (config_word(beta, 0), pa_rhs(n, m, beta)));
         // a-column: config(β,0) valid over 3 ≤ n+3.
         lemma_config_word_valid(beta, 0);                  // word_valid(·, 3)
