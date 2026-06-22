@@ -204,3 +204,11 @@ pub mod higman_completeness;
 // h1_base = F2 lifted via the retraction). See docs/brick5-c3.2c-plan.md §4.2.
 #[cfg(verus_keep_ghost)]
 pub mod f_free_a1;
+
+// phi_l_iso: Layer 2 / Brick 5, C3.2c / the C-arc — the per-level iso crux
+// `lemma_phi_l_iso_at_h2II` (emb(a_words,w) ≡ ε ⟺ emb(b_words,w) ≡ ε over h2_II), via the
+// unified HNN lifting lemma (faithfulness lifts base→HNN under an association-preserving
+// embedding), instantiated for map_a/map_b. First brick = the φ_l digit-scaling identity
+// φ_l(config(β,0)) = config(mβ+l,0). See docs/brick5-c3.2c-plan.md §5.
+#[cfg(verus_keep_ghost)]
+pub mod phi_l_iso;
