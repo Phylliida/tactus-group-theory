@@ -25,20 +25,22 @@ use crate::word::*;
 use crate::presentation::*;
 use crate::homomorphism::{apply_hom, lemma_hom_preserves_equiv};
 use crate::machine_group::{ModMachine, mod_machine_wf, g_m, lemma_g_m_num_generators, config_word,
-    lemma_config_word_valid, lemma_word_valid_mono};
+    lemma_config_word_valid, lemma_word_valid_mono, lemma_config_word_zero,
+    lemma_single_hnn_base_faithful};
 use crate::h1::h1_base;
 use crate::benign::{apply_embedding, lemma_apply_embedding_valid};
 use crate::free_basis::{kill_hom, lemma_kill_hom_valid, lemma_kill_fixes_low, config_emb,
     lemma_config_emb_free, basis_emb, basis_elt, lemma_basis_elt_free, lemma_free_to_basis_elt,
     lemma_free_to_embedding};
-use crate::machine_group::lemma_config_word_zero;
 use crate::higman_operations::free_group;
 use crate::hnn::{HNNData, hnn_associations_isomorphic};
 use crate::h2::{p_assoc, td_word};
-use crate::h3_ii::{recog_data, family_II_assoc, family_II_rhs};
+use crate::h3_ii::{recog_data, family_II_assoc, family_II_rhs, h2_II, lemma_recog_data_valid,
+    lemma_recog_presentation};
 use crate::h1::{h_w_b, lemma_h1_base_valid, lemma_h1_base_num_generators};
 use crate::layout::{b_base, d_idx, h1_num_gens};
 use crate::word_numbering::{numbers_word, w_b, w_c};
+use crate::f_free_h1::{f_h1_family, lemma_f_free_in_h1};
 
 verus! {
 
@@ -322,6 +324,72 @@ pub proof fn lemma_recog_associations_isomorphic(mm: ModMachine, n: nat, m: nat,
             lemma_free_to_embedding(config_emb(bb), data.base, w);
         }
     }
+}
+
+// ----------------------------------------------------------------------------
+// B4 — A1's payoff: Britton over `recog_data` applies to `h2_II`.
+// ----------------------------------------------------------------------------
+
+/// **`h1_base ↪ h2_II` is faithful** (the direct payoff of A1). A `h1_base`-word that is trivial in
+/// `h2_II` is already trivial in `h1_base`. This is the "base embeds faithfully in the HNN" lemma
+/// instantiated at `recog_data`: A1 (`lemma_recog_associations_isomorphic`) discharges the iso
+/// precondition, `lemma_recog_data_valid` the validity, and `lemma_recog_presentation`
+/// (`hnn_presentation(recog_data) == h2_II`) routes Britton's conclusion onto `h2_II`. The reusable
+/// descent-to-base step that the C-forward Britton peel leans on.
+pub proof fn lemma_h1_faithful_in_h2_II(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, w: Word)
+    requires
+        mod_machine_wf(mm),
+        2 * n < m,
+        !alphas.contains(0nat),
+        alphas.no_duplicates(),
+        forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]),
+        word_valid(w, h1_base(mm, n).num_generators),
+        equiv_in_presentation(h2_II(mm, n, m, alphas), w, empty_word()),
+    ensures
+        equiv_in_presentation(h1_base(mm, n), w, empty_word()),
+{
+    let data = recog_data(mm, n, m, alphas);
+    lemma_recog_data_valid(mm, n, m, alphas);                  // hnn_data_valid(data)
+    lemma_recog_associations_isomorphic(mm, n, m, alphas);     // A1: hnn_associations_isomorphic(data)
+    lemma_recog_presentation(mm, n, m, alphas);                // hnn_presentation(data) == h2_II
+    assert(data.base == h1_base(mm, n));
+    // word_valid(w, data.base.num_generators) and equiv_in(hnn_presentation(data)=h2_II, w, ε).
+    lemma_single_hnn_base_faithful(data, w);
+}
+
+/// **`F = [t,x,b_1..b_n,d]` is free in `h2_II`.** Compose B3 (`lemma_f_free_in_h1`: `F` free in
+/// `h1_base`) with the faithfulness `lemma_h1_faithful_in_h2_II`: the embedded product
+/// `apply_embedding(f_h1_family, w)` is a `h1_base`-word, so its triviality in `h2_II` descends to
+/// `h1_base`, where B3's free-family property closes it. (The Route-B von Dyck uses `F` free in
+/// `h1_base` directly, but this lifted form makes `A = ⟨t,x,d,b_j,p⟩ = HNN(F, p | family II)` a
+/// legitimate subgroup presentation of `h2_II`.)
+pub proof fn lemma_f_free_in_h2_II(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, w: Word)
+    requires
+        mod_machine_wf(mm),
+        2 * n < m,
+        !alphas.contains(0nat),
+        alphas.no_duplicates(),
+        forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]),
+        word_valid(w, f_h1_family(mm, n).len()),
+        equiv_in_presentation(h2_II(mm, n, m, alphas),
+            apply_embedding(f_h1_family(mm, n), w), empty_word()),
+    ensures
+        equiv_in_presentation(free_group(f_h1_family(mm, n).len()), w, empty_word()),
+{
+    let fam = f_h1_family(mm, n);
+    let base = h1_base(mm, n);
+    let prod = apply_embedding(fam, w);
+    lemma_f_free_in_h1(mm, n);                                 // is_free_family(base, fam)
+    lemma_h1_base_num_generators(mm, n);                       // base.num_generators == h1_num_gens(nk,n)
+    // each fam[i] is valid over base's generators (first conjunct of is_free_family).
+    assert forall|i: int| 0 <= i < fam.len() implies
+        word_valid(#[trigger] fam[i], base.num_generators) by { }
+    // ⟹ the embedded product is a base word.
+    lemma_apply_embedding_valid(fam, w, base.num_generators);
+    // descend h2_II → h1_base.
+    lemma_h1_faithful_in_h2_II(mm, n, m, alphas, prod);
+    // is_free_family's implication: base-trivial product ⟹ w ≡_free ε.
+    assert(equiv_in_presentation(free_group(fam.len()), w, empty_word()));
 }
 
 } // verus!
