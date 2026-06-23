@@ -407,12 +407,15 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       `lemma_map_b_forward` (= M1 factoring + map_a fwd + M2) + `lemma_phi_l_iso_at_h2II` (C-asm = map_a fwd/bwd
       + map_b fwd/bwd glued through `w≡_{P_A}ε`). Side conds = `sigma_backsat(betas)` + `sigma_fwdsat(betas)`
       (the σ-forward-saturation dual, new); finite-slice for map_b-bwd derived from fwd-sat + l≥1.
-      **NEXT = C3.2d** (the ONLY remaining C3.2 item): the `decreases l` outer induction `lemma_phi_l_iso`
-      building `hnn_associations_isomorphic(phi_l_data(..,l))` (base = `h3_II_upto(l-1)`, NOT h2_II) at every
-      a-tower level, from C-asm (bottom crux at h2_II=h3_II_upto(0)) + IH-descent. **Mirror
-      `lemma_b_m_upto_faithful`.** C3.2d-infra DONE (`lemma_phi_l_emb_h2_valid`,
-      `lemma_h2II_equiv_lifts_to_tower`, `lemma_phi_l_data_{base,valid}`). Then C2(p-level)/C4/C5. **C4 must
-      pick the finite `alphas` σ-CLOSED BOTH directions to satisfy `sigma_backsat`+`sigma_fwdsat`.**
+      **C3.2d COMPLETE 2026-06-22 (session 6): `phi_l_iso_tower.rs` 2/0 — C3.2 IS FULLY DONE.** The a-tower
+      lift: `lemma_h3_II_upto_faithful` (an h2-word trivial in `h3_II_upto(l)` ⟹ trivial in `h2_II`, a
+      `decreases l` faithfulness induction DIRECTLY mirroring `lemma_b_m_upto_faithful`, inline-building the
+      per-step iso from the bottom crux + IH-descent + `lemma_h2II_equiv_lifts_to_tower`) + `lemma_phi_l_iso`
+      (the C3.2 GOAL: `hnn_associations_isomorphic(phi_l_data(..,l))` at every a-tower level, standalone).
+      `sigma_sat_upto(alphas,m,l)` bundles the per-level σ-saturation side conditions. **C3.2 (the φ_l
+      a-level iso at every tower level) is COMPLETE.** **NEXT = C2 (p-level) / C4 (the Fork-B virtual-iso
+      k-engine, the C-arc's deep faithfulness, a `tower_peel`-sized arc per `docs/brick5-completeness-plan.md`;
+      must pick finite `alphas` σ-CLOSED BOTH dirs to satisfy `sigma_sat_upto`) / C5.**
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).
