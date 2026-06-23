@@ -51,6 +51,8 @@ use crate::phi_l_iso::lemma_config_zero_form;
 use crate::free_family_perm::{conjugate_family, lemma_free_family_conjugate,
     lemma_free_family_respects_equiv};
 use crate::f_free::is_free_family;
+use crate::f_free_tower::{free_stable_tower, free_stable_family, free_stable_letter,
+    lemma_free_stable_tower_extends, lemma_free_stable_tower_closed, lemma_free_stable_family_closed};
 
 verus! {
 
@@ -482,6 +484,47 @@ pub proof fn lemma_tx_image_free(l: nat, m: nat)
 
     // --- step 4: transfer freeness to target ---
     lemma_free_family_respects_equiv(pres_tx(), fam, target);
+}
+
+/// The pre-transvection F-family `[config(l,0), xᵐ, d, b_1, …, b_n]` (`d = Gen2`, `b_j = Gen(2+j)`):
+/// `[config(l,0), xᵐ]` followed by the `n+1` free stable letters `Gen2, …, Gen(n+2)`.
+pub open spec fn txd_b_family(l: nat, m: nat, n: nat) -> Seq<Word> {
+    seq![config_word(l, 0), symbol_power(Symbol::Gen(1), m)]
+        + Seq::new((n + 1) as nat, |i: int| seq![Symbol::Gen((2 + i) as nat)])
+}
+
+/// **Rungs (ii)/(iii)** — `[config(l,0), xᵐ, d, b_1, …, b_n]` is FREE in `free(n+3)`.  Iterate the
+/// generic free-stable-letter tower (`f_free_tower`) `n+1` times over the rung-(i) seed
+/// `[config(l,0), xᵐ]` free in `pres_tx = free(2)`: each adjoined `Gen2, …, Gen(n+2)` is a free
+/// stable letter, and the tower closed form gives `free_stable_tower(pres_tx, n+1) == free(n+3)` (same
+/// `n+3` generators, no relators).  The natural tower order puts `d=Gen2` at index 2 then `b_1..b_n` —
+/// exactly φ_F's order modulo `d ↦ b_l·d` (handled by the transvection (iv)).
+pub proof fn lemma_txd_b_free(l: nat, m: nat, n: nat)
+    requires
+        m >= 1,
+    ensures
+        is_free_family(free_group((n + 3) as nat), txd_b_family(l, m, n)),
+{
+    let seed = seq![config_word(l, 0), symbol_power(Symbol::Gen(1), m)];
+    assert(presentation_valid(pres_tx())) by { reveal(presentation_valid); }
+    lemma_tx_image_free(l, m);                                   // is_free_family(pres_tx, seed)
+    // iterate the tower n+1 times.
+    lemma_free_stable_tower_extends(pres_tx(), seed, (n + 1) as nat);
+    // tower == free_group(n+3): num_gens 2+(n+1)=n+3, relators empty.
+    lemma_free_stable_tower_closed(pres_tx(), (n + 1) as nat);
+    assert(free_stable_tower(pres_tx(), (n + 1) as nat) == free_group((n + 3) as nat)) by {
+        assert(free_stable_tower(pres_tx(), (n + 1) as nat).num_generators == 2 + (n + 1));
+        assert(free_stable_tower(pres_tx(), (n + 1) as nat).relators == pres_tx().relators);
+        assert(pres_tx().relators =~= Seq::<Word>::empty());
+        assert(free_group((n + 3) as nat).relators =~= Seq::<Word>::empty());
+    }
+    // family closed form: seed ++ [Gen2, …, Gen(n+2)] == txd_b_family.
+    lemma_free_stable_family_closed(pres_tx(), seed, (n + 1) as nat);
+    assert(free_stable_family(pres_tx(), seed, (n + 1) as nat) =~= txd_b_family(l, m, n)) by {
+        // free_stable_letter(pres_tx.num_generators=2, i) = [Gen(2+i)].
+        assert(Seq::new((n + 1) as nat, |i: int| free_stable_letter(2, i))
+            =~= Seq::new((n + 1) as nat, |i: int| seq![Symbol::Gen((2 + i) as nat)]));
+    }
 }
 
 /// One direction of `lemma_pa_data_isomorphic` (a-side⟹b-side when `fwd`, else b-side⟹a-side).
