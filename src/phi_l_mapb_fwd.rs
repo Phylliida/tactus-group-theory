@@ -26,7 +26,13 @@ use crate::f_free::{stable_emb, free_stable_data, is_free_family, lemma_extend_s
 use crate::machine_group::lemma_single_hnn_base_faithful;
 use crate::pa_data::{pa_data, pa_rhs, pa_assoc, pa_b_base, lemma_pa_data_shape, lemma_pa_data_valid};
 use crate::phi_l_mapb::{phi_l_src, phi_F_family, sigma_betas, lemma_phi_F_family_free,
-    lemma_phi_l_src_len, lemma_phi_l_src_valid, lemma_phi_F_on_config};
+    lemma_phi_l_src_len, lemma_phi_l_src_valid, lemma_phi_F_on_config, lemma_mapb_factor_source,
+    lemma_pa_data_isomorphic};
+use crate::phi_l_pinch::lemma_map_a_forward;
+use crate::phi_l_lift::b_words;
+use crate::phi_l_maps::a_words;
+use crate::h3_ii::h2_II;
+use crate::f_free_a1::{betas, lemma_betas_index};
 use crate::r_prime::{sigma_backsat, lemma_config_reflect_full, lemma_config_word_valid2};
 use crate::r_prime_b::{pa_rhs_emb, sigma_fwdsat, lemma_pa_rhs_reflect_full, lemma_phi_F_on_pa_rhs};
 use crate::free_basis::config_emb;
@@ -634,6 +640,74 @@ pub proof fn lemma_mapb_M2(mm: ModMachine, n: nat, m: nat, l: nat, bet: Seq<nat>
         lemma_mapb_M2(mm, n, m, l, bet, wshort);
         lemma_equiv_transitive(src, w, wshort, empty_word());
     }
+}
+
+// ----------------------------------------------------------------------------
+// map_b forward — the backward crux direction (Route II factoring assembled).
+// ----------------------------------------------------------------------------
+
+/// **`map_b` FORWARD (faithful)**: `emb(b_words, w) ≡_{h2_II} ε ⟹ w ≡_{P_A} ε`.  Route II
+/// (factoring): `emb(b_words, w) = emb(a_words, emb(φ_l_src, w))` (M1) ⟹ (map_a forward)
+/// `emb(φ_l_src, w) ≡_{P_A} ε` ⟹ (M2 = φ_l_src injective on P_A) `w ≡_{P_A} ε`.  With the
+/// von-Dyck-backward half (DONE), this completes `map_b` as a FAITHFUL embedding `P_A ↪ h2_II`.
+pub proof fn lemma_map_b_forward(mm: ModMachine, n: nat, m: nat, l: nat, alphas: Seq<nat>, w: Word)
+    requires
+        mod_machine_wf(mm),
+        1 <= l <= 2 * n,
+        2 * n < m,
+        !alphas.contains(0nat),
+        alphas.no_duplicates(),
+        forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]),
+        sigma_backsat(betas(alphas), m, l),
+        sigma_fwdsat(betas(alphas), m, l),
+        word_valid(w, (n + 4) as nat),
+        equiv_in_presentation(h2_II(mm, n, m, alphas),
+            apply_embedding(b_words(mm, n, m, l), w), empty_word()),
+    ensures
+        equiv_in_presentation(hnn_presentation(pa_data(n, m, betas(alphas))), w, empty_word()),
+{
+    let bet = betas(alphas);
+    let phi = phi_l_src(n, m, l);
+    let pw = apply_embedding(phi, w);
+    let h2ii = h2_II(mm, n, m, alphas);
+    lemma_betas_index(alphas);
+
+    // M1: emb(b_words, w) = emb(a_words, pw) ⟹ emb(a_words, pw) ≡_{h2_II} ε.
+    lemma_mapb_factor_source(mm, n, m, l, w);
+    assert(apply_embedding(b_words(mm, n, m, l), w) =~= apply_embedding(a_words(mm, n), pw));
+    assert(equiv_in_presentation(h2ii, apply_embedding(a_words(mm, n), pw), empty_word()));
+
+    // pw valid over n+4.
+    lemma_phi_l_src_valid(n, m, l);
+    lemma_phi_l_src_len(n, m, l);
+    lemma_apply_embedding_valid(phi, w, (n + 4) as nat);
+
+    // map_a forward ⟹ pw ≡_{P_A} ε.
+    lemma_map_a_forward(mm, n, m, alphas, pw);
+    assert(equiv_in_presentation(hnn_presentation(pa_data(n, m, bet)), pw, empty_word()));
+
+    // betas side conditions (no-duplicates, numbers_word) + pa iso.
+    assert forall|i: int| 0 <= i < bet.len() implies numbers_word(n, m, #[trigger] bet[i]) by {
+        if i == 0 { assert(bet[0] == 0); } else { assert(bet[i] == alphas[i - 1]); }
+    }
+    assert(bet.no_duplicates()) by {
+        assert forall|i: int, j: int|
+            0 <= i < bet.len() && 0 <= j < bet.len() && i != j implies bet[i] != bet[j] by {
+            if i == 0 {
+                assert(bet[j] == alphas[j - 1]);
+                assert(alphas.contains(alphas[j - 1]));
+            } else if j == 0 {
+                assert(bet[i] == alphas[i - 1]);
+                assert(alphas.contains(alphas[i - 1]));
+            } else {
+                assert(bet[i] == alphas[i - 1] && bet[j] == alphas[j - 1]);
+            }
+        }
+    }
+    lemma_pa_data_isomorphic(mm, n, m, alphas);                // hnn_associations_isomorphic(pa_data(bet))
+
+    // M2 ⟹ w ≡_{P_A} ε.
+    lemma_mapb_M2(mm, n, m, l, bet, w);
 }
 
 } // verus!
