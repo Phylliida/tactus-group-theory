@@ -53,6 +53,7 @@ use crate::free_family_perm::{conjugate_family, lemma_free_family_conjugate,
 use crate::f_free::is_free_family;
 use crate::f_free_tower::{free_stable_tower, free_stable_family, free_stable_letter,
     lemma_free_stable_tower_extends, lemma_free_stable_tower_closed, lemma_free_stable_family_closed};
+use crate::free_family_perm::{transvect_emb, lemma_free_family_transvect};
 
 verus! {
 
@@ -524,6 +525,135 @@ pub proof fn lemma_txd_b_free(l: nat, m: nat, n: nat)
         // free_stable_letter(pres_tx.num_generators=2, i) = [Gen(2+i)].
         assert(Seq::new((n + 1) as nat, |i: int| free_stable_letter(2, i))
             =~= Seq::new((n + 1) as nat, |i: int| seq![Symbol::Gen((2 + i) as nat)]));
+    }
+}
+
+/// **`φ_F`'s image family** `[config(l,0), xᵐ, b_l·d, b_1, …, b_n]` — `phi_l_src` restricted to the
+/// `n+3` F-generators (`b_l·d = [alphabet_letter(3,n,l), Gen2]`, `b_j = Gen(2+j)`).
+pub open spec fn phi_F_family(n: nat, m: nat, l: nat) -> Seq<Word> {
+    seq![config_word(l, 0), symbol_power(Symbol::Gen(1), m),
+         seq![alphabet_letter(pa_b_base(), n, l), Symbol::Gen(2)]]
+        + Seq::new(n, |j: int| seq![Symbol::Gen((3 + j) as nat)])
+}
+
+/// **(A) φ_F injective on free F** = `is_free_family(free(n+3), phi_F_family)`.  Rung (iv): apply the
+/// Nielsen transvection `d ↦ b_l·d` (left-multiply index-2 generator `d=Gen2` by the b-letter `s =
+/// alphabet_letter(3,n,l)`) to rungs (ii)/(iii)'s `[config(l,0),xᵐ,d,b_1..b_n]`.  Since each b/d
+/// generator of `txd_b_family` is a single gen, `emb_symbol(txd_b_family, s) = [s]`, so the
+/// transvected family is exactly `phi_F_family`.
+pub proof fn lemma_phi_F_family_free(n: nat, m: nat, l: nat)
+    requires
+        1 <= l <= 2 * n,
+        m >= 1,
+    ensures
+        is_free_family(free_group((n + 3) as nat), phi_F_family(n, m, l)),
+{
+    let s = alphabet_letter(pa_b_base(), n, l);
+    let base = txd_b_family(l, m, n);                            // [config(l,0),xᵐ,Gen2,..,Gen(n+2)]
+    let fg = free_group((n + 3) as nat);
+    crate::higman_operations::lemma_free_group_valid((n + 3) as nat);  // presentation_valid(fg)
+    lemma_txd_b_free(l, m, n);                                   // is_free_family(fg, base)
+    assert(base.len() == n + 3);
+    // s valid over n+3, generator_index(s) != 2.
+    let j = generator_index(s);
+    assert(symbol_valid(s, (n + 3) as nat) && j != 2) by {
+        if l <= n {
+            assert(s == Symbol::Gen((3 + l - 1) as nat));       // Gen(2+l), 2+l ∈ [3, n+2]
+            assert(j == 3 + l - 1);
+        } else {
+            assert(s == Symbol::Inv((3 + (l - n) - 1) as nat)); // Inv(2+(l-n)), 2+(l-n) ∈ [3, n+2]
+            assert(j == 3 + (l - n) - 1);
+        }
+    }
+    // apply transvection.
+    lemma_free_family_transvect(fg, base, 2, s);
+    let nf = compose_embeddings(base, transvect_emb(base.len(), 2, s));
+    // nf =~= phi_F_family.
+    assert(nf =~= phi_F_family(n, m, l)) by {
+        lemma_phi_F_compose_eq(n, m, l);
+    }
+}
+
+/// `compose(txd_b_family, transvect_emb(n+3, 2, alphabet_letter(3,n,l))) =~= phi_F_family` — the
+/// per-generator check: index 2 becomes `[s]·d = b_l·d` (b/d gens are single, so `emb_symbol = [s]`),
+/// all others unchanged.
+proof fn lemma_phi_F_compose_eq(n: nat, m: nat, l: nat)
+    requires
+        1 <= l <= 2 * n,
+    ensures
+        compose_embeddings(txd_b_family(l, m, n),
+            transvect_emb(txd_b_family(l, m, n).len(), 2, alphabet_letter(pa_b_base(), n, l)))
+        =~= phi_F_family(n, m, l),
+{
+    let s = alphabet_letter(pa_b_base(), n, l);
+    let base = txd_b_family(l, m, n);
+    let k = base.len();                                          // n+3
+    let t = transvect_emb(k, 2, s);
+    let nf = compose_embeddings(base, t);
+    let target = phi_F_family(n, m, l);
+    assert(k == n + 3);
+    // base indexing: [0]=config, [1]=xᵐ, [2+i]=Gen(2+i) for i∈[0,n].
+    let tail = Seq::new((n + 1) as nat, |i: int| seq![Symbol::Gen((2 + i) as nat)]);
+    let head2 = seq![config_word(l, 0), symbol_power(Symbol::Gen(1), m)];
+    assert(base == head2 + tail);
+    assert(head2.len() == 2);
+    assert forall|g: int| 2 <= g < n + 3 implies base[g] == seq![Symbol::Gen(g as nat)] by {
+        assert(base[g] == tail[g - 2]);
+        assert(tail[g - 2] == seq![Symbol::Gen((2 + (g - 2)) as nat)]);
+    }
+    // target indexing.
+    let thead = seq![config_word(l, 0), symbol_power(Symbol::Gen(1), m),
+        seq![s, Symbol::Gen(2)]];
+    let ttail = Seq::new(n, |j: int| seq![Symbol::Gen((3 + j) as nat)]);
+    assert(target == thead + ttail);
+    assert(thead.len() == 3);
+    assert(nf.len() == k == n + 3);
+    assert(target.len() == n + 3);
+    let jj = generator_index(s);
+    assert(jj != 2 && 3 <= jj < n + 3) by {
+        if l <= n { assert(s == Symbol::Gen((2 + l) as nat)); assert(jj == 2 + l); }
+        else { assert(s == Symbol::Inv((2 + (l - n)) as nat)); assert(jj == 2 + (l - n)); }
+    }
+    assert forall|g: int| 0 <= g < n + 3 implies nf[g] =~= target[g] by {
+        assert(nf[g] == apply_embedding(base, t[g]));
+        if g == 2 {
+            // t[2] = [s, Gen2]; emb(base, [s,Gen2]) = emb_symbol(base,s) + base[2] = [s] + [Gen2].
+            assert(t[2] == seq![s, Symbol::Gen(2)]);
+            reveal_with_fuel(apply_embedding, 3);
+            // emb_symbol(base, s) = [s]  (base[jj] = [Gen(jj)] single gen).
+            assert(base[jj as int] == seq![Symbol::Gen(jj)]);
+            assert(apply_embedding_symbol(base, s) =~= seq![s]) by {
+                match s {
+                    Symbol::Gen(gg) => { assert(gg == jj); },
+                    Symbol::Inv(gg) => {
+                        assert(gg == jj);
+                        reveal_with_fuel(inverse_word, 2);
+                    },
+                }
+            }
+            assert(base[2] == seq![Symbol::Gen(2)]);
+            assert(nf[2] =~= seq![s] + seq![Symbol::Gen(2)]);
+            assert(target[2] == thead[2]);
+            assert(thead[2] == seq![s, Symbol::Gen(2)]);
+        } else {
+            // t[g] = [Gen(g)]; emb(base, [Gen(g)]) = base[g].
+            assert(t[g] == seq![Symbol::Gen(g as nat)]);
+            reveal_with_fuel(apply_embedding, 2);
+            lemma_concat_empty_right(base[g as int]);
+            assert(apply_embedding(base, seq![Symbol::Gen(g as nat)]) =~= base[g as int]);
+            if g == 0 {
+                assert(base[0] == config_word(l, 0));
+                assert(target[0] == thead[0]);
+            } else if g == 1 {
+                assert(base[1] == symbol_power(Symbol::Gen(1), m));
+                assert(target[1] == thead[1]);
+            } else {
+                // g ∈ [3, n+2]: base[g]=[Gen(g)], target[g]=ttail[g-3]=[Gen(3+(g-3))]=[Gen(g)].
+                assert(base[g] == seq![Symbol::Gen(g as nat)]);
+                assert(target[g] == ttail[g - 3]);
+                assert(ttail[g - 3] == seq![Symbol::Gen((3 + (g - 3)) as nat)]);
+            }
+        }
     }
 }
 
