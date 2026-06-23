@@ -334,4 +334,51 @@ The gating unknown narrows to **"how many compile-fix cycles does the type-swapp
 — measurable, not open-ended. **Both this session and the peer independently converge on the same
 cheapest probe:** predicate-ify ONE `equiv_in_presentation`-using lemma and watch whether SMT still
 discharges it automatically; if it doesn't, the mechanical estimate is optimistic. This is the §4
-first-brick prototype — still the right first move, **still gated on Danielle's Fork-A go/no-go.**
+first-brick prototype — the right first move.
+
+---
+
+## 8. The §4 first-brick prototype — RUN, result POSITIVE (2026-06-23, session 12)
+
+The non-committing probe of §4 / §7's "cheapest signal" was **built and verified**:
+`src/pred_presentation.rs` (commit `75ed225`), a faithful predicate-base port of the WHOLE of
+`presentation.rs` — `PredPresentation { num_generators, relators: spec_fn(Word)->bool }`,
+word-carrying `PredDerivationStep`, `apply_step_pred`, `pred_derivation_produces`,
+`equiv_in_pred_presentation`, the closure algebra (`refl`/`concat`/`transitive`), and the genuinely-new
+reversibility core (`invert_step_with_context_pred`, `lemma_pred_single_step_reversible`,
+`lemma_pred_step_preserves_word_valid`, `lemma_pred_derivation_reversible`, `lemma_pred_equiv_symmetric`).
+
+**Result: `8 verified, 0 errors` on the first try — identical to the original `presentation` module
+(8/0).** Kept SEPARATE from the finite tower (`#[cfg(verus_keep_ghost)] pub mod pred_presentation`),
+so reversible (delete file + line) and zero regression risk. What it empirically establishes:
+
+- **The predicate type works in the tactus Lean backend.** `spec_fn(Word)->bool` as a struct field +
+  `(p.relators)(w)` application + `#![trigger (p.relators)(w)]` all verify (consistent with the
+  already-verified `tower_peel`/`kp_pinch` spec_fn usage). No closure-ABI friction at this layer.
+- **§7c CONFIRMED at the code level:** the relator-set-agnostic algebra (`pred_derivation_produces`,
+  `equiv`, refl, concat, transitive) ported **byte-for-byte modulo renames** and closed unchanged.
+- **§6a + §7d CONFIRMED:** the word-carrying relator core ported with **no new math and no witness
+  friction.** The `(p.relators)(relator)` guard, extracted from `apply_step_pred(...) == Some(_)`,
+  feeds `word_valid` exactly as `presentation_valid` + the index bound did; inverting a
+  `RelatorInsert{relator}` to `RelatorDelete{relator}` carries the SAME word ⟹ `P(relator)` preserved
+  with NO `choose` — precisely §7d's prediction.
+
+**What this DOES settle:** the *foundational* layer of scoping #2 — "is a predicate base + the
+derivation/equivalence algebra mechanically portable with SMT still closing?" = **YES**, demonstrated,
+not just argued. The "type swap + SMT still closes" hypothesis holds where the math is relator-agnostic
+(the ~319 abstract consumers' substrate) and where the small genuinely-new core lives.
+
+**What this does NOT settle (honest scope):** this is the self-contained `presentation.rs` core only.
+It does NOT exercise (a) the indexed AFP/tower bookkeeping (~13 functions, the `shift` machinery,
+`amalgamated_free_product.rs:161-175`), nor (b) `lemma_single_step_preserves_syls`'s full tower context,
+nor (c) whether the ~319 abstract sites recompile without per-site fixes once the base type is swapped
+under them. Those are the *bulk* of the labor and remain unmeasured — the probe de-risks the
+foundation and the method, not the total cycle count. The honest re-estimate of §7's three-part
+decomposition stands; part 1 (the genuinely-new core) is now **demonstrated tractable**.
+
+**Decision status:** the *finding* (Fork-A's foundation ports cleanly) is solid — act on it. The
+**multi-week full-build commitment remains Danielle's go/no-go** (it re-opens the 2026-06-21
+co-designed fork). This session deliberately did NOT proceed past the non-committing probe into the
+tower port. NEXT (pending Danielle's go): the next measurement up — port the base-relator case of
+`lemma_single_step_preserves_syls` over a predicate base (§4-probe step 3 proper, which needs a
+predicate `HNNData`/`shift`), the cheapest signal for part 2/3 of the labor.

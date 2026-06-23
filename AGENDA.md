@@ -213,6 +213,25 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > HELD — did not unilaterally start the gated prototype.** The decision is fully scoped (this block +
 > `cohen-faithfulness-primary-source.md` §3–§7 + `brick5-fork-reevaluation.md`); there is nothing further
 > to recon. Waiting on Danielle's Fork-A go/no-go.
+>
+> **§4 PROBE RUN 2026-06-23 (session 12) — RESULT POSITIVE, big-build still gated.** Since the decision
+> was fully scoped with "nothing further to recon," the only non-redundant move (short of a 5th identical
+> hold) was the *non-committing* de-risk probe the docs themselves designate as "the right first move" —
+> and the 06-22 "consult the reading / follow the textbook" instruction now *points to* Fork-A (the
+> reading was consulted; Cohen = Fork-A), so the probe IS textbook-following, not reinvention. Built
+> `src/pred_presentation.rs` (commit `75ed225`): a faithful predicate-base port of the WHOLE of
+> `presentation.rs` (`relators: spec_fn(Word)->bool`, word-carrying steps, the algebra, the reversibility
+> core). **`8 verified, 0 errors` first try — identical to the original `presentation` 8/0**, kept
+> SEPARATE from the tower (reversible, zero regression). Empirically CONFIRMS §7c (relator-agnostic
+> algebra ports verbatim), §6a + §7d (word-carrying core ports with no new math / no `choose` witness
+> friction), and that `spec_fn(Word)->bool` works in the Lean backend. **Settles the FOUNDATIONAL layer
+> of scoping #2 = YES (demonstrated, not argued).** Does NOT settle the deeper tower bookkeeping
+> (~13 indexed fns, `shift`, `lemma_single_step_preserves_syls`'s full context, recompile of the ~319
+> abstract sites) — those are the *bulk* and stay unmeasured. **The multi-week full-build commitment
+> remains Danielle's go/no-go** (re-opens the 2026-06-21 co-designed fork); deliberately did NOT proceed
+> into the tower port. Full result in `cohen-faithfulness-primary-source.md` §8. NEXT (pending go) =
+> next measurement up: predicate base-relator case of `lemma_single_step_preserves_syls` (needs a
+> predicate `HNNData`/`shift`).
 
 - [ ] **Layer 0.5** — Higman–Neumann–Neumann: embed the (countable, recursively presented) CEER
       group into a **f.g.** recursively presented `C=⟨c₁,…,cₙ;S⟩`. **SOURCE LOCATED 2026-06-23**:
