@@ -176,7 +176,7 @@ pub open spec fn a_words(mm: ModMachine, n: nat) -> Seq<Word> {
 
 /// `a_words` on a b-block index `[3, n+2]` is the literal `b`-generator (the F-b-gen `Gen(2+d)`
 /// maps to the h2-b-gen `Gen(b_base+d-1) = Gen(nk+n+d-1)`).  A shift by `nk+n-3` on the b-block.
-proof fn lemma_a_words_bblock(mm: ModMachine, n: nat, k: int)
+pub proof fn lemma_a_words_bblock(mm: ModMachine, n: nat, k: int)
     requires
         3 <= k < n + 3,
     ensures
@@ -200,7 +200,7 @@ proof fn lemma_a_words_bblock(mm: ModMachine, n: nat, k: int)
 /// **The digit relabel**: `apply_embedding(a_words, [alphabet_letter(3,n,d)]) =~=
 /// [alphabet_letter(nk+n,n,d)]` for `1 ≤ d ≤ 2n`.  The F-b-block letter for digit `d` maps to the
 /// h2-b-block letter for `d` (both `+` for `d≤n`, both `⁻¹` for `d>n`; the b-block shift `+nk+n-3`).
-proof fn lemma_a_words_on_alpha_letter(mm: ModMachine, n: nat, d: nat)
+pub proof fn lemma_a_words_on_alpha_letter(mm: ModMachine, n: nat, d: nat)
     requires
         1 <= d <= 2 * n,
     ensures
@@ -291,7 +291,7 @@ pub proof fn lemma_a_words_relabel_wc(mm: ModMachine, n: nat, m: nat, gamma: nat
 // ----------------------------------------------------------------------------
 
 /// `a_words`'s first three entries: `[0]=t, [1]=x, [2]=d` (= `Gen(d_idx)`), and `|a_words|=n+4`.
-proof fn lemma_a_words_head(mm: ModMachine, n: nat)
+pub proof fn lemma_a_words_head(mm: ModMachine, n: nat)
     ensures
         a_words(mm, n)[0] == seq![Symbol::Gen(0)],
         a_words(mm, n)[1] == seq![Symbol::Gen(1)],
