@@ -25,7 +25,11 @@ use crate::presentation::{Presentation, presentation_valid, equiv_in_presentatio
 use crate::presentation_lemmas::{lemma_equiv_concat_left, lemma_equiv_concat_right};
 use crate::machine_group::{config_word, symbol_power, signed_power, gsconfig, CanonLetter,
     canl_eval, canw_eval, gexp, sym_exp, lemma_signed_power_add, lemma_signed_power_valid,
-    lemma_inverse_word_concat, lemma_gexp_concat, lemma_gexp_signed_power};
+    lemma_inverse_word_concat, lemma_gexp_concat, lemma_gexp_signed_power, lemma_gexp_inverse,
+    sconfig, lemma_sconfig_nat, base_A, lemma_base_A_valid,
+    lemma_no_relator_equiv_implies_freely_equivalent};
+use crate::config_reduce::{is_canl_word, canon_represents, lemma_canon_represents_eval};
+use crate::presentation_lemmas::lemma_freely_equivalent_implies_equiv;
 use crate::ii_subset::lemma_signed_power_inverse;
 use crate::benign::{apply_embedding, apply_embedding_symbol, in_generated_subgroup,
     factors_from_generators, concat_all, is_generator_or_inverse};
@@ -834,6 +838,153 @@ pub proof fn lemma_retraction(n: nat, m: nat, l: nat, u: Word, bet: Seq<nat>)
     crate::machine_group::lemma_word_valid_mono(pword, 2, (n + 3) as nat);
     lemma_equiv_symmetric(fg, pword, pp_u);
     lemma_equiv_transitive(fg, pp_u, pword, g);
+}
+
+// ----------------------------------------------------------------------------
+// factors → canon (the `C_bet` builder): a config_emb(bet) membership as a canw with coords ⊆ bet.
+// ----------------------------------------------------------------------------
+
+/// A `config_emb(bet)` factor as a `CanonLetter` (coordinate `bet[j]`, sign from gen-vs-inverse).
+pub open spec fn bet_factor_to_canl(bet: Seq<nat>, f: Word) -> CanonLetter {
+    let j = choose|j: int| 0 <= j < bet.len()
+        && (f == config_word(bet[j], 0) || f == inverse_word(config_word(bet[j], 0)));
+    if f == config_word(bet[j], 0) {
+        CanonLetter { r: bet[j] as int, s: 0, e: 1 }
+    } else {
+        CanonLetter { r: bet[j] as int, s: 0, e: -1 }
+    }
+}
+
+/// One factor is a `canl`-word at a `bet`-coordinate.
+proof fn lemma_bet_factor_to_canl(bet: Seq<nat>, f: Word)
+    requires
+        is_generator_or_inverse(config_emb(bet), f),
+    ensures
+        is_canl_word(f, bet_factor_to_canl(bet, f)),
+        bet_factor_to_canl(bet, f).s == 0,
+        exists|j: int| 0 <= j < bet.len() && bet[j] as int == bet_factor_to_canl(bet, f).r,
+{
+    let j = choose|j: int| 0 <= j < bet.len()
+        && (f == config_word(bet[j], 0) || f == inverse_word(config_word(bet[j], 0)));
+    assert(0 <= j < bet.len()
+        && (f == config_word(bet[j], 0) || f == inverse_word(config_word(bet[j], 0)))) by {
+        assert(config_emb(bet)[j] == config_word(bet[j], 0));
+    }
+    let c = bet_factor_to_canl(bet, f);
+    lemma_sconfig_nat(bet[j] as int, 0);   // config_word(bet[j],0) =~= sconfig(bet[j],0)
+    assert(config_word(bet[j], 0) =~= sconfig(bet[j] as int, 0));
+    if f == config_word(bet[j], 0) {
+        assert(c == CanonLetter { r: bet[j] as int, s: 0, e: 1 });
+        assert(f =~= sconfig(c.r, c.s));
+    } else {
+        assert(c == CanonLetter { r: bet[j] as int, s: 0, e: -1 });
+        assert(f =~= inverse_word(sconfig(c.r, c.s)));
+    }
+}
+
+/// **`C_bet` builder**: a `config_emb(bet)` factor list, as a canw with the same value and coords ⊆ bet.
+pub proof fn lemma_membership_to_canon(bet: Seq<nat>, factors: Seq<Word>) -> (canon: Seq<CanonLetter>)
+    requires
+        factors_from_generators(config_emb(bet), factors),
+    ensures
+        concat_all(factors) =~= canw_eval(canon),
+        forall|i: int| 0 <= i < canon.len() ==> {
+            &&& (#[trigger] canon[i]).s == 0
+            &&& (exists|j: int| 0 <= j < bet.len() && bet[j] as int == canon[i].r)
+        },
+{
+    let canon = Seq::new(factors.len(), |i: int| bet_factor_to_canl(bet, factors[i]));
+    assert(canon_represents(factors, canon)) by {
+        assert forall|i: int| 0 <= i < factors.len()
+            implies is_canl_word(#[trigger] factors[i], canon[i]) by {
+            assert(is_generator_or_inverse(config_emb(bet), factors[i]));
+            lemma_bet_factor_to_canl(bet, factors[i]);
+        }
+    }
+    lemma_canon_represents_eval(factors, canon);
+    assert forall|i: int| 0 <= i < canon.len() implies {
+        &&& (#[trigger] canon[i]).s == 0
+        &&& (exists|j: int| 0 <= j < bet.len() && bet[j] as int == canon[i].r)
+    } by {
+        assert(canon[i] == bet_factor_to_canl(bet, factors[i]));
+        assert(is_generator_or_inverse(config_emb(bet), factors[i]));
+        lemma_bet_factor_to_canl(bet, factors[i]);
+    }
+    canon
+}
+
+// ----------------------------------------------------------------------------
+// free → base_A — a {t,x}-word equivalence in free(n+3) holds in base_A (free reduction is sound).
+// ----------------------------------------------------------------------------
+
+/// `w1 ≡ w2` over a free group ⟹ `w1 ≡ w2` in any presentation (free reduction is universally sound),
+/// for words valid over the target.  Here: free(n+3) → base_A for `{t,x}`-words.
+pub proof fn lemma_free_to_base_A(k: nat, w1: Word, w2: Word)
+    requires
+        equiv_in_presentation(free_group(k), w1, w2),
+        word_valid(w1, 3),
+        word_valid(w2, 3),
+    ensures
+        equiv_in_presentation(base_A(), w1, w2),
+{
+    assert(free_group(k).relators.len() == 0);
+    lemma_no_relator_equiv_implies_freely_equivalent(free_group(k), w1, w2);
+    lemma_base_A_valid();
+    assert(base_A().num_generators == 3);
+    lemma_freely_equivalent_implies_equiv(base_A(), w1, w2);
+}
+
+// ----------------------------------------------------------------------------
+// gexp(1) of a config-product factor list is 0 (each factor is a conjugate of t).
+// ----------------------------------------------------------------------------
+
+/// `gexp(1, config_word(r,0)) == 0` and `gexp(1, inverse_word(config_word(r,0))) == 0`.
+pub proof fn lemma_gexp1_config_word(r: nat)
+    ensures
+        gexp(1, config_word(r, 0)) == 0,
+        gexp(1, inverse_word(config_word(r, 0))) == 0,
+{
+    let g0: Word = seq![Symbol::Gen(0)];
+    lemma_config_word_zero_form(r);   // config_word(r,0) =~= sp(1,-r)+[Gen0]+sp(1,r)
+    lemma_gexp_concat(1, signed_power(1, -(r as int)) + g0, signed_power(1, r as int));
+    lemma_gexp_concat(1, signed_power(1, -(r as int)), g0);
+    lemma_gexp_signed_power(1, 1, -(r as int));   // -r
+    lemma_gexp_signed_power(1, 1, r as int);      // r
+    assert(gexp(1, g0) == 0) by { reveal_with_fuel(gexp, 2); }
+    crate::machine_group::lemma_gexp_inverse(1, config_word(r, 0));   // gexp(1,inv w) = -gexp(1,w)
+}
+
+/// `gexp(1, concat_all(factors)) == 0` for a `config_emb(bet)` factor list.
+pub proof fn lemma_gexp1_config_factors(bet: Seq<nat>, factors: Seq<Word>)
+    requires
+        factors_from_generators(config_emb(bet), factors),
+    ensures
+        gexp(1, concat_all(factors)) == 0,
+    decreases factors.len(),
+{
+    if factors.len() == 0 {
+        assert(concat_all(factors) =~= empty_word());
+    } else {
+        let rest = factors.drop_first();
+        assert(factors_from_generators(config_emb(bet), rest)) by {
+            assert forall|k: int| 0 <= k < rest.len()
+                implies is_generator_or_inverse(config_emb(bet), #[trigger] rest[k]) by {
+                assert(rest[k] == factors[k + 1]);
+            }
+        }
+        lemma_gexp1_config_factors(bet, rest);
+        assert(concat_all(factors) =~= factors.first() + concat_all(rest));
+        lemma_gexp_concat(1, factors.first(), concat_all(rest));
+        // factors[0] = config_word(bet[j],0)^{±1}, gexp(1)=0.
+        assert(is_generator_or_inverse(config_emb(bet), factors[0]));
+        let j = choose|j: int| 0 <= j < config_emb(bet).len()
+            && (factors[0] == #[trigger] config_emb(bet)[j]
+                || factors[0] == inverse_word(config_emb(bet)[j]));
+        assert(0 <= j < config_emb(bet).len()
+            && (factors[0] == config_emb(bet)[j] || factors[0] == inverse_word(config_emb(bet)[j])));
+        assert(config_emb(bet)[j] == config_word(bet[j], 0));
+        lemma_gexp1_config_word(bet[j]);
+    }
 }
 
 // ----------------------------------------------------------------------------
