@@ -640,3 +640,64 @@ than half-opening FA-9a, because FA-9a's first real question (the tower Cayley-p
 a focused trace, not a session-tail rush — the exact failure mode the session-15 note flagged. The FA-9
 decomposition above is the precise handoff; pred_hnn + reduction-reuse + FA-8 mean FA-9a is a small
 clean brick and FA-9b is the last big one.
+
+## 13. FA-9a COMPLETE — the predicate tower scaffold ported, Cayley leapfrog confirmed (2026-06-23, session 17)
+
+**Result.** `src/pred_tower.rs` verifies **13 verified, 0 errors** (`./check.sh --verify-module
+pred_tower`). Full crate **2159 verified, 20 errors** = baseline 2146/20 **+ 13, no regression** (the
+20 are the pre-existing runtime/todd_coxeter `tactus_auto` rejections + the machine_group glob-ambiguity,
+all unchanged). Additive/reversible (`M lib.rs` + `?? src/pred_tower.rs`).
+
+**Cayley-leapfrog CONFIRMED by census (the session-16 first-question, answered before porting).** Grepped
+every `tower.rs` identifier `britton_via_tower.rs` references. It consumes from the tower **only**:
+`tower_afp_data` (91), `tower_presentation` (51), `lemma_tower_afp_data_valid` (36),
+`lemma_tower_num_generators` (25), `lemma_tower_valid` (19), `tower_textbook_chain` (13),
+`tower_textbook_prereqs_at` (11), `lemma_g0_embeds_in_tower_textbook` (2). It references **ZERO**
+Cayley-path fns (`tower_h_prereqs_at`/`tower_cayley_chain`/`lemma_g0_embeds_in_tower`/`word_in_copy`/
+`curry` all 0) and zero Part-E scaffold *in code* (`level_at`/`translate_base_word`/`britton_lemma_via_tower`
+all 0; the lone `max_level` "ref" is a doc-comment at `britton_via_tower.rs:2040`). So `britton_lemma_full`
+threads `lemma_g0_embeds_in_tower_textbook` → `pred_normal_form_afp_textbook::lemma_afp_injectivity` (the
+FA-8 textbook engine), never the leapfrogged Cayley `normal_form_amalgamated::lemma_afp_injectivity`
+(@2533) / `h_prereqs` / `CosetTable` machinery (which has no pred analog).
+
+**What was ported / dropped.** Ported Parts A (`tower_afp_data`, `tower_presentation`), B
+(`lemma_tower_num_generators`, the private `lemma_word_valid_weaken`, `lemma_tower_valid`,
+`lemma_tower_afp_data_valid`), D (`tower_textbook_prereqs_at`, `tower_textbook_chain`,
+`lemma_g0_embeds_in_tower_textbook`), and E scaffold (`level_at`, `max_level`, `translate_base_word`,
+`britton_lemma_via_tower` — textbook/agnostic, port verbatim, kept for a faithful parallel even though
+FA-9b consumes none in code). **Dropped** the Cayley trio + `curry` + the unused `word_in_copy` (= old
+Part C).
+
+**The port was PURE FA-8-recipe type-swap, NO hand-rewrites** (as predicted: no `.relators[i]`/
+`get_relator`/`DerivationStep` index-friction in tower.rs). Symbol map applied:
+`HNNData→PredHNNData`, `Presentation→PredPresentation`, `AmalgamatedData→PredAmalgamatedData`,
+`equiv_in_presentation→equiv_in_pred_presentation`, `hnn_data_valid→hnn_pred_data_valid`,
+`hnn_associations_isomorphic→hnn_pred_associations_isomorphic`, `hnn_presentation→hnn_pred_presentation`,
+`amalgamated_free_product→amalgamated_free_product_pred`, `amalgamation_relators→amalgamation_relators_pred`,
+`free_product→free_product_pred`, `presentation_valid→pred_presentation_valid`,
+`amalgamated_data_valid→amalgamated_data_pred_valid`, `lemma_amalgamated_valid→lemma_amalgamated_pred_valid`,
+`identifications_isomorphic→pred_normal_form_amalgamated::identifications_isomorphic_pred`,
+`normal_form_afp_textbook::{action_preserves_canonical, lemma_afp_injectivity}→pred_*`. The one
+non-1:1 swap: finite `amalgamated_free_product::lemma_add_relators_num_generators(fp, rels)` →
+`pred_normal_form_afp_textbook::lemma_afp_num_gens_pred(fp, rels)` (FA-8's definitional num-gens helper).
+
+**Two compile-fix cycles (both trivial).** (1) `shift_word` is the AGNOSTIC word op in
+`crate::free_product` (NOT pred-prefixed) — reused verbatim per the FA-8 recipe, added explicit
+`use crate::free_product::shift_word;` (matching how `pred_amalgamated_free_product` imports it). (2)
+none — verified on the next run. The pred `lemma_afp_injectivity` requires are IDENTICAL to the finite
+ones modulo type-swap (`amalgamated_data_pred_valid` + `pred_presentation_valid(p1/p2)` +
+`identifications_isomorphic_pred` + `action_preserves_canonical`), all discharged by the same in-context
+lemmas, so the textbook embed body ported 1:1. Low-confidence trigger-inference notes (pred_tower.rs:114/
+115/159/161) are informational and identical to the finite `tower.rs` notes — left as-is for verbatim
+faithfulness, not annotated away.
+
+**NEXT = FA-9b** — port `britton_via_tower.rs` (8.7k, 169 proof + 32 spec) → `pred_britton_via_tower.rs`,
+the LAST normal-form brick. Dominant type-swap `HNNData→PredHNNData` (172 refs); reuses
+`crate::reduction::*` verbatim (fully presentation-agnostic, 0 pres refs); consumes pred_tower (this
+brick) + pred_hnn + FA-8's `pred_normal_form_afp_textbook`. Apply the FA-8 recipe + the SAME Cayley
+leapfrog (port the textbook-chain consumers, drop any Cayley-chain fns). Gating unknown (narrowed): does
+the HNN→tower derivation translation carry its own `.relators[i]`/`get_relator`/`DerivationStep`
+index-friction beyond the AFP classification? — census `get_relator`/`relator_index`/`DerivationStep`
+density in `britton_via_tower.rs` first to size the hand-rewrites. Main theorems = `britton_lemma_full`
+(@8678) + `britton_lemma`/`britton_lemma_unconditional`. After FA-9b, Cohen §1 (recognize A/Aᵢ/A₊/A₋ as
+p-HNN-of-free, read isos off, base-embeds-in-HNN) assembles Layer-2 completeness.

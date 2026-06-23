@@ -200,6 +200,20 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > A/Aᵢ/A₊/A₋, read isos off, base-embeds) assembles Layer-2 completeness. Full scope +
 > handoff in `cohen-faithfulness-primary-source.md` §11.
 >
+> **✅ FA-9a DONE 2026-06-23 (session 17) — `pred_tower.rs` 13/0, crate 2159/20 (+13, no regression).**
+> Port of `tower.rs` over the predicate base. **Cayley leapfrog CONFIRMED by census before porting:**
+> `britton_via_tower.rs` references ZERO Cayley-path tower fns (it threads
+> `lemma_g0_embeds_in_tower_textbook` → FA-8's `pred_normal_form_afp_textbook::lemma_afp_injectivity`
+> only). Ported Parts A/B/D + E scaffold (textbook/agnostic); **dropped** the Cayley trio
+> (`tower_cayley_chain`/`tower_h_prereqs_at`/`lemma_g0_embeds_in_tower`) + `curry`/`word_in_copy`. As
+> predicted: **PURE FA-8-recipe type-swap, NO hand-rewrites** (no `.relators[i]`/`get_relator`/
+> `DerivationStep` friction in tower.rs); only fix was importing the agnostic `crate::free_product::
+> shift_word` verbatim. Symbol-map + recipe detail in `cohen-faithfulness-primary-source.md` §13.
+> **NEXT = FA-9b** = port `britton_via_tower.rs` (8.7k, 169 proof + 32 spec) → `pred_britton_via_tower.rs`
+> (the big mechanical port): dominant `HNNData→PredHNNData` swap, reuse `crate::reduction::*` verbatim,
+> consume pred_tower + pred_hnn + FA-8. Census `get_relator`/`relator_index`/`DerivationStep` density
+> first to size hand-rewrites. Main theorems `britton_lemma_full`/`britton_lemma`/`_unconditional`.
+>
 > **✅ FORK-A STARTED 2026-06-23 (session 14) — elementary foundation arc DONE, ports VERBATIM.**
 > The completeness route is **Fork-A** (predicate presentation; the textbook route per
 > `docs/cohen-faithfulness-primary-source.md` §1/§10). Go taken on the standing "follow the textbook"

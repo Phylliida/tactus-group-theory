@@ -138,6 +138,14 @@ pub mod normal_form_afp_textbook;
 #[cfg(verus_keep_ghost)]
 pub mod pred_normal_form_afp_textbook;
 
+// FA-9a: predicate-base port of tower.rs (Fork-A Britton-via-tower scaffold).
+// The iterated AFP tower T_n over a PredHNNData base + the TEXTBOOK one-shot
+// embedding lemma_g0_embeds_in_tower_textbook (Cayley path leapfrogged — no pred
+// analog). Consumes pred_amalgamated_free_product + pred_normal_form_{amalgamated,
+// afp_textbook} (FA-8). Reversible, additive; consumed by the FA-9b britton port.
+#[cfg(verus_keep_ghost)]
+pub mod pred_tower;
+
 #[cfg(verus_keep_ghost)]
 pub mod britton_via_tower;
 
