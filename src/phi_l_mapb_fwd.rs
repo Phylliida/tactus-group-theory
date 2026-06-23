@@ -12,20 +12,32 @@
 use vstd::prelude::*;
 use crate::symbol::*;
 use crate::word::*;
-use crate::machine_group::{ModMachine, mod_machine_wf, lemma_strip_prefix_preserves_pinch,
-    lemma_prepend_preserves_pinch};
+use crate::machine_group::{ModMachine, mod_machine_wf, config_word, lemma_strip_prefix_preserves_pinch,
+    lemma_prepend_preserves_pinch, lemma_word_valid_mono, lemma_g_m_num_generators, g_m};
 use crate::benign::{apply_embedding, apply_embedding_symbol, in_generated_subgroup,
-    lemma_apply_embedding_concat};
-use crate::britton_via_tower::{has_pinch, has_pinch_at, has_adjacent_opposite_at, is_stable};
+    lemma_apply_embedding_concat, lemma_apply_embedding_inverse, lemma_apply_embedding_valid};
+use crate::britton_via_tower::{has_pinch, has_pinch_at, has_adjacent_opposite_at, is_stable,
+    has_stable_letter, stable_count, britton_lemma_full};
+use crate::hnn::{HNNData, hnn_relator, hnn_relators, hnn_presentation, stable_letter, stable_letter_inv,
+    hnn_associations_isomorphic, hnn_data_valid, lemma_base_embeds_in_hnn};
 use crate::higman_operations::{free_group, lemma_free_group_valid};
 use crate::f_free::{stable_emb, free_stable_data, is_free_family, lemma_extend_spanning,
-    lemma_apply_embedding_agree_prefix, lemma_word_valid_no_inner_stable};
-use crate::pa_data::{pa_data, pa_rhs, pa_assoc, pa_b_base, lemma_pa_data_shape};
-use crate::phi_l_mapb::{phi_l_src, phi_F_family, lemma_phi_F_family_free, lemma_phi_l_src_len};
-use crate::r_prime::{sigma_backsat, lemma_config_reflect_full};
-use crate::r_prime_b::{pa_rhs_emb, sigma_fwdsat, lemma_pa_rhs_reflect_full};
+    lemma_apply_embedding_agree_prefix, lemma_word_valid_no_inner_stable, lemma_extend_stable_count_eq};
+use crate::machine_group::lemma_single_hnn_base_faithful;
+use crate::pa_data::{pa_data, pa_rhs, pa_assoc, pa_b_base, lemma_pa_data_shape, lemma_pa_data_valid};
+use crate::phi_l_mapb::{phi_l_src, phi_F_family, sigma_betas, lemma_phi_F_family_free,
+    lemma_phi_l_src_len, lemma_phi_l_src_valid, lemma_phi_F_on_config};
+use crate::r_prime::{sigma_backsat, lemma_config_reflect_full, lemma_config_word_valid2};
+use crate::r_prime_b::{pa_rhs_emb, sigma_fwdsat, lemma_pa_rhs_reflect_full, lemma_phi_F_on_pa_rhs};
 use crate::free_basis::config_emb;
 use crate::word_numbering::numbers_word;
+use crate::presentation::{equiv_in_presentation, presentation_valid, lemma_equiv_transitive,
+    lemma_equiv_symmetric};
+use crate::presentation_lemmas::lemma_relator_is_identity;
+use crate::britton_infra::lemma_hnn_presentation_valid;
+use crate::machine_group::{lemma_emb_respects_source_equiv, lemma_stable_count_pos_has_stable,
+    lemma_stable_count_zero_no_stable};
+use crate::phi_l_pinch::lemma_pd_pinch_out;
 
 verus! {
 
@@ -384,6 +396,244 @@ proof fn lemma_mapb_pinch_spanning(mm: ModMachine, n: nat, m: nat, l: nat, bet: 
         assert(has_pinch_at(pd, w, 0, lo));
     }
     assert(has_pinch(pd, w)) by { assert(has_pinch_at(pd, w, 0, lo)); }
+}
+
+// ----------------------------------------------------------------------------
+// von Dyck — `φ_l_src` sends each `P_A` relator to (the σ-shifted) `P_A` relator (≡ ε).
+// ----------------------------------------------------------------------------
+
+/// **`φ_l_src` respects `P_A`'s relators**: `emb(φ_l_src, hnn_relator(pd, j)) ≡_{P_A} ε`.  The
+/// `j`-th `p`-conjugation relator `p⁻¹·config(γ,0)·p·pa_rhs(γ)⁻¹` maps (digit-scaling + the F-level
+/// family-(II) payoff `φ_F(pa_rhs(γ))=pa_rhs(σγ)`) to the σ(γ)-relator, which is a literal `P_A`
+/// relator since `σγ ∈ bet` (forward-saturation) — hence trivial.  This is φ_l_src's homomorphism
+/// condition `P_A → P_A`, consumed by the M2 Britton-peel recursion.
+pub proof fn lemma_phi_l_src_on_pa_relator(mm: ModMachine, n: nat, m: nat, l: nat, bet: Seq<nat>,
+    j: int)
+    requires
+        1 <= l <= 2 * n,
+        2 * n < m,
+        sigma_fwdsat(bet, m, l),
+        forall|i: int| 0 <= i < bet.len() ==> numbers_word(n, m, #[trigger] bet[i]),
+        0 <= j < bet.len(),
+    ensures
+        equiv_in_presentation(hnn_presentation(pa_data(n, m, bet)),
+            apply_embedding(phi_l_src(n, m, l), hnn_relator(pa_data(n, m, bet), j)), empty_word()),
+{
+    let pd = pa_data(n, m, bet);
+    let src = phi_l_src(n, m, l);
+    let pf = phi_F_family(n, m, l);
+    let st = (n + 3) as nat;
+    let gamma = bet[j];
+    let sgamma = (m * gamma + l) as nat;
+    let cfg = config_word(gamma, 0);
+    let rhs = pa_rhs(n, m, gamma);
+
+    lemma_pa_data_shape(n, m, bet);
+    lemma_pa_data_valid(n, m, bet);
+    lemma_hnn_presentation_valid(pd);
+    lemma_phi_l_src_len(n, m, l);
+    assert(stable_letter(pd) == Symbol::Gen(st) && stable_letter_inv(pd) == Symbol::Inv(st));
+    assert(pd.associations[j] == (cfg, rhs));
+    assert(word_valid(rhs, st));                              // hnn_data_valid: column valid over n+3
+
+    // hnn_relator(pd, j) = ((av + cfg) + cv) + inverse(rhs).
+    let av: Word = Seq::new(1, |_q: int| stable_letter_inv(pd));
+    let cv: Word = Seq::new(1, |_q: int| stable_letter(pd));
+    assert(av =~= seq![Symbol::Inv(st)] && cv =~= seq![Symbol::Gen(st)]);
+    let hr = hnn_relator(pd, j);
+    assert(hr == ((av + cfg) + cv) + inverse_word(rhs));
+    lemma_apply_embedding_concat(src, (av + cfg) + cv, inverse_word(rhs));
+    lemma_apply_embedding_concat(src, av + cfg, cv);
+    lemma_apply_embedding_concat(src, av, cfg);
+
+    // φ_l_src fixes p: emb(src, [Inv(st)]) = [Inv(st)], emb(src, [Gen(st)]) = [Gen(st)].
+    reveal_with_fuel(apply_embedding, 2);
+    assert(src[st as int] == seq![Symbol::Gen(st)]);
+    lemma_concat_empty_right(inverse_word(src[st as int]));
+    assert(apply_embedding(src, av) =~= inverse_word(src[st as int]));
+    assert(inverse_word(src[st as int]) =~= seq![Symbol::Inv(st)]) by { reveal_with_fuel(inverse_word, 2); }
+    lemma_concat_empty_right(src[st as int]);
+    assert(apply_embedding(src, cv) =~= src[st as int]);
+
+    // emb(src, cfg) = emb(pf, cfg) = config(σγ, 0).
+    lemma_config_word_valid2(gamma);
+    lemma_word_valid_mono(cfg, 2, st);
+    assert(pf.len() == n + 3 && src.len() == n + 4);
+    assert forall|i: int| 0 <= i < st implies src[i] == pf[i] by {}
+    lemma_apply_embedding_agree_prefix(src, pf, cfg, st);
+    lemma_phi_F_on_config(mm, n, m, l, gamma);
+    assert(apply_embedding(src, cfg) =~= config_word(sgamma, 0));
+
+    // emb(src, inverse(rhs)) = inverse(emb(pf, rhs)) = inverse(pa_rhs(σγ)).
+    lemma_apply_embedding_inverse(src, rhs);
+    lemma_apply_embedding_agree_prefix(src, pf, rhs, st);
+    lemma_phi_F_on_pa_rhs(mm, n, m, l, gamma);
+    assert(apply_embedding(src, rhs) =~= pa_rhs(n, m, sgamma));
+    assert(apply_embedding(src, inverse_word(rhs)) =~= inverse_word(pa_rhs(n, m, sgamma)));
+
+    // assemble: emb(src, hr) =~= the σγ-relator form.
+    assert(apply_embedding(src, hr)
+        =~= ((seq![Symbol::Inv(st)] + config_word(sgamma, 0)) + seq![Symbol::Gen(st)])
+            + inverse_word(pa_rhs(n, m, sgamma)));
+
+    // σγ ∈ bet (forward-saturation) ⟹ the σγ-relator IS hnn_relator(pd, k), a P_A relator.
+    assert(bet.contains(sgamma)) by { assert(sigma_betas(bet, m, l)[j] == sgamma); }
+    let k = choose|k: int| 0 <= k < bet.len() && bet[k] == sgamma;
+    assert(0 <= k < bet.len() && bet[k] == sgamma);
+    assert(pd.associations[k] == (config_word(sgamma, 0), pa_rhs(n, m, sgamma)));
+    let avk: Word = Seq::new(1, |_q: int| stable_letter_inv(pd));
+    let cvk: Word = Seq::new(1, |_q: int| stable_letter(pd));
+    assert(hnn_relator(pd, k)
+        == ((avk + config_word(sgamma, 0)) + cvk) + inverse_word(pa_rhs(n, m, sgamma)));
+    assert(apply_embedding(src, hr) =~= hnn_relator(pd, k));
+
+    // hnn_relator(pd, k) is relator k of hnn_presentation(pd) ⟹ ≡ ε.
+    assert(hnn_presentation(pd).relators =~= hnn_relators(pd)) by {
+        assert(pd.base.relators == Seq::<Word>::empty());
+    }
+    assert(hnn_presentation(pd).relators[k] == hnn_relators(pd)[k]);
+    assert(hnn_relators(pd)[k] == hnn_relator(pd, k));
+    lemma_relator_is_identity(hnn_presentation(pd), k);
+}
+
+// ----------------------------------------------------------------------------
+// M2 — `φ_l_src` injective on `P_A` (the Britton peel, mirror of `lemma_map_a_forward`).
+// ----------------------------------------------------------------------------
+
+/// `stable_count` depends only on `base.num_generators` (`is_stable`), so it transfers between two
+/// HNN data with the same base generator count.
+proof fn lemma_stable_count_same_base(d1: HNNData, d2: HNNData, w: Word)
+    requires
+        d1.base.num_generators == d2.base.num_generators,
+    ensures
+        stable_count(d1, w) == stable_count(d2, w),
+    decreases w.len(),
+{
+    if w.len() == 0 {
+    } else {
+        assert(is_stable(d1, w.last()) == is_stable(d2, w.last()));
+        lemma_stable_count_same_base(d1, d2, w.drop_last());
+    }
+}
+
+/// **M2 — `φ_l_src` is injective on `P_A`**: `emb(φ_l_src, w) ≡_{P_A} ε ⟹ w ≡_{P_A} ε`.  A Britton
+/// peel over `pa_data` (`decreases stable_count`).  Base case (no stable letter): `emb(φ_l_src, w) =
+/// emb(φ_F, w)` descends `P_A → free(n+3)` (`lemma_single_hnn_base_faithful` + the pa iso), then
+/// `φ_F` free gives `w ≡_{free} ε`, then base-embeds.  Step case: `britton_lemma_full` (pa iso) gives
+/// a pinch of `emb(φ_l_src, w)`; descend it to a pinch of `w` (the spanning descent); pinch out
+/// (`lemma_pd_pinch_out`); `φ_l_src` respects `P_A`'s relators so `emb(φ_l_src, w) ≡ emb(φ_l_src,
+/// wshort)`; recurse.
+pub proof fn lemma_mapb_M2(mm: ModMachine, n: nat, m: nat, l: nat, bet: Seq<nat>, w: Word)
+    requires
+        mod_machine_wf(mm),
+        1 <= l <= 2 * n,
+        2 * n < m,
+        bet.no_duplicates(),
+        forall|i: int| 0 <= i < bet.len() ==> numbers_word(n, m, #[trigger] bet[i]),
+        sigma_backsat(bet, m, l),
+        sigma_fwdsat(bet, m, l),
+        hnn_associations_isomorphic(pa_data(n, m, bet)),
+        word_valid(w, (n + 4) as nat),
+        equiv_in_presentation(hnn_presentation(pa_data(n, m, bet)),
+            apply_embedding(phi_l_src(n, m, l), w), empty_word()),
+    ensures
+        equiv_in_presentation(hnn_presentation(pa_data(n, m, bet)), w, empty_word()),
+    decreases stable_count(pa_data(n, m, bet), w),
+{
+    let pd = pa_data(n, m, bet);
+    let src = hnn_presentation(pd);
+    let phi = phi_l_src(n, m, l);
+    let pf = phi_F_family(n, m, l);
+    let fg = free_group((n + 3) as nat);
+    let pw = apply_embedding(phi, w);
+
+    lemma_free_group_valid((n + 3) as nat);
+    lemma_pa_data_shape(n, m, bet);
+    assert(pd.base.num_generators == n + 3);
+    assert(pd.base == fg);
+    lemma_pa_data_valid(n, m, bet);
+    lemma_hnn_presentation_valid(pd);
+    assert(src.num_generators == n + 4);
+    lemma_phi_F_family_free(n, m, l);                          // is_free_family(fg, pf)
+    assert(pf.len() == n + 3);
+    lemma_phi_l_src_valid(n, m, l);
+    lemma_phi_l_src_len(n, m, l);
+
+    if stable_count(pd, w) == 0 {
+        // --- base case: w is an F-word over n+3 ---
+        lemma_stable_count_zero_no_stable(pd, w);
+        assert(word_valid(w, (n + 3) as nat)) by {
+            assert forall|k: int| 0 <= k < w.len() implies symbol_valid(#[trigger] w[k], (n + 3) as nat)
+            by {
+                assert(!is_stable(pd, w[k]));
+                assert(symbol_valid(w[k], (n + 4) as nat));
+                assert(generator_index(w[k]) != n + 3);
+                match w[k] {
+                    Symbol::Gen(gg) => { },
+                    Symbol::Inv(gg) => { },
+                }
+            }
+        }
+        // emb(φ_l_src, w) = emb(φ_F, w) (agree on first n+3), a base word over n+3.
+        assert forall|i: int| 0 <= i < n + 3 implies phi[i] == pf[i] by {}
+        lemma_apply_embedding_agree_prefix(phi, pf, w, (n + 3) as nat);
+        assert(pw == apply_embedding(pf, w));
+        lemma_apply_embedding_valid(pf, w, (n + 3) as nat);
+        // P_A → free(n+3): emb(φ_F, w) ≡_{free} ε.
+        lemma_single_hnn_base_faithful(pd, pw);
+        assert(equiv_in_presentation(fg, pw, empty_word()));
+        // φ_F free ⟹ w ≡_{free} ε.
+        assert(word_valid(w, pf.len()));
+        assert(equiv_in_presentation(free_group(pf.len()), w, empty_word()));
+        // base embeds ⟹ w ≡_{P_A} ε.
+        lemma_base_embeds_in_hnn(pd, w, empty_word());
+    } else {
+        // --- step case ---
+        // stable_count(pd, pw) == stable_count(pd, w) > 0.
+        lemma_extend_stable_count_eq(fg, pf, w);
+        assert(stable_emb(fg, pf) == phi) by { lemma_phi_l_src_eq_stable_emb(n, m, l); }
+        assert(stable_count(free_stable_data(fg), pw)
+            == stable_count(free_stable_data(free_group(pf.len())), w));
+        lemma_stable_count_same_base(pd, free_stable_data(fg), pw);
+        lemma_stable_count_same_base(pd, free_stable_data(free_group(pf.len())), w);
+        assert(stable_count(pd, pw) == stable_count(pd, w));
+        lemma_stable_count_pos_has_stable(pd, pw);
+        assert(has_stable_letter(pd, pw));
+
+        // pw valid over src.num_generators = n+4.
+        assert forall|i: int| 0 <= i < phi.len() implies word_valid(#[trigger] phi[i], (n + 4) as nat)
+        by {}
+        lemma_apply_embedding_valid(phi, w, (n + 4) as nat);
+
+        britton_lemma_full(pd, pw);                            // has_pinch(pd, pw)
+        lemma_mapb_pinch_descends(mm, n, m, l, bet, w);        // has_pinch(pd, w)
+        let ij = choose|i: int, j: int| has_pinch_at(pd, w, i, j);
+        assert(has_pinch_at(pd, w, ij.0, ij.1));
+
+        // pinch out.
+        let wshort = lemma_pd_pinch_out(pd, w, ij.0, ij.1);
+        assert(equiv_in_presentation(src, w, wshort));
+        assert(word_valid(wshort, src.num_generators));
+        assert(stable_count(pd, wshort) < stable_count(pd, w));
+
+        // φ_l_src respects P_A's relators ⟹ emb(φ_l_src, w) ≡_{P_A} emb(φ_l_src, wshort).
+        assert(src.relators =~= hnn_relators(pd)) by {
+            assert(pd.base.relators == Seq::<Word>::empty());
+        }
+        assert forall|jj: int| 0 <= jj < src.relators.len() implies
+            equiv_in_presentation(src, apply_embedding(phi, src.relators[jj]), empty_word()) by {
+            assert(src.relators[jj] == hnn_relators(pd)[jj]);
+            assert(hnn_relators(pd)[jj] == hnn_relator(pd, jj));
+            lemma_phi_l_src_on_pa_relator(mm, n, m, l, bet, jj);
+        }
+        lemma_emb_respects_source_equiv(src, src, phi, w, wshort);
+        lemma_equiv_symmetric(src, pw, apply_embedding(phi, wshort));
+        lemma_equiv_transitive(src, apply_embedding(phi, wshort), pw, empty_word());
+
+        // recurse.
+        lemma_mapb_M2(mm, n, m, l, bet, wshort);
+        lemma_equiv_transitive(src, w, wshort, empty_word());
+    }
 }
 
 } // verus!
