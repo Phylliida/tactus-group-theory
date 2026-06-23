@@ -701,3 +701,61 @@ index-friction beyond the AFP classification? — census `get_relator`/`relator_
 density in `britton_via_tower.rs` first to size the hand-rewrites. Main theorems = `britton_lemma_full`
 (@8678) + `britton_lemma`/`britton_lemma_unconditional`. After FA-9b, Cohen §1 (recognize A/Aᵢ/A₊/A₋ as
 p-HNN-of-free, read isos off, base-embeds-in-HNN) assembles Layer-2 completeness.
+
+## 14. FA-9b COMPLETE — Britton's lemma ported, the NORMAL-FORM ARC is DONE (2026-06-23, session 17)
+
+**Result.** `src/pred_britton_via_tower.rs` (8.7k) verifies **197 verified, 0 errors**
+(`./check.sh --verify-module pred_britton_via_tower`). Full crate **2356 verified, 20 errors** =
+baseline 2159/20 **+ 197, no regression**. Committed (`b09c786`), additive/reversible. No
+`assume`/`admit`/`external_body`. **This completes the entire reserved normal-form / Britton-tower
+arc** (FA-5..FA-9b) — the predicate-base substrate Cohen §1 needs to assemble Layer-2 completeness.
+
+**The port was the FA-8 recipe + a friction pass, exactly as decomposed.** The ordered symbol-map
+carried the WHOLE 8.7k-line file mechanically; only **14 translation-core lemmas** carried the genuine
+relator-by-INDEX friction (`DerivationStep::RelatorInsert{relator_index:nat}` →
+`PredDerivationStep::RelatorInsert{relator:Word}`, guard `idx<relators.len()` → `(p.relators)(relator)`).
+Each was rewritten by the uniform pattern: signature `idx:nat`+bound → `relator:Word` +
+`(hnn_pred_presentation(data).relators)(relator)`; body case-split `idx<nb` → `if (data.base.relators)
+(relator)` (base) vs `hnn_extra_relator_pred` (extract `hi` via `choose`); `get_relator(p,idx,inv)` →
+`get_relator_pred(relator,inv)`; `p.relators[idx]` → `relator`. The membership hypothesis flows from
+`apply_step_pred(...) is Some` (the step guard) and the level condition from `step_level_ok` →
+`step_is_hnn_relator` (redefined `relator_index>=nb` → `!(data.base.relators)(relator)`). The 14:
+`lemma_net_level_hnn_pres_relator`, `lemma_net_level_get_relator`, `lemma_step_valid_in_fp_left`,
+`lemma_base_relator_in_tower`, `lemma_translate_base_relator_valid`, `lemma_translate_relator_valid`,
+`lemma_translate_relator_equiv_empty`, `lemma_shift_hom_valid`, `lemma_hnn_step_tower_equiv`,
+`step_is_hnn_relator`, `lemma_step_preserves_net_level`, `lemma_relator_insert_preserves`,
+`lemma_relator_delete_preserves`, `lemma_single_step_preserves_syls`.
+
+**Missed-dep modules (the "one compile cycle surfaces a dep" moment, ×4).** Beyond the §11/§12 census,
+britton consumed four more finite modules that needed retargeting/porting (all surfaced fast — name
+errors abort before type errors, so they came in waves):
+- `crate::homomorphism::` → `crate::pred_homomorphism::` (FA-5): `HomomorphismData→PredHomomorphismData`,
+  `apply_hom→apply_hom_pred`, `apply_hom_symbol→apply_hom_symbol_pred`, `is_valid_homomorphism→
+  is_valid_pred_homomorphism`, `lemma_hom_preserves_equiv→lemma_hom_pred_preserves_equiv`. The
+  `is_valid_pred_homomorphism` relator condition is now a `forall|w| (source.relators)(w) ⟹ …` word-quantifier
+  (was index-quantified), so `lemma_shift_hom_valid`'s relator-image block became a word-forall.
+- `crate::quotient::{lemma_add_relators_preserves_equiv, lemma_each_added_relator_is_identity}` →
+  `crate::pred_amalgamated_free_product::{lemma_add_relators_pred_preserves_equiv,
+  lemma_each_added_relator_pred_is_identity}` (sigs match 1:1).
+- `crate::britton_infra::lemma_hnn_presentation_valid` → `lemma_hnn_pred_presentation_valid` (pred_hnn);
+  `crate::britton_infra::lemma_step_preserves_word_valid` (HNN-specific, no direct pred analog) → a tiny
+  LOCAL wrapper `lemma_hnn_step_preserves_word_valid` routing through `lemma_pred_step_preserves_word_valid`.
+- `crate::coset_group::lemma_cancel_inverse_right` (no pred analog) → a LOCAL port
+  `lemma_pred_cancel_inverse_right` (pure presentation algebra, symbol-mapped 1:1).
+- `crate::normal_form_amalgamated`'s `in_generated_subgroup` (finite, Presentation) → bare-renamed to
+  `crate::pred_normal_form_amalgamated::in_generated_subgroup_pred` (FA-7).
+- Plus a local `lemma_pred_inverse_of_trivial` (port of `normal_form_amalgamated::lemma_inverse_of_trivial`).
+
+**The lift verified essentially first-try after the friction pass** — the ~186 mechanical functions +
+the heavy AFP coset/van-der-Waerden machinery (already ported in FA-8) composed with no proof-level
+surprises; the only iterations were the name/type errors guiding the missed-dep retargets, never a
+failed proof. Confirms the §7b/§12 thesis end-to-end: the predicate change is a large MECHANICAL port,
+not a re-derivation, because the math enters through `equiv_in_pred_presentation` as a black box and the
+relator-index friction localizes.
+
+**NEXT = Cohen §1 assembly (Layer-2 completeness `C ↪ H₃`).** With `britton_lemma_full` now available
+over the predicate base, the Fork-A route can recognize `A/Aᵢ/A₊/A₋` as p-HNN-of-free over the
+INFINITELY-presented (predicate) `H₂`, read the isos off (relabeling + von Dyck + c-killing endo), and
+base-embed-in-HNN via `pred_britton`/`pred_tower`. The verified soundness (`lemma_III`, Layer 1) is
+untouched. This is the §1 textbook route the whole re-evaluation pointed to (no virtual-Britton, no
+σ-orbit, no map_a/map_b).

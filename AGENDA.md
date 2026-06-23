@@ -209,10 +209,23 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > predicted: **PURE FA-8-recipe type-swap, NO hand-rewrites** (no `.relators[i]`/`get_relator`/
 > `DerivationStep` friction in tower.rs); only fix was importing the agnostic `crate::free_product::
 > shift_word` verbatim. Symbol-map + recipe detail in `cohen-faithfulness-primary-source.md` §13.
-> **NEXT = FA-9b** = port `britton_via_tower.rs` (8.7k, 169 proof + 32 spec) → `pred_britton_via_tower.rs`
-> (the big mechanical port): dominant `HNNData→PredHNNData` swap, reuse `crate::reduction::*` verbatim,
-> consume pred_tower + pred_hnn + FA-8. Census `get_relator`/`relator_index`/`DerivationStep` density
-> first to size hand-rewrites. Main theorems `britton_lemma_full`/`britton_lemma`/`_unconditional`.
+> **✅ FA-9b DONE 2026-06-23 (session 17) — `pred_britton_via_tower.rs` 197/0, crate 2356/20 (+197,
+> no regression). THE NORMAL-FORM ARC (FA-5..FA-9b) IS COMPLETE.** Port of `britton_via_tower.rs`
+> (8.7k, 169 proof + 32 spec) — Britton's lemma over the predicate base. The FA-8 ordered symbol-map
+> carried the WHOLE file; only **14 translation-core lemmas** held the genuine relator-by-INDEX friction
+> (`DerivationStep::RelatorInsert{relator_index:nat}` → `{relator:Word}`, guard `idx<relators.len()` →
+> `(p.relators)(relator)`), each rewritten by the uniform idx→relator:Word+predicate-membership pattern
+> (case-split base vs `hnn_extra_relator_pred` via `choose`). Four missed-dep modules surfaced + retargeted
+> (homomorphism→pred_homomorphism, quotient→pred_amalgamated_free_product, britton_infra→pred_hnn + a local
+> wrapper, coset_group→a local port) + `in_generated_subgroup`→`_pred`. Verified essentially first-try
+> after the friction pass (the heavy AFP machinery was already ported in FA-8); no failed proofs, only
+> name/type errors guiding retargets. No assume/admit/external_body. Main theorems `britton_lemma_full`/
+> `britton_lemma`/`_unconditional`. Full detail in `cohen-faithfulness-primary-source.md` §14.
+> **NEXT = Cohen §1 assembly (Layer-2 completeness `C ↪ H₃`)** — recognize A/Aᵢ/A₊/A₋ as p-HNN-of-free
+> over the predicate `H₂`, read isos off (relabeling + von Dyck + c-killing endo), base-embed via
+> pred_britton/pred_tower. This is the textbook route the whole re-evaluation pointed to (no virtual-Britton,
+> no σ-orbit, no map_a/map_b — those Fork-B arcs are superseded). Layer 0.5 also unblocked by the same
+> predicate foundation (the {a⁻ⁱbaⁱ}/{b⁻ⁱabⁱ}-free F₂ cruxes are already banked).
 >
 > **✅ FORK-A STARTED 2026-06-23 (session 14) — elementary foundation arc DONE, ports VERBATIM.**
 > The completeness route is **Fork-A** (predicate presentation; the textbook route per
