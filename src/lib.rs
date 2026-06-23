@@ -48,6 +48,12 @@ pub mod pred_amalgamated_free_product;
 #[cfg(verus_keep_ghost)]
 pub mod pred_homomorphism;
 
+// FORK-A brick 6: predicate-base free-product injectivity (analog of
+// normal_form_free_product.rs) via retraction homomorphisms (FA-5). The first
+// real normal-form result over a predicate base. Reversible, zero regression.
+#[cfg(verus_keep_ghost)]
+pub mod pred_normal_form_free_product;
+
 #[cfg(verus_keep_ghost)]
 pub mod presentation_lemmas;
 
