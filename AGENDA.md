@@ -413,9 +413,21 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       per-step iso from the bottom crux + IH-descent + `lemma_h2II_equiv_lifts_to_tower`) + `lemma_phi_l_iso`
       (the C3.2 GOAL: `hnn_associations_isomorphic(phi_l_data(..,l))` at every a-tower level, standalone).
       `sigma_sat_upto(alphas,m,l)` bundles the per-level σ-saturation side conditions. **C3.2 (the φ_l
-      a-level iso at every tower level) is COMPLETE.** **NEXT = C2 (p-level) / C4 (the Fork-B virtual-iso
-      k-engine, the C-arc's deep faithfulness, a `tower_peel`-sized arc per `docs/brick5-completeness-plan.md`;
-      must pick finite `alphas` σ-CLOSED BOTH dirs to satisfy `sigma_sat_upto`) / C5.**
+      a-level iso at every tower level) is COMPLETE.**
+      **C4 σ-CLOSURE BLOCKER FOUND 2026-06-22 (session 7), `docs/brick5-c4-plan.md`.** The C3.2 side
+      condition `sigma_sat_upto` is **UNSATISFIABLE for any finite `alphas`**: it requires `sigma_fwdsat`
+      (forward-closure `σ(betas)⊆betas`), and since `betas∋0` and `σ_j(β)=mβ+j` strictly grows (appends a
+      base-m digit), it forces an infinite chain — so the verified C3.2 isos are vacuous and C4 cannot use
+      them. Two `sigma_fwdsat` consumers: **(a)** the b-side reflection `lemma_r_prime_b` — **FIXED
+      backsat-only** (commit `28b2898`: coord-keyed selector via the strengthened `lemma_coords_in_sigma`,
+      `lemma_phi_prime_canon`; r_prime 52/0, r_prime_b 25/0, no regression); **(b)** the von-Dyck
+      `lemma_phi_l_src_on_pa_relator` (φ_l_src a self-ENDO of `P_A(bet)` needs `σγ∈bet`) — **THE REAL
+      BLOCKER, not reflection-fixable**, intrinsic to "φ_l is an HNN association iso". **FIX = RETARGET
+      `φ_l_src: P_A(bet)→P_A(σbet)`** (peer-confirmed): von-Dyck then automatic (σγ∈σbet by construction),
+      pinch-descent middle natively in `⟨pa_rhs_emb(σbet)⟩` (intersection property, NO reflection — obviates
+      (a)), and `alphas` = the BOUNDED σ-orbit (finite, satisfiable). Coupled multi-module cascade R1–R7
+      (`docs/brick5-c4-plan.md` §4); bottleneck = R2 (rewrite the cross-index pinch-descent). **NEXT = C4
+      retargeting (R1–R7) / C2 (p-level) / C5.**
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).
