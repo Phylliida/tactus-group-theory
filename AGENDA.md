@@ -176,6 +176,20 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 ### 3.2 — Layer 2: the Higman embedding `C ↪ H₃`
 *`docs/higman-embedding-blueprint.md` (Cohen §9.6). Build on the finished `G(M)=K_M`.*
 
+> **✅ NORMAL-FORM ARC UNDER WAY 2026-06-23 (session 15) — bottom 3 layers ported FIRST-TRY + a
+> CAYLEY LEAPFROG.** The reserved multi-week commit is now in progress as reversible bricks (the
+> *direction* was settled: textbook = AFP/Britton = the substrate = the predicate port; Bass–Serre =
+> reinvention). Shipped, crate GREEN (1912/20): **`pred_homomorphism` (FA-5, 19/0)**,
+> **`pred_normal_form_free_product` (FA-6, 11/0, free-product injectivity via retraction homs)**,
+> **`pred_normal_form_amalgamated` (FA-7, thin spec interface)**. **Cayley leapfrog**: the heavy
+> ~70-relator-site Cayley injectivity in `normal_form_amalgamated.rs` is an ALTERNATE proof OFF the
+> critical path — britton consumes `normal_form_afp_textbook.rs`, which needs only the FA-7 thin
+> interface — so the port skips it. **NEXT = FA-8**: port `normal_form_afp_textbook.rs` (12.4k; 68/215
+> proof fns take `AmalgamatedData` ⟹ type-swap; ~147 + specs presentation-agnostic ⟹ reuse verbatim;
+> the one rewritten lemma = relator-classification @6019-6058 → predicate disjunction). Then **FA-9** =
+> the `britton_via_tower` base-embeds direction (`lemma_single_hnn_base_faithful` analog). Full scope +
+> honest stop-note in `cohen-faithfulness-primary-source.md` §11.
+>
 > **✅ FORK-A STARTED 2026-06-23 (session 14) — elementary foundation arc DONE, ports VERBATIM.**
 > The completeness route is **Fork-A** (predicate presentation; the textbook route per
 > `docs/cohen-faithfulness-primary-source.md` §1/§10). Go taken on the standing "follow the textbook"
