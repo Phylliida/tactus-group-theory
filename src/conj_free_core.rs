@@ -23,6 +23,13 @@ use crate::conj_free::*;
 use crate::machine_group::{symbol_power, lemma_symbol_power_merge, lemma_symbol_power_one,
     lemma_inverse_word_one};
 use crate::benign::{apply_embedding, apply_embedding_symbol};
+use crate::presentation::{equiv_in_presentation, presentation_valid, lemma_equiv_symmetric,
+    lemma_equiv_transitive};
+use crate::presentation_lemmas::lemma_freely_equivalent_implies_equiv;
+use crate::higman_operations::{free_group, lemma_free_group_valid};
+use crate::machine_group::lemma_emb_respects_source_equiv;
+use crate::free_word_problem::lemma_free_group_equiv_freely_equivalent;
+use crate::f_free::is_free_family;
 
 verus! {
 
@@ -896,6 +903,112 @@ pub proof fn lemma_count1_bsep_invariant(w: Word, fuel: nat)
             lemma_reduce_preserves_bsep(w, pos as int);
             lemma_count1_bsep_invariant(reduce_at(w, pos as int), (fuel - 1) as nat);
         }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Assembly: `conj_family(k)` is a FREE family in `F₂ = free_group(2)`.
+// ----------------------------------------------------------------------------
+
+/// Free reduction preserves word validity (every symbol of `reduce_n_steps(w, fuel)` came from `w`).
+proof fn lemma_reduce_n_steps_word_valid(w: Word, fuel: nat, n: nat)
+    requires
+        word_valid(w, n),
+    ensures
+        word_valid(reduce_n_steps(w, fuel), n),
+    decreases fuel,
+{
+    if fuel == 0 {
+    } else {
+        let pos = find_cancellation_from(w, 0);
+        lemma_find_cancellation_from_valid(w, 0);
+        if pos >= w.len() {
+        } else {
+            assert(word_valid(reduce_at(w, pos as int), n)) by {
+                crate::britton_infra::lemma_subrange_word_valid(w, 0, pos as int, n);
+                crate::britton_infra::lemma_subrange_word_valid(w, pos as int + 2, w.len() as int, n);
+                lemma_concat_word_valid(w.subrange(0, pos as int),
+                    w.subrange(pos as int + 2, w.len() as int), n);
+            }
+            lemma_reduce_n_steps_word_valid(reduce_at(w, pos as int), (fuel - 1) as nat, n);
+        }
+    }
+}
+
+/// **The forward freeness obligation.**  If `φ(w)` is trivial in `F₂`, then `w` was already trivial
+/// in the abstract free group on the family.  The chain: reduce `w` to `w' = normal_form(w)`; push
+/// the source equivalence through φ; the bridge gives `normal_form(φ(w')) = ε`; but `bsep(φ(w'))`
+/// (base case) keeps `count1` constant through reduction, so `count1(ε) = count1(φ(w')) = |w'|`,
+/// forcing `w' = ε`.
+proof fn lemma_conj_family_free_forward(k: nat, w: Word)
+    requires
+        word_valid(w, k),
+        equiv_in_presentation(free_group(2), apply_embedding(conj_family(k), w), empty_word()),
+    ensures
+        equiv_in_presentation(free_group(k), w, empty_word()),
+{
+    let fam = conj_family(k);
+    let wp = normal_form(w);
+    lemma_reduces_to_normal_form(w);                    // reduces_to(w, wp)
+    lemma_normal_form_is_reduced(w);                    // is_reduced(wp)
+    lemma_reduce_n_steps_word_valid(w, w.len(), k);     // word_valid(wp, k)
+    lemma_free_group_valid(k);
+    lemma_free_group_valid(2);
+    // w ≡ w' in free_group(k) (a pure free reduction).
+    lemma_reduces_to_refl(wp);
+    assert(freely_equivalent(w, wp));
+    lemma_freely_equivalent_implies_equiv(free_group(k), w, wp);
+    // Each family image is valid over 2.
+    assert forall|i: int| 0 <= i < fam.len() implies word_valid(#[trigger] fam[i], 2) by {
+        assert(fam[i] == conj_word(i as nat));
+        lemma_conj_word_valid(i as nat);
+    }
+    // φ respects the (relator-free) source equivalence.
+    lemma_emb_respects_source_equiv(free_group(k), free_group(2), fam, w, wp);
+    let phw = apply_embedding(fam, w);
+    let phwp = apply_embedding(fam, wp);
+    crate::benign::lemma_apply_embedding_valid(fam, w, 2);   // word_valid(phw, 2)
+    lemma_equiv_symmetric(free_group(2), phw, phwp);
+    lemma_equiv_transitive(free_group(2), phwp, phw, empty_word());   // equiv(F₂, φ(w'), ε)
+    // Bridge to free reduction; normal_form(φ(w')) = ε.
+    lemma_free_group_equiv_freely_equivalent(2, phwp, empty_word());
+    lemma_normal_form_equiv_forward(phwp, empty_word());
+    lemma_empty_is_reduced();
+    lemma_reduced_is_own_normal_form(empty_word());
+    assert(normal_form(phwp) =~= empty_word());
+    // count1 is constant through the reduction, by bsep — so |w'| = count1(ε) = 0.
+    lemma_count1_emb(k, wp);                            // count1(φ(w')) == |w'|
+    lemma_bsep_emb(k, wp);                              // bsep(φ(w'))
+    lemma_count1_bsep_invariant(phwp, phwp.len());      // count1(normal_form(φ(w'))) == count1(φ(w'))
+    assert(count1(empty_word()) == 0);
+    assert(wp.len() == 0);
+    assert(wp =~= empty_word());
+    assert(equiv_in_presentation(free_group(k), w, empty_word()));
+}
+
+/// **THE FREE-FAMILY LEMMA (Miller §4.1).**  `conj_family(k) = {a⁻ⁱbaⁱ : 0 ≤ i < k}` is a FREE
+/// family in `F₂ = free_group(2)`.  This is the representation-independent foundational lemma of the
+/// Higman–Neumann–Neumann embedding (Layer 0.5): "the central b of each term survives free
+/// reduction".  Built on the net-exponent invariant `bsep` + the already-banked `count1` counting
+/// (`docs/higman-embedding-blueprint.md` §"Build order" step 2).
+pub proof fn lemma_conj_family_free(k: nat)
+    ensures
+        is_free_family(free_group(2), conj_family(k)),
+{
+    let fam = conj_family(k);
+    assert(free_group(2).num_generators == 2);
+    // Clause 1: each image is a valid F₂-word.
+    assert forall|i: int| 0 <= i < fam.len()
+        implies word_valid(#[trigger] fam[i], free_group(2).num_generators) by {
+        assert(fam[i] == conj_word(i as nat));
+        lemma_conj_word_valid(i as nat);
+    }
+    // Clause 2: the forward freeness obligation.
+    assert forall|w: Word| (#[trigger] word_valid(w, fam.len())
+        && equiv_in_presentation(free_group(2), apply_embedding(fam, w), empty_word()))
+        implies equiv_in_presentation(free_group(fam.len()), w, empty_word()) by {
+        assert(fam.len() == k);
+        lemma_conj_family_free_forward(k, w);
     }
 }
 
