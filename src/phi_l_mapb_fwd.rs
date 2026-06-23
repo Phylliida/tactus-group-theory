@@ -31,12 +31,15 @@ use crate::phi_l_mapb::{phi_l_src, phi_F_family, sigma_betas, lemma_phi_F_family
 use crate::phi_l_pinch::lemma_map_a_forward;
 use crate::phi_l_lift::{b_words, lemma_map_a_von_dyck_backward, lemma_map_b_von_dyck_backward};
 use crate::phi_l_maps::{a_words, lemma_a_words_is_phi_col0};
-use crate::h3_ii::{h2_II, lemma_phi_assoc_len};
+use crate::h3_ii::{h2_II, lemma_phi_assoc_len, compose_embeddings};
 use crate::h3::{phi_assoc, lemma_phi_assoc_valid};
 use crate::layout::h2_num_gens;
 use crate::f_free_a1::{betas, lemma_betas_index};
 use crate::r_prime::{sigma_backsat, lemma_config_reflect_full, lemma_config_word_valid2};
-use crate::r_prime_b::{pa_rhs_emb, sigma_fwdsat, lemma_pa_rhs_reflect_full, lemma_phi_F_on_pa_rhs};
+use crate::r_prime_b::{pa_rhs_emb, sigma_fwdsat, lemma_pa_rhs_reflect_full, lemma_phi_F_on_pa_rhs,
+    lemma_compose_phi_F_pa_rhs_emb, lemma_pa_rhs_valid_n3};
+use crate::phi_l_mapb::lemma_compose_phi_F_config_emb;
+use crate::phi_l_forward::lemma_intersection_property;
 use crate::free_basis::config_emb;
 use crate::word_numbering::{numbers_word, lemma_div_mod_step};
 use crate::presentation::{equiv_in_presentation, presentation_valid, lemma_equiv_transitive,
@@ -636,6 +639,74 @@ pub proof fn lemma_phi_l_src_on_pa_relator_retarget(mm: ModMachine, n: nat, m: n
     assert(hnn_presentation(pdt).relators[j] == hnn_relators(pdt)[j]);
     assert(hnn_relators(pdt)[j] == hnn_relator(pdt, j));
     lemma_relator_is_identity(hnn_presentation(pdt), j);
+}
+
+// ----------------------------------------------------------------------------
+// R2 reflection cores — the σbet→bet reflection via the INTERSECTION PROPERTY (no saturation).
+//
+// In the retargeted pinch-descent the pinch is over `pa_data(σbet)`, so the spanning middle
+// `emb(φ_F,mid)` is NATIVELY in `⟨col(σbet)⟩` (= `⟨compose(φ_F, col(bet))⟩`), and the intersection
+// property reflects it straight to `mid ∈ ⟨col(bet)⟩`.  This REPLACES the (R)/(R)_b reflections (which
+// needed σ-saturation to lift `bet → σbet`) — here the element is already at `σbet`, so only the
+// saturation-free intersection property is needed.  See docs/brick5-c4-plan.md §4 R2.
+// ----------------------------------------------------------------------------
+
+/// **b-column R2 reflection**: `emb(φ_F,mid) ∈ ⟨pa_rhs_emb(σbet)⟩ ⟹ mid ∈ ⟨pa_rhs_emb(bet)⟩` (no σ-sat).
+pub proof fn lemma_pa_rhs_reflect_intersection(mm: ModMachine, n: nat, m: nat, l: nat, mid: Word,
+    bet: Seq<nat>)
+    requires
+        1 <= l <= 2 * n,
+        2 * n < m,
+        word_valid(mid, (n + 3) as nat),
+        forall|i: int| 0 <= i < bet.len() ==> numbers_word(n, m, #[trigger] bet[i]),
+        in_generated_subgroup(free_group((n + 3) as nat), pa_rhs_emb(n, m, sigma_betas(bet, m, l)),
+            apply_embedding(phi_F_family(n, m, l), mid)),
+    ensures
+        in_generated_subgroup(free_group((n + 3) as nat), pa_rhs_emb(n, m, bet), mid),
+{
+    let fg = free_group((n + 3) as nat);
+    let pf = phi_F_family(n, m, l);
+    let pr = pa_rhs_emb(n, m, bet);
+    lemma_free_group_valid((n + 3) as nat);
+    lemma_phi_F_family_free(n, m, l);                      // is_free_family(fg, pf)
+    assert(pf.len() == n + 3);
+    assert(word_valid(mid, pf.len()));
+    assert forall|k: int| 0 <= k < pr.len() implies word_valid(#[trigger] pr[k], pf.len()) by {
+        assert(pr[k] == pa_rhs(n, m, bet[k]));
+        lemma_pa_rhs_valid_n3(n, m, bet[k]);
+    }
+    lemma_compose_phi_F_pa_rhs_emb(mm, n, m, l, bet);     // compose(pf, pr) = pa_rhs_emb(σbet)
+    assert(compose_embeddings(pf, pr) == pa_rhs_emb(n, m, sigma_betas(bet, m, l)));
+    lemma_intersection_property(fg, pf, pr, mid);
+}
+
+/// **a-column R2 reflection**: `emb(φ_F,mid) ∈ ⟨config_emb(σbet)⟩ ⟹ mid ∈ ⟨config_emb(bet)⟩` (no σ-sat).
+pub proof fn lemma_config_reflect_intersection(mm: ModMachine, n: nat, m: nat, l: nat, mid: Word,
+    bet: Seq<nat>)
+    requires
+        1 <= l <= 2 * n,
+        2 * n < m,
+        word_valid(mid, (n + 3) as nat),
+        in_generated_subgroup(free_group((n + 3) as nat), config_emb(sigma_betas(bet, m, l)),
+            apply_embedding(phi_F_family(n, m, l), mid)),
+    ensures
+        in_generated_subgroup(free_group((n + 3) as nat), config_emb(bet), mid),
+{
+    let fg = free_group((n + 3) as nat);
+    let pf = phi_F_family(n, m, l);
+    let ce = config_emb(bet);
+    lemma_free_group_valid((n + 3) as nat);
+    lemma_phi_F_family_free(n, m, l);                      // is_free_family(fg, pf)
+    assert(pf.len() == n + 3);
+    assert(word_valid(mid, pf.len()));
+    assert forall|k: int| 0 <= k < ce.len() implies word_valid(#[trigger] ce[k], pf.len()) by {
+        assert(ce[k] == config_word(bet[k], 0));
+        lemma_config_word_valid2(bet[k]);
+        lemma_word_valid_mono(config_word(bet[k], 0), 2, (n + 3) as nat);
+    }
+    lemma_compose_phi_F_config_emb(mm, n, m, l, bet);     // compose(pf, ce) = config_emb(σbet)
+    assert(compose_embeddings(pf, ce) == config_emb(sigma_betas(bet, m, l)));
+    lemma_intersection_property(fg, pf, ce, mid);
 }
 
 // ----------------------------------------------------------------------------
