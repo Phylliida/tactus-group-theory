@@ -40,9 +40,17 @@ use crate::free_basis::lemma_free_to_embedding;
 use crate::h1::{h1_base, lemma_h1_base_valid, lemma_h1_base_num_generators};
 use crate::higman_operations::free_group;
 use crate::hnn::hnn_associations_isomorphic;
-use crate::presentation::equiv_in_presentation;
+use crate::presentation::{equiv_in_presentation, presentation_valid, lemma_equiv_refl,
+    lemma_equiv_symmetric, lemma_equiv_transitive};
+use crate::presentation_lemmas::{lemma_equiv_concat_left, lemma_word_inverse_left};
 use crate::word_numbering::numbers_word;
-use crate::machine_group::mod_machine_wf;
+use crate::machine_group::{mod_machine_wf, pres_tx, psi_F_images, lemma_psi_F_injective,
+    lemma_config_word_valid, lemma_symbol_power_merge, lemma_inverse_word_sympower,
+    lemma_symbol_power_valid};
+use crate::phi_l_iso::lemma_config_zero_form;
+use crate::free_family_perm::{conjugate_family, lemma_free_family_conjugate,
+    lemma_free_family_respects_equiv};
+use crate::f_free::is_free_family;
 
 verus! {
 
@@ -358,6 +366,122 @@ pub proof fn lemma_pa_data_isomorphic(mm: ModMachine, n: nat, m: nat, alphas: Se
             lemma_pa_iso_one_dir(mm, n, m, alphas, w, false);
         }
     }
+}
+
+// ----------------------------------------------------------------------------
+// (A) φ_F injective on free F — rung (i): [config(l,0), xᵐ] free in pres_tx = free(2).
+// ----------------------------------------------------------------------------
+
+/// **Rung (i)** — `[config(l,0), xᵐ]` is a FREE family in `pres_tx = free(2)`.  This is `φ_F`
+/// restricted to the `⟨t,x⟩` factor (the scaling-plus-conjugate base map `t↦config(l,0)=x⁻ˡtxˡ,
+/// x↦xᵐ`).  Route: `psi_F_images(m) = [t, xᵐ]` is free (`lemma_psi_F_injective`); conjugating by
+/// `c = x⁻ˡ` gives `[x⁻ˡtxˡ, x⁻ˡxᵐxˡ]` free (`lemma_free_family_conjugate`); and that family is
+/// per-generator equivalent to `[config(l,0), xᵐ]` (`config(l,0) =~= x⁻ˡtxˡ` syntactically; `xᵐ ≡
+/// x⁻ˡxᵐxˡ` since x-powers commute), so freeness transfers (`lemma_free_family_respects_equiv`).
+pub proof fn lemma_tx_image_free(l: nat, m: nat)
+    requires
+        m >= 1,
+    ensures
+        is_free_family(pres_tx(), seq![config_word(l, 0), symbol_power(Symbol::Gen(1), m)]),
+{
+    let g0: Word = seq![Symbol::Gen(0)];
+    let xm = symbol_power(Symbol::Gen(1), m);
+    let xl = symbol_power(Symbol::Gen(1), l);
+    let xinvl = symbol_power(Symbol::Inv(1), l);                 // c = x⁻ˡ
+    let pf = psi_F_images(m);                                    // [t, xᵐ]
+    let fam = conjugate_family(pf, xinvl);
+    let target = seq![config_word(l, 0), xm];
+
+    assert(presentation_valid(pres_tx())) by { reveal(presentation_valid); }
+    assert(pres_tx() == free_group(2));                         // {2, empty relators}
+    assert(pf == seq![g0, xm]);
+    assert(pf.len() == 2);
+
+    // --- step 1: psi_F_images(m) is free in pres_tx ---
+    assert(is_free_family(pres_tx(), pf)) by {
+        lemma_symbol_power_valid(Symbol::Gen(1), 1, 2);         // xᵐ valid over 2
+        assert forall|i: int| 0 <= i < pf.len() implies word_valid(#[trigger] pf[i], 2) by {
+            if i == 0 { assert(pf[0] == g0); } else { assert(pf[1] == xm); }
+        }
+        assert forall|w: Word| (#[trigger] word_valid(w, pf.len())
+            && equiv_in_presentation(pres_tx(), apply_embedding(pf, w), empty_word()))
+            implies equiv_in_presentation(free_group(pf.len()), w, empty_word()) by {
+            assert(word_valid(w, 2));
+            lemma_psi_F_injective(m, w);                        // w ≡_{pres_tx} ε
+            assert(pf.len() == 2);
+        }
+    }
+
+    // --- step 2: conjugate by c = x⁻ˡ ---
+    assert(word_valid(xinvl, 2)) by { lemma_symbol_power_valid(Symbol::Inv(1), 1, 2); }
+    lemma_free_family_conjugate(pres_tx(), pf, xinvl);          // is_free_family(pres_tx, fam)
+
+    // --- step 3: per-generator equivalence fam[i] ≡ target[i] (target[i] ≡ fam[i]) ---
+    lemma_inverse_word_sympower(Symbol::Inv(1), l);             // inverse_word(x⁻ˡ) =~= xˡ
+    assert(inverse_word(xinvl) =~= xl);
+    assert(fam.len() == 2);
+    // fam[0] = (x⁻ˡ + [t]) + xˡ =~= config(l,0).
+    assert(fam[0] == (xinvl + g0) + inverse_word(xinvl));
+    lemma_config_zero_form(l);                                  // config(l,0) =~= x⁻ˡ + [t] + xˡ
+    assert(config_word(l, 0) =~= (xinvl + g0) + xl);
+    assert(fam[0] =~= config_word(l, 0));
+    // fam[1] = (x⁻ˡ + xᵐ) + xˡ ≡ xᵐ.
+    assert(fam[1] == (xinvl + xm) + inverse_word(xinvl));
+    assert(fam[1] =~= (xinvl + xm) + xl);
+    // xᵐ + xˡ =~= x^{m+l} =~= xˡ + xᵐ.
+    lemma_symbol_power_merge(Symbol::Gen(1), m, l);
+    lemma_symbol_power_merge(Symbol::Gen(1), l, m);
+    assert(xm + xl =~= xl + xm);
+    // (x⁻ˡ + xᵐ) + xˡ =~= x⁻ˡ + (xˡ + xᵐ) =~= (x⁻ˡ + xˡ) + xᵐ.
+    assert((xinvl + xm) + xl =~= (xinvl + xl) + xm) by {
+        assert((xinvl + xm) + xl =~= xinvl + (xm + xl));
+        assert(xinvl + (xl + xm) =~= (xinvl + xl) + xm);
+    }
+    // x⁻ˡ + xˡ ≡ ε  (x⁻ˡ = inverse_word(xˡ)).
+    lemma_inverse_word_sympower(Symbol::Gen(1), l);             // inverse_word(xˡ) =~= x⁻ˡ
+    assert(inverse_word(xl) =~= xinvl);
+    lemma_symbol_power_valid(Symbol::Gen(1), 1, 2);             // xˡ, xᵐ valid over 2
+    lemma_symbol_power_valid(Symbol::Inv(1), 1, 2);
+    lemma_word_inverse_left(pres_tx(), xl);                     // inverse_word(xˡ) + xˡ ≡ ε
+    assert(xinvl + xl =~= inverse_word(xl) + xl);
+    // (x⁻ˡ + xˡ) + xᵐ ≡ ε + xᵐ =~= xᵐ.
+    lemma_concat_word_valid(xinvl, xl, 2);
+    lemma_equiv_concat_left(pres_tx(), xinvl + xl, empty_word(), xm);
+    assert(concat(xinvl + xl, xm) == (xinvl + xl) + xm);
+    assert(concat(empty_word(), xm) =~= xm);
+    assert(equiv_in_presentation(pres_tx(), (xinvl + xl) + xm, xm));
+    // fam[1] =~= (x⁻ˡ+xˡ)+xᵐ ≡ xᵐ ⟹ fam[1] ≡ xᵐ ⟹ xᵐ ≡ fam[1].
+    assert(fam[1] =~= (xinvl + xl) + xm);
+    assert(equiv_in_presentation(pres_tx(), fam[1], xm));
+    lemma_equiv_symmetric(pres_tx(), fam[1], xm);
+
+    // target[i] ≡ fam[i].
+    assert(target.len() == 2);
+    assert forall|i: int| 0 <= i < 2 implies equiv_in_presentation(pres_tx(), target[i], fam[i]) by {
+        if i == 0 {
+            assert(target[0] == config_word(l, 0));
+            assert(config_word(l, 0) =~= fam[0]);
+            lemma_equiv_refl(pres_tx(), config_word(l, 0));
+        } else {
+            assert(target[1] == xm);
+            assert(equiv_in_presentation(pres_tx(), xm, fam[1]));
+        }
+    }
+    // target entries valid over 2.
+    assert forall|i: int| 0 <= i < 2 implies word_valid(#[trigger] target[i], 2) by {
+        if i == 0 {
+            assert(target[0] == config_word(l, 0));
+            // config(l,0) =~= (x⁻ˡ+[t])+xˡ, all over gens {0,1}.
+            lemma_concat_word_valid(xinvl, g0, 2);
+            lemma_concat_word_valid(xinvl + g0, xl, 2);
+            assert(config_word(l, 0) =~= (xinvl + g0) + xl);
+        } else {
+            assert(target[1] == xm);
+        }
+    }
+
+    // --- step 4: transfer freeness to target ---
+    lemma_free_family_respects_equiv(pres_tx(), fam, target);
 }
 
 /// One direction of `lemma_pa_data_isomorphic` (a-side⟹b-side when `fwd`, else b-side⟹a-side).
