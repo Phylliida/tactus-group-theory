@@ -176,15 +176,23 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 ### 3.2 — Layer 2: the Higman embedding `C ↪ H₃`
 *`docs/higman-embedding-blueprint.md` (Cohen §9.6). Build on the finished `G(M)=K_M`.*
 
-> **⚠ ARCHITECTURE RE-EVALUATION (2026-06-23) — read `docs/brick5-fork-reevaluation.md` FIRST.** The
-> completeness route (Fork B / route-A word-restricted virtual iso) was found to have an UNDESIGNED
-> CORE: the iso-consuming Britton calls route through `lemma_single_step_preserves_syls`, which needs
-> the *universal* iso over an *arbitrary derivation* — not restrictable to a fixed word's pinch-middles
-> — and "iso in the quotient" only feeds Britton circularly (would need a new "virtual Britton's
-> Lemma", no extant sketch). RECOMMENDATION (pending real-Danielle confirmation): pivot to **Fork A** —
-> build a predicate/countable presentation foundation, which is ALSO the common blocker for Layer 0.5
-> (infinite-gen `C`). One foundation unblocks both frontiers. The R1–R4 directional machinery stays
-> verified + reusable; the verified soundness (`lemma_III` etc.) is untouched.
+> **⚠ ARCHITECTURE RE-EVALUATION (2026-06-23) — read `docs/cohen-faithfulness-primary-source.md`
+> THEN `docs/brick5-fork-reevaluation.md` FIRST.** The completeness route (Fork B / route-A
+> word-restricted virtual iso) was found to have an UNDESIGNED CORE: the iso-consuming Britton calls
+> route through `lemma_single_step_preserves_syls`, which needs the *universal* iso over an *arbitrary
+> derivation* — not restrictable to a fixed word's pinch-middles — and "iso in the quotient" only
+> feeds Britton circularly (would need a new "virtual Britton's Lemma", no extant sketch).
+> **PRIMARY-SOURCE READING (2026-06-23, Cohen pp.279–281 read directly) CONFIRMS the pivot:** Cohen
+> proves `C↪H₃` faithful with **NO Britton-peel of the `aᵢ`/`k` level** — he recognizes
+> `A/Aᵢ/A₊/A₋` as p-HNN extensions of free groups (**Prop 1.34** + Layer-1 properties (ii)/(vi)/(vii),
+> all DONE) over the **infinitely-presented `H₂`**, reads the isos off cheaply (relabeling; von Dyck +
+> c-killing endomorphism), then base-embeds-in-HNN. The whole C0–C5 / map_a-map_b / σ-orbit / virtual
+> iso arc is solving a problem Cohen doesn't have. RECOMMENDATION (pending real-Danielle confirmation):
+> pivot to **Fork A** — a predicate/countable presentation foundation (ALSO the Layer-0.5 blocker; one
+> foundation unblocks both). **Scoping #2 answered:** predicate-Britton is STANDARD math (not Fork-B's
+> new virtual Britton); the only residual risk is whether the AFP-tower `shift`/normal-form machinery
+> generalizes to a predicate base — answerable by a small non-committing prototype (see the
+> primary-source note §4). The verified soundness (`lemma_III` etc.) and Layer 1 are untouched.
 
 - [ ] **Layer 0.5** — Higman–Neumann–Neumann: embed the (countable, recursively presented) CEER
       group into a **f.g.** recursively presented `C=⟨c₁,…,cₙ;S⟩`. **SOURCE LOCATED 2026-06-23**:

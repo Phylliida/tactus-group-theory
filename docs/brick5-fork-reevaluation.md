@@ -4,6 +4,14 @@ Companion to `brick5-completeness-plan.md` (§2.3 Fork A/B decision) and `brick5
 (§7–§8 the route-A reframe). **Read this before writing any C3.2/C4 completeness code.** It records
 a finding that changes the architecture and a recommendation that re-opens the Fork A/B decision.
 
+> **UPDATE 2026-06-23 — `docs/cohen-faithfulness-primary-source.md` CONFIRMS + SHARPENS this.**
+> Cohen pp.279–281 read directly from the PDF: the textbook proves faithfulness with **no
+> Britton-peel of the `aᵢ`/`k` level at all** — Prop-1.34 recognition of `A/Aᵢ/A₊/A₋` as p-HNN of
+> free groups over the **infinitely-presented `H₂`** + cheap isos (relabeling; von Dyck + c-kill
+> endo) + base-embeds-in-HNN. Fork-A is the textbook route; Fork-B was the reinvention. Scoping #2
+> is answered there: predicate-Britton is standard math, residual risk = the AFP-tower `shift`
+> generalization (one prototype to check). Read that note alongside this one.
+
 > **STATUS: FINDING + RECOMMENDATION, pending real-Danielle confirmation.** This was reasoned out
 > + co-designed against the Danielle endpoint-proxy in one session; it re-opens a fork that was
 > originally decided WITH Danielle (2026-06-21), so the *decision to commit weeks to building the
