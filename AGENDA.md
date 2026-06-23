@@ -182,15 +182,17 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > instruction (Fork-A IS the textbook) + an explicit peer "Go". Built as separate, reversible `pred_*`
 > modules (zero regression; baseline still 20 pre-existing errors): `pred_presentation` 8/0 (session
 > 12), **`pred_presentation_lemmas` 15/0** (congruence algebra), **`pred_hnn` 10/0** (HNN presentation +
-> fwd base-embeds + conjugation), **`pred_free_product` 7/0** (free product + the predicate `shift`) —
-> ALL FIRST TRY. This **empirically settles** §6a/§7c at the proof level across four layers: the entire
-> relator-set-agnostic foundation type-swaps to a predicate base with SMT still closing. **Remaining =
-> the AFP normal-form / Britton-tower arc** (the hard *reverse* base-embeds `britton_pred_embeds`,
-> `normal_form_afp_textbook` 12.4k + `britton_via_tower` 8.7k) = the reserved multi-week commit; next
-> dependency-ordered brick is the AFP *construction* (`amalgamated_free_product.rs` 401 lines, still
-> fwd/relator-agnostic). See `docs/FORK-DECISION.md` (refined ask: confirm continuing into the
-> normal-form arc) + `cohen-faithfulness-primary-source.md` §10. The OLD warning below (Fork-B is
-> undesigned; the map_a/map_b/σ-orbit/virtual-iso arc) stands as the record of why Fork-B was rejected.
+> fwd base-embeds + conjugation), **`pred_free_product` 7/0** (free product + the predicate `shift`),
+> **`pred_amalgamated_free_product` 11/0** (AFP construction + add_relators_pred + fwd embeds) — ALL
+> FIRST TRY (51 lemmas). This **empirically settles** §6a/§7c at the proof level across five layers: the
+> entire relator-set-agnostic elementary + CONSTRUCTION foundation type-swaps to a predicate base with
+> SMT still closing. **That layer is now EXHAUSTED — every remaining brick is the reserved AFP
+> normal-form / Britton-tower arc** (the hard *reverse* base-embeds `britton_pred_embeds`,
+> `normal_form_afp_textbook` 12.4k + `normal_form_amalgamated` 2.5k + `britton_via_tower` 8.7k) = the
+> multi-week commit. See `docs/FORK-DECISION.md` (refined ask: confirm continuing into the normal-form
+> arc; or redirect to a Bass–Serre/action-based base-embeds, §4 step 4) +
+> `cohen-faithfulness-primary-source.md` §10. The OLD warning below (Fork-B undesigned;
+> map_a/map_b/σ-orbit/virtual-iso) stands as the record of why Fork-B was rejected.
 
 > **⚠ ARCHITECTURE RE-EVALUATION (2026-06-23) — read `docs/cohen-faithfulness-primary-source.md`
 > THEN `docs/brick5-fork-reevaluation.md` FIRST.** The completeness route (Fork B / route-A

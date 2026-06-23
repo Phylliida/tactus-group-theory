@@ -7,14 +7,15 @@ Last updated 2026-06-23 (session 14).*
 > **STATUS UPDATE 2026-06-23 (session 14): Fork-A STARTED — the elementary foundation arc is DONE
 > and ports VERBATIM.** On the strength of the standing "follow the textbook" instruction (Fork-A IS
 > the textbook) + an explicit peer "Go", this session built the relator-agnostic foundation as
-> separate, reversible `pred_*` modules: `pred_hnn` (10/0), `pred_presentation_lemmas` (15/0),
-> `pred_free_product` (7/0) — all FIRST TRY (joining `pred_presentation` 8/0). This **answers the
-> "does the type-swap port with SMT closing?" question = YES across the whole elementary layer**
-> (HNN, congruence, free product incl. the predicate `shift`). The reserved multi-week commit is now
-> *only* the **AFP normal-form / Britton-tower arc** (the hard reverse base-embeds faithfulness,
-> `cohen-faithfulness-primary-source.md` §10). **The ask below now reads: confirm continuing into the
-> normal-form arc** (the foundation is a clean reversible down-payment; redirect if you'd scope it
-> differently).
+> separate, reversible `pred_*` modules: `pred_presentation_lemmas` (15/0), `pred_hnn` (10/0),
+> `pred_free_product` (7/0), `pred_amalgamated_free_product` (11/0) — all FIRST TRY (joining
+> `pred_presentation` 8/0). This **answers the "does the type-swap port with SMT closing?" question =
+> YES across the whole elementary + CONSTRUCTION layer** (presentation, congruence, HNN, free product
+> incl. the predicate `shift`, AFP). **That layer is now exhausted** — every remaining brick is the
+> reserved multi-week **AFP normal-form / Britton-tower arc** (the hard reverse base-embeds
+> faithfulness, `cohen-faithfulness-primary-source.md` §10). **The ask below now reads: confirm
+> continuing into the normal-form arc** (the foundation is a clean reversible down-payment; redirect
+> if you'd scope it differently).
 
 ---
 
@@ -91,9 +92,9 @@ top; `cohen-faithfulness-primary-source.md` §10). The `HNNData`/`shift` foundat
 ask named as "the first step on Go" is **done** (`pred_hnn` + `pred_free_product`).
 
 **Refined ask (the remaining reserved decision): confirm continuing into the AFP normal-form arc.**
-The next dependency-ordered brick is the AFP *construction* (`amalgamated_free_product.rs`, 401 lines,
-still forward/relator-agnostic — a thin `add_relators_pred` + the same fwd-embed pattern). **After**
-that comes the genuinely-hard, genuinely-multi-week part: the predicate AFP **normal form**
+The AFP *construction* (`amalgamated_free_product.rs` analog, FA-4) is now **DONE** — the construction
+layer is exhausted, so the **next brick IS the reserved part**: the genuinely-hard, genuinely-multi-week
+predicate AFP **normal form**
 (`normal_form_afp_textbook.rs` 12.4k + `normal_form_amalgamated.rs` 2.5k) + the predicate **Britton
 tower** (`britton_via_tower.rs` 8.7k), i.e. the *reverse* base-embeds faithfulness (`britton_pred_embeds`),
 which is where the 64 indexed→predicate bookkeeping rewrites land (§7b). I have **not** started this —

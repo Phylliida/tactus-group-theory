@@ -441,8 +441,11 @@ confirmation before it begins.
 | FA-1 | `pred_hnn.rs` | 10/0 | `hnn.rs` (HNN presentation + validity + forward base-embeds + conjugation) |
 | FA-2 | `pred_presentation_lemmas.rs` | 15/0 | `presentation_lemmas.rs` core (the equivalence-congruence algebra) |
 | FA-3 | `pred_free_product.rs` | 7/0 | `free_product.rs` (free-product construction + the predicate **shift** + fwd embeds) |
+| FA-4 | `pred_amalgamated_free_product.rs` | 11/0 | `amalgamated_free_product.rs` + `quotient.rs` add_relators (AFP construction + fwd embeds + identifies) |
 
-(plus FA-0 = `pred_presentation.rs` 8/0 from session 12.)
+(plus FA-0 = `pred_presentation.rs` 8/0 from session 12.)  **The elementary + CONSTRUCTION layer
+(presentation, congruence, HNN, free product, AFP) is now COMPLETE over a predicate base — 51 lemmas,
+all forward/relator-agnostic, all first-try.**
 
 **What this empirically settles** (the "measure the mechanical labor" signal §6–§9 kept asking for):
 the entire **relator-set-agnostic foundation** — derivation/equivalence algebra, congruence (concat
@@ -465,9 +468,9 @@ economies discovered:
 hard *reverse* base-embeds (faithfulness). Per §7a/§9 it rests on the AFP injectivity in
 `normal_form_afp_textbook.rs` (12.4k) + `britton_via_tower.rs` (8.7k), and per §7b that is where the 64
 indexed→predicate bookkeeping rewrites land (the genuinely-laborious part). The foundation arc did
-**not** touch it. The next dependency-ordered brick is the AFP *construction*
-(`amalgamated_free_product.rs`, 401 lines — also forward/relator-agnostic, a thin `add_relators_pred`
-mini-layer + the same fwd-embed pattern), and **after that** the normal-form giants.
+**not** touch it. **The AFP *construction* (FA-4) is now also DONE**, so the construction layer is
+exhausted — **every remaining brick is the normal-form giants** (no forward/relator-agnostic work
+remains below the reserved arc). This is the true wall: the next step IS the reserved multi-week commit.
 
 **Recommendation / standing ask:** the foundation result **strengthens the Fork-A go/no-go** — the
 "does the type-swap port with SMT closing?" question is now answered YES across the whole elementary
