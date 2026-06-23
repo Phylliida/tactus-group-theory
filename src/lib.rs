@@ -41,6 +41,13 @@ pub mod pred_free_product;
 #[cfg(verus_keep_ghost)]
 pub mod pred_amalgamated_free_product;
 
+// FORK-A brick 5: predicate-base homomorphisms (analog of homomorphism.rs).
+// The BOTTOM of the AFP normal-form / Britton-tower port: free-product
+// injectivity (normal_form_free_product) is proven via retraction homomorphisms
+// routing through lemma_hom_pred_preserves_equiv. Reversible, zero regression.
+#[cfg(verus_keep_ghost)]
+pub mod pred_homomorphism;
+
 #[cfg(verus_keep_ghost)]
 pub mod presentation_lemmas;
 
