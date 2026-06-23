@@ -146,8 +146,21 @@ generated**. So:
             and `|R(w')|>0` (leftmost `bᵉ¹` survives); conclude via `lemma_reduces_to_reduced_unique`.
           • **count_b invariant**: `count_b(φ(w')) = |w'|` and free reduction of a φ-image never cancels
             a b (opposite-sign b's never become adjacent — `w'` reduced rules out the only way), so
-            `count_b(normal_form(φ(w'))) = |w'| > 0`. Slicker counter, but the "never cancels a b"
-            invariant still needs the structural argument. Spelled-form is more explicit/likely easier.
+            `count_b(normal_form(φ(w'))) = |w'| > 0`.
+     - ✅ **counting infra DONE** (`conj_free.rs` 8/0): `count1` (#b-letters), additive/inverse-invariant/
+       zero-on-a-powers, `lemma_count1_emb`: `count1(φ(w)) = |w|`. The count_b route's first half.
+     - **THE CLEANER CORE INSIGHT (2026-06-23) — the net-exponent invariant** (recommended over the
+       spelled-form): a free-reduction step removes an `a a⁻¹` (index-0) pair, which preserves the
+       **signed sum of index-0 symbols between any two fixed b's**. So "the net index-0 exponent between
+       consecutive b's" is a REDUCTION INVARIANT. In `φ(w')` that net between `bₖ, bₖ₊₁` is `iₖ − iₖ₊₁`.
+       Two b's can only cancel if they become ADJACENT (their between-block empties) AND have opposite
+       sign; the block empties ⟹ net = 0 ⟹ `iₖ = iₖ₊₁` ⟹ (w' reduced) `εₖ = εₖ₊₁` (SAME sign) ⟹ no
+       cancel. So **no φ-image reduction ever cancels a b** ⟹ `count1(normal_form(φ(w'))) = |w'| > 0`.
+       This avoids defining the explicit signed-exponent spelled form `R(w')`; instead carry the
+       reduction invariant `no_adjacent_opposite_b ∧ (between consecutive b's: net=0 ⟹ same sign)` —
+       preserved by `reduce_at`, holds for `φ(w')`, and forbids any index-1 cancellation. The remaining
+       work = formalize "net index-0 exponent between consecutive index-1 symbols" + its `reduce_at`
+       invariance + the φ(w')-base-case. (~150–250 lines; the next iteration's task.)
 3. **Layer 2** — `H₁` (direct product), `H₂` (HNN, stable letter `p`), `H₃` (HNN, stable letters
    `a_i, k`); prove `C ↪ H₃` and `H₃` f.p. with relations (I). Re-read book p.279–281 (PDF 284–286)
    for the precise `A/A_i/A₊/A₋` generators and associations.

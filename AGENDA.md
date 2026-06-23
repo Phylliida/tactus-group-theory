@@ -187,9 +187,11 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       stated. Crux foundational lemma = `{a⁻ⁱbaⁱ}` free in `F₂` (representation-independent — buildable
       now, a fresh from-scratch normal-form arc; the existing `f_free.rs` freeness descends via
       retractions, never computing a free normal form). **Bridge DONE** (`free_word_problem.rs` 4/0,
-      `lemma_free_group_equiv_freely_equivalent`: `≡_{free_group(n)} ⟹ freely_equivalent`); the full
-      executable plan for the `{a⁻ⁱbaⁱ}`-free lemma (steps 1–4, core "central b survives" = step 4) is
-      in `docs/higman-embedding-blueprint.md` §"Build order" step 2.
+      `lemma_free_group_equiv_freely_equivalent`: `≡_{free_group(n)} ⟹ freely_equivalent`). **Counting
+      infra DONE** (`conj_free.rs` 8/0: `count1`, `lemma_count1_emb`: `count1(φ(w))=|w|`). **NEXT = the
+      core "central b survives"** via the **net-exponent invariant** (free reduction preserves the
+      signed index-0 sum between consecutive b's ⟹ no b ever cancels ⟹ `count1(nf(φ(w')))=|w'|>0`);
+      ~150–250 lines, full plan in `docs/higman-embedding-blueprint.md` §"Build order" step 2.
 - [ ] **word-numbering bridge** — `wα(c)`, with `wα(c)∈S ⟺ (α,0)∈H₀(M)` (ties the relator set `S`
       to the machine, built from the reduction in §3.3).
 - [x] **H₁ = K_M ∗ (C × ⟨b_j⟩) ∗ ⟨d⟩** — literal finite `h1_base` built (`h1.rs`), and
