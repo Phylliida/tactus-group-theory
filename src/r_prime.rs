@@ -29,6 +29,7 @@ use crate::machine_group::{config_word, symbol_power, signed_power, gsconfig, Ca
 use crate::ii_subset::lemma_signed_power_inverse;
 use crate::benign::{apply_embedding, apply_embedding_symbol};
 use crate::config_reduce::lemma_canw_eval_concat;
+use crate::phi_l_mapb::sigma_betas;
 
 verus! {
 
@@ -510,6 +511,59 @@ pub proof fn lemma_cong_l_intro(r: int, m: nat, l: nat, b: int)
     ensures
         cong_l(r, m, l),
 {
+}
+
+// ----------------------------------------------------------------------------
+// σ-backward-saturation — the side condition that makes (R') true.
+// ----------------------------------------------------------------------------
+
+/// **σ-backward-saturation**: every `bet`-element of the form `m·b + l` has its preimage `b` in `bet`.
+/// (Without it, (R') is false — see docs/brick5-c3.2c-plan.md §6 counterexample.)
+pub open spec fn sigma_backsat(bet: Seq<nat>, m: nat, l: nat) -> bool {
+    forall|b: nat| bet.contains(#[trigger] ((m * b + l) as nat)) ==> bet.contains(b)
+}
+
+/// **Saturation bridge**: a `bet`-coordinate `r ≡ l (mod m)` is actually a `σ(bet)`-coordinate.
+/// From `cong_l` get `r = m·b + l`; `r ≥ 0` (a nat coordinate) and `l < m` force `b ≥ 0`; saturation
+/// pulls `b` into `bet`, so `r = σ(b) = sigma_betas(bet)[k]` for that `k`.
+pub proof fn lemma_sat_bridge(bet: Seq<nat>, m: nat, l: nat, r: int)
+    requires
+        m >= 1,
+        l < m,
+        cong_l(r, m, l),
+        exists|j: int| 0 <= j < bet.len() && bet[j] as int == r,
+        sigma_backsat(bet, m, l),
+    ensures
+        exists|k: int| 0 <= k < bet.len() && sigma_betas(bet, m, l)[k] as int == r,
+{
+    let j = choose|j: int| 0 <= j < bet.len() && bet[j] as int == r;
+    assert(0 <= j < bet.len() && bet[j] as int == r);
+    assert(r >= 0);   // r == bet[j] : nat
+    let b = choose|b: int| r == #[trigger] ((m as int) * b) + (l as int);   // from cong_l
+    assert(r == (m as int) * b + (l as int));
+    // b ≥ 0: if b ≤ −1 then m·b ≤ −m, so r = m·b + l ≤ l − m < 0, contradicting r ≥ 0.
+    assert(b >= 0) by(nonlinear_arith)
+        requires r == (m as int) * b + (l as int), r >= 0, (l as int) < (m as int), m >= 1;
+    let bn = b as nat;
+    assert(bn == b && (m * bn + l) as int == r) by {
+        assert(bn as int == b);
+        assert((m as int) * b + (l as int) == r);
+    }
+    // bet contains m·bn + l  (= r = bet[j]).
+    assert(bet.contains((m * bn + l) as nat)) by {
+        assert((m * bn + l) as nat == bet[j]);
+        assert(bet[j] == bet[j]);
+    }
+    // saturation ⟹ bet contains bn.
+    assert(bet.contains(bn));
+    let k = choose|k: int| 0 <= k < bet.len() && bet[k] == bn;
+    assert(0 <= k < bet.len() && bet[k] == bn);
+    // sigma_betas(bet)[k] = m·bet[k] + l = m·bn + l = r.
+    assert(sigma_betas(bet, m, l)[k] == (m * bet[k] + l) as nat);
+    assert(sigma_betas(bet, m, l)[k] as int == r) by {
+        assert(bet[k] == bn);
+        assert((m * bn + l) as int == r);
+    }
 }
 
 /// **Coordinate congruence**: every letter of `phi_canon_acc(u, xe)` has `s = 0` and a coordinate
