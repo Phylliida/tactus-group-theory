@@ -227,6 +227,21 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > no σ-orbit, no map_a/map_b — those Fork-B arcs are superseded). Layer 0.5 also unblocked by the same
 > predicate foundation (the {a⁻ⁱbaⁱ}/{b⁻ⁱabⁱ}-free F₂ cruxes are already banked).
 >
+> **✅ COHEN §1 ASSEMBLY STARTED 2026-06-23 (session 18) — the canonical completeness route, CS-1+CS-2
+> DONE.** New plan `docs/cohen-section1-assembly-plan.md` (supersedes `brick5-completeness-plan.md`'s
+> Fork-B C0–C5/σ-orbit/map_a/map_b — all superseded). The faithfulness chain factors into **(1)** a
+> Britton descent down the finite-association H₃ tower (`britton_lemma_unconditional`, needs the a_i+k
+> isos — CS-4/CS-5, the hard arc) and **(2)** a **c-retraction** `H₂→C` for the H₂→C step — which
+> SIDESTEPS an infinite-association Britton for the p-peel (peer-validated). **CS-1 DONE**
+> (`cohen_h2.rs` 3/0, commit b2a0363): `h2_pred` = the predicate base H₂ carrying the full infinite
+> family (II) + the abstract c-block relator predicate `S` of `C=⟨c;S⟩`; `pred_presentation_valid`.
+> **CS-2 DONE** (`cohen_retraction.rs` 16/0, commit 309a741): `lemma_h2_pred_descends_to_c` — step (2)
+> COMPLETE (the iso-free half), via `c_retraction` validity (every relator class ↦ C-identity) +
+> fixes-c-words + `lemma_hom_pred_preserves_equiv`. Crate 2375/20 (+19, no regression). **NEXT = CS-3**
+> (the single-letter PredHNN tower `h3_pred_upto`/`h3_pred` + validity, low-risk defs brick) → **CS-4**
+> (a_i relabeling iso, §1a, Layer-1 residue facts) → **CS-5** (k iso, §1b, von Dyck + c-kill endo,
+> uses `s_realizes` + `lemma_theorem1`) → **CS-6** (assembly + transport to printable `h3_pres`).
+>
 > **✅ FORK-A STARTED 2026-06-23 (session 14) — elementary foundation arc DONE, ports VERBATIM.**
 > The completeness route is **Fork-A** (predicate presentation; the textbook route per
 > `docs/cohen-faithfulness-primary-source.md` §1/§10). Go taken on the standing "follow the textbook"
