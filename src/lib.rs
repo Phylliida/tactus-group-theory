@@ -287,3 +287,7 @@ pub mod phi_l_iso_tower;
 // C3.2 must be reframed to a word-restricted virtual iso (docs/brick5-c4-plan.md §7).
 #[cfg(verus_keep_ghost)]
 pub mod phi_l_iso_unsat;
+// C3.2 reframe (step 2): the BOUNDED σ-ORBIT — the finite, satisfiable replacement for the
+// unsatisfiable universal σ-forward-closure (the word-restricted virtual-iso side condition).
+#[cfg(verus_keep_ghost)]
+pub mod sigma_orbit;
