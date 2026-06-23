@@ -30,7 +30,10 @@ use crate::phi_l_iso::lemma_apply_embedding_fixes;
 use crate::phi_l_lift::b_words;
 use crate::h3::phi_assoc;
 use crate::h3_ii::{compose_embeddings, lemma_apply_embedding_compose, lemma_phi_assoc_index,
-    recog_data};
+    recog_data, phi_l_subst};
+use crate::phi_l_iso::lemma_phi_l_on_config_zero;
+use crate::f_free::lemma_apply_embedding_agree_prefix;
+use crate::layout::h2_num_gens;
 use crate::pa_data::{pa_data, lemma_pa_data_valid, lemma_pa_data_shape};
 use crate::phi_l_maps::{a_words_F, lemma_map_a_faithful};
 use crate::phi_l_pinch::{lemma_a_col_correspondence, lemma_b_col_correspondence};
@@ -526,6 +529,42 @@ pub proof fn lemma_txd_b_free(l: nat, m: nat, n: nat)
         assert(Seq::new((n + 1) as nat, |i: int| free_stable_letter(2, i))
             =~= Seq::new((n + 1) as nat, |i: int| seq![Symbol::Gen((2 + i) as nat)]));
     }
+}
+
+/// **The digit-scaling for `phi_F_family`**: `emb(phi_F_family, config(β,0)) =~= config(mβ+l, 0)`.
+/// `config(β,0)` uses only gens `{0,1}`, where `phi_F_family` agrees with `phi_l_subst` (both map
+/// `t↦config(l,0), x↦xᵐ`), so the embedding equals `phi_l_subst`'s, `= config(mβ+l,0)`
+/// (`lemma_phi_l_on_config_zero`).  This is the column-translation behind `compose(phi_F_family,
+/// config_emb(betas)) = config_emb(σ(betas))` — the (R)⟸(R') reduction's key computation.
+pub proof fn lemma_phi_F_on_config(mm: ModMachine, n: nat, m: nat, l: nat, beta: nat)
+    requires
+        1 <= l <= 2 * n,
+    ensures
+        apply_embedding(phi_F_family(n, m, l), config_word(beta, 0)) =~= config_word(m * beta + l, 0),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let subst = phi_l_subst(nk, n, m, l);
+    let pf = phi_F_family(n, m, l);
+    // config(β,0) valid over 2 (uses only gens {0,1}).
+    lemma_config_zero_form(beta);
+    let i1 = symbol_power(Symbol::Inv(1), beta);
+    let g1 = symbol_power(Symbol::Gen(1), beta);
+    assert(config_word(beta, 0) =~= (i1 + seq![Symbol::Gen(0)]) + g1);
+    lemma_symbol_power_valid(Symbol::Inv(1), 1, 2);
+    lemma_symbol_power_valid(Symbol::Gen(1), 1, 2);
+    lemma_concat_word_valid(i1, seq![Symbol::Gen(0)], 2);
+    lemma_concat_word_valid(i1 + seq![Symbol::Gen(0)], g1, 2);
+    assert(word_valid(config_word(beta, 0), 2));
+    // pf, subst agree on gens 0,1 (both [config(l,0), xᵐ]).
+    assert(pf.len() == n + 3);
+    assert(h2_num_gens(nk, n) >= 2) by { assert(nk >= 4); }
+    assert(pf[0] == config_word(l, 0) && pf[1] == symbol_power(Symbol::Gen(1), m));
+    assert(subst[0] == config_word(l, 0) && subst[1] == symbol_power(Symbol::Gen(1), m));
+    assert forall|i: int| 0 <= i < 2 implies pf[i] == subst[i] by {}
+    lemma_apply_embedding_agree_prefix(pf, subst, config_word(beta, 0), 2);
+    // emb(subst, config(β,0)) = config(mβ+l, 0).
+    lemma_phi_l_on_config_zero(mm, n, m, l, beta);
 }
 
 /// **`φ_F`'s image family** `[config(l,0), xᵐ, b_l·d, b_1, …, b_n]` — `phi_l_src` restricted to the
