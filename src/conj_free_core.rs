@@ -547,6 +547,96 @@ pub proof fn lemma_phi_block_struct(s: Symbol)
 }
 
 // ----------------------------------------------------------------------------
+// Concat-subrange helpers for the base case.
+// ----------------------------------------------------------------------------
+
+/// A subrange entirely inside the right factor: `(h+v)[a..b] = v[a−|h|..b−|h|]`.
+proof fn lemma_concat_subrange_right(h: Word, v: Word, a: int, b: int)
+    requires
+        h.len() <= a <= b <= h.len() + v.len(),
+    ensures
+        (h + v).subrange(a, b) =~= v.subrange(a - h.len(), b - h.len()),
+{
+    assert forall|j: int| #![trigger (h + v).subrange(a, b)[j]]
+        0 <= j < (h + v).subrange(a, b).len()
+        implies (h + v).subrange(a, b)[j] == v.subrange(a - h.len(), b - h.len())[j] by {
+        assert((h + v).subrange(a, b)[j] == (h + v)[a + j]);
+        assert((h + v)[a + j] == v[a + j - h.len()]);
+        assert(v.subrange(a - h.len(), b - h.len())[j] == v[a - h.len() + j]);
+    }
+}
+
+/// A subrange straddling the split: `(h+v)[a..b] = h[a..|h|] ++ v[0..b−|h|]`.
+proof fn lemma_concat_subrange_mid(h: Word, v: Word, a: int, b: int)
+    requires
+        0 <= a <= h.len() <= b <= h.len() + v.len(),
+    ensures
+        (h + v).subrange(a, b) =~= h.subrange(a, h.len() as int) + v.subrange(0, b - h.len()),
+{
+    let l = h.len() as int;
+    assert forall|j: int| #![trigger (h + v).subrange(a, b)[j]]
+        0 <= j < (h + v).subrange(a, b).len()
+        implies (h + v).subrange(a, b)[j] == (h.subrange(a, l) + v.subrange(0, b - l))[j] by {
+        assert((h + v).subrange(a, b)[j] == (h + v)[a + j]);
+        assert(h.subrange(a, l).len() == l - a);
+        if a + j < l {
+            assert((h + v)[a + j] == h[a + j]);
+            assert((h.subrange(a, l) + v.subrange(0, b - l))[j] == h.subrange(a, l)[j]);
+            assert(h.subrange(a, l)[j] == h[a + j]);
+        } else {
+            assert((h + v)[a + j] == v[a + j - l]);
+            assert((h.subrange(a, l) + v.subrange(0, b - l))[j]
+                == v.subrange(0, b - l)[j - (l - a)]);
+            assert(v.subrange(0, b - l)[j - (l - a)] == v[j - (l - a)]);
+        }
+    }
+}
+
+/// **First b of a φ-image.**  For `V = φ(w)` (`w` nonempty), the first b-letter sits at position
+/// `c = generator_index(w[0])`, equals `b_sym(w[0])`, the earlier positions are non-b, and the
+/// length-`c` prefix is exactly `a⁻ᶜ` (a-exponent `−c`).
+pub proof fn lemma_emb_first_b(k: nat, w: Word)
+    requires
+        word_valid(w, k),
+        w.len() > 0,
+    ensures
+        ({
+            let v = crate::benign::apply_embedding(conj_family(k), w);
+            let c = generator_index(w[0]) as int;
+            &&& c < v.len()
+            &&& is_b(v[c])
+            &&& v[c] == b_sym(w[0])
+            &&& (forall|m: int| 0 <= m < c ==> !is_b(#[trigger] v[m]))
+            &&& v.subrange(0, c) =~= symbol_power(Symbol::Inv(0), generator_index(w[0]))
+        }),
+{
+    let v = crate::benign::apply_embedding(conj_family(k), w);
+    let s = w[0];
+    let c = generator_index(s) as int;
+    let h = phi_block(s);
+    lemma_emb_first_block(k, w);          // v =~= h + φ(rest)
+    lemma_phi_block_struct(s);            // h structure, len 2c+1
+    let rest_emb = crate::benign::apply_embedding(conj_family(k), w.drop_first());
+    assert(v =~= h + rest_emb);
+    assert(h.len() == 2 * c + 1);
+    // For m ≤ c < h.len(), v[m] = h[m].
+    assert forall|m: int| 0 <= m <= c implies v[m] == h[m] by {
+        assert(v[m] == (h + rest_emb)[m]);
+    }
+    assert(v[c] == h[c]);
+    // Prefix of length c is the leading a⁻ᶜ of the block.
+    assert(v.subrange(0, c) =~= symbol_power(Symbol::Inv(0), generator_index(s))) by {
+        let pre = symbol_power(Symbol::Inv(0), generator_index(s));
+        assert forall|j: int| #![trigger v.subrange(0, c)[j]] 0 <= j < c
+            implies v.subrange(0, c)[j] == pre[j] by {
+            assert(v.subrange(0, c)[j] == v[j]);
+            assert(v[j] == h[j]);
+            assert(h[j] == pre[j]);   // h = pre + mid + post, j < c = pre.len()
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
 // `count1` is preserved through the entire reduction to normal form, under `bsep`.
 // ----------------------------------------------------------------------------
 
