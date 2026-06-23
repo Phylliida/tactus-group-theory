@@ -412,3 +412,9 @@ pub mod cohen_retraction;
 // psi_assoc verbatim; defs + validity + num-gens. docs/cohen-section1-assembly-plan.md §1/§5.
 #[cfg(verus_keep_ghost)]
 pub mod cohen_h3;
+
+// cohen_cs4: Layer 2 — Cohen §1 assembly, brick CS-4a. The von-Dyck halves of the a_i iso over
+// the predicate base h2_pred — UNCONDITIONAL (the predicate carries the full family (II), so the
+// finite-tower σ-slice obstruction is gone). docs/cohen-cs4-architecture.md §4.
+#[cfg(verus_keep_ghost)]
+pub mod cohen_cs4;
