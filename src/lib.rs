@@ -400,3 +400,9 @@ pub mod sigma_orbit;
 // docs/cohen-section1-assembly-plan.md.
 #[cfg(verus_keep_ghost)]
 pub mod cohen_h2;
+
+// cohen_retraction: Layer 2 — Cohen §1 assembly, brick CS-2. The c-retraction descent H₂→C
+// (the iso-free back-half of faithfulness): ρ fixes c_j, kills all else; w_α(c)=1 in h2_pred ⟹
+// =1 in C, no infinite-association Britton needed. docs/cohen-section1-assembly-plan.md §3.
+#[cfg(verus_keep_ghost)]
+pub mod cohen_retraction;
