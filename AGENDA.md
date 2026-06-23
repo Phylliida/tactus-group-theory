@@ -176,19 +176,29 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 ### 3.2 — Layer 2: the Higman embedding `C ↪ H₃`
 *`docs/higman-embedding-blueprint.md` (Cohen §9.6). Build on the finished `G(M)=K_M`.*
 
-> **✅ NORMAL-FORM ARC UNDER WAY 2026-06-23 (session 15) — bottom 3 layers ported FIRST-TRY + a
-> CAYLEY LEAPFROG.** The reserved multi-week commit is now in progress as reversible bricks (the
+> **✅ NORMAL-FORM ARC: FA-8 DONE 2026-06-23 (session 16) — the 12.4k AFP-injectivity engine is
+> ported, crate-additive.** The reserved multi-week commit is being shipped as reversible bricks (the
 > *direction* was settled: textbook = AFP/Britton = the substrate = the predicate port; Bass–Serre =
-> reinvention). Shipped, crate GREEN (1912/20): **`pred_homomorphism` (FA-5, 19/0)**,
-> **`pred_normal_form_free_product` (FA-6, 11/0, free-product injectivity via retraction homs)**,
-> **`pred_normal_form_amalgamated` (FA-7, thin spec interface)**. **Cayley leapfrog**: the heavy
-> ~70-relator-site Cayley injectivity in `normal_form_amalgamated.rs` is an ALTERNATE proof OFF the
-> critical path — britton consumes `normal_form_afp_textbook.rs`, which needs only the FA-7 thin
-> interface — so the port skips it. **NEXT = FA-8**: port `normal_form_afp_textbook.rs` (12.4k; 68/215
-> proof fns take `AmalgamatedData` ⟹ type-swap; ~147 + specs presentation-agnostic ⟹ reuse verbatim;
-> the one rewritten lemma = relator-classification @6019-6058 → predicate disjunction). Then **FA-9** =
-> the `britton_via_tower` base-embeds direction (`lemma_single_hnn_base_faithful` analog). Full scope +
-> honest stop-note in `cohen-faithfulness-primary-source.md` §11.
+> reinvention). Shipped: **`pred_homomorphism` (FA-5, 19/0)**, **`pred_normal_form_free_product`
+> (FA-6, 11/0)**, **`pred_normal_form_amalgamated` (FA-7, thin spec interface)**, and now
+> **`pred_normal_form_afp_textbook` (FA-8, 234/0)** — the textbook AFP injectivity (Lyndon-Schupp
+> reduced sequences) over a `PredPresentation` base (relators = `spec_fn(Word)->bool`). **Cayley
+> leapfrog** still holds: britton consumes `normal_form_afp_textbook`, not the heavy Cayley file, so
+> the port skips it.
+>
+> **FA-8 method (for the FA-9 handoff):** wholesale copy + ordered symbol substitution; agnostic
+> helpers (word_lex_rank/shortlex, shift_word, unshift_sym, benign) reused verbatim; only ~4 fns
+> hand-rewritten where finite-Seq `.relators[i]` indexing becomes a predicate disjunction
+> (`action_well_defined`, `lemma_act_word_deriv` arms, `lemma_action_well_defined_proof`,
+> `lemma_afp_injectivity`/`_right` choose-bridges). **Scope correction:** the session-15 estimate
+> (68 type-swaps / 147 reuse) was empirically ~3× off — **191** proof fns take `AmalgamatedData`
+> (only ~13 truly reusable) — BUT the deeper claim held: all finite-Seq `.relators[i]` uses localize
+> to 2 spots, so the 191 swaps are *mechanical* (global sub), and the relator-classification rewrite
+> dropped `lemma_add_relators_concat` entirely (the disjunction `added_relators_pred` is definitional).
+> **NEXT = FA-9** = the `britton_via_tower` base-embeds direction (`lemma_single_hnn_base_faithful`
+> analog) over the predicate base — the LAST normal-form brick, after which Cohen §1 (recognize
+> A/Aᵢ/A₊/A₋, read isos off, base-embeds) assembles Layer-2 completeness. Full scope +
+> handoff in `cohen-faithfulness-primary-source.md` §11.
 >
 > **✅ FORK-A STARTED 2026-06-23 (session 14) — elementary foundation arc DONE, ports VERBATIM.**
 > The completeness route is **Fork-A** (predicate presentation; the textbook route per
