@@ -193,6 +193,15 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > new virtual Britton); the only residual risk is whether the AFP-tower `shift`/normal-form machinery
 > generalizes to a predicate base — answerable by a small non-committing prototype (see the
 > primary-source note §4). The verified soundness (`lemma_III` etc.) and Layer 1 are untouched.
+> **SHARPENED 2026-06-23 (primary-source note §7, code-grounded + peer-reviewed):** the embedding-only
+> hope is largely false (base-embeds rests on the AFP injectivity, both 21k-line files stay on the
+> path), BUT the predicate change lands on a THIN layer — the relator-by-index lookup is localized to
+> ONE spec fn (`apply_step`; the whole equiv/derivation algebra above it is relator-agnostic and ports
+> verbatim), the 64 indexed sites cluster in ~13 bookkeeping functions, the ~319 abstract
+> `equiv_in_presentation` sites carry the math as a black box (ZERO relator-search sites ⟹ no witness
+> friction), so Fork-A is a **large MECHANICAL port, not a mathematical re-derivation**. The gating
+> unknown narrows to "how many compile-fix cycles does the type-swapped parallel tower take" —
+> measurable by the §4 one-lemma prototype, still gated on Danielle's go/no-go.
 
 - [ ] **Layer 0.5** — Higman–Neumann–Neumann: embed the (countable, recursively presented) CEER
       group into a **f.g.** recursively presented `C=⟨c₁,…,cₙ;S⟩`. **SOURCE LOCATED 2026-06-23**:
