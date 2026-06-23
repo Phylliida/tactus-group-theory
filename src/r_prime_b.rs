@@ -478,7 +478,7 @@ proof fn lemma_compose_pa_rhs_sigma_selector(n: nat, m: nat, l: nat, bet: Seq<na
 }
 
 /// `pa_rhs(β)` is valid over `n+3` (config over `{0,1}`, `w_c` over `[3,n+3)`, `d = Gen2 < n+3`).
-proof fn lemma_pa_rhs_valid_n3(n: nat, m: nat, beta: nat)
+pub proof fn lemma_pa_rhs_valid_n3(n: nat, m: nat, beta: nat)
     requires
         numbers_word(n, m, beta),
         2 * n < m,
