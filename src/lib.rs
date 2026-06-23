@@ -282,3 +282,8 @@ pub mod phi_l_mapb_fwd;
 // faithfulness induction, mirror lemma_b_m_upto_faithful) → lemma_phi_l_iso at every level.
 #[cfg(verus_keep_ghost)]
 pub mod phi_l_iso_tower;
+// C3.2 obstruction: machine-checked proof that `sigma_sat_upto` (the a-tower iso side condition) is
+// UNSATISFIABLE for finite `alphas` — so `lemma_phi_l_iso`/`lemma_h3_II_upto_faithful` are vacuous and
+// C3.2 must be reframed to a word-restricted virtual iso (docs/brick5-c4-plan.md §7).
+#[cfg(verus_keep_ghost)]
+pub mod phi_l_iso_unsat;

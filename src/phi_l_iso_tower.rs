@@ -29,9 +29,22 @@ verus! {
 
 /// The per-level side-condition bundle for the a-tower iso: for every tower level `j ∈ [1, l]`,
 /// `betas(alphas)` is σ-BACKWARD-saturated at digit `j`, AND the **finite-slice** holds — each
-/// shifted index `m·γ+j` (`γ ∈ betas`) lands in `alphas`.  This REPLACES the old σ-FORWARD-saturation
-/// (which was unsatisfiable for finite `alphas` — `betas∋0` forces an infinite ascending σ-chain);
-/// the finite-slice is finite-satisfiable by a bounded σ-orbit `alphas` (C4 picks it).
+/// shifted index `m·γ+j` (`γ ∈ betas`) lands in `alphas`.
+///
+/// **⚠ VACUOUS — UNSATISFIABLE for any finite `alphas` (found 2026-06-22, confirmed w/ Danielle).**
+/// The finite-slice was claimed finite-satisfiable by a "bounded σ-orbit", but it is NOT: with
+/// `γ = betas[0] = 0, j = 1` it forces `1 ∈ alphas`, then `γ = 1` forces `m+1 ∈ alphas`, then
+/// `m²+m+1`, … — a strictly increasing infinite chain into a finite `Seq` (proof:
+/// `lemma_sigma_sat_upto_unsatisfiable`).  It is the SAME failure as the old σ-forward-saturation,
+/// merely relocated.  ROOT CAUSE: the von-Dyck-backward direction needs `family_II_relator(m·β+l) ≡ ε`
+/// in the base, which a finite base only has when `m·β+l ∈ alphas`; so the UNIVERSAL iso
+/// (`hnn_associations_isomorphic`, ∀ww) requires σ-forward-closure of `alphas` ⟹ infinite.  A finite
+/// presentation simply cannot carry the full (infinite) family (II), so the a-level associations are
+/// NOT genuine universal isos over the base — only **virtual** isos (true in the group `h3_pres`,
+/// false in the base presentation).  This is the SAME situation already flagged for the k-level
+/// (`brick5-completeness-plan.md` §2.3, Fork B).  **C3.2 is therefore NOT done** — it must be reframed
+/// to a WORD-RESTRICTED virtual iso (the R1–R4 directional machinery is reusable; only this universal
+/// packaging + the `britton_lemma_full` tower lift are wrong).  See `docs/brick5-c4-plan.md` §7.
 pub open spec fn sigma_sat_upto(alphas: Seq<nat>, m: nat, l: nat) -> bool {
     forall|j: nat| #![trigger sigma_backsat(betas(alphas), m, j)] 1 <= j <= l ==>
         sigma_backsat(betas(alphas), m, j)
