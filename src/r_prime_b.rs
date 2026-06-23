@@ -32,8 +32,11 @@ use crate::homomorphism::{apply_hom, apply_hom_symbol, lemma_hom_preserves_equiv
 use crate::free_basis::{comp_images, lemma_apply_hom_embedding_compose, lemma_apply_hom_eq_embedding,
     config_emb};
 use crate::higman_operations::{free_group, lemma_free_group_valid};
-use crate::word_numbering::{w_c, numbers_word, lemma_w_c_valid, lemma_w_c_gens_in_block};
+use crate::word_numbering::{w_c, w_b, numbers_word, lemma_w_c_valid, lemma_w_c_gens_in_block,
+    lemma_w_b_snoc, alphabet_letter};
 use crate::pa_data::{pa_b_base, pa_rhs};
+use crate::phi_l_mapb::lemma_phi_F_on_config;
+use crate::phi_l_iso::lemma_apply_embedding_fixes;
 use crate::phi_l_mapb::{sigma_betas, phi_F_family};
 use crate::r_prime::{phi_prime, phi_canon_acc, kill_db, sigma_backsat,
     lemma_phi_prime_emb_valid, lemma_membership_to_canon, lemma_phi_canon_invariant,
@@ -555,6 +558,158 @@ pub proof fn lemma_r_prime_b(mm: ModMachine, n: nat, m: nat, l: nat, u: Word, be
 
     // (6) g ≡ emb(pr, v) ⟹ g ∈ ⟨pa_rhs_emb(σbet)⟩.
     lemma_in_subgroup_respects_equiv(fg, pa_rhs_emb(n, m, sbet), apply_embedding(pr, v), g);
+}
+
+// ----------------------------------------------------------------------------
+// (R)_b — the b-side reflection (R)⟸(R')_b via the generic intersection property.
+// ----------------------------------------------------------------------------
+
+/// **`φ_F` fixes `w_c(3,n,m,β)`** — its symbols all live in the F-b-block `[3, n+3)`, where
+/// `phi_F_family` maps every generator to itself (the identity tail `[Gen(g)]`).
+proof fn lemma_phi_F_fixes_w_c(n: nat, m: nat, l: nat, beta: nat)
+    requires
+        numbers_word(n, m, beta),
+        2 * n < m,
+        1 <= l <= 2 * n,
+    ensures
+        apply_embedding(phi_F_family(n, m, l), w_c(pa_b_base(), n, m, beta))
+            =~= w_c(pa_b_base(), n, m, beta),
+{
+    let pf = phi_F_family(n, m, l);
+    let wc = w_c(pa_b_base(), n, m, beta);
+    assert(pf.len() == n + 3);
+    let tail = Seq::new(n, |j: int| seq![Symbol::Gen((3 + j) as nat)]);
+    lemma_w_c_gens_in_block(pa_b_base(), n, m, beta);
+    assert forall|i: int| 0 <= i < wc.len()
+        implies apply_embedding_symbol(pf, #[trigger] wc[i]) =~= seq![wc[i]] by {
+        let g = generator_index(wc[i]);
+        assert(pa_b_base() <= g < pa_b_base() + n);                 // 3 ≤ g < n+3
+        // pf[g] = tail[g-3] = [Gen(g)].
+        assert(pf[g as int] == tail[g - 3]) by { assert(g >= 3); }
+        assert(tail[g - 3] == seq![Symbol::Gen((3 + (g - 3)) as nat)]);
+        assert(pf[g as int] == seq![Symbol::Gen(g)]);
+        match wc[i] {
+            Symbol::Gen(gg) => { assert(gg == g); },
+            Symbol::Inv(gg) => { assert(gg == g); reveal_with_fuel(inverse_word, 2); },
+        }
+    }
+    lemma_apply_embedding_fixes(pf, wc);
+}
+
+/// **`φ_F(pa_rhs(β)) = pa_rhs(σβ)`** — the F-level family-(II) payoff (= `lemma_phi_l_on_family_II_rhs`
+/// at the `P_A`/`F` level).  `φ_F` scales the config part (`config(β,0)↦config(σβ,0)`), fixes
+/// `w_β(b)` (b-block), and `d↦b_l·d`; the numbering snoc `w_{σβ}(b) = w_β(b)·b_l` then aligns the
+/// image with `pa_rhs(σβ)`.
+pub proof fn lemma_phi_F_on_pa_rhs(mm: ModMachine, n: nat, m: nat, l: nat, beta: nat)
+    requires
+        numbers_word(n, m, beta),
+        2 * n < m,
+        1 <= l <= 2 * n,
+    ensures
+        apply_embedding(phi_F_family(n, m, l), pa_rhs(n, m, beta))
+            =~= pa_rhs(n, m, (m * beta + l) as nat),
+{
+    let pf = phi_F_family(n, m, l);
+    let bb = pa_b_base();                                  // 3
+    let cfg = config_word(beta, 0);
+    let wc = w_c(bb, n, m, beta);
+    let dw: Word = seq![Symbol::Gen(2)];
+    let bl = alphabet_letter(bb, n, l);
+
+    // pa_rhs(β) = (cfg + wc) + [Gen2]; distribute.
+    assert(pa_rhs(n, m, beta) == (cfg + wc) + dw);
+    lemma_apply_embedding_concat(pf, cfg + wc, dw);
+    lemma_apply_embedding_concat(pf, cfg, wc);
+
+    // The three φ_F images.
+    lemma_phi_F_on_config(mm, n, m, l, beta);             // φ_F(cfg) =~= config(mβ+l, 0)
+    lemma_phi_F_fixes_w_c(n, m, l, beta);                 // φ_F(wc) =~= wc
+    reveal_with_fuel(apply_embedding, 2);
+    lemma_concat_empty_right(pf[2]);
+    assert(apply_embedding(pf, dw) =~= pf[2]);            // φ_F(d) = pf[2] = [bl, Gen2]
+    assert(pf[2] == seq![bl, Symbol::Gen(2)]);
+
+    let cfg2 = config_word((m * beta + l) as nat, 0);
+    assert(apply_embedding(pf, pa_rhs(n, m, beta)) =~= (cfg2 + wc) + seq![bl, Symbol::Gen(2)]);
+
+    // Target side: w_{σβ}(b) = w_β(b)·b_l  (numbering snoc).  snoc yields β·m+l; bridge to m·β+l.
+    lemma_w_b_snoc(bb, n, m, beta, l);
+    assert(beta * m + l == m * beta + l) by (nonlinear_arith);
+    let bl_seq = Seq::new(1, |_k: int| alphabet_letter(bb, n, l));
+    assert(w_b(bb, n, m, (m * beta + l) as nat) =~= wc + bl_seq) by {
+        assert(w_b(bb, n, m, beta) == wc);                // w_b := w_c
+    }
+    assert(bl_seq =~= seq![bl]);
+    assert(pa_rhs(n, m, (m * beta + l) as nat)
+        == (cfg2 + w_c(bb, n, m, (m * beta + l) as nat)) + dw);
+    assert(w_c(bb, n, m, (m * beta + l) as nat) == w_b(bb, n, m, (m * beta + l) as nat));
+    assert(seq![bl, Symbol::Gen(2)] =~= seq![bl] + dw);
+}
+
+/// `compose(φ_F, pa_rhs_emb(bet)) = pa_rhs_emb(σbet)` — the b-column σ-shift (mirror of
+/// `lemma_compose_phi_F_config_emb`).  The recog-vs-pa relation `ψ = φ_F` at the b-column.
+pub proof fn lemma_compose_phi_F_pa_rhs_emb(mm: ModMachine, n: nat, m: nat, l: nat, bet: Seq<nat>)
+    requires
+        2 * n < m,
+        1 <= l <= 2 * n,
+        forall|i: int| 0 <= i < bet.len() ==> numbers_word(n, m, #[trigger] bet[i]),
+    ensures
+        compose_embeddings(phi_F_family(n, m, l), pa_rhs_emb(n, m, bet))
+            =~= pa_rhs_emb(n, m, sigma_betas(bet, m, l)),
+{
+    let pf = phi_F_family(n, m, l);
+    let pr = pa_rhs_emb(n, m, bet);
+    let sb = sigma_betas(bet, m, l);
+    let comp = compose_embeddings(pf, pr);
+    assert(comp.len() == bet.len() && pa_rhs_emb(n, m, sb).len() == bet.len());
+    assert forall|i: int| 0 <= i < bet.len() implies comp[i] =~= pa_rhs_emb(n, m, sb)[i] by {
+        assert(comp[i] == apply_embedding(pf, pr[i]));
+        assert(pr[i] == pa_rhs(n, m, bet[i]));
+        lemma_phi_F_on_pa_rhs(mm, n, m, l, bet[i]);
+        assert(sb[i] == m * bet[i] + l);
+        assert(pa_rhs_emb(n, m, sb)[i] == pa_rhs(n, m, sb[i]));
+    }
+}
+
+/// **(R)_b — the b-side reflection**: `emb(φ_F, u) ∈ ⟨pa_rhs_emb(bet)⟩ ⟹ u ∈ ⟨pa_rhs_emb(bet)⟩`,
+/// under σ-saturation (both directions).  (R')_b lifts the membership into `⟨pa_rhs_emb(σbet)⟩`, then
+/// the generic intersection property (`ψ = φ_F` free, b-column `compose = pa_rhs_emb(σbet)`) reflects
+/// it to `u`.  This is the b-column M2 pinch-middle consumable (mirror of `lemma_config_reflect_full`).
+pub proof fn lemma_pa_rhs_reflect_full(mm: ModMachine, n: nat, m: nat, l: nat, u: Word, bet: Seq<nat>)
+    requires
+        mod_machine_wf(mm),
+        1 <= l <= 2 * n,
+        2 * n < m,
+        word_valid(u, (n + 3) as nat),
+        bet.no_duplicates(),
+        forall|i: int| 0 <= i < bet.len() ==> numbers_word(n, m, #[trigger] bet[i]),
+        in_generated_subgroup(free_group((n + 3) as nat), pa_rhs_emb(n, m, bet),
+            apply_embedding(phi_F_family(n, m, l), u)),
+        sigma_backsat(bet, m, l),
+        sigma_fwdsat(bet, m, l),
+    ensures
+        in_generated_subgroup(free_group((n + 3) as nat), pa_rhs_emb(n, m, bet), u),
+{
+    let fg = free_group((n + 3) as nat);
+    let pf = phi_F_family(n, m, l);
+    let pr = pa_rhs_emb(n, m, bet);
+    let sb = sigma_betas(bet, m, l);
+    lemma_free_group_valid((n + 3) as nat);
+    crate::phi_l_mapb::lemma_phi_F_family_free(n, m, l);   // is_free_family(fg, pf)
+    assert(pf.len() == n + 3);
+
+    // (R')_b: emb(φ_F, u) ∈ ⟨pa_rhs_emb(σbet)⟩.
+    lemma_r_prime_b(mm, n, m, l, u, bet);
+
+    // pa_rhs_emb(bet) columns valid over pf.len() = n+3.
+    assert forall|k: int| 0 <= k < pr.len() implies word_valid(#[trigger] pr[k], pf.len()) by {
+        assert(pr[k] == pa_rhs(n, m, bet[k]));
+        lemma_pa_rhs_valid_n3(n, m, bet[k]);
+    }
+    // compose(φ_F, pa_rhs_emb(bet)) = pa_rhs_emb(σbet), so (R')_b IS the intersection hypothesis.
+    lemma_compose_phi_F_pa_rhs_emb(mm, n, m, l, bet);
+    assert(compose_embeddings(pf, pr) == pa_rhs_emb(n, m, sb));
+    lemma_intersection_property(fg, pf, pr, u);
 }
 
 } // verus!
