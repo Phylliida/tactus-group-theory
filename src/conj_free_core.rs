@@ -20,6 +20,8 @@ use crate::symbol::*;
 use crate::word::*;
 use crate::reduction::*;
 use crate::conj_free::*;
+use crate::machine_group::{symbol_power, lemma_symbol_power_merge, lemma_symbol_power_one,
+    lemma_inverse_word_one};
 
 verus! {
 
@@ -400,6 +402,147 @@ pub proof fn lemma_reduce_preserves_bsep(w: Word, i: int)
         // a-exponent of the block is preserved.
         assert(0 <= p < q <= red.len());
         lemma_asum_infix_eq(w, i, p, q);
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Block structure of φ-images: `apply_embedding_symbol(conj_family(k), s) = phi_block(s)`.
+// ----------------------------------------------------------------------------
+
+/// The central b-letter of `phi_block(s)`: `Gen(1)` for a generator, `Inv(1)` for an inverse.
+pub open spec fn b_sym(s: Symbol) -> Symbol {
+    match s { Symbol::Gen(_) => Symbol::Gen(1), Symbol::Inv(_) => Symbol::Inv(1) }
+}
+
+/// The image block of a single source symbol: `a⁻ᶜ b^{±} aᶜ` with `c = generator_index(s)`.
+pub open spec fn phi_block(s: Symbol) -> Word {
+    symbol_power(Symbol::Inv(0), generator_index(s)) + seq![b_sym(s)]
+        + symbol_power(Symbol::Gen(0), generator_index(s))
+}
+
+/// `inverse_word(symbol_power(s, n)) == symbol_power(inverse_symbol(s), n)` (a constant power).
+proof fn lemma_inverse_symbol_power(s: Symbol, n: nat)
+    ensures
+        inverse_word(symbol_power(s, n)) =~= symbol_power(inverse_symbol(s), n),
+    decreases n,
+{
+    if n == 0 {
+        assert(symbol_power(s, 0) =~= empty_word());
+        assert(symbol_power(inverse_symbol(s), 0) =~= empty_word());
+    } else {
+        lemma_symbol_power_merge(s, 1, (n - 1) as nat);
+        lemma_inverse_concat(symbol_power(s, 1), symbol_power(s, (n - 1) as nat));
+        lemma_inverse_symbol_power(s, (n - 1) as nat);
+        lemma_symbol_power_one(s);
+        lemma_inverse_word_one(s);
+        lemma_symbol_power_merge(inverse_symbol(s), (n - 1) as nat, 1);
+        lemma_symbol_power_one(inverse_symbol(s));
+    }
+}
+
+/// `inverse_word(conj_word(i)) == phi_block(Inv(i)) = a⁻ⁱ b⁻¹ aⁱ`.
+proof fn lemma_inverse_conj_word(i: nat)
+    ensures
+        inverse_word(conj_word(i)) =~= symbol_power(Symbol::Inv(0), i) + seq![Symbol::Inv(1)]
+            + symbol_power(Symbol::Gen(0), i),
+{
+    let p = symbol_power(Symbol::Inv(0), i);
+    let m = seq![Symbol::Gen(1)];
+    let s = symbol_power(Symbol::Gen(0), i);
+    assert(conj_word(i) == p + m + s);
+    lemma_inverse_concat(p + m, s);
+    lemma_inverse_concat(p, m);
+    lemma_inverse_symbol_power(Symbol::Gen(0), i);
+    lemma_inverse_symbol_power(Symbol::Inv(0), i);
+    lemma_inverse_word_one(Symbol::Gen(1));
+}
+
+/// `apply_embedding_symbol(conj_family(k), s) == phi_block(s)`.
+pub proof fn lemma_phi_block(k: nat, s: Symbol)
+    requires
+        symbol_valid(s, k),
+    ensures
+        crate::benign::apply_embedding_symbol(conj_family(k), s) == phi_block(s),
+{
+    let fam = conj_family(k);
+    let c = generator_index(s);
+    assert(c < k);
+    match s {
+        Symbol::Gen(i) => {
+            assert(fam[i as int] == conj_word(i));
+            assert(phi_block(s) =~= conj_word(i));
+        },
+        Symbol::Inv(i) => {
+            assert(fam[i as int] == conj_word(i));
+            lemma_inverse_conj_word(i);
+        },
+    }
+}
+
+/// The leading block of a φ-image peels off: `φ(w) = phi_block(w[0]) ++ φ(drop_first(w))`.
+pub proof fn lemma_emb_first_block(k: nat, w: Word)
+    requires
+        word_valid(w, k),
+        w.len() > 0,
+    ensures
+        crate::benign::apply_embedding(conj_family(k), w)
+            =~= phi_block(w[0]) + crate::benign::apply_embedding(conj_family(k), w.drop_first()),
+{
+    assert(w.first() == w[0]);
+    assert(symbol_valid(w[0], k));
+    lemma_phi_block(k, w[0]);
+}
+
+/// The a-exponent of a one-symbol power: `asum(symbol_power(s, n)) == n · asym(s)`.
+proof fn lemma_asum_symbol_power(s: Symbol, n: nat)
+    ensures
+        asum(symbol_power(s, n)) == (n as int) * asym(s),
+    decreases n,
+{
+    if n == 0 {
+        assert(symbol_power(s, 0) =~= empty_word());
+    } else {
+        let sp = symbol_power(s, n);
+        assert(sp.first() == s);
+        assert(sp.drop_first() =~= symbol_power(s, (n - 1) as nat));
+        lemma_asum_symbol_power(s, (n - 1) as nat);
+        assert(asum(sp) == asym(s) + ((n - 1) as int) * asym(s));
+        assert((n as int) * asym(s) == asym(s) + ((n - 1) as int) * asym(s)) by(nonlinear_arith);
+    }
+}
+
+/// **Structure of `phi_block(s)`** (`c = generator_index(s)`): length `2c+1`; the leading `c` and
+/// trailing `c` symbols are non-b `a`-letters; position `c` is the b-letter.
+pub proof fn lemma_phi_block_struct(s: Symbol)
+    ensures
+        phi_block(s).len() == 2 * generator_index(s) + 1,
+        is_b(phi_block(s)[generator_index(s) as int]),
+        phi_block(s)[generator_index(s) as int] == b_sym(s),
+        forall|m: int| 0 <= m < generator_index(s) ==> !is_b(#[trigger] phi_block(s)[m]),
+        forall|m: int| generator_index(s) < m < phi_block(s).len() ==> !is_b(#[trigger] phi_block(s)[m]),
+{
+    let c = generator_index(s);
+    let pre = symbol_power(Symbol::Inv(0), c);
+    let mid = seq![b_sym(s)];
+    let post = symbol_power(Symbol::Gen(0), c);
+    assert(pre.len() == c && post.len() == c);
+    assert(phi_block(s) == pre + mid + post);
+    assert(b_sym(s) == Symbol::Gen(1) || b_sym(s) == Symbol::Inv(1)) by {
+        match s { Symbol::Gen(_) => {}, Symbol::Inv(_) => {} }
+    }
+    // Position c is the b-letter.
+    assert((pre + mid)[c as int] == b_sym(s));
+    assert(phi_block(s)[c as int] == b_sym(s));
+    assert(generator_index(b_sym(s)) == 1);
+    // Leading positions: Inv(0), index 0.
+    assert forall|m: int| 0 <= m < c implies !is_b(#[trigger] phi_block(s)[m]) by {
+        assert(phi_block(s)[m] == pre[m]);
+        assert(pre[m] == Symbol::Inv(0));
+    }
+    // Trailing positions: Gen(0), index 0.
+    assert forall|m: int| c < m < phi_block(s).len() implies !is_b(#[trigger] phi_block(s)[m]) by {
+        assert(phi_block(s)[m] == post[m - c - 1]);
+        assert(post[m - c - 1] == Symbol::Gen(0));
     }
 }
 
