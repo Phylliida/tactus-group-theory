@@ -562,3 +562,48 @@ the eventual C4 side-condition need the saturation hypothesis threaded through.
 ### Then
 - C-asm `lemma_phi_l_iso_at_h2II` = map_a (DONE) + map_b (von-Dyck DONE + forward) chained through `w ≡_{P_A} ε`.
 - C3.2d outer induction → C2/C4/C5.
+
+## 7. (R') — the canw index-tracking core (ARCHITECTURE LOCKED, session 5, companion-validated)
+
+**Goal** (`r_prime.rs`, NEW module).  With σ-backward-saturation `∀β. (mβ+l)∈bet ⟹ β∈bet`:
+> **(R')**: `emb(φ_F, u) ∈ ⟨config_emb(bet)⟩_{free(n+3)} ⟹ emb(φ_F, u) ∈ ⟨config_emb(σ(bet))⟩_{free(n+3)}`,
+> `σ(β)=mβ+l`.  (Then `lemma_config_reflect_a` glues (R)⟸(R'); M2 step case consumes (R).)
+
+**The reduction is irreducible** — it IS "which config-products lie in `Image(φ_F)∩⟨t,x⟩`: exactly
+those whose conjugating indices `≡ l (mod m)`."  Route = canw coordinate-tracking, reusing Layer-1's
+`lemma_tfree_coord_restrict` (config_reduce.rs:782 — the coordinate-survival CRUX, avoids full
+normal-form uniqueness) + `lemma_canw_eval_nontrivial` + the free-level `canon_to_free` bridge.
+
+**Architecture (7 pieces, ordered):**
+1. **kill_db retraction** (`HomomorphismData` free(n+3)→free(n+3), gens≥2 ↦ ε, identity on t,x).  Valid
+   (relators of free(n+3) empty ⟹ vacuous).  `G:=emb(φ_F,u) ∈ ⟨config(bet)⟩ ⊆ ⟨t,x⟩`, so π fixes G:
+   `π(G) ≡_{free} G`.  And `π∘φ_F = φ' := [config(l,0), xᵐ, ε,…,ε]`, so `π(G) = emb(φ',u) =: G'`, a
+   word over gens {0,1}.  ⟹ `G' ≡_{free(n+3)} emb(config_emb(bet),v) = canw_eval(C_bet)` (`C_bet =
+   w_to_canon(bet,v)`, coords ⊆ bet; `lemma_config_emb_eq_canw` is SYNTACTIC).
+2. **Coordinate-tracking invariant** (CENTERPIECE, highest risk).  `phi_canon_acc(u,E)` (left fold,
+   running x-exp E): Gen0↦prepend `{l−mE,0,1}`; Inv0↦`{l−mE,0,−1}`; Gen1↦recurse E+1; Inv1↦E−1;
+   gen≥2↦recurse E.  Invariant (any presentation `p`):
+   `signed_power(1,m·E) + emb(φ',u) ≡_p canw_eval(phi_canon_acc(u,E)) + signed_power(1, m·(E+xexp(u)))`.
+   At E=0: `G' ≡ canw_eval(C_u) + x^{m·xexp(u)}`, `C_u=phi_canon_acc(u,0)`, EVERY coord `= l−mE'` so
+   `≡ l (mod m)`.  Per-step atoms: `x^{mE}+config(l,0) ≡ gsconfig(l−mE,0,1)+x^{mE}` (signed-power
+   absorb, `lemma_signed_power_add` both sides reduce to `x^{mE−l}·t·x^l`) + Inv0/x-power/ε cases.
+3. **xexp(u)=0** via `gexp(1,·)` (`lemma_equiv_preserves_gexp`, free relators vacuous): `gexp(1,canw_eval)=0`,
+   `gexp(1,x^k)=k`, `G'≡canw_eval(C_bet)` has `gexp(1)=0` ⟹ `m·xexp(u)=0` ⟹ tail vanishes ⟹
+   `G' ≡_{free} canw_eval(C_u)`.
+4. **free→base_A** (`lemma_freely_equivalent_implies_equiv`): both canw equivs (G'≡canw(C_u), G'≡canw(C_bet))
+   are over gens {0,1}, ≡_{free(n+3)}; convert to ≡_{base_A} so `lemma_tfree_coord_restrict` applies.
+   (free reduction over {0,1} is a base_A derivation; relators unused.)
+5. **coord_restrict + saturation**: `canw_eval(C_u) ≡_{base_A} canw_eval(C_bet)` ⟹ ∀coord of
+   `D:=cw_reduce(C_u)`, `coord ∈ C_bet` (⊆ bet) [`lemma_tfree_coord_restrict`].  Also `coords(D) ⊆ coords(C_u)`
+   [`lemma_cw_reduce_coords`] so `≡ l (mod m)`.  ⟹ `coords(D) ⊆ bet ∩ σ(ℤ) ⊆ σ(bet)` (saturation:
+   `r∈bet ∧ r=mβ+l ⟹ β≥0 (l<m) ∧ β∈bet ⟹ r=σ(β)∈val(σ(bet))`).
+6. **free cw_reduce eval** (s=0): `canw_eval(C_u) ≡_{free(n+3)} canw_eval(cw_reduce(C_u))` — NEEDED (base_A
+   `lemma_cw_reduce_eval` is wrong direction).  s=0 merge/zero ARE free reductions; either re-derive a
+   `freely_equivalent` version or route through `canon_to_free`/`lemma_canon_cons_free` (free_basis, already free-level).
+7. **Reconstruction**: `D` reduced, `coords(D) ⊆ val(σ(bet))` ⟹ `canw_eval(D) ∈_{free(n+3)} ⟨config_emb(σ(bet))⟩`
+   (induction: each `{γ,0,e}` ↦ `config(γ)^e`, γ∈σ(bet) ⟹ generator-power ∈ subgroup; product closure
+   `lemma_product_in_subgroup` + `lemma_spow_int_mult_in_G`).  Chain G ≡ G' ≡ canw(C_u) ≡ canw(D) ∈ ⟨config(σ(bet))⟩.
+
+**Companion (local model) sanity-checked the architecture 2026-06-22**: sound; suggested step-3
+simplification (derive `xexp(u)=0` from membership, not algebraic vanishing) — adopted.  No full
+normal-form uniqueness needed (coordinate-survival suffices).
