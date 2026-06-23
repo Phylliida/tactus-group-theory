@@ -22,14 +22,15 @@ use crate::symbol::*;
 use crate::word::*;
 use crate::presentation::{Presentation, presentation_valid, equiv_in_presentation, lemma_equiv_refl,
     lemma_equiv_symmetric, lemma_equiv_transitive};
-use crate::presentation_lemmas::{lemma_equiv_concat_left, lemma_equiv_concat_right};
+use crate::presentation_lemmas::{lemma_equiv_concat_left, lemma_equiv_concat_right,
+    lemma_word_inverse_left};
 use crate::machine_group::{config_word, symbol_power, signed_power, gsconfig, CanonLetter,
     canl_eval, canw_eval, gexp, sym_exp, lemma_signed_power_add, lemma_signed_power_valid,
     lemma_inverse_word_concat, lemma_gexp_concat, lemma_gexp_signed_power, lemma_gexp_inverse,
     sconfig, lemma_sconfig_nat, base_A, lemma_base_A_valid,
     lemma_no_relator_equiv_implies_freely_equivalent};
 use crate::config_reduce::{is_canl_word, canon_represents, lemma_canon_represents_eval,
-    cw_reduce, coord_in, lemma_cw_reduce_coords, lemma_tfree_coord_restrict};
+    cw_reduce, coord_in, lemma_cw_reduce_coords, lemma_tfree_coord_restrict, lemma_cw_reduce_eval};
 use crate::presentation_lemmas::lemma_freely_equivalent_implies_equiv;
 use crate::ii_subset::lemma_signed_power_inverse;
 use crate::benign::{apply_embedding, apply_embedding_symbol, in_generated_subgroup,
@@ -986,6 +987,162 @@ pub proof fn lemma_gexp1_config_factors(bet: Seq<nat>, factors: Seq<Word>)
         assert(config_emb(bet)[j] == config_word(bet[j], 0));
         lemma_gexp1_config_word(bet[j]);
     }
+}
+
+// ----------------------------------------------------------------------------
+// Step 6 — free-level cw_reduce evaluation: canw_eval(cw_reduce(C)) ≡_{free} canw_eval(C) (s=0).
+// Reuse the base_A `lemma_cw_reduce_eval`, then a y-killing retraction base_A → free(n+3).
+// ----------------------------------------------------------------------------
+
+/// `kill_y : base_A → free(n+3)` — kill `y` (gen 2 ↦ ε), fix `t, x`.  Valid: the relator `[x,y]`
+/// maps to `x·x⁻¹ ≡ ε`.
+pub open spec fn kill_y(n: nat) -> HomomorphismData {
+    HomomorphismData {
+        source: base_A(),
+        target: free_group((n + 3) as nat),
+        generator_images: seq![seq![Symbol::Gen(0)], seq![Symbol::Gen(1)], empty_word()],
+    }
+}
+
+pub proof fn lemma_kill_y_valid(n: nat)
+    ensures
+        is_valid_homomorphism(kill_y(n)),
+{
+    let h = kill_y(n);
+    lemma_base_A_valid();
+    lemma_free_group_valid((n + 3) as nat);
+    assert(h.generator_images.len() == 3 && h.source.num_generators == 3);
+    assert forall|i: int| 0 <= i < 3
+        implies word_valid(#[trigger] h.generator_images[i], (n + 3) as nat) by {
+        if i == 0 { assert(h.generator_images[0] == seq![Symbol::Gen(0)]); }
+        else if i == 1 { assert(h.generator_images[1] == seq![Symbol::Gen(1)]); }
+        else { assert(h.generator_images[2] == empty_word()); }
+    }
+    // the single relator [Gen1,Gen2,Inv1,Inv2] ↦ [Gen1, Inv1] ≡ ε.
+    assert(h.source.relators.len() == 1);
+    let rel = base_A().relators[0];
+    assert(rel == seq![Symbol::Gen(1), Symbol::Gen(2), Symbol::Inv(1), Symbol::Inv(2)]);
+    assert(apply_hom(h, rel) =~= seq![Symbol::Gen(1)] + seq![Symbol::Inv(1)]) by {
+        reveal_with_fuel(apply_hom, 5);
+        assert(apply_hom_symbol(h, Symbol::Gen(2)) == empty_word());
+        assert(apply_hom_symbol(h, Symbol::Inv(2)) =~= empty_word()) by { lemma_inverse_empty(); }
+        assert(apply_hom_symbol(h, Symbol::Gen(1)) == seq![Symbol::Gen(1)]);
+        assert(apply_hom_symbol(h, Symbol::Inv(1)) =~= seq![Symbol::Inv(1)]) by {
+            reveal_with_fuel(inverse_word, 2);
+        }
+    }
+    // [Gen1] + [Inv1] = inverse_word([Inv1]) + [Inv1] ≡ ε.
+    assert(seq![Symbol::Gen(1)] =~= inverse_word(seq![Symbol::Inv(1)])) by {
+        reveal_with_fuel(inverse_word, 2);
+    }
+    lemma_word_inverse_left(free_group((n + 3) as nat), seq![Symbol::Inv(1)]);
+    assert(apply_hom(h, rel) =~= inverse_word(seq![Symbol::Inv(1)]) + seq![Symbol::Inv(1)]);
+}
+
+/// `kill_y` fixes any word over gens {0,1} (same images as `kill_db` on the low gens).
+pub proof fn lemma_kill_y_fixes_low(n: nat, w: Word)
+    requires
+        word_valid(w, 2),
+    ensures
+        apply_hom(kill_y(n), w) =~= w,
+    decreases w.len(),
+{
+    let h = kill_y(n);
+    if w.len() == 0 {
+        assert(apply_hom(h, w) =~= empty_word());
+        assert(w =~= empty_word());
+    } else {
+        let s = w.first();
+        let rest = w.drop_first();
+        assert(symbol_valid(s, 2)) by { assert(w[0] == s); }
+        assert(word_valid(rest, 2)) by {
+            assert forall|k: int| 0 <= k < rest.len() implies symbol_valid(#[trigger] rest[k], 2) by {
+                assert(rest[k] == w[k + 1]);
+            }
+        }
+        assert(apply_hom_symbol(h, s) =~= seq![s]) by {
+            match s {
+                Symbol::Gen(i) => { assert(i < 2); assert(h.generator_images[i as int] == seq![Symbol::Gen(i)]); },
+                Symbol::Inv(i) => {
+                    assert(i < 2);
+                    assert(h.generator_images[i as int] == seq![Symbol::Gen(i)]);
+                    assert(inverse_word(seq![Symbol::Gen(i)]) =~= seq![Symbol::Inv(i)]) by {
+                        reveal_with_fuel(inverse_word, 2);
+                    }
+                },
+            }
+        }
+        lemma_kill_y_fixes_low(n, rest);
+        assert(apply_hom(h, w) =~= concat(seq![s], rest));
+        assert(w =~= seq![s] + rest);
+    }
+}
+
+/// `gsconfig(r,0,e)` is valid over the 2 generators `{t, x}` (no `y` at `s = 0`).
+pub proof fn lemma_gsconfig_zero_valid2(r: int, e: int)
+    ensures
+        word_valid(gsconfig(r, 0, e), 2),
+{
+    lemma_gsconfig_zero_form(r, e);   // gsconfig(r,0,e) =~= sp(1,-r)+sp(0,e)+sp(1,r)
+    lemma_signed_power_valid(1, -r, 2);
+    lemma_signed_power_valid(0, e, 2);
+    lemma_signed_power_valid(1, r, 2);
+    lemma_concat_word_valid(signed_power(1, -r), signed_power(0, e), 2);
+    lemma_concat_word_valid(signed_power(1, -r) + signed_power(0, e), signed_power(1, r), 2);
+}
+
+/// `canw_eval(w)` is valid over `{t, x}` when every letter has `s = 0`.
+pub proof fn lemma_canw_eval_valid2(w: Seq<CanonLetter>)
+    requires
+        forall|i: int| 0 <= i < w.len() ==> (#[trigger] w[i]).s == 0,
+    ensures
+        word_valid(canw_eval(w), 2),
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        assert(canw_eval(w) =~= empty_word());
+    } else {
+        assert(w[0].s == 0);
+        lemma_gsconfig_zero_valid2(w[0].r, w[0].e);   // canl_eval(w[0]) = gsconfig(w[0].r,0,w[0].e)
+        assert(forall|i: int| 0 <= i < w.drop_first().len()
+            ==> (#[trigger] w.drop_first()[i]).s == 0) by {
+            assert forall|i: int| 0 <= i < w.drop_first().len()
+                implies (#[trigger] w.drop_first()[i]).s == 0 by {
+                assert(w.drop_first()[i] == w[i + 1]);
+            }
+        }
+        lemma_canw_eval_valid2(w.drop_first());
+        lemma_concat_word_valid(canl_eval(w[0]), canw_eval(w.drop_first()), 2);
+    }
+}
+
+/// **Step 6 — free cw_reduce eval**: `canw_eval(cw_reduce(C)) ≡_{free(n+3)} canw_eval(C)` (all `s=0`).
+/// base_A `lemma_cw_reduce_eval` + the `kill_y` retraction (fixes the `{t,x}`-words, lands in free(n+3)).
+pub proof fn lemma_free_cw_reduce_eval(n: nat, cu: Seq<CanonLetter>)
+    requires
+        forall|i: int| 0 <= i < cu.len() ==> (#[trigger] cu[i]).s == 0,
+    ensures
+        equiv_in_presentation(free_group((n + 3) as nat),
+            canw_eval(cw_reduce(cu)), canw_eval(cu)),
+{
+    let h = kill_y(n);
+    let red = cw_reduce(cu);
+    lemma_cw_reduce_eval(cu);   // equiv(base_A, canw_eval(red), canw_eval(cu))
+    lemma_kill_y_valid(n);
+    lemma_hom_preserves_equiv(h, canw_eval(red), canw_eval(cu));
+    // h fixes both (s=0 ⟹ valid over 2).
+    lemma_canw_eval_valid2(cu);
+    assert(forall|i: int| 0 <= i < red.len() ==> (#[trigger] red[i]).s == 0) by {
+        lemma_cw_reduce_coords(cu);
+        assert forall|i: int| 0 <= i < red.len() implies (#[trigger] red[i]).s == 0 by {
+            assert(coord_in(cu, red[i].r, red[i].s));
+            let j = choose|j: int| 0 <= j < cu.len() && cu[j].r == red[i].r && cu[j].s == red[i].s;
+            assert(0 <= j < cu.len() && cu[j].s == red[i].s && cu[j].s == 0);
+        }
+    }
+    lemma_canw_eval_valid2(red);
+    lemma_kill_y_fixes_low(n, canw_eval(red));
+    lemma_kill_y_fixes_low(n, canw_eval(cu));
 }
 
 // ----------------------------------------------------------------------------
