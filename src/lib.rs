@@ -272,3 +272,8 @@ pub mod r_prime;
 // free-basis transfer (config_emb ↔ pa_rhs_emb). See docs/brick5-c3.2c-plan.md §6.
 #[cfg(verus_keep_ghost)]
 pub mod r_prime_b;
+
+// phi_l_mapb_fwd: Layer 2 / Brick 5, C3.2c / map_b forward — M2 (φ_l_src injective on P_A) +
+// the map_b forward assembly. Spanning Britton peel over pa_data, (R) a/b for the pinch middle.
+#[cfg(verus_keep_ghost)]
+pub mod phi_l_mapb_fwd;
