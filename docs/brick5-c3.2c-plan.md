@@ -542,6 +542,23 @@ reuse `lemma_free_family_transvect`) to reduce to `⟨t,x⟩`, then the **canw m
 CAVEAT: canw is built over `base_A` (has `[x,y]` relator), so adapting it to free `⟨t,x⟩` needs care.
 **The hardest remaining piece**; ≈ the Layer-1 t-freeness/config-injectivity arc. A fresh focused session.
 
+### ⚠ CRITICAL DESIGN FINDING (session 4, my analysis + companion-confirmed): the side condition needs σ-BACKWARD-SATURATION.
+
+The M2 pinch-descent reflection `φ_F(mid) ∈ ⟨config(β):β∈bet⟩ ⟹ mid ∈ ⟨config(β):β∈bet⟩` is **FALSE**
+without `bet` being σ-saturated.  Counterexample (`m=3,l=1`, `4∈bet`, `1∉bet`): `mid=config(1)`,
+`φ_F(mid)=config(3·1+1)=config(4)∈⟨config(β):β∈bet⟩`, but `config(1)∉⟨config(β):β∈bet⟩`.  Root cause:
+`φ_F`'s image indices are `≡ l (mod m)` (= `σ(ℤ)`), so `φ_F(mid)∈⟨config(bet)⟩` only pins them to
+`bet∩σ(ℤ)`; the reflection needs that `⊆ σ(bet)`, i.e. **`β∈bet ∧ β≡l (mod m) ⟹ (β−l)/m ∈ bet`**
+(σ-backward-closure).  Worse — without it, `φ_F` maps a Britton-non-pinch (`p⁻¹·config(1)·p`) to a
+pinch (`p⁻¹·config(4)·p ≡ …`), so `φ_l_src` is **not even an HNN-embedding** and injectivity itself can
+fail.  **FIX (locked): the crux `lemma_phi_l_iso_at_h2II` must carry the extra side condition
+`betas ∩ σ(ℤ) ⊆ σ(betas)` (σ-backward-saturation), in addition to the existing forward `σ(betas)⊆alphas`.**
+This is a finite-slice closure that **C4 satisfies by picking the concrete finite `alphas` σ-CLOSED**
+(both directions; the σ-orbits are finite since number-word indices are bounded).  With saturation, (R')
+is TRUE (`φ_F(mid)`'s indices `∈ bet∩σ(ℤ) ⊆ σ(bet)`) and provable.  The already-built
+`lemma_config_reflect_a` (R)⟸(R') glue is UNAFFECTED (it's correct conditional on (R')); only (R') and
+the eventual C4 side-condition need the saturation hypothesis threaded through.
+
 ### Then
 - C-asm `lemma_phi_l_iso_at_h2II` = map_a (DONE) + map_b (von-Dyck DONE + forward) chained through `w ≡_{P_A} ε`.
 - C3.2d outer induction → C2/C4/C5.
