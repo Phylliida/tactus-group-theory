@@ -488,4 +488,114 @@ proof fn lemma_conj_cancel(gp: Presentation, g: Word, c: Word)
     lemma_equiv_transitive(gp, g, (ci + x) + c, empty_word());
 }
 
+// ----------------------------------------------------------------------------
+// Free families respect per-generator equivalence.
+// (Used by map_b forward rung (i): the conjugate of psi_F_images(m) is per-gen ≡ [config(l,0), xᵐ].)
+// ----------------------------------------------------------------------------
+
+/// **`apply_embedding` respects per-generator equivalence**: if `gens2[i] ≡_{gp} gens[i]` for each
+/// `i`, then `emb(gens2, w) ≡_{gp} emb(gens, w)`.  Induction on `w` (per-symbol uses the gen equiv,
+/// `lemma_equiv_inverse` for `Inv`).
+pub proof fn lemma_emb_respects_gen_equiv(
+    gp: Presentation, gens: Seq<Word>, gens2: Seq<Word>, w: Word)
+    requires
+        presentation_valid(gp),
+        gens.len() == gens2.len(),
+        forall|i: int| 0 <= i < gens.len() ==> word_valid(#[trigger] gens[i], gp.num_generators),
+        forall|i: int| 0 <= i < gens2.len() ==> word_valid(#[trigger] gens2[i], gp.num_generators),
+        forall|i: int| 0 <= i < gens.len() ==>
+            equiv_in_presentation(gp, #[trigger] gens2[i], gens[i]),
+        word_valid(w, gens.len()),
+    ensures
+        equiv_in_presentation(gp, apply_embedding(gens2, w), apply_embedding(gens, w)),
+    decreases w.len(),
+{
+    let ng = gp.num_generators;
+    if w.len() == 0 {
+        assert(apply_embedding(gens2, w) =~= empty_word());
+        assert(apply_embedding(gens, w) =~= empty_word());
+        lemma_equiv_refl(gp, empty_word());
+    } else {
+        let sym = w.first();
+        let rest = w.drop_first();
+        assert(symbol_valid(sym, gens.len())) by { assert(sym == w[0]); }
+        assert(word_valid(rest, gens.len())) by {
+            assert forall|i: int| 0 <= i < rest.len() implies symbol_valid(#[trigger] rest[i], gens.len())
+            by { assert(rest[i] == w[i + 1]); }
+        }
+        let es2 = apply_embedding_symbol(gens2, sym);
+        let es = apply_embedding_symbol(gens, sym);
+        assert(apply_embedding(gens2, w) =~= es2 + apply_embedding(gens2, rest));
+        assert(apply_embedding(gens, w) =~= es + apply_embedding(gens, rest));
+        // es2 ≡ es, and validities.
+        assert(word_valid(es2, ng) && word_valid(es, ng)) by {
+            match sym {
+                Symbol::Gen(i) => { assert(es2 == gens2[i as int] && es == gens[i as int]); },
+                Symbol::Inv(i) => {
+                    assert(es2 =~= inverse_word(gens2[i as int]) && es =~= inverse_word(gens[i as int]));
+                    lemma_inverse_word_valid(gens2[i as int], ng);
+                    lemma_inverse_word_valid(gens[i as int], ng);
+                },
+            }
+        }
+        assert(equiv_in_presentation(gp, es2, es)) by {
+            match sym {
+                Symbol::Gen(i) => {
+                    assert(es2 == gens2[i as int] && es == gens[i as int]);
+                    assert(equiv_in_presentation(gp, gens2[i as int], gens[i as int]));
+                },
+                Symbol::Inv(i) => {
+                    assert(es2 =~= inverse_word(gens2[i as int]) && es =~= inverse_word(gens[i as int]));
+                    crate::higman_consequences::lemma_equiv_inverse(gp, gens2[i as int], gens[i as int]);
+                },
+            }
+        }
+        // IH + concat congruence.
+        lemma_emb_respects_gen_equiv(gp, gens, gens2, rest);
+        lemma_apply_embedding_valid(gens2, rest, ng);
+        lemma_apply_embedding_valid(gens, rest, ng);
+        lemma_equiv_concat_left(gp, es2, es, apply_embedding(gens2, rest));
+        assert(concat(es2, apply_embedding(gens2, rest)) == es2 + apply_embedding(gens2, rest));
+        assert(concat(es, apply_embedding(gens2, rest)) == es + apply_embedding(gens2, rest));
+        lemma_equiv_concat_right(gp, es, apply_embedding(gens2, rest), apply_embedding(gens, rest));
+        assert(concat(es, apply_embedding(gens, rest)) == es + apply_embedding(gens, rest));
+        lemma_equiv_transitive(gp, es2 + apply_embedding(gens2, rest),
+            es + apply_embedding(gens2, rest), es + apply_embedding(gens, rest));
+    }
+}
+
+/// **Free families respect per-generator equivalence**: if `gens` is free and `gens2[i] ≡_{gp}
+/// gens[i]` for each `i`, then `gens2` is free.  (A relation `emb(gens2,w)≡ε` transfers to
+/// `emb(gens,w)≡ε` via `lemma_emb_respects_gen_equiv`, then `gens` freeness closes it.)
+pub proof fn lemma_free_family_respects_equiv(gp: Presentation, gens: Seq<Word>, gens2: Seq<Word>)
+    requires
+        presentation_valid(gp),
+        is_free_family(gp, gens),
+        gens2.len() == gens.len(),
+        forall|i: int| 0 <= i < gens2.len() ==> word_valid(#[trigger] gens2[i], gp.num_generators),
+        forall|i: int| 0 <= i < gens.len() ==>
+            equiv_in_presentation(gp, #[trigger] gens2[i], gens[i]),
+    ensures
+        is_free_family(gp, gens2),
+{
+    let ng = gp.num_generators;
+    let k = gens.len();
+    // gens valid (first conjunct of is_free_family).
+    assert forall|i: int| 0 <= i < k implies word_valid(#[trigger] gens[i], ng) by {}
+    assert forall|w: Word| (#[trigger] word_valid(w, gens2.len())
+        && equiv_in_presentation(gp, apply_embedding(gens2, w), empty_word()))
+        implies equiv_in_presentation(free_group(gens2.len()), w, empty_word()) by {
+        assert(word_valid(w, k));
+        // emb(gens2,w) ≡ emb(gens,w);  emb(gens2,w) ≡ ε ⟹ emb(gens,w) ≡ ε.
+        lemma_emb_respects_gen_equiv(gp, gens, gens2, w);
+        lemma_apply_embedding_valid(gens2, w, ng);
+        lemma_apply_embedding_valid(gens, w, ng);
+        lemma_equiv_symmetric(gp, apply_embedding(gens2, w), apply_embedding(gens, w));
+        lemma_equiv_transitive(gp, apply_embedding(gens, w), apply_embedding(gens2, w), empty_word());
+        // gens free ⟹ w ≡_free ε.
+        assert(equiv_in_presentation(free_group(k), w, empty_word()));
+        assert(gens2.len() == k);
+    }
+}
+
 } // verus!
