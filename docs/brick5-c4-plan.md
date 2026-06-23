@@ -189,9 +189,16 @@ Faithfulness is **per-α** (a fixed `w_α(c)`), whose Britton analysis touches *
 1. **Pin the word-restricted iso notion** — an analog of `hnn_associations_isomorphic` quantified over a
    *given finite set of association-words* (or a bound on the config-indices touched), satisfiable by a
    bounded `alphas`. This is the Fork-B engine's input shape; design it once, use it at every tower level.
-2. **Bounded σ-orbit + satisfiability** — `sigma_orbit(D, m, depth)` (D closed under `σ_1..σ_{2n}` up to
-   `depth` applications), prove finite + number-words + the word-relative finite-slice it satisfies. The
-   clean self-contained combinatorial brick; build it first to de-risk.
+2. **Bounded σ-orbit + satisfiability — ✅ DONE 2026-06-23** (`sigma_orbit.rs` 13/0). `sigma_orbit(d,m,n,depth)`
+   = the depth-stratified accumulation `orbit(0)=d`, `orbit(k+1)=orbit(k) ++ σ-expand(orbit(k))`, built as
+   an explicit finite `Seq<nat>`. Proven: number-word preservation (`lemma_sigma_orbit_numbers_word`, via
+   the existing `lemma_sigma_numbers_word`), depth-stratified σ-closure `lemma_sigma_orbit_closed_step`
+   (`orbit(d)→orbit(d+1)` — a DAG, the top layer's σ-shifts are NOT required, which is *why* it dodges the
+   unsat forward-closure), monotonicity, and the **satisfiability witness** `lemma_sigma_slice_satisfiable`
+   + `lemma_sigma_orbit_covers` (one finite `alphas` covers all `2n` levels). The reframed
+   `sigma_slice_ok(seed, alphas, m, n)` is pinned there: it quantifies the digit-append requirement over a
+   SEPARATE finite `seed` (decoupled from `alphas`), so no element forces its own σ-image — the direct
+   refutation of the session-7/8 "even the bounded slice is vacuous". See §7.5 for how it slots in.
 3. **Weaken + re-verify the directional lemmas** to the word-relative finite-slice (they already only USE
    it at the pinches encountered; the `∀γ∈betas` precondition is gratuitously strong).
 4. **Word-restricted tower lift** replacing `lemma_h3_II_upto_faithful`'s `britton_lemma_full` with the
@@ -200,3 +207,53 @@ Faithfulness is **per-α** (a fixed `w_α(c)`), whose Britton analysis touches *
 **Status:** keep `phi_l_iso_tower.rs` / the R1–R4 modules — they verify and the directional pieces are
 reused. `lemma_phi_l_iso` / `lemma_h3_II_upto_faithful` remain in-tree, **marked vacuous** (their
 hypothesis is `lemma_sigma_sat_upto_unsatisfiable`-refuted); do NOT build on them as written.
+
+---
+
+## 8. The route decision: SURGICAL (route A), not full-Britton re-prove (2026-06-23)
+
+With the de-risking brick landed (§7.4 step 2), the next gating decision is *how* to consume a
+word-restricted iso. The universal `hnn_associations_isomorphic(data)` threads through **all** of
+`britton_via_tower.rs` (dozens of lemmas) via `lemma_tower_textbook_chain_from_hnn_iso`, so the naive
+"thread a word-restricted predicate through the whole tower-textbook chain" (route B) is enormous.
+
+**Decision (peer-confirmed 2026-06-23): take route A — derivation-local / surgical.** Re-derive
+faithfulness for a FIXED `w` by peeling `w` with Britton (induction on stable-letter count), invoking
+the iso ONLY at the pinch-middles that actually arise. This turns a group-theory ∀-statement into a
+rewriting-theory statement about a finite derivation object — and we already have the verified
+per-direction pinch pieces (`lemma_map_a_forward`, `lemma_map_b_forward_rt`, the von-Dyck backwards, the
+pinch-descents). Route B fights the ∀w quantifier we *know* is UNSAT; route A never forms it.
+
+**Why route A's index set is a-priori finite (the satisfiability we lacked):**
+- *Lyapunov bound on pinch count.* Each Britton step consumes one `s … s⁻¹` pair, so the stable-letter
+  count strictly decreases by 2; total pinches ≤ ½·(stable-letter count of `w`). No step *introduces*
+  stable letters. ⟹ **finitely many pinch-middles**, bounded by `w` alone.
+- *Bounded index growth = the σ-orbit at depth ≤ 2n.* Each pinch-middle is a base word whose config
+  generators carry indices `β`; eliminating a level-`l` pinch applies `φ_l : β ↦ m·β+l = σ_l(β)`, so the
+  middles' indices σ-shift by one digit **per tower level**, and the tower height is `2n`. ⟹ all indices
+  ever touched live in `sigma_orbit(L₀, m, n, 2n)` where `L₀` = config-indices appearing in `w`. That set
+  is FINITE (the brick), so `alphas ⊇ sigma_orbit(L₀,m,n,2n)` discharges every per-pinch von-Dyck-backward
+  `family_II_relator(σ_l(β)) ≡ ε`. **This is precisely what `sigma_orbit.rs` was built to supply.**
+  (Caveat for the next session: the index set is the σ-*orbit* of `L₀`, not just `L₀` — the middles' indices
+  genuinely grow by σ as you descend; the Lyapunov argument bounds the *count* of middles, the orbit bounds
+  their *indices*. Both finite.)
+
+**The remaining co-design with Danielle (the actual signature — do NOT guess solo; wrong-signature has
+burned two sessions):**
+1. *Shape of the word-restricted faithfulness lemma.* Two candidate signatures:
+   (i) `iso_on(data, W)` = the iff quantified over a precomputed finite word-set `W` (clean, but you must
+   pre-extract `W` from `w`'s derivation, which is awkward since the derivation is `choose`-n); or
+   (ii) thread the iso as a *per-pinch obligation* inside a fresh `decreases stable_count` peel of `w`
+   (no precomputed `W`; the iso is discharged at each pinch from `alphas ⊇ sigma_orbit(...)`). (ii) matches
+   route A's derivation-local nature and the existing pinch-descent lemmas better, but is a new induction.
+2. *Where it attaches.* A word-restricted analog of `lemma_single_hnn_base_faithful` (NOT a re-prove of
+   `lemma_tower_textbook_chain_from_hnn_iso`), used at each a-tower level in place of the vacuous
+   `lemma_phi_l_iso_at_h2II` + `britton_lemma_full` calls in `phi_l_iso_tower.rs`.
+3. *The satisfiable side condition* replacing `sigma_sat_upto`: `sigma_backsat(...)` (still needed, still
+   finite-satisfiable — the digit-STRIP closure) **+** `alphas ⊇ sigma_orbit(L₀, m, n, 2n)` (via
+   `sigma_slice_ok` / `lemma_sigma_orbit_covers`), with `L₀` extracted from the fixed `w`. C4 then picks
+   `alphas` = that bounded orbit for the fixed `wα(c)`.
+
+**Status going into the co-design session:** step 2 (the index-set tool) is verified and committed. The
+directional Britton pieces (R1–R4) are verified and reusable. What is NOT yet built is the route-A
+word-restricted peel itself (item 2 above) and its signature (item 1) — that is the next arc.

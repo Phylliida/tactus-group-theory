@@ -453,6 +453,28 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       (2) bounded σ-orbit `sigma_orbit(D,m,depth)` + its word-relative finite-slice (finite, satisfiable — build
       first to de-risk); (3) weaken+re-verify the directional lemmas to the word-relative slice; (4) word-restricted
       tower lift replacing `britton_lemma_full`. Then C3.2 (word-restricted), C2, C4 (k-level), C5 share one engine.
+      **REFRAME STEP 2 DONE 2026-06-23 (session 9): the BOUNDED σ-ORBIT brick `sigma_orbit.rs` 13/0.** The
+      de-risking combinatorial brick (`docs/brick5-c4-plan.md` §7.4 step 2): `sigma_orbit(d,m,n,depth)` =
+      depth-stratified accumulation (`orbit(0)=d`, `orbit(k+1)=orbit(k) ++ σ-expand(orbit(k))`) as an explicit
+      finite `Seq<nat>`. Proven: number-word preservation (`lemma_sigma_orbit_numbers_word`), depth-stratified
+      σ-closure `lemma_sigma_orbit_closed_step` (`orbit(d)→orbit(d+1)` — a DAG, top layer never needs its own
+      shifts ⟹ dodges the unsat forward-closure), monotonicity, and **the SATISFIABILITY WITNESS**
+      (`lemma_sigma_slice_satisfiable` + `lemma_sigma_orbit_covers`: one finite `alphas` covers all `2n` tower
+      levels). Pins the reframed `sigma_slice_ok(seed,alphas,m,n)` (seed DECOUPLED from alphas ⟹ no
+      self-σ-image forcing) — the machine-checked refutation of the session-7/8 "even the bounded slice is
+      vacuous". **ROUTE DECISION (peer-confirmed, `docs/brick5-c4-plan.md` §8): take ROUTE A = derivation-local
+      / SURGICAL, NOT a full re-prove of `britton_via_tower`'s tower-textbook chain.** Peel a FIXED `w` by
+      Britton, invoke the iso ONLY at the pinch-middles that arise. Index set is a-priori finite: Lyapunov bound
+      (pinch count ≤ ½·stable-count of `w`, no step introduces stable letters ⟹ finitely many middles) + bounded
+      index growth (each level-`l` pinch applies `φ_l:β↦σ_l(β)`, tower height `2n` ⟹ all indices ∈
+      `sigma_orbit(L₀,m,n,2n)`, FINITE = exactly the brick). **NEXT (the co-design arc, do NOT guess the
+      signature solo — wrong-sig burned 2 sessions): (1) shape of the word-restricted faithfulness lemma —
+      precomputed word-set `iso_on(data,W)` vs. per-pinch obligation inside a fresh `decreases stable_count`
+      peel (the latter matches route A + existing pinch-descents); (2) attach as a word-restricted analog of
+      `lemma_single_hnn_base_faithful` (NOT re-prove `tower_textbook_chain`), replacing the vacuous
+      `lemma_phi_l_iso_at_h2II`+`britton_lemma_full` calls in `phi_l_iso_tower.rs`; (3) side condition =
+      `sigma_backsat` + `alphas ⊇ sigma_orbit(L₀,m,n,2n)` via `sigma_slice_ok`. C4 then picks the bounded
+      orbit of `wα(c)`'s digits.** See `docs/brick5-c4-plan.md` §7–§8.
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).
