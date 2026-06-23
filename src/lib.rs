@@ -86,6 +86,13 @@ pub mod britton_via_tower;
 #[cfg(verus_keep_ghost)]
 pub mod higman_operations;
 
+// free_word_problem: the free-group word problem IS free reduction —
+// `equiv_in_presentation(free_group(n), w1, w2) ⟹ freely_equivalent(w1, w2)` (converse of
+// `lemma_freely_equivalent_implies_equiv`). The bridge from `≡_{free_group}` to a free NORMAL FORM,
+// needed by the Higman–Neumann–Neumann `{a⁻ⁱbaⁱ}`-free cancellation argument (Layer 0.5).
+#[cfg(verus_keep_ghost)]
+pub mod free_word_problem;
+
 #[cfg(verus_keep_ghost)]
 pub mod tietze;
 
