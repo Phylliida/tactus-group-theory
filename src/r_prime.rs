@@ -33,13 +33,15 @@ use crate::config_reduce::{is_canl_word, canon_represents, lemma_canon_represent
     cw_reduce, coord_in, lemma_cw_reduce_coords, lemma_tfree_coord_restrict, lemma_cw_reduce_eval,
     lemma_gsconfig_merge, lemma_sconfig_is_gsconfig1};
 use crate::benign::lemma_generator_in_generated_subgroup;
-use crate::machine_group::{lemma_product_in_subgroup, lemma_in_subgroup_respects_equiv};
+use crate::machine_group::{lemma_product_in_subgroup, lemma_in_subgroup_respects_equiv,
+    lemma_equiv_preserves_gexp, lemma_word_valid_mono};
 use crate::presentation_lemmas::lemma_freely_equivalent_implies_equiv;
 use crate::ii_subset::lemma_signed_power_inverse;
 use crate::benign::{apply_embedding, apply_embedding_symbol, in_generated_subgroup,
     factors_from_generators, concat_all, is_generator_or_inverse};
 use crate::config_reduce::lemma_canw_eval_concat;
-use crate::phi_l_mapb::{sigma_betas, phi_F_family};
+use crate::phi_l_mapb::{sigma_betas, phi_F_family, lemma_config_reflect_a};
+use crate::machine_group::ModMachine;
 use crate::homomorphism::{HomomorphismData, apply_hom, apply_hom_symbol, is_valid_homomorphism,
     lemma_hom_preserves_equiv};
 use crate::free_basis::{comp_images, lemma_apply_hom_embedding_compose, config_emb};
@@ -1486,6 +1488,190 @@ pub proof fn lemma_phi_canon_acc_coords(l: nat, m: nat, u: Word, xe: int)
             }
         }
     }
+}
+
+// ----------------------------------------------------------------------------
+// THE (R') ASSEMBLY — emb(φ_F,u) ∈ ⟨config(bet)⟩ ⟹ ∈ ⟨config(σ(bet))⟩.
+// ----------------------------------------------------------------------------
+
+/// `emb(φ', u)` is valid over `n+3` generators.
+pub proof fn lemma_phi_prime_emb_valid(n: nat, m: nat, l: nat, u: Word)
+    requires
+        word_valid(u, (n + 3) as nat),
+    ensures
+        word_valid(apply_embedding(phi_prime(n, m, l), u), (n + 3) as nat),
+{
+    let pp = phi_prime(n, m, l);
+    assert forall|i: int| 0 <= i < pp.len() implies word_valid(#[trigger] pp[i], (n + 3) as nat) by {
+        if i == 0 {
+            assert(pp[0] == config_word(l, 0));
+            lemma_config_word_valid2(l);
+            lemma_word_valid_mono(config_word(l, 0), 2, (n + 3) as nat);
+        } else if i == 1 {
+            assert(pp[1] == symbol_power(Symbol::Gen(1), m));
+            lemma_symbol_power_valid_local(Symbol::Gen(1), m, (n + 3) as nat);
+        } else {
+            assert(pp[i] == empty_word());
+        }
+    }
+    crate::benign::lemma_apply_embedding_valid(pp, u, (n + 3) as nat);
+}
+
+/// `emb(φ_F, u)` is valid over `n+3` generators.
+pub proof fn lemma_phi_F_emb_valid(n: nat, m: nat, l: nat, u: Word)
+    requires
+        1 <= l <= 2 * n,
+        word_valid(u, (n + 3) as nat),
+    ensures
+        word_valid(apply_embedding(phi_F_family(n, m, l), u), (n + 3) as nat),
+{
+    let pf = phi_F_family(n, m, l);
+    assert(pf.len() == n + 3);
+    assert forall|i: int| 0 <= i < pf.len() implies word_valid(#[trigger] pf[i], (n + 3) as nat) by {
+        if i == 0 {
+            assert(pf[0] == config_word(l, 0));
+            lemma_config_word_valid2(l);
+            lemma_word_valid_mono(config_word(l, 0), 2, (n + 3) as nat);
+        } else if i == 1 {
+            assert(pf[1] == symbol_power(Symbol::Gen(1), m));
+            lemma_symbol_power_valid_local(Symbol::Gen(1), m, (n + 3) as nat);
+        } else if i == 2 {
+            let al = alphabet_letter(pa_b_base(), n, l);
+            assert(pf[2] == seq![al, Symbol::Gen(2)]);
+            assert(symbol_valid(al, (n + 3) as nat)) by {
+                if l <= n { assert(al == Symbol::Gen((pa_b_base() + l - 1) as nat)); }
+                else { assert(al == Symbol::Inv((pa_b_base() + (l - n) - 1) as nat)); }
+            }
+            assert(symbol_valid(Symbol::Gen(2), (n + 3) as nat));
+            assert forall|t: int| 0 <= t < pf[2].len() implies symbol_valid(#[trigger] pf[2][t], (n + 3) as nat) by {}
+        } else {
+            assert(pf[i] == seq![Symbol::Gen(i as nat)]);
+            assert(symbol_valid(Symbol::Gen(i as nat), (n + 3) as nat));
+            assert forall|t: int| 0 <= t < pf[i].len() implies symbol_valid(#[trigger] pf[i][t], (n + 3) as nat) by {}
+        }
+    }
+    crate::benign::lemma_apply_embedding_valid(pf, u, (n + 3) as nat);
+}
+
+/// **(R')** — the canw index-tracking core.  Under σ-backward-saturation, a `φ_F`-image that lies in
+/// `⟨config_emb(bet)⟩` lies in the σ-shifted `⟨config_emb(σ(bet))⟩`.  Assembles §7:
+/// retraction (`G ≡ emb(φ',u)`) → coordinate-tracking (`≡ canw_eval(C_u)·x^{m·xexp}`) → `xexp=0`
+/// (gexp) → free→base_A → coord-restrict+saturation (`cw_reduce(C_u)` coords ⊆ σ(bet)) →
+/// free cw_reduce → reconstruction.
+pub proof fn lemma_r_prime(n: nat, m: nat, l: nat, u: Word, bet: Seq<nat>)
+    requires
+        1 <= l <= 2 * n,
+        2 * n < m,
+        word_valid(u, (n + 3) as nat),
+        in_generated_subgroup(free_group((n + 3) as nat), config_emb(bet),
+            apply_embedding(phi_F_family(n, m, l), u)),
+        sigma_backsat(bet, m, l),
+    ensures
+        in_generated_subgroup(free_group((n + 3) as nat), config_emb(sigma_betas(bet, m, l)),
+            apply_embedding(phi_F_family(n, m, l), u)),
+{
+    let fg = free_group((n + 3) as nat);
+    let g_word = apply_embedding(phi_F_family(n, m, l), u);
+    let pp_u = apply_embedding(phi_prime(n, m, l), u);
+    let cu = phi_canon_acc(l, m, u, 0);
+    let mm = m as int;
+    let gx = gexp(1, u);
+    let sbet = sigma_betas(bet, m, l);
+    lemma_free_group_valid((n + 3) as nat);
+    lemma_phi_prime_emb_valid(n, m, l, u);   // word_valid(pp_u, n+3)
+    lemma_phi_F_emb_valid(n, m, l, u);       // word_valid(g_word, n+3)
+
+    // ---- Step 1: retraction.  pp_u ≡_fg G. ----
+    lemma_retraction(n, m, l, u, bet);
+    assert(equiv_in_presentation(fg, pp_u, g_word));
+
+    // ---- Step 2: coordinate-tracking at xe=0.  pp_u ≡_fg canw_eval(cu) + x^{mm·gx}. ----
+    lemma_phi_canon_invariant(fg, n, m, l, u, 0);
+    let rhs2 = canw_eval(cu) + signed_power(1, mm * gx);
+    assert(mm * 0 == 0 && signed_power(1, mm * 0) =~= empty_word());
+    lemma_concat_empty_left(pp_u);
+    assert(signed_power(1, mm * 0) + pp_u =~= pp_u);
+    assert(mm * (0 + gx) == mm * gx);
+    assert(equiv_in_presentation(fg, pp_u, rhs2));
+
+    // ---- the config_emb(bet) witness + its canon (coords ⊆ bet) ----
+    let factors = choose|f: Seq<Word>| #[trigger] factors_from_generators(config_emb(bet), f)
+        && equiv_in_presentation(fg, concat_all(f), g_word);
+    assert(factors_from_generators(config_emb(bet), factors)
+        && equiv_in_presentation(fg, concat_all(factors), g_word));
+    let cbet = lemma_membership_to_canon(bet, factors);
+    assert(concat_all(factors) =~= canw_eval(cbet));
+    // G ≡_fg canw_eval(cbet).
+    assert(equiv_in_presentation(fg, canw_eval(cbet), g_word));
+
+    // ---- Step 3: xexp(u) = 0  (gexp(1) of both sides; config products have gexp(1)=0). ----
+    lemma_gexp1_config_factors(bet, factors);                  // gexp(1, concat_all(factors)) = 0
+    lemma_equiv_preserves_gexp(fg, concat_all(factors), g_word, 1);   // gexp(1, G) = 0
+    assert(gexp(1, g_word) == 0);
+    // gexp(1, rhs2) = gexp(1, canw_eval(cu)) + gexp(1, x^{mm·gx}) = 0 + mm·gx.
+    lemma_gexp1_canw_zero(cu);
+    lemma_gexp_concat(1, canw_eval(cu), signed_power(1, mm * gx));
+    lemma_gexp_signed_power(1, 1, mm * gx);
+    // G ≡ pp_u ≡ rhs2  ⟹  gexp(1, G) = gexp(1, rhs2) = mm·gx.
+    lemma_equiv_symmetric(fg, pp_u, g_word);                   // equiv(fg, G, pp_u)
+    lemma_equiv_transitive(fg, g_word, pp_u, rhs2);            // equiv(fg, G, rhs2)
+    lemma_equiv_preserves_gexp(fg, g_word, rhs2, 1);
+    assert(mm * gx == 0);
+    assert(gx == 0) by(nonlinear_arith) requires mm * gx == 0, mm >= 1;
+    // ⟹ x^{mm·gx} = x^0 = ε  ⟹  rhs2 =~= canw_eval(cu)  ⟹  pp_u ≡ canw_eval(cu) ≡ G.
+    assert(mm * gx == 0 && signed_power(1, mm * gx) =~= empty_word());
+    lemma_concat_empty_right(canw_eval(cu));
+    assert(rhs2 =~= canw_eval(cu));
+    assert(equiv_in_presentation(fg, canw_eval(cu), g_word)) by {
+        assert(equiv_in_presentation(fg, g_word, rhs2));
+        assert(rhs2 =~= canw_eval(cu));
+        lemma_equiv_symmetric(fg, g_word, rhs2);
+    }
+
+    // ---- Step 4: free→base_A.  canw_eval(cu) ≡_base_A canw_eval(cbet). ----
+    // canw_eval(cu) ≡_fg canw_eval(cbet)  (both ≡_fg G).
+    lemma_phi_canon_acc_coords(l, m, u, 0);                    // cu: s=0, cong_l
+    assert(forall|i: int| 0 <= i < cu.len() ==> (#[trigger] cu[i]).s == 0) by {}
+    lemma_canw_eval_valid2(cu);
+    assert(forall|i: int| 0 <= i < cbet.len() ==> (#[trigger] cbet[i]).s == 0) by {}
+    lemma_canw_eval_valid2(cbet);
+    lemma_word_valid_mono(canw_eval(cu), 2, 3);
+    lemma_word_valid_mono(canw_eval(cbet), 2, 3);
+    lemma_equiv_symmetric(fg, canw_eval(cbet), g_word);        // equiv(fg, G, canw_eval(cbet))
+    lemma_word_valid_mono(canw_eval(cbet), 2, (n + 3) as nat);
+    lemma_equiv_transitive(fg, canw_eval(cu), g_word, canw_eval(cbet));
+    lemma_free_to_base_A((n + 3) as nat, canw_eval(cu), canw_eval(cbet));
+
+    // ---- Step 5: coordinate restriction.  cw_reduce(cu) coords ⊆ σ(bet). ----
+    assert(l < m);
+    lemma_coords_in_sigma(bet, m, l, cu, cbet);
+
+    // ---- Step 6: free cw_reduce.  canw_eval(cw_reduce(cu)) ≡_fg canw_eval(cu) ≡_fg G. ----
+    lemma_free_cw_reduce_eval(n, cu);
+    lemma_equiv_transitive(fg, canw_eval(cw_reduce(cu)), canw_eval(cu), g_word);
+
+    // ---- Step 7: reconstruction + final respects_equiv. ----
+    lemma_canw_in_config_subgroup(sbet, n, cw_reduce(cu));
+    lemma_in_subgroup_respects_equiv(fg, config_emb(sbet), canw_eval(cw_reduce(cu)), g_word);
+}
+
+/// **(R) — the config reflection** (the M2 pinch-middle consumable): under σ-saturation,
+/// `emb(φ_F, u) ∈ ⟨config_emb(bet)⟩ ⟹ u ∈ ⟨config_emb(bet)⟩`.  Composes (R') = `lemma_r_prime`
+/// (lift the membership into the σ-shifted subgroup) with the DONE `lemma_config_reflect_a`
+/// ((R)⟸(R') via the intersection property).  `mm` is threaded through `lemma_config_reflect_a`.
+pub proof fn lemma_config_reflect_full(mm: ModMachine, n: nat, m: nat, l: nat, u: Word, bet: Seq<nat>)
+    requires
+        1 <= l <= 2 * n,
+        2 * n < m,
+        word_valid(u, (n + 3) as nat),
+        in_generated_subgroup(free_group((n + 3) as nat), config_emb(bet),
+            apply_embedding(phi_F_family(n, m, l), u)),
+        sigma_backsat(bet, m, l),
+    ensures
+        in_generated_subgroup(free_group((n + 3) as nat), config_emb(bet), u),
+{
+    lemma_r_prime(n, m, l, u, bet);                  // (R'): emb(φ_F,u) ∈ ⟨config(σ(bet))⟩
+    lemma_config_reflect_a(mm, n, m, l, bet, u);     // (R) ⟸ (R')
 }
 
 } // verus!
