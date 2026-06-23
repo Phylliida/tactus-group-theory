@@ -252,3 +252,10 @@ pub mod phi_l_forward;
 // pinch descent, and the forward injectivity. Wires phi_l_forward's generic leaves to recog_data.
 #[cfg(verus_keep_ghost)]
 pub mod phi_l_pinch;
+
+// phi_l_mapb: Layer 2 / Brick 5, C3.2c / the C-arc — map_b's forward (faithful) direction via the
+// "map_b = ψ_a ∘ φ_l" source-level factoring (φ_l_src = the P_A-level φ_l subst).  M1 (down-payment):
+// emb(b_words,w) = emb(a_words, emb(φ_l_src, w)), reducing map_b forward to map_a forward (DONE) +
+// φ_l_src injective on P_A. See docs/brick5-c3.2c-plan.md §5.
+#[cfg(verus_keep_ghost)]
+pub mod phi_l_mapb;
