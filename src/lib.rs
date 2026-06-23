@@ -131,6 +131,13 @@ pub mod tower;
 #[cfg(verus_keep_ghost)]
 pub mod normal_form_afp_textbook;
 
+// FA-8: predicate-base port of normal_form_afp_textbook (Fork-A normal-form arc).
+// The AFP injectivity engine over a PredPresentation base (relators as
+// spec_fn(Word)->bool). Reversible, additive; consumed by the predicate
+// britton base-embeds (FA-9).
+#[cfg(verus_keep_ghost)]
+pub mod pred_normal_form_afp_textbook;
+
 #[cfg(verus_keep_ghost)]
 pub mod britton_via_tower;
 
