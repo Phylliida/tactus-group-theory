@@ -18,6 +18,12 @@ pub mod presentation;
 #[cfg(verus_keep_ghost)]
 pub mod pred_presentation;
 
+// FORK-A brick 1: predicate-base HNN extensions (analog of `hnn.rs`).
+// docs/FORK-DECISION.md, cohen-faithfulness-primary-source.md §1/§6c.
+// Separate from the verified finite `hnn` module: reversible, zero regression.
+#[cfg(verus_keep_ghost)]
+pub mod pred_hnn;
+
 #[cfg(verus_keep_ghost)]
 pub mod presentation_lemmas;
 
