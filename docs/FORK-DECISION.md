@@ -63,6 +63,11 @@ type-swapped parallel tower take"). Measurable, not open-ended.
   `lemma_single_step_preserves_syls` (§6a shows it *should* port — iso-free, word-level). If that ports
   cleanly the full parallel predicate tower is justified and scoped; if it drags in the indexed AFP
   construction, weigh a Bass–Serre / action-based base-embeds proof that sidesteps the AFP normal form.
+  **⚠ This step is NOT a cheap reversible spike** (code-confirmed 2026-06-23,
+  `cohen-faithfulness-primary-source.md` §9): unlike the `pred_presentation` probe, its very *statement*
+  rides on `textbook_act_hnn` → `psi_p` → the AFP normal form, so attempting it *is* standing up the
+  tower port. **No bounded de-risk remains below this go/no-go** — the next real signal is the commit's
+  leading edge itself.
 
 ---
 

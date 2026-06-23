@@ -382,3 +382,40 @@ co-designed fork). This session deliberately did NOT proceed past the non-commit
 tower port. NEXT (pending Danielle's go): the next measurement up — port the base-relator case of
 `lemma_single_step_preserves_syls` over a predicate base (§4-probe step 3 proper, which needs a
 predicate `HNNData`/`shift`), the cheapest signal for part 2/3 of the labor.
+
+---
+
+## 9. The "next probe" is NOT a boundable disposable spike — it IS the tower port's leading edge (2026-06-23, session 13)
+
+A read-only scope check (no `.rs` touched) settled the one ambiguity that survived sessions 11–12:
+**is the §4-probe step 3 (port the base-relator case of `lemma_single_step_preserves_syls`) a cheap
+reversible spike like §8's `pred_presentation` was, or is it the multi-week commit's leading edge?**
+§4 framed steps 1–3 together as "the minimal non-committing probe"; §8/`FORK-DECISION.md` reclassified
+step 3 as "pending Go." **The code is dispositive: §8 is right.**
+
+- `lemma_relator_insert_preserves` / `lemma_single_step_preserves_syls`'s base-relator case
+  (`britton_via_tower.rs:8440–8476`) — whose *proof body* §6a correctly showed is predicate-agnostic —
+  is **stated over** `textbook_act_hnn(data, …)` (its `ensures`/preconditions reference it directly).
+- `textbook_act_hnn` (`:4627`) recurses through `textbook_psi_p` / `textbook_psi_p_inv` — the HNN
+  *action* — which bottom out in the **AFP coset / normal-form machinery** (`normal_form_afp_textbook.rs`).
+- Therefore you **cannot even STATE** the base-relator case over a predicate base without first
+  standing up a predicate `HNNData` + `textbook_act_hnn` + `psi_p`/`psi_p_inv` + the AFP normal form.
+  That scaffold IS the leading edge of the 21k-line port (§7a: base-embeds rests on AFP injectivity —
+  the normal form is on the critical path, not skippable).
+
+**Contrast with what made `pred_presentation` legitimately non-committing:** that probe was the
+*self-contained* `presentation.rs` algebra (`PredPresentation` + derivation/equivalence + reversibility)
+with **zero tower contact** — deletable as one `#[cfg]` module, no dependency stood up the tower. Step 3
+has no such isolation: its signature is structurally embedded in the tower action. A companion-model
+("disposable spike, keep it in `experiments/`") read assumed step-3 is isolatable like step-1; the code
+**refutes that assumption** — there is no minimal predicate `textbook_act_hnn` short of porting `psi_p` +
+the AFP normal form.
+
+**Net:** the §4 "steps 1–3 are the minimal non-committing probe" wording was over-optimistic about step
+3; treat steps 1 (done) and 2 (a pure *statement*, still cheap) as the non-committing boundary, and
+step 3 onward as the multi-week commit proper. **No further bounded de-risk remains below the
+go/no-go** — the next genuine signal (does predicate `textbook_act_hnn`/`psi_p` port?) *is* the start of
+the tower port. Held accordingly; baseline re-verified GREEN (`conj_free_b` 12/0 + `pred_presentation`
+8/0 = 20/0, Lean backend). Decision unchanged and now fully recon'd: **awaiting Danielle's Fork-A
+go/no-go; there is no remaining work below it that does not either start the commit or risk a
+non-textbook dragon (§3.3 machine-reduction).**
