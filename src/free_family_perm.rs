@@ -18,11 +18,14 @@ use vstd::prelude::*;
 use crate::symbol::*;
 use crate::word::*;
 use crate::presentation::*;
+use crate::presentation_lemmas::{lemma_equiv_concat_left, lemma_equiv_concat_right,
+    lemma_word_inverse_left, lemma_word_inverse_right};
 use crate::benign::{apply_embedding, apply_embedding_symbol, lemma_apply_embedding_valid};
 use crate::higman_operations::{free_group, lemma_free_group_valid};
 use crate::free_basis::lemma_free_to_embedding;
 use crate::f_free::is_free_family;
 use crate::h3_ii::{compose_embeddings, lemma_apply_embedding_compose};
+use crate::machine_group::lemma_inverse_word_concat;
 
 verus! {
 
@@ -202,6 +205,287 @@ pub proof fn lemma_free_family_permute(
         assert(apply_embedding(relabel_emb(sigma_inv), w_rel) =~= w);
         assert(pf.len() == k);
     }
+}
+
+// ----------------------------------------------------------------------------
+// Free families are invariant under uniform conjugation by a fixed word `c`.
+// (Used by map_b forward rung (i): [config(l,0), xᵐ] = conj of psi_F_images(m) by x⁻ˡ.)
+// ----------------------------------------------------------------------------
+
+/// The family `gens` with every generator conjugated by a fixed word `c`:
+/// `conjugate_family(gens, c)[i] = (c · gens[i]) · c⁻¹`.
+pub open spec fn conjugate_family(gens: Seq<Word>, c: Word) -> Seq<Word> {
+    Seq::new(gens.len(), |i: int| (c + gens[i]) + inverse_word(c))
+}
+
+/// **Splice cancellation**: `(A·c⁻¹)·((c·B)·c⁻¹) ≡ (A·B)·c⁻¹` (the inner `c⁻¹·c` cancels).
+proof fn lemma_conj_splice(gp: Presentation, a: Word, b: Word, c: Word)
+    requires
+        presentation_valid(gp),
+        word_valid(a, gp.num_generators),
+        word_valid(b, gp.num_generators),
+        word_valid(c, gp.num_generators),
+    ensures
+        equiv_in_presentation(gp,
+            (a + inverse_word(c)) + ((c + b) + inverse_word(c)),
+            (a + b) + inverse_word(c)),
+{
+    let ng = gp.num_generators;
+    let ci = inverse_word(c);
+    lemma_inverse_word_valid(c, ng);
+    lemma_concat_word_valid(ci, c, ng);
+    lemma_concat_word_valid(b, ci, ng);
+    lemma_concat_word_valid(a, b, ng);
+    lemma_concat_word_valid(a + b, ci, ng);
+    lemma_concat_word_valid(ci, c + b, ng);
+    lemma_concat_word_valid(c, b, ng);
+    // ci·c ≡ ε.
+    lemma_word_inverse_left(gp, c);                          // ci + c ≡ ε
+    // ((ci+c) + (b+ci)) ≡ (ε + (b+ci)) = b+ci.
+    lemma_concat_word_valid(ci + c, b + ci, ng);
+    lemma_equiv_concat_left(gp, ci + c, empty_word(), b + ci);
+    assert(concat(ci + c, b + ci) == (ci + c) + (b + ci));
+    assert(concat(empty_word(), b + ci) =~= b + ci);
+    assert(equiv_in_presentation(gp, (ci + c) + (b + ci), b + ci));
+    // a + ((ci+c)+(b+ci)) ≡ a + (b+ci).
+    lemma_equiv_concat_right(gp, a, (ci + c) + (b + ci), b + ci);
+    assert(concat(a, (ci + c) + (b + ci)) == a + ((ci + c) + (b + ci)));
+    assert(concat(a, b + ci) == a + (b + ci));
+    // the two flat sides are extensionally equal to the regroupings.
+    assert((a + ci) + ((c + b) + ci) =~= a + ((ci + c) + (b + ci)));
+    assert(a + (b + ci) =~= (a + b) + ci);
+}
+
+/// **Conjugating each image by `c` preserves `apply_embedding_symbol`**:
+/// `apply_embedding_symbol(conjugate_family(gens,c), sym) =~= (c · apply_embedding_symbol(gens,sym)) · c⁻¹`.
+proof fn lemma_conj_emb_symbol(gens: Seq<Word>, c: Word, sym: Symbol)
+    requires
+        symbol_valid(sym, gens.len()),
+    ensures
+        apply_embedding_symbol(conjugate_family(gens, c), sym)
+            =~= (c + apply_embedding_symbol(gens, sym)) + inverse_word(c),
+{
+    let cf = conjugate_family(gens, c);
+    let ci = inverse_word(c);
+    match sym {
+        Symbol::Gen(i) => {
+            assert(i < gens.len());
+            assert(apply_embedding_symbol(cf, sym) == cf[i as int]);
+            assert(cf[i as int] == (c + gens[i as int]) + ci);
+            assert(apply_embedding_symbol(gens, sym) == gens[i as int]);
+        },
+        Symbol::Inv(i) => {
+            assert(i < gens.len());
+            assert(apply_embedding_symbol(cf, sym) =~= inverse_word(cf[i as int]));
+            assert(cf[i as int] == (c + gens[i as int]) + ci);
+            // inverse_word((c+gens[i]) + ci) = inverse_word(ci) + inverse_word(c+gens[i])
+            //                                = c + (inverse_word(gens[i]) + inverse_word(c)).
+            lemma_inverse_word_concat(c + gens[i as int], ci);
+            crate::word::lemma_inverse_involution(c);
+            lemma_inverse_word_concat(c, gens[i as int]);
+            assert(inverse_word(cf[i as int])
+                =~= c + (inverse_word(gens[i as int]) + ci));
+            assert(apply_embedding_symbol(gens, sym) =~= inverse_word(gens[i as int]));
+            assert((c + inverse_word(gens[i as int])) + ci =~= c + (inverse_word(gens[i as int]) + ci));
+        },
+    }
+}
+
+/// **Conjugation telescopes through `apply_embedding`**: `emb(conjugate_family(gens,c), w) ≡_{gp}
+/// (c · emb(gens, w)) · c⁻¹`.  Induction on `w`, splicing out the inner `c⁻¹·c` at each step.
+proof fn lemma_conjugate_emb_telescopes(gp: Presentation, gens: Seq<Word>, c: Word, w: Word)
+    requires
+        presentation_valid(gp),
+        word_valid(c, gp.num_generators),
+        forall|i: int| 0 <= i < gens.len() ==> word_valid(#[trigger] gens[i], gp.num_generators),
+        word_valid(w, gens.len()),
+    ensures
+        equiv_in_presentation(gp, apply_embedding(conjugate_family(gens, c), w),
+            (c + apply_embedding(gens, w)) + inverse_word(c)),
+    decreases w.len(),
+{
+    let ng = gp.num_generators;
+    let cf = conjugate_family(gens, c);
+    let ci = inverse_word(c);
+    lemma_inverse_word_valid(c, ng);
+    // cf entries valid over ng.
+    assert forall|i: int| 0 <= i < cf.len() implies word_valid(#[trigger] cf[i], ng) by {
+        assert(cf[i] == (c + gens[i]) + ci);
+        lemma_concat_word_valid(c, gens[i], ng);
+        lemma_concat_word_valid(c + gens[i], ci, ng);
+    }
+    if w.len() == 0 {
+        // emb(cf, []) = ε;  (c + ε) + ci = c + ci ≡ ε.
+        assert(apply_embedding(cf, w) =~= empty_word());
+        assert(apply_embedding(gens, w) =~= empty_word());
+        lemma_word_inverse_right(gp, c);                    // c + ci ≡ ε
+        lemma_equiv_symmetric(gp, c + ci, empty_word());
+        assert((c + apply_embedding(gens, w)) + ci =~= c + ci);
+    } else {
+        let sym = w.first();
+        let rest = w.drop_first();
+        assert(symbol_valid(sym, gens.len())) by { assert(sym == w[0]); }
+        assert(word_valid(rest, gens.len())) by {
+            assert forall|i: int| 0 <= i < rest.len() implies symbol_valid(#[trigger] rest[i], gens.len())
+            by { assert(rest[i] == w[i + 1]); }
+        }
+        // emb(cf, w) = emb_symbol(cf, sym) + emb(cf, rest).
+        let es_cf = apply_embedding_symbol(cf, sym);
+        let es_g = apply_embedding_symbol(gens, sym);
+        assert(apply_embedding(cf, w) =~= es_cf + apply_embedding(cf, rest));
+        // es_cf =~= (c + es_g) + ci.
+        lemma_conj_emb_symbol(gens, c, sym);
+        // es_g, emb(gens, rest) valid.
+        assert(es_g == apply_embedding_symbol(gens, sym));
+        assert(word_valid(es_g, ng)) by {
+            match sym {
+                Symbol::Gen(i) => { assert(es_g == gens[i as int]); },
+                Symbol::Inv(i) => {
+                    assert(es_g =~= inverse_word(gens[i as int]));
+                    lemma_inverse_word_valid(gens[i as int], ng);
+                },
+            }
+        }
+        lemma_apply_embedding_valid(gens, rest, ng);
+        let b = apply_embedding(gens, rest);
+        // IH: emb(cf, rest) ≡ (c + b) + ci.
+        lemma_conjugate_emb_telescopes(gp, gens, c, rest);
+        // emb(cf, w) ≡ es_cf + ((c+b)+ci)   [equiv_concat_right with IH].
+        lemma_apply_embedding_valid(cf, rest, ng);
+        lemma_concat_word_valid(c, b, ng);
+        lemma_concat_word_valid(c + b, ci, ng);
+        lemma_equiv_concat_right(gp, es_cf, apply_embedding(cf, rest), (c + b) + ci);
+        assert(concat(es_cf, apply_embedding(cf, rest)) == es_cf + apply_embedding(cf, rest));
+        assert(concat(es_cf, (c + b) + ci) == es_cf + ((c + b) + ci));
+        // es_cf =~= (c + es_g) + ci = A + ci with A = c + es_g.
+        assert(es_cf =~= (c + es_g) + ci);
+        assert(es_cf + ((c + b) + ci) =~= ((c + es_g) + ci) + ((c + b) + ci));
+        // splice: ((c+es_g)+ci) + ((c+b)+ci) ≡ ((c+es_g)+b)+ci.
+        lemma_concat_word_valid(c, es_g, ng);
+        lemma_conj_splice(gp, c + es_g, b, c);
+        // chain: emb(cf,w) ≡ es_cf+((c+b)+ci) ≡ ((c+es_g)+b)+ci.
+        lemma_equiv_transitive(gp, apply_embedding(cf, w), es_cf + ((c + b) + ci),
+            ((c + es_g) + b) + ci);
+        // ((c+es_g)+b)+ci = (c + (es_g+b)) + ci = (c + emb(gens,w)) + ci.
+        assert(apply_embedding(gens, w) =~= es_g + b);
+        assert(((c + es_g) + b) + ci =~= (c + apply_embedding(gens, w)) + ci);
+    }
+}
+
+/// **Uniform conjugation preserves freeness.**  If `gens` is a free family in `gp` and `c` is a
+/// `gp`-word, then `conjugate_family(gens, c)` (each generator conjugated by `c`) is also a free
+/// family.  (Telescoping: a relation `emb(conj, w) ≡ ε` gives `c·emb(gens,w)·c⁻¹ ≡ ε`, so
+/// `emb(gens, w) ≡ ε`, so `w ≡_free ε`.)  Rung (i) of map_b forward's φ_F-injectivity:
+/// `[config(l,0), xᵐ] = conjugate_family(psi_F_images(m), x⁻ˡ)`.
+pub proof fn lemma_free_family_conjugate(gp: Presentation, gens: Seq<Word>, c: Word)
+    requires
+        presentation_valid(gp),
+        is_free_family(gp, gens),
+        word_valid(c, gp.num_generators),
+    ensures
+        is_free_family(gp, conjugate_family(gens, c)),
+{
+    let ng = gp.num_generators;
+    let k = gens.len();
+    let cf = conjugate_family(gens, c);
+    let ci = inverse_word(c);
+    lemma_inverse_word_valid(c, ng);
+    assert(cf.len() == k);
+    // gens valid (first conjunct of is_free_family).
+    assert forall|i: int| 0 <= i < k implies word_valid(#[trigger] gens[i], ng) by {}
+    // cf entries valid.
+    assert forall|i: int| 0 <= i < cf.len() implies word_valid(#[trigger] cf[i], ng) by {
+        assert(cf[i] == (c + gens[i]) + ci);
+        lemma_concat_word_valid(c, gens[i], ng);
+        lemma_concat_word_valid(c + gens[i], ci, ng);
+    }
+    // freeness: a relation of cf descends to w ≡_free ε.
+    assert forall|w: Word| (#[trigger] word_valid(w, cf.len())
+        && equiv_in_presentation(gp, apply_embedding(cf, w), empty_word()))
+        implies equiv_in_presentation(free_group(cf.len()), w, empty_word()) by {
+        assert(word_valid(w, k));
+        // cf entries valid (re-establish inside this assert-forall context).
+        assert forall|i: int| 0 <= i < cf.len() implies word_valid(#[trigger] cf[i], ng) by {
+            assert(cf[i] == (c + gens[i]) + ci);
+            lemma_concat_word_valid(c, gens[i], ng);
+            lemma_concat_word_valid(c + gens[i], ci, ng);
+        }
+        lemma_apply_embedding_valid(cf, w, ng);             // emb(cf, w) valid over ng
+        // telescoping: emb(cf, w) ≡ (c + emb(gens,w)) + ci.
+        lemma_conjugate_emb_telescopes(gp, gens, c, w);
+        let g = apply_embedding(gens, w);
+        lemma_apply_embedding_valid(gens, w, ng);
+        lemma_concat_word_valid(c, g, ng);
+        lemma_concat_word_valid(c + g, ci, ng);
+        // (c+g)+ci ≡ ε  [transitivity with the hypothesis emb(cf,w) ≡ ε].
+        lemma_equiv_symmetric(gp, apply_embedding(cf, w), (c + g) + ci);
+        lemma_equiv_transitive(gp, (c + g) + ci, apply_embedding(cf, w), empty_word());
+        // c·g·c⁻¹ ≡ ε  ⟹  g ≡ ε   (left-mult ci, right-mult c, cancel).
+        lemma_conj_cancel(gp, g, c);
+        assert(equiv_in_presentation(gp, g, empty_word()));
+        // is_free_family(gp, gens): g = emb(gens, w) ≡ ε ⟹ w ≡_free ε.
+        assert(equiv_in_presentation(free_group(k), w, empty_word()));
+        assert(cf.len() == k);
+    }
+}
+
+/// **Conjugation cancellation**: `(c·g)·c⁻¹ ≡ ε ⟹ g ≡ ε`.  (`g ≡ c⁻¹·((c·g)·c⁻¹)·c ≡ c⁻¹·ε·c ≡ ε`.)
+proof fn lemma_conj_cancel(gp: Presentation, g: Word, c: Word)
+    requires
+        presentation_valid(gp),
+        word_valid(g, gp.num_generators),
+        word_valid(c, gp.num_generators),
+        equiv_in_presentation(gp, (c + g) + inverse_word(c), empty_word()),
+    ensures
+        equiv_in_presentation(gp, g, empty_word()),
+{
+    let ng = gp.num_generators;
+    let ci = inverse_word(c);
+    let x = (c + g) + ci;                                    // the hypothesis word, ≡ ε
+    lemma_inverse_word_valid(c, ng);
+    lemma_concat_word_valid(c, g, ng);
+    lemma_concat_word_valid(c + g, ci, ng);                  // x valid
+    lemma_concat_word_valid(ci, x, ng);
+    lemma_concat_word_valid(ci + x, c, ng);                  // (ci+x)+c valid
+    lemma_concat_word_valid(ci, c, ng);                      // ci+c valid
+    lemma_concat_word_valid(ci + c, g, ng);
+    lemma_concat_word_valid(g, ci + c, ng);
+    lemma_word_inverse_left(gp, c);                          // ci + c ≡ ε
+
+    // --- Fact A:  g ≡ (ci+x)+c ---
+    // (ci+x)+c =~= ((ci+c)+g)+(ci+c)   (both flatten to ci,c,g,ci,c)
+    assert((ci + x) + c =~= ((ci + c) + g) + (ci + c));
+    // (ci+c)+g ≡ ε+g =~= g
+    lemma_equiv_concat_left(gp, ci + c, empty_word(), g);
+    assert(concat(ci + c, g) == (ci + c) + g);
+    assert(concat(empty_word(), g) =~= g);
+    // ((ci+c)+g)+(ci+c) ≡ g+(ci+c)
+    lemma_equiv_concat_left(gp, (ci + c) + g, g, ci + c);
+    assert(concat((ci + c) + g, ci + c) == ((ci + c) + g) + (ci + c));
+    assert(concat(g, ci + c) == g + (ci + c));
+    // g+(ci+c) ≡ g+ε =~= g
+    lemma_equiv_concat_right(gp, g, ci + c, empty_word());
+    assert(concat(g, empty_word()) =~= g);
+    // chain: ((ci+c)+g)+(ci+c) ≡ g+(ci+c) ≡ g
+    lemma_equiv_transitive(gp, ((ci + c) + g) + (ci + c), g + (ci + c), g);
+    // so (ci+x)+c ≡ g  ⟹ g ≡ (ci+x)+c
+    assert(equiv_in_presentation(gp, (ci + x) + c, g));
+    lemma_equiv_symmetric(gp, (ci + x) + c, g);
+
+    // --- Fact B:  (ci+x)+c ≡ ε ---
+    // ci+x ≡ ci+ε =~= ci   (x ≡ ε)
+    lemma_equiv_concat_right(gp, ci, x, empty_word());
+    assert(concat(ci, x) == ci + x);
+    assert(concat(ci, empty_word()) =~= ci);
+    // (ci+x)+c ≡ ci+c
+    lemma_equiv_concat_left(gp, ci + x, ci, c);
+    assert(concat(ci + x, c) == (ci + x) + c);
+    assert(concat(ci, c) == ci + c);
+    // ci+c ≡ ε  ⟹ (ci+x)+c ≡ ε
+    lemma_equiv_transitive(gp, (ci + x) + c, ci + c, empty_word());
+
+    // --- chain Fact A + Fact B:  g ≡ (ci+x)+c ≡ ε ---
+    lemma_equiv_transitive(gp, g, (ci + x) + c, empty_word());
 }
 
 } // verus!
