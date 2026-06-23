@@ -598,4 +598,205 @@ pub proof fn lemma_free_family_respects_equiv(gp: Presentation, gens: Seq<Word>,
     }
 }
 
+// ----------------------------------------------------------------------------
+// Nielsen transvection: replacing one generator by `s·g_i` (left-multiply by a letter `s`)
+// preserves freeness.  (Used by map_b forward rung (iv): d ↦ b_l·d in [config(l,0),xᵐ,d,b_j].)
+// ----------------------------------------------------------------------------
+
+/// The transvection embedding: `gen i ↦ [s, Gen(i)]` (left-multiply by the letter `s`), every other
+/// `gen g ↦ [Gen(g)]`.  Composing `gens` with it left-multiplies `gens[i]` by `apply_embedding_symbol(gens, s)`.
+pub open spec fn transvect_emb(k: nat, i: int, s: Symbol) -> Seq<Word> {
+    Seq::new(k, |g: int| if g == i { seq![s, Symbol::Gen(g as nat)] } else { seq![Symbol::Gen(g as nat)] })
+}
+
+/// `apply_embedding_symbol(transvect_emb(k,i,inverse_symbol(s)), s) =~= [s]` when `generator_index(s)
+/// = j ≠ i` (the off-`i` entries are identity singletons, so the letter `s` maps to itself).
+proof fn lemma_transvect_inv_on_s(k: nat, i: int, s: Symbol)
+    requires
+        symbol_valid(s, k),
+        generator_index(s) != i,
+    ensures
+        apply_embedding_symbol(transvect_emb(k, i, inverse_symbol(s)), s) =~= seq![s],
+{
+    let ti = transvect_emb(k, i, inverse_symbol(s));
+    let j = generator_index(s);
+    assert(j < k);
+    assert(ti[j as int] == seq![Symbol::Gen(j)]) by { assert(j != i); }
+    match s {
+        Symbol::Gen(g) => {
+            assert(g == j);
+            assert(apply_embedding_symbol(ti, s) == ti[j as int]);
+        },
+        Symbol::Inv(g) => {
+            assert(g == j);
+            assert(apply_embedding_symbol(ti, s) =~= inverse_word(ti[j as int]));
+            reveal_with_fuel(inverse_word, 2);
+        },
+    }
+}
+
+/// **`compose(τ⁻¹, τ)` is per-generator free-equivalent to the identity embedding.**  At `i`:
+/// `[s, s⁻¹, Gen(i)] ≡_free [Gen(i)]` (the `s·s⁻¹` cancels); elsewhere: `[Gen(g)]` unchanged.
+proof fn lemma_transvect_compose_inv(k: nat, i: int, s: Symbol, g: int)
+    requires
+        symbol_valid(s, k),
+        generator_index(s) != i,
+        0 <= i < k,
+        0 <= g < k,
+    ensures
+        equiv_in_presentation(free_group(k),
+            compose_embeddings(transvect_emb(k, i, inverse_symbol(s)), transvect_emb(k, i, s))[g],
+            seq![Symbol::Gen(g as nat)]),
+{
+    let fg = free_group(k);
+    lemma_free_group_valid(k);
+    let t = transvect_emb(k, i, s);
+    let ti = transvect_emb(k, i, inverse_symbol(s));
+    let comp = compose_embeddings(ti, t);
+    assert(comp[g] == apply_embedding(ti, t[g]));
+    if g == i {
+        // t[i] = [s, Gen(i)]; emb(ti, [s,Gen(i)]) = aes(ti,s) + ti[i] = [s] + [s⁻¹, Gen(i)].
+        assert(t[i] == seq![s, Symbol::Gen(i as nat)]);
+        reveal_with_fuel(apply_embedding, 3);
+        lemma_transvect_inv_on_s(k, i, s);                       // aes(ti, s) =~= [s]
+        assert(ti[i as int] == seq![inverse_symbol(s), Symbol::Gen(i as nat)]);
+        // emb(ti, [s, Gen(i)]) =~= [s] + [s⁻¹, Gen(i)] = [s, s⁻¹, Gen(i)].
+        assert(apply_embedding(ti, seq![s, Symbol::Gen(i as nat)])
+            =~= seq![s] + seq![inverse_symbol(s), Symbol::Gen(i as nat)]);
+        assert(comp[g] =~= seq![s, inverse_symbol(s), Symbol::Gen(i as nat)]);
+        // [s, s⁻¹] ≡ ε  ⟹  [s, s⁻¹, Gen(i)] ≡ [Gen(i)].
+        assert(seq![s] + seq![inverse_symbol(s)] =~= seq![s, inverse_symbol(s)]);
+        assert(inverse_word(seq![s]) =~= seq![inverse_symbol(s)]) by { reveal_with_fuel(inverse_word, 2); }
+        assert(symbol_valid(s, k));
+        assert(word_valid(seq![s], k));
+        lemma_word_inverse_right(fg, seq![s]);                   // [s]+[s⁻¹] ≡ ε
+        assert(seq![s] + inverse_word(seq![s]) =~= seq![s, inverse_symbol(s)]);
+        // splice: [s,s⁻¹]+[Gen(i)] ≡ ε+[Gen(i)] = [Gen(i)].
+        assert(symbol_valid(Symbol::Gen(i as nat), k));
+        lemma_equiv_concat_left(fg, seq![s, inverse_symbol(s)], empty_word(),
+            seq![Symbol::Gen(i as nat)]);
+        assert(concat(seq![s, inverse_symbol(s)], seq![Symbol::Gen(i as nat)])
+            =~= seq![s, inverse_symbol(s), Symbol::Gen(i as nat)]);
+        assert(concat(empty_word(), seq![Symbol::Gen(i as nat)]) =~= seq![Symbol::Gen(i as nat)]);
+    } else {
+        // t[g] = [Gen(g)]; emb(ti, [Gen(g)]) = ti[g] = [Gen(g)] (g ≠ i).
+        assert(t[g] == seq![Symbol::Gen(g as nat)]);
+        reveal_with_fuel(apply_embedding, 2);
+        lemma_concat_empty_right(ti[g as int]);
+        assert(apply_embedding(ti, seq![Symbol::Gen(g as nat)]) =~= ti[g as int]);
+        assert(ti[g as int] == seq![Symbol::Gen(g as nat)]) by { assert(g != i); }
+        lemma_equiv_refl(fg, seq![Symbol::Gen(g as nat)]);
+    }
+}
+
+/// **The transvection embedding is injective** on `free(k)`: `emb(transvect_emb(k,i,s), w) ≡_free ε
+/// ⟹ w ≡_free ε`.  Undo by `τ⁻¹` (`free_to_embedding`); `compose(τ⁻¹, τ)` is per-gen `≡_free` the
+/// identity (`lemma_transvect_compose_inv`), which `respects_gen_equiv` + `apply_id_emb` collapse to `w`.
+proof fn lemma_transvect_emb_injective(k: nat, i: int, s: Symbol, w: Word)
+    requires
+        symbol_valid(s, k),
+        generator_index(s) != i,
+        0 <= i < k,
+        word_valid(w, k),
+        equiv_in_presentation(free_group(k), apply_embedding(transvect_emb(k, i, s), w), empty_word()),
+    ensures
+        equiv_in_presentation(free_group(k), w, empty_word()),
+{
+    let fg = free_group(k);
+    lemma_free_group_valid(k);
+    let t = transvect_emb(k, i, s);
+    let ti = transvect_emb(k, i, inverse_symbol(s));
+    let comp = compose_embeddings(ti, t);
+    let id_emb = Seq::new(k as int as nat, |g: int| seq![Symbol::Gen(g as nat)]);
+    // t, ti entries valid over k.
+    assert(t.len() == k && ti.len() == k);
+    assert forall|g: int| 0 <= g < k implies (word_valid(#[trigger] t[g], k) && word_valid(ti[g], k)) by {
+        if g == i {
+            assert(t[g] == seq![s, Symbol::Gen(g as nat)]);
+            assert(ti[g] == seq![inverse_symbol(s), Symbol::Gen(g as nat)]);
+            assert(symbol_valid(inverse_symbol(s), k));
+        } else {
+            assert(t[g] == seq![Symbol::Gen(g as nat)] && ti[g] == seq![Symbol::Gen(g as nat)]);
+        }
+    }
+    // emb(ti, emb(t, w)) ≡_free emb(ti, ε) = ε.
+    lemma_apply_embedding_valid(t, w, k);
+    lemma_free_to_embedding(ti, fg, apply_embedding(t, w));
+    assert(apply_embedding(ti, empty_word()) =~= empty_word());
+    // emb(ti, emb(t,w)) = emb(comp, w).
+    lemma_apply_embedding_compose(ti, t, w);
+    assert(apply_embedding(ti, apply_embedding(t, w)) == apply_embedding(comp, w));
+    // comp per-gen ≡_free id_emb ⟹ emb(comp, w) ≡_free emb(id_emb, w) = w.
+    assert(comp.len() == k && id_emb.len() == k);
+    assert forall|g: int| 0 <= g < k implies (word_valid(#[trigger] comp[g], k)
+        && word_valid(id_emb[g], k)) by {
+        lemma_apply_embedding_valid(ti, t[g], k);
+        assert(comp[g] == apply_embedding(ti, t[g]));
+        assert(id_emb[g] == seq![Symbol::Gen(g as nat)]);
+    }
+    assert forall|g: int| 0 <= g < k implies
+        equiv_in_presentation(fg, comp[g], id_emb[g]) by {
+        lemma_transvect_compose_inv(k, i, s, g);
+        assert(id_emb[g] == seq![Symbol::Gen(g as nat)]);
+    }
+    lemma_emb_respects_gen_equiv(fg, id_emb, comp, w);          // emb(comp,w) ≡ emb(id_emb,w)
+    lemma_apply_id_emb(k, w);                                    // emb(id_emb, w) =~= w
+    lemma_apply_embedding_valid(comp, w, k);                     // emb(comp,w) valid over k
+    // emb(comp,w) ≡_free ε  (free_to_embedding gave emb(ti,emb(t,w)) ≡ ε; = emb(comp,w)).
+    assert(equiv_in_presentation(fg, apply_embedding(comp, w), empty_word()));
+    // emb(id_emb,w) = w  ⟹  emb(comp,w) ≡ w  ⟹  w ≡ emb(comp,w) ≡ ε.
+    assert(apply_embedding(id_emb, w) =~= w);
+    lemma_equiv_symmetric(fg, apply_embedding(comp, w), w);
+    lemma_equiv_transitive(fg, w, apply_embedding(comp, w), empty_word());
+}
+
+/// **Nielsen transvection preserves freeness.**  If `gens` is a free family in `gp`, `s` a letter
+/// over `gens.len()` with `generator_index(s) ≠ i`, then `compose(gens, transvect_emb(·,i,s))` — `gens`
+/// with `gens[i]` left-multiplied by `apply_embedding_symbol(gens, s)` — is a free family.  Rung (iv)
+/// of map_b forward's φ_F injectivity (`d ↦ b_l·d`).
+pub proof fn lemma_free_family_transvect(gp: Presentation, gens: Seq<Word>, i: int, s: Symbol)
+    requires
+        presentation_valid(gp),
+        is_free_family(gp, gens),
+        0 <= i < gens.len(),
+        symbol_valid(s, gens.len()),
+        generator_index(s) != i,
+    ensures
+        is_free_family(gp, compose_embeddings(gens, transvect_emb(gens.len(), i, s))),
+{
+    let ng = gp.num_generators;
+    let k = gens.len();
+    let t = transvect_emb(k, i, s);
+    let nf = compose_embeddings(gens, t);
+    // gens valid (first conjunct).
+    assert forall|g: int| 0 <= g < k implies word_valid(#[trigger] gens[g], ng) by {}
+    // t entries valid over k.
+    assert forall|g: int| 0 <= g < k implies word_valid(#[trigger] t[g], k) by {
+        if g == i { assert(t[g] == seq![s, Symbol::Gen(g as nat)]); }
+        else { assert(t[g] == seq![Symbol::Gen(g as nat)]); }
+    }
+    // nf entries valid over ng (= emb(gens, t[g])).
+    assert(nf.len() == k);
+    assert forall|g: int| 0 <= g < k implies word_valid(#[trigger] nf[g], ng) by {
+        assert(nf[g] == apply_embedding(gens, t[g]));
+        lemma_apply_embedding_valid(gens, t[g], ng);
+    }
+    // freeness: emb(nf, w) ≡_{gp} ε ⟹ w ≡_free ε.
+    assert forall|w: Word| (#[trigger] word_valid(w, nf.len())
+        && equiv_in_presentation(gp, apply_embedding(nf, w), empty_word()))
+        implies equiv_in_presentation(free_group(nf.len()), w, empty_word()) by {
+        assert(word_valid(w, k));
+        // emb(nf, w) = emb(gens, emb(t, w)).
+        lemma_apply_embedding_compose(gens, t, w);
+        assert(apply_embedding(gens, apply_embedding(t, w)) == apply_embedding(nf, w));
+        // gens free ⟹ emb(t, w) ≡_free ε.
+        lemma_apply_embedding_valid(t, w, k);
+        assert(equiv_in_presentation(gp, apply_embedding(gens, apply_embedding(t, w)), empty_word()));
+        assert(equiv_in_presentation(free_group(k), apply_embedding(t, w), empty_word()));
+        // transvect injective ⟹ w ≡_free ε.
+        lemma_transvect_emb_injective(k, i, s, w);
+        assert(nf.len() == k);
+    }
+}
+
 } // verus!
