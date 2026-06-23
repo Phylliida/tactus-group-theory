@@ -713,7 +713,7 @@ pub proof fn lemma_pd_pinch_out(data: HNNData, w: Word, i: int, j: int) -> (wsho
 
 /// Each `a_words[i]` (a single literal generator) is valid over `h2_II`'s generator count
 /// `h2_num_gens = nk+2n+2` (the max image index is `p_idx = nk+2n+1`).
-proof fn lemma_a_words_img_valid(mm: ModMachine, n: nat, i: int)
+pub proof fn lemma_a_words_img_valid(mm: ModMachine, n: nat, i: int)
     requires
         0 <= i < n + 4,
     ensures

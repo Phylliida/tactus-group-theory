@@ -318,6 +318,68 @@ pub open spec fn b_words(mm: ModMachine, n: nat, m: nat, l: nat) -> Seq<Word> {
     Seq::new((n + 4) as nat, |i: int| phi_assoc(g_m(mm).num_generators, n, m, l)[i].1)
 }
 
+/// **The von-Dyck-`b` per-relator condition**: `b_words` sends each `pa_data(betas(alphas))` relator
+/// to `ε` in `h2_II`.  `ae(b_words, hnn_relator(pd, j)) = φ_l(ae(a_words, hr)) = φ_l(family_II_relator(γⱼ))
+/// =~= family_II_relator(m·γⱼ+l)` (digit-scaling, B1.5 bridge `lemma_phi_l_factor_through_subst` +
+/// `lemma_a_words_on_hnn_relator`), `≡_{h2_II} ε` since `m·γⱼ+l ∈ alphas` (finite-slice, via
+/// `lemma_phi_l_relator_equiv_empty`).  Extracted for reuse by BOTH the von-Dyck-backward
+/// (`lemma_emb_respects_source_equiv` homomorphism condition) and the direct `map_b` forward peel
+/// (`lemma_map_b_forward_rt`).
+pub proof fn lemma_b_words_relator_trivial(mm: ModMachine, n: nat, m: nat, l: nat,
+    alphas: Seq<nat>, j: int)
+    requires
+        2 * n < m,
+        1 <= l <= 2 * n,
+        forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]),
+        forall|jj: int| 0 <= jj < betas(alphas).len() ==>
+            exists|k: int| 0 <= k < alphas.len() && alphas[k] == m * (#[trigger] betas(alphas)[jj]) + l,
+        0 <= j < betas(alphas).len(),
+    ensures
+        equiv_in_presentation(h2_II(mm, n, m, alphas),
+            apply_embedding(b_words(mm, n, m, l), hnn_relator(pa_data(n, m, betas(alphas)), j)),
+            empty_word()),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let gammas = betas(alphas);
+    let bw = b_words(mm, n, m, l);
+    let pd = pa_data(n, m, gammas);
+    let src = hnn_presentation(pd);
+    let subst = phi_l_subst(nk, n, m, l);
+    lemma_betas_index(alphas);
+    lemma_pa_data_shape(n, m, gammas);
+    lemma_pa_data_valid(n, m, gammas);
+    lemma_hnn_presentation_valid(pd);
+    assert(src.relators =~= hnn_relators(pd)) by {
+        assert(pd.base.relators == Seq::<Word>::empty());
+    }
+    assert(src.num_generators == n + 4);
+    let hr = hnn_relator(pd, j);
+    assert(src.relators[j] == hnn_relators(pd)[j]);
+    assert(hnn_relators(pd)[j] == hnn_relator(pd, j));
+    assert(word_valid(hr, (n + 4) as nat)) by {
+        reveal(presentation_valid);
+        assert(word_valid(src.relators[j], src.num_generators));
+    }
+    assert(numbers_word(n, m, gammas[j])) by {
+        if j == 0 { assert(gammas[0] == 0); } else { assert(gammas[j] == alphas[j - 1]); }
+    }
+    // ae(b_words, hr) = φ_l(ae(col0=a_words, hr)) = φ_l(family_II_relator(γ_j)).
+    lemma_a_words_is_phi_col0(mm, n, m, l);
+    let col0 = Seq::new((n + 4) as nat, |i: int| phi_assoc(nk, n, m, l)[i].0);
+    assert(col0 =~= a_words(mm, n));
+    lemma_phi_l_factor_through_subst(mm, n, m, l, hr);     // ae(bw, hr) = subst(ae(col0, hr))
+    assert(apply_embedding(col0, hr) == apply_embedding(a_words(mm, n), hr));
+    lemma_a_words_on_hnn_relator(mm, n, m, gammas, j);     // ae(a_words, hr) =~= family_II_relator(γ_j)
+    assert(apply_embedding(col0, hr) =~= family_II_relator(mm, n, m, gammas[j]));
+    assert(apply_embedding(bw, hr)
+        == apply_embedding(subst, family_II_relator(mm, n, m, gammas[j])));
+    // φ_l(family_II_relator(γ_j)) ≡_{h2_II} ε  (m·γ_j+l ∈ alphas).
+    let k = choose|k: int| 0 <= k < alphas.len() && alphas[k] == m * gammas[j] + l;
+    assert(0 <= k < alphas.len() && alphas[k] == m * gammas[j] + l);
+    lemma_phi_l_relator_equiv_empty(mm, n, m, l, alphas, gammas[j], k);
+}
+
 /// **`map_b` von-Dyck backward (`⟸`)**: `w ≡_{P_A} ε ⟹ apply_embedding(b_words, w) ≡_{h2_II} ε`,
 /// `P_A = pa_data(betas(alphas))`.  Discharges the generic lemma's relator-preservation through the
 /// B1.5 bridge: `ae(b_words, hr_j) = φ_l(ae(a_words, hr_j)) = φ_l(family_II_relator(γⱼ)) =~=
@@ -374,31 +436,11 @@ pub proof fn lemma_map_b_von_dyck_backward(mm: ModMachine, n: nat, m: nat, l: na
     let col0 = Seq::new((n + 4) as nat, |i: int| phi_assoc(nk, n, m, l)[i].0);
     assert(col0 =~= a_words(mm, n));
 
-    // relator-preservation: ae(b_words, hnn_relator(pd,j)) ≡_{h2_II} ε.
+    // relator-preservation: ae(b_words, hnn_relator(pd,j)) ≡_{h2_II} ε  (extracted helper).
     assert forall|j: int| 0 <= j < gammas.len() implies
         equiv_in_presentation(h2_II(mm, n, m, alphas),
             apply_embedding(bw, hnn_relator(pd, j)), empty_word()) by {
-        let hr = hnn_relator(pd, j);
-        assert(src.relators[j] == hnn_relators(pd)[j]);
-        assert(hnn_relators(pd)[j] == hnn_relator(pd, j));
-        assert(word_valid(hr, (n + 4) as nat)) by {
-            reveal(presentation_valid);
-            assert(word_valid(src.relators[j], src.num_generators));
-        }
-        assert(numbers_word(n, m, gammas[j])) by {
-            if j == 0 { assert(gammas[0] == 0); } else { assert(gammas[j] == alphas[j - 1]); }
-        }
-        // ae(b_words, hr) = φ_l(ae(col0, hr)) = φ_l(ae(a_words, hr)) = φ_l(family_II_relator(γ_j)).
-        lemma_phi_l_factor_through_subst(mm, n, m, l, hr);     // ae(col1=bw, hr) = subst(ae(col0, hr))
-        assert(apply_embedding(col0, hr) == apply_embedding(a_words(mm, n), hr));
-        lemma_a_words_on_hnn_relator(mm, n, m, gammas, j);     // ae(a_words, hr) =~= family_II_relator(γ_j)
-        assert(apply_embedding(col0, hr) =~= family_II_relator(mm, n, m, gammas[j]));
-        assert(apply_embedding(bw, hr)
-            == apply_embedding(subst, family_II_relator(mm, n, m, gammas[j])));
-        // φ_l(family_II_relator(γ_j)) ≡_{h2_II} ε  (m·γ_j+l ∈ alphas).
-        let k = choose|k: int| 0 <= k < alphas.len() && alphas[k] == m * gammas[j] + l;
-        assert(0 <= k < alphas.len() && alphas[k] == m * gammas[j] + l);
-        lemma_phi_l_relator_equiv_empty(mm, n, m, l, alphas, gammas[j], k);
+        lemma_b_words_relator_trivial(mm, n, m, l, alphas, j);
     }
 
     lemma_pa_von_dyck_backward(mm, n, m, alphas, gammas, bw, w);

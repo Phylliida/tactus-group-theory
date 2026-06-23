@@ -22,18 +22,22 @@ use crate::h3_ii::{h2_II, h3_II_upto, phi_l_data, lemma_phi_l_emb_h2_valid,
     lemma_phi_assoc_len};
 use crate::phi_l_mapb_fwd::lemma_phi_l_iso_at_h2II;
 use crate::r_prime::sigma_backsat;
-use crate::r_prime_b::sigma_fwdsat;
 use crate::f_free_a1::betas;
 use crate::word_numbering::numbers_word;
 
 verus! {
 
-/// The per-level side-condition bundle: for every tower level `j ∈ [1, l]`, `betas(alphas)` is
-/// σ-saturated (both directions) at digit `j`.  C4 picks the finite `alphas` so this holds up to
-/// `l = 2n` (the σ-orbits are finite among number-word indices).
+/// The per-level side-condition bundle for the a-tower iso: for every tower level `j ∈ [1, l]`,
+/// `betas(alphas)` is σ-BACKWARD-saturated at digit `j`, AND the **finite-slice** holds — each
+/// shifted index `m·γ+j` (`γ ∈ betas`) lands in `alphas`.  This REPLACES the old σ-FORWARD-saturation
+/// (which was unsatisfiable for finite `alphas` — `betas∋0` forces an infinite ascending σ-chain);
+/// the finite-slice is finite-satisfiable by a bounded σ-orbit `alphas` (C4 picks it).
 pub open spec fn sigma_sat_upto(alphas: Seq<nat>, m: nat, l: nat) -> bool {
-    forall|j: nat| 1 <= j <= l ==>
-        (#[trigger] sigma_backsat(betas(alphas), m, j)) && sigma_fwdsat(betas(alphas), m, j)
+    forall|j: nat| #![trigger sigma_backsat(betas(alphas), m, j)] 1 <= j <= l ==>
+        sigma_backsat(betas(alphas), m, j)
+        && (forall|jj: int| 0 <= jj < betas(alphas).len() ==>
+              exists|kk: int| 0 <= kk < alphas.len()
+                  && alphas[kk] == m * (#[trigger] betas(alphas)[jj]) + j)
 }
 
 /// **C3.2d — the a-tower faithfulness** (mirror of `lemma_b_m_upto_faithful`).  An `h2`-word `w`
@@ -76,6 +80,7 @@ pub proof fn lemma_h3_II_upto_faithful(mm: ModMachine, n: nat, m: nat, alphas: S
         let a_words = Seq::new(k, |idx: int| step.associations[idx].0);
         let b_words = Seq::new(k, |idx: int| step.associations[idx].1);
         assert(hnn_associations_isomorphic(step)) by {
+            assert(sigma_backsat(betas(alphas), m, l));       // trigger sigma_sat_upto at j=l (backsat + finite-slice)
             lemma_phi_l_iso_at_h2II(mm, n, m, alphas, l);     // bottom crux: iso at h2_II
             let cr = HNNData { base: h2_II(mm, n, m, alphas), associations: phi_assoc(nk, n, m, l) };
             let cr_a = Seq::new(k, |idx: int| cr.associations[idx].0);
@@ -145,6 +150,7 @@ pub proof fn lemma_phi_l_iso(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, l
     let a_words = Seq::new(k, |idx: int| data.associations[idx].0);
     let b_words = Seq::new(k, |idx: int| data.associations[idx].1);
 
+    assert(sigma_backsat(betas(alphas), m, l));               // trigger sigma_sat_upto at j=l (backsat + finite-slice)
     lemma_phi_l_iso_at_h2II(mm, n, m, alphas, l);             // bottom crux: iso at h2_II
     let cr = HNNData { base: h2_II(mm, n, m, alphas), associations: phi_assoc(nk, n, m, l) };
     let cr_a = Seq::new(k, |idx: int| cr.associations[idx].0);
