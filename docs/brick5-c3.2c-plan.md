@@ -456,3 +456,77 @@ Proof = the Britton-peel induction on `w.len()` (mirror `lemma_psi_A_injective`)
 relators touch (so the image relation is present in the finite augmentation).  NOTE the `γ=0` case gives
 **`l ∈ alphas`** (since `m·0+l = l`).  Bake `{l} ∪ {m·α+l : α∈alphas} ⊆ alphas` into the crux's `requires`;
 C4 picks the concrete finite set.
+
+---
+
+## 6. map_b forward — the DE-RISKED ladder (Route II = factoring, design locked 2026-06-22 session 4)
+
+**The crux already half-holds.**  The crux `lemma_phi_l_iso_at_h2II` forward direction
+(`emb(a_words,w) ≡ ε ⟹ emb(b_words,w) ≡ ε`) is OBTAINABLE NOW: `map_a` forward (`w ≡_{P_A} ε`) +
+`map_b` von-Dyck-backward (DONE) close it.  Only the BACKWARD crux direction needs **map_b forward**
+(`emb(b_words,w) ≡_{h2_II} ε ⟹ w ≡_{P_A} ε`).
+
+**Route decision — Route II (source-level factoring), NOT a direct b_words Britton peel.**  `b_words`
+is a digit-SCALING map (`x↦xᵐ`), so a direct peel needs a non-same-index (spanning) pinch descent AND
+the association columns misalign under `b_words_F` (`config(β) ↦ config(mβ+l)`, NOT a column of
+`recog`).  The factoring `map_b = ψ_a ∘ φ_l` isolates the scaling into a PURE free-group injectivity:
+```
+emb(b_words,w) ≡_{h2_II} ε
+  = emb(a_words, emb(φ_l_src, w)) ≡_{h2_II} ε        (M1 DONE: lemma_mapb_factor_source)
+  ⟹ emb(φ_l_src, w) ≡_{P_A} ε                        (map_a forward DONE, applied to φ_l_src(w))
+  ⟹ w ≡_{P_A} ε                                       (M2: φ_l_src injective on P_A)
+```
+`φ_l_src` (`phi_l_mapb::phi_l_src`) = the P_A-level φ_l subst (`t↦config(l,0), x↦xᵐ, d↦b_l·d,
+b_j↦b_j, p↦p`).  With the finite-slice side condition `{mβ+l:β∈betas} ⊆ alphas ⊆ betas`, `φ_l_src` IS
+a homomorphism `P_A → P_A` (sends the β-relator to the (mβ+l)-relator, a P_A relator).
+
+### DONE (session 4)
+- [x] **M1 — source-level factoring** (`phi_l_mapb.rs`, `lemma_mapb_factor_source`): `emb(b_words,w)
+  =~= emb(a_words, emb(φ_l_src, w))`.  `compose(a_words, φ_l_src) = b_words` per-gen
+  (`lemma_compose_a_words_phi_l_src`, reusing `phi_l_maps` column translations) + `lemma_apply_embedding_compose`.
+- [x] **pa_data iso** (`lemma_pa_data_isomorphic`): `hnn_associations_isomorphic(pa_data(betas))`.
+  Clean assembly: column correspondences (`recog col = compose(a_words_F, pa col)`) + A1 (recog iso)
+  + `a_words_F` free (map_a faithful) + `lemma_free_family_injective` both directions.  NO fresh
+  free-group machinery.  Needed for the M2 Britton peel over `pa_data`.
+
+### M2 — φ_l_src injective on P_A (the remaining hard arc).  Britton peel over `pa_data`, `decreases stable_count(pa_data, w)`:
+- **base case** (`w` an F-word, `stable_count==0`): `emb(φ_l_src,w) ≡_{P_A} ε` ⟹
+  (`lemma_single_hnn_base_faithful`, pa iso DONE) `≡_{free(n+3)} ε` ⟹ **(φ_F injective on free F)**
+  `w ≡_{free(n+3)} ε` ⟹ (`lemma_base_embeds_in_hnn`) `w ≡_{P_A} ε`.
+- **step case**: `britton_lemma_full(pa_data, emb(φ_l_src,w))` (pa iso DONE) ⟹ a pinch; **descend it to
+  a pinch of `w`** (the SPANNING pinch descent — `φ_l_src` fixes `p` as a length-1 image, so the
+  `p`-letters are in bijection with `w`'s, but F-segments scale; mirror `lemma_psi_A_pinch_descends`
+  but the stable letter is NOT scaled, so SIMPLER than the template's `y↦yᵠ` run case); the pinch
+  middle `emb(φ_F, u) ∈ AssocSub(P_A)` forces **(R) the config-reflection** `u ∈ AssocSub(P_A)`; pinch
+  out (`lemma_pd_pinch_out`, GENERIC, reused from map_a) + recurse.
+
+### The two genuinely-new hard sub-lemmas (each ~a session):
+
+**(A) φ_F injective on free F** = `is_free_family(free(n+3), [config(l,0), xᵐ, b_l·d, b_1..b_n])`
+(= the φ_l-image family is free).  De-risked ladder (uses the f_free Britton-over-empty-HNN spanning
+tool, which already proved `[t,x,b,d]` free in the tower):
+  - (i) `[config(l,0), xᵐ]` free in `pres_tx = free(2)`: `psi_F_images(m)=[t,xᵐ]` free
+    (`lemma_psi_F_injective`) + a NEW **conjugate-free-family** lemma (`[g_i]` free ⟹ `[w g_i w⁻¹]`
+    free; here `config(l,0)=x⁻ˡ·t·xˡ`, `xᵐ=x⁻ˡ·xᵐ·xˡ`, so the family is `psi_F_images(m)` conjugated
+    by `x⁻ˡ` — `lemma_free_family_conjugate`, ~general, reusable).
+  - (ii)/(iii) extend by `b_1..b_n` then `d` as **free stable letters**
+    (`f_free::lemma_extend_free_by_stable`, iterated like `f_free_tower`) → `[config(l,0),xᵐ,b_1..b_n,d]`
+    free in `free(n+3)`.
+  - (iv) **Nielsen transvection**: replace `d` by `b_l·d` (`b_l` already in the family) → still free
+    (NEW `lemma_free_family_transvection`: `[..,g_i,..,g_j,..]` free ⟹ `[..,g_i,..,g_j·g_i,..]` free;
+    general, reusable).
+  - (v) permute to φ_F's order `[config(l,0),xᵐ,b_l·d,b_1..b_n]` (`lemma_free_family_permute`, DONE).
+  Equivalent restatement: `φ_F inj on free F ⟺ b_words_F free in h1` (circular — must prove via (A) directly).
+
+**(R) config-reflection over free F** (the companion-confirmed crux): `emb(φ_F, u) ∈
+⟨config(β):β∈betas⟩_{free F} ⟹ u ∈ ⟨config(β):β∈betas⟩_{free F}` (a-side; b-side analog via `pa_rhs`).
+Route (companion 2026-06-22): (1) free-product retraction `F = ⟨t,x⟩ * ⟨d,b⟩` reduces `u` to `⟨t,x⟩`
+(`φ_F` diagonal; `A_low ⊂ ⟨t,x⟩`; `ρ_db∘φ_F = φ_db∘ρ_db`, `φ_db` inj on `⟨d,b⟩`); (2) within free
+`⟨t,x⟩`, the t-conjugate subgroup reflection via the **canw machinery** (`config_emb_eq_canw` +
+`lemma_canw_eval_nontrivial` injectivity): `φ_F` relabels the conjugating index `β↦mβ+l` (an injective
+σ, σ(betas)⊆betas by side cond), so reading canonical conjugating indices + matching against σ-image
+gives the descent.  **The hardest piece**; comparable to the Layer-1 t-freeness/config-injectivity arc.
+
+### Then
+- C-asm `lemma_phi_l_iso_at_h2II` = map_a (DONE) + map_b (von-Dyck DONE + forward) chained through `w ≡_{P_A} ε`.
+- C3.2d outer induction → C2/C4/C5.
