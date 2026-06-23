@@ -22,6 +22,7 @@ use crate::reduction::*;
 use crate::conj_free::*;
 use crate::machine_group::{symbol_power, lemma_symbol_power_merge, lemma_symbol_power_one,
     lemma_inverse_word_one};
+use crate::benign::{apply_embedding, apply_embedding_symbol};
 
 verus! {
 
@@ -632,6 +633,239 @@ pub proof fn lemma_emb_first_b(k: nat, w: Word)
             assert(v.subrange(0, c)[j] == v[j]);
             assert(v[j] == h[j]);
             assert(h[j] == pre[j]);   // h = pre + mid + post, j < c = pre.len()
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// The base case: `bsep(φ(w'))` for a reduced source word `w'`.
+// ----------------------------------------------------------------------------
+
+/// If the central b's of two blocks are an inverse pair and the source symbols share a generator
+/// index, the source symbols themselves are an inverse pair.
+proof fn lemma_b_sym_inverse(s1: Symbol, s2: Symbol)
+    requires
+        generator_index(s1) == generator_index(s2),
+        is_inverse_pair(b_sym(s1), b_sym(s2)),
+    ensures
+        is_inverse_pair(s1, s2),
+{
+    match s1 {
+        Symbol::Gen(i) => { match s2 { Symbol::Gen(j) => {}, Symbol::Inv(j) => {} } },
+        Symbol::Inv(i) => { match s2 { Symbol::Gen(j) => {}, Symbol::Inv(j) => {} } },
+    }
+}
+
+/// **Boundary case** of the base induction: the head block's b paired with the first b of the rest.
+/// The a-block between them has a-exponent `c − c'` (`c = index(w[0])`, `c' = index(w[1])`); the
+/// source word being reduced forces `c ≠ c'`, so the exponent is nonzero.
+proof fn lemma_bsep_emb_boundary(k: nat, w: Word, q: int)
+    requires
+        word_valid(w, k),
+        is_reduced(w),
+        w.len() > 0,
+        consec_b(apply_embedding(conj_family(k), w), generator_index(w[0]) as int, q),
+        is_inverse_pair(apply_embedding(conj_family(k), w)[generator_index(w[0]) as int],
+            apply_embedding(conj_family(k), w)[q]),
+    ensures
+        asum(apply_embedding(conj_family(k), w).subrange(generator_index(w[0]) as int + 1, q)) != 0,
+{
+    let fam = conj_family(k);
+    let big_w = apply_embedding(fam, w);
+    let s = w[0];
+    let c = generator_index(s) as int;
+    let h = phi_block(s);
+    let rest = w.drop_first();
+    let v = apply_embedding(fam, rest);
+    lemma_emb_first_block(k, w);
+    lemma_phi_block_struct(s);
+    let l = 2 * c + 1;
+    assert(h.len() == l);
+    assert(big_w =~= h + v);
+    assert(c < q);
+    // The rest is nonempty (else the only b is the head-b at c).
+    assert(rest.len() > 0) by {
+        if rest.len() == 0 {
+            assert(v =~= empty_word());
+            assert(big_w =~= h);
+            assert(big_w[q] == h[q]);
+            assert(is_b(big_w[q]));
+            assert(q == c);
+            assert(false);
+        }
+    }
+    assert(word_valid(rest, k)) by {
+        assert forall|j: int| 0 <= j < rest.len() implies symbol_valid(#[trigger] rest[j], k) by {
+            assert(rest[j] == w[j + 1]);
+        }
+    }
+    lemma_emb_first_b(k, rest);
+    let cp = generator_index(rest[0]) as int;
+    assert(is_b(big_w[q]));
+    // q lands in the V-region.
+    assert(q >= l) by {
+        if q < l {
+            assert(big_w[q] == h[q]);
+            assert(q == c);
+            assert(false);
+        }
+    }
+    let qp = q - l;
+    assert(big_w[q] == v[qp]) by { assert(big_w[q] == (h + v)[q]); }
+    assert(qp < v.len());
+    // qp is exactly the first b of V.
+    assert(qp >= cp) by {
+        if qp < cp {
+            assert(!is_b(v[qp]));
+            assert(false);
+        }
+    }
+    assert(qp <= cp) by {
+        if qp > cp {
+            assert(cp < v.len());
+            assert(is_b(v[cp]));
+            assert(big_w[l + cp] == v[cp]) by { assert(big_w[l + cp] == (h + v)[l + cp]); }
+            assert(c < l + cp < q);
+            assert(!is_b(big_w[l + cp]));
+            assert(false);
+        }
+    }
+    assert(qp == cp);
+    assert(q == l + cp);
+    // Infix a-exponent = c (trailing aᶜ of the head) + (−c') (leading a⁻ᶜ' of the rest).
+    lemma_concat_subrange_mid(h, v, c + 1, q);
+    assert(big_w.subrange(c + 1, q) =~= h.subrange(c + 1, l) + v.subrange(0, cp));
+    assert(h.subrange(c + 1, l) =~= symbol_power(Symbol::Gen(0), generator_index(s))) by {
+        let post = symbol_power(Symbol::Gen(0), generator_index(s));
+        let pre = symbol_power(Symbol::Inv(0), generator_index(s));
+        let mid = seq![b_sym(s)];
+        assert((pre + mid).len() == c + 1);
+        assert forall|j: int| #![trigger h.subrange(c + 1, l)[j]] 0 <= j < c
+            implies h.subrange(c + 1, l)[j] == post[j] by {
+            assert(h.subrange(c + 1, l)[j] == h[c + 1 + j]);
+            assert(h[c + 1 + j] == post[j]);
+        }
+    }
+    lemma_asum_symbol_power(Symbol::Gen(0), generator_index(s));
+    lemma_asum_symbol_power(Symbol::Inv(0), generator_index(rest[0]));
+    lemma_asum_concat(h.subrange(c + 1, l), v.subrange(0, cp));
+    // c ≠ c' from reducedness.
+    assert(c != cp) by {
+        if c == cp {
+            assert(big_w[c] == h[c]) by { assert(big_w[c] == (h + v)[c]); }
+            assert(h[c] == b_sym(s));
+            assert(v[cp] == b_sym(rest[0]));
+            assert(is_inverse_pair(b_sym(s), b_sym(rest[0])));
+            lemma_b_sym_inverse(s, rest[0]);
+            assert(rest[0] == w[1]);
+            assert(is_inverse_pair(w[0], w[1]));
+            assert(has_cancellation_at(w, 0));
+            assert(has_cancellation(w));
+            assert(false);
+        }
+    }
+}
+
+/// **Inner case** of the base induction: both b's lie inside the rest's image; conclude directly
+/// from `bsep` of the rest's image (the head block lies entirely before them).
+proof fn lemma_bsep_emb_inner(k: nat, w: Word, p: int, q: int)
+    requires
+        word_valid(w, k),
+        w.len() > 0,
+        bsep(apply_embedding(conj_family(k), w.drop_first())),
+        2 * generator_index(w[0]) + 1 <= p,
+        consec_b(apply_embedding(conj_family(k), w), p, q),
+        is_inverse_pair(apply_embedding(conj_family(k), w)[p], apply_embedding(conj_family(k), w)[q]),
+    ensures
+        asum(apply_embedding(conj_family(k), w).subrange(p + 1, q)) != 0,
+{
+    let fam = conj_family(k);
+    let big_w = apply_embedding(fam, w);
+    let s = w[0];
+    let c = generator_index(s) as int;
+    let h = phi_block(s);
+    let rest = w.drop_first();
+    let v = apply_embedding(fam, rest);
+    lemma_emb_first_block(k, w);
+    lemma_phi_block_struct(s);
+    let l = 2 * c + 1;
+    assert(h.len() == l);
+    assert(big_w =~= h + v);
+    assert(p < q);
+    let pp = p - l;
+    let qp = q - l;
+    assert(0 <= pp < qp);
+    assert(qp < v.len());
+    assert(big_w[p] == v[pp]) by { assert(big_w[p] == (h + v)[p]); }
+    assert(big_w[q] == v[qp]) by { assert(big_w[q] == (h + v)[q]); }
+    assert(consec_b(v, pp, qp)) by {
+        assert forall|mm: int| pp < mm < qp implies !is_b(v[mm]) by {
+            assert(big_w[l + mm] == v[mm]) by { assert(big_w[l + mm] == (h + v)[l + mm]); }
+            assert(p < l + mm < q);
+            assert(!is_b(big_w[l + mm]));
+        }
+    }
+    assert(is_inverse_pair(v[pp], v[qp]));
+    assert(asum(v.subrange(pp + 1, qp)) != 0);
+    lemma_concat_subrange_right(h, v, p + 1, q);
+    assert(big_w.subrange(p + 1, q) =~= v.subrange(pp + 1, qp));
+}
+
+/// **THE BASE CASE.**  For a reduced source word `w'`, the embedding `φ(w')` satisfies the
+/// net-exponent invariant `bsep`: consecutive same-index source letters are forced to share a sign,
+/// so no two consecutive image-b's at equal height ever form an inverse pair.
+pub proof fn lemma_bsep_emb(k: nat, w: Word)
+    requires
+        word_valid(w, k),
+        is_reduced(w),
+    ensures
+        bsep(apply_embedding(conj_family(k), w)),
+    decreases w.len(),
+{
+    let fam = conj_family(k);
+    let big_w = apply_embedding(fam, w);
+    if w.len() == 0 {
+        assert(big_w =~= empty_word());
+    } else {
+        let s = w[0];
+        let c = generator_index(s) as int;
+        let rest = w.drop_first();
+        let v = apply_embedding(fam, rest);
+        let h = phi_block(s);
+        let l = 2 * c + 1;
+        // rest valid + reduced.
+        assert(word_valid(rest, k)) by {
+            assert forall|j: int| 0 <= j < rest.len() implies symbol_valid(#[trigger] rest[j], k) by {
+                assert(rest[j] == w[j + 1]);
+            }
+        }
+        assert(is_reduced(rest)) by {
+            assert forall|i: int| !has_cancellation_at(rest, i) by {
+                if 0 <= i < rest.len() - 1 {
+                    assert(rest[i] == w[i + 1] && rest[i + 1] == w[i + 2]);
+                    if has_cancellation_at(rest, i) {
+                        assert(has_cancellation_at(w, i + 1));
+                        assert(has_cancellation(w));
+                    }
+                }
+            }
+        }
+        lemma_bsep_emb(k, rest);            // bsep(v)
+        lemma_emb_first_block(k, w);        // big_w =~= h + v
+        lemma_phi_block_struct(s);
+        assert(h.len() == l);
+        assert(big_w =~= h + v);
+        assert forall|p: int, q: int| (#[trigger] consec_b(big_w, p, q))
+            && is_inverse_pair(big_w[p], big_w[q])
+            implies asum(big_w.subrange(p + 1, q)) != 0 by {
+            if p < l {
+                // The only b in the head block is at position c.
+                assert(big_w[p] == h[p]) by { assert(big_w[p] == (h + v)[p]); }
+                assert(p == c);
+                lemma_bsep_emb_boundary(k, w, q);
+            } else {
+                lemma_bsep_emb_inner(k, w, p, q);
+            }
         }
     }
 }
