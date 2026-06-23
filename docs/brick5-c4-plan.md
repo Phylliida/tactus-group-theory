@@ -88,21 +88,26 @@ chain (M2 consumes the von-Dyck; retargeting one breaks the other). Suggested or
   AUTOMATIC (σbet[j]=σγ literal relator), no `sigma_fwdsat`. + `lemma_sigma_numbers_word` /
   `lemma_sigma_betas_numbers_word` (σ preserves number-word-ness). The self-endo
   `lemma_phi_l_src_on_pa_relator` stays for now; the parallel retargeted chain replaces it at R2–R7.
-- **R2 — cross-index pinch-descent (THE BOTTLENECK).** Rework `lemma_mapb_pinch_descends` /
-  `lemma_mapb_pinch_spanning`: a pinch of `pw=emb(φ_l_src,w)` over `pa_data(σbet)` descends to a pinch
-  of `w` over `pa_data(bet)`. Both have base `free(n+3)` so the generic strip/prepend/is_stable helpers
-  apply; the head-peel induction (`decreases w.len()`) threads BOTH datas. The spanning case's middle
-  `emb(φ_F,mid)` is natively in `⟨col(σbet)⟩` (the `pa_data(σbet)` association column), so the
-  intersection property (`lemma_intersection_property`, `compose(φ_F,col(bet))=col(σbet)`) gives
-  `mid∈⟨col(bet)⟩` DIRECTLY — replaces the (R)/(R)_b reflection calls, NO saturation. (`lemma_extend_spanning`
-  position correspondence still applies since `φ_l_src=stable_emb(free(n+3),φ_F_family)`.)
-- **R3 — cross-index M2.** `lemma_mapb_M2`: `emb(φ_l_src,w)≡_{P_A(σbet)}ε ⟹ w≡_{P_A(bet)}ε`.
-  Self-endo wiring to fix (current body, `phi_l_mapb_fwd.rs:668`): `britton_lemma_full` over
-  `pa_data(σbet)` (needs `hnn_associations_isomorphic(pa_data(σbet))` — prove via `lemma_pa_data_isomorphic`
-  over σbet, a finite set; σbet entries are number words by R1's helper) ; R2 to descend the pinch to `w`
-  over `pa_data(bet)`; `lemma_pd_pinch_out` over `pa_data(bet)`; the recursion's `emb(φ_l_src,w) ≡
-  emb(φ_l_src,wshort)` step uses R1 (von-Dyck into `pa_data(σbet)`); base case (`stable_count==0`)
-  `lemma_single_hnn_base_faithful` already index-agnostic. Drop `sigma_fwdsat`.
+- **R2 — cross-index pinch-descent — DONE 2026-06-22** (`phi_l_mapb_fwd.rs` 16/0):
+  `lemma_pa_rhs_reflect_intersection` / `lemma_config_reflect_intersection` (the σbet→bet reflection via
+  `lemma_intersection_property`, replacing (R)/(R)_b, NO saturation) + `lemma_mapb_pinch_spanning_rt`
+  (spanning, middle natively in `⟨col(σbet)⟩`) + `lemma_mapb_pinch_descends_rt` (head-peel, pinch ops
+  over `pa_data(σbet)`, w-pinch over `pa_data(bet)`, common base `free(n+3)`). Verified ~first try.
+- **R3 — cross-index M2 — DONE 2026-06-22** (`phi_l_mapb_fwd.rs` 17/0, `lemma_mapb_M2_rt`):
+  `emb(φ_l_src,w)≡_{P_A(σbet)}ε ⟹ w≡_{P_A(bet)}ε`. `britton_lemma_full` over `pa_data(σbet)` (iso as a
+  HYPOTHESIS), R2 to descend, pinch-out over `pa_data(bet)`, R1 for the cross-presentation
+  `lemma_emb_respects_source_equiv`. **R1+R2+R3 = the full injectivity `φ_l_src: P_A(bet)↪P_A(σbet)`, no
+  σ-saturation — the bottleneck is CRACKED.**
+- **R4 — retargeted map_b forward (NEXT, the index-set-generalization layer).** Current
+  `lemma_map_b_forward` does `M1 → map_a fwd → M2(self-endo)`, where `lemma_map_a_forward` gives
+  `pw ≡_{P_A(betas(alphas))} ε`. But `lemma_mapb_M2_rt` wants `pw ≡_{P_A(σbet)} ε` (σbet =
+  `sigma_betas(betas(alphas),m,l)`). So R4 needs **map_a forward over the index set σbet** (and
+  `hnn_associations_isomorphic(pa_data(σbet))`). Both `lemma_map_a_forward` and `lemma_pa_data_isomorphic`
+  are currently tied to `betas(alphas)` (via `recog_data`/`h2_II`'s own alphas) — R4 = **generalize them
+  to an arbitrary number-word, no-dup index set `S ⊆ alphas`** (so `h2_II` carries family-II over `S`),
+  then instantiate at `S = σbet`. This forces `σbet ⊆ alphas` = the **bounded-orbit alphas (R6)**: alphas
+  must contain `betas(alphas) ∪ σ(betas(alphas)) ∪ …` up to the needed depth (FINITE for a fixed
+  instance — the satisfiable replacement for `sigma_sat_upto`).
 - **R4 — map_b forward** over the two index sets (map_a fwd both, M1, M2).
 - **R5 — the crux** `lemma_phi_l_iso_at_h2II`: the association iso over a base carrying family-II for
   `bet ∪ σbet`. New side condition `σbet ⊆ alphas` (satisfiable).

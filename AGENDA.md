@@ -427,12 +427,15 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       pinch-descent middle natively in `⟨pa_rhs_emb(σbet)⟩` (intersection property, NO reflection — obviates
       (a)), and `alphas` = the BOUNDED σ-orbit (finite, satisfiable). Coupled multi-module cascade R1–R7
       (`docs/brick5-c4-plan.md` §4); bottleneck = R2 (rewrite the cross-index pinch-descent).
-      **R1 DONE 2026-06-22** (`phi_l_mapb_fwd.rs` 12/0, `lemma_phi_l_src_on_pa_relator_retarget` — von-Dyck
-      automatic, no fwdsat; old self-endo kept, parallel chain). **NEXT = C4 R2–R7** (R2 = retarget
-      `lemma_mapb_pinch_descends`/`_spanning` cross-index; the spanning middle is natively in `⟨col(σbet)⟩`
-      so `lemma_intersection_property` replaces the (R)/(R)_b reflections directly — SIMPLER, no saturation.
-      Then R3 cross-index M2, R4 map_b fwd, R5 crux, R6 `h3_II` bounded-orbit alphas, R7 instantiation) /
-      C2 / C5.**
+      **R1+R2+R3 DONE 2026-06-22** (`phi_l_mapb_fwd.rs` 17/0): the cross-index Britton-peel injectivity
+      `φ_l_src: P_A(bet)↪P_A(σbet)` is COMPLETE, NO σ-saturation — the bottleneck is CRACKED. R1
+      `lemma_phi_l_src_on_pa_relator_retarget` (von-Dyck automatic); R2 `lemma_{pa_rhs,config}_reflect_intersection`
+      (σbet→bet via intersection property, replaces (R)/(R)_b) + `lemma_mapb_pinch_spanning_rt` +
+      `lemma_mapb_pinch_descends_rt`; R3 `lemma_mapb_M2_rt`. Old self-endo chain kept (parallel; swap at R5/R6).
+      **NEXT = C4 R4** (retargeted map_b fwd = the index-set-GENERALIZATION layer: `lemma_map_a_forward` gives
+      P_A(betas(alphas)) but M2_rt wants P_A(σbet) ⟹ generalize `lemma_map_a_forward` + `lemma_pa_data_isomorphic`
+      to arbitrary number-word no-dup S⊆alphas, instantiate at S=σbet ⟹ σbet⊆alphas = R6 bounded-orbit alphas)
+      → R5 crux → R6 `h3_II` bounded-orbit alphas → R7 instantiation / C2 / C5.**
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).
