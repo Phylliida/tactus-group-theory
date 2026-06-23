@@ -38,7 +38,7 @@ use crate::f_free_a1::{betas, lemma_betas_index};
 use crate::r_prime::{sigma_backsat, lemma_config_reflect_full, lemma_config_word_valid2};
 use crate::r_prime_b::{pa_rhs_emb, sigma_fwdsat, lemma_pa_rhs_reflect_full, lemma_phi_F_on_pa_rhs};
 use crate::free_basis::config_emb;
-use crate::word_numbering::numbers_word;
+use crate::word_numbering::{numbers_word, lemma_div_mod_step};
 use crate::presentation::{equiv_in_presentation, presentation_valid, lemma_equiv_transitive,
     lemma_equiv_symmetric};
 use crate::presentation_lemmas::lemma_relator_is_identity;
@@ -502,6 +502,140 @@ pub proof fn lemma_phi_l_src_on_pa_relator(mm: ModMachine, n: nat, m: nat, l: na
     assert(hnn_presentation(pd).relators[k] == hnn_relators(pd)[k]);
     assert(hnn_relators(pd)[k] == hnn_relator(pd, k));
     lemma_relator_is_identity(hnn_presentation(pd), k);
+}
+
+// ----------------------------------------------------------------------------
+// R1 (C4 retargeting, docs/brick5-c4-plan.md §4) — the von-Dyck WITHOUT forward-saturation.
+//
+// The self-endo `lemma_phi_l_src_on_pa_relator` (above) needs `σγ ∈ bet` (forward-saturation,
+// unsatisfiable for finite `bet`).  The fix is to RETARGET: `φ_l_src` maps the j-th `pa_data(bet)`
+// relator to the j-th `pa_data(σbet)` relator (σbet = sigma_betas(bet,m,l)), which is `≡ ε` in
+// `P_A(σbet)` AUTOMATICALLY — `σbet[j] = m·bet[j]+l` is in `σbet` by construction, no saturation.
+// ----------------------------------------------------------------------------
+
+/// `σ_l(β) = m·β + l` (append base-m digit `l ∈ [1,2n]`) preserves number-word-ness.
+pub proof fn lemma_sigma_numbers_word(n: nat, m: nat, l: nat, beta: nat)
+    requires
+        numbers_word(n, m, beta),
+        1 <= l <= 2 * n,
+        2 * n < m,
+    ensures
+        numbers_word(n, m, (m * beta + l) as nat),
+{
+    let sg = (m * beta + l) as nat;
+    assert(m * beta == beta * m) by (nonlinear_arith);
+    assert(sg == (beta * m + l) as nat);
+    lemma_div_mod_step(beta, m, l);                 // (beta*m+l)/m == beta, %m == l
+    assert(m > 1);
+    assert(sg >= l && sg != 0);
+    assert(sg % m == l && sg / m == beta);
+    assert(1 <= (sg % m) <= 2 * n);
+    assert(numbers_word(n, m, sg));                 // unfold one step (open spec fn)
+}
+
+/// **`sigma_betas(bet,m,l)` entries are number words** (each `σ(bet[i]) = m·bet[i]+l`).
+pub proof fn lemma_sigma_betas_numbers_word(n: nat, m: nat, l: nat, bet: Seq<nat>)
+    requires
+        1 <= l <= 2 * n,
+        2 * n < m,
+        forall|i: int| 0 <= i < bet.len() ==> numbers_word(n, m, #[trigger] bet[i]),
+    ensures
+        forall|i: int| 0 <= i < sigma_betas(bet, m, l).len()
+            ==> numbers_word(n, m, #[trigger] sigma_betas(bet, m, l)[i]),
+{
+    let sbet = sigma_betas(bet, m, l);
+    assert forall|i: int| 0 <= i < sbet.len() implies numbers_word(n, m, #[trigger] sbet[i]) by {
+        assert(sbet[i] == (m * bet[i] + l) as nat);
+        lemma_sigma_numbers_word(n, m, l, bet[i]);
+    }
+}
+
+/// **R1 — retargeted von-Dyck (no forward-saturation)**: `φ_l_src(j-th pa_data(bet) relator) ≡ ε` in
+/// `P_A(σbet)`.  Mirrors `lemma_phi_l_src_on_pa_relator`'s computation `emb(src, hr) = σγ-relator form`,
+/// then identifies it as the j-th `pa_data(σbet)` relator (`σbet[j] = σγ`) — a LITERAL relator of the
+/// target, ≡ ε by `lemma_relator_is_identity`.
+pub proof fn lemma_phi_l_src_on_pa_relator_retarget(mm: ModMachine, n: nat, m: nat, l: nat,
+    bet: Seq<nat>, j: int)
+    requires
+        1 <= l <= 2 * n,
+        2 * n < m,
+        forall|i: int| 0 <= i < bet.len() ==> numbers_word(n, m, #[trigger] bet[i]),
+        0 <= j < bet.len(),
+    ensures
+        equiv_in_presentation(hnn_presentation(pa_data(n, m, sigma_betas(bet, m, l))),
+            apply_embedding(phi_l_src(n, m, l), hnn_relator(pa_data(n, m, bet), j)), empty_word()),
+{
+    let sbet = sigma_betas(bet, m, l);
+    let pd = pa_data(n, m, bet);
+    let pdt = pa_data(n, m, sbet);
+    let src = phi_l_src(n, m, l);
+    let pf = phi_F_family(n, m, l);
+    let st = (n + 3) as nat;
+    let gamma = bet[j];
+    let sgamma = (m * gamma + l) as nat;
+    let cfg = config_word(gamma, 0);
+    let rhs = pa_rhs(n, m, gamma);
+
+    lemma_pa_data_shape(n, m, bet);
+    lemma_pa_data_valid(n, m, bet);
+    lemma_phi_l_src_len(n, m, l);
+    assert(pd.associations[j] == (cfg, rhs));
+    assert(word_valid(rhs, st));
+
+    // ---- compute emb(src, hnn_relator(pd, j)) = the σγ-relator form (mirror of the self-endo). ----
+    let av: Word = Seq::new(1, |_q: int| stable_letter_inv(pd));
+    let cv: Word = Seq::new(1, |_q: int| stable_letter(pd));
+    assert(av =~= seq![Symbol::Inv(st)] && cv =~= seq![Symbol::Gen(st)]);
+    let hr = hnn_relator(pd, j);
+    assert(hr == ((av + cfg) + cv) + inverse_word(rhs));
+    lemma_apply_embedding_concat(src, (av + cfg) + cv, inverse_word(rhs));
+    lemma_apply_embedding_concat(src, av + cfg, cv);
+    lemma_apply_embedding_concat(src, av, cfg);
+    reveal_with_fuel(apply_embedding, 2);
+    assert(src[st as int] == seq![Symbol::Gen(st)]);
+    lemma_concat_empty_right(inverse_word(src[st as int]));
+    assert(apply_embedding(src, av) =~= inverse_word(src[st as int]));
+    assert(inverse_word(src[st as int]) =~= seq![Symbol::Inv(st)]) by { reveal_with_fuel(inverse_word, 2); }
+    lemma_concat_empty_right(src[st as int]);
+    assert(apply_embedding(src, cv) =~= src[st as int]);
+    lemma_config_word_valid2(gamma);
+    lemma_word_valid_mono(cfg, 2, st);
+    assert(pf.len() == n + 3 && src.len() == n + 4);
+    assert forall|i: int| 0 <= i < st implies src[i] == pf[i] by {}
+    lemma_apply_embedding_agree_prefix(src, pf, cfg, st);
+    lemma_phi_F_on_config(mm, n, m, l, gamma);
+    assert(apply_embedding(src, cfg) =~= config_word(sgamma, 0));
+    lemma_apply_embedding_inverse(src, rhs);
+    lemma_apply_embedding_agree_prefix(src, pf, rhs, st);
+    lemma_phi_F_on_pa_rhs(mm, n, m, l, gamma);
+    assert(apply_embedding(src, rhs) =~= pa_rhs(n, m, sgamma));
+    assert(apply_embedding(src, inverse_word(rhs)) =~= inverse_word(pa_rhs(n, m, sgamma)));
+    assert(apply_embedding(src, hr)
+        =~= ((seq![Symbol::Inv(st)] + config_word(sgamma, 0)) + seq![Symbol::Gen(st)])
+            + inverse_word(pa_rhs(n, m, sgamma)));
+
+    // ---- identify the σγ-relator as the j-th relator of the TARGET pa_data(σbet). ----
+    lemma_sigma_betas_numbers_word(n, m, l, bet);
+    lemma_pa_data_shape(n, m, sbet);
+    lemma_pa_data_valid(n, m, sbet);
+    lemma_hnn_presentation_valid(pdt);
+    assert(sbet[j] == sgamma) by { assert(sbet[j] == (m * bet[j] + l) as nat); }
+    assert(pdt.associations[j] == (config_word(sgamma, 0), pa_rhs(n, m, sgamma)));
+    assert(stable_letter(pdt) == Symbol::Gen(st) && stable_letter_inv(pdt) == Symbol::Inv(st));
+    let avk: Word = Seq::new(1, |_q: int| stable_letter_inv(pdt));
+    let cvk: Word = Seq::new(1, |_q: int| stable_letter(pdt));
+    assert(avk =~= seq![Symbol::Inv(st)] && cvk =~= seq![Symbol::Gen(st)]);
+    assert(hnn_relator(pdt, j)
+        == ((avk + config_word(sgamma, 0)) + cvk) + inverse_word(pa_rhs(n, m, sgamma)));
+    assert(apply_embedding(src, hr) =~= hnn_relator(pdt, j));
+
+    // hnn_relator(pdt, j) is relator j of hnn_presentation(pdt) ⟹ ≡ ε.
+    assert(hnn_presentation(pdt).relators =~= hnn_relators(pdt)) by {
+        assert(pdt.base.relators == Seq::<Word>::empty());
+    }
+    assert(hnn_presentation(pdt).relators[j] == hnn_relators(pdt)[j]);
+    assert(hnn_relators(pdt)[j] == hnn_relator(pdt, j));
+    lemma_relator_is_identity(hnn_presentation(pdt), j);
 }
 
 // ----------------------------------------------------------------------------
