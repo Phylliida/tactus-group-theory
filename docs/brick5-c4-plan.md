@@ -133,3 +133,70 @@ The retargeting is the bulk of C4 — a `tower_peel`-sized arc touching `phi_l_m
 `phi_l_iso_tower.rs`, and `h3_ii.rs`. It is the RIGHT design (peer-confirmed: the self-endo framing is
 mathematically impossible for finite index sets; retargeting makes the von-Dyck a triviality). No
 verifier bypasses (standing rule). Lean-backend, `./check.sh --verify-module <name>`.
+
+---
+
+## 7. ⚠ THE FINITE-SLICE IS ALSO UNSATISFIABLE — C3.2 IS VACUOUS (found 2026-06-22, w/ Danielle)
+
+**The R4 retargeting did NOT crack the blocker — it relocated it.** The new `sigma_sat_upto`
+(`backsat` + `finite-slice`, `phi_l_iso_tower.rs`) is **just as unsatisfiable for finite `alphas`** as
+the `sigma_fwdsat` it replaced. So `lemma_phi_l_iso` and `lemma_h3_II_upto_faithful` verify ONLY because
+their hypothesis is a contradiction — they are **vacuous and cannot be instantiated**. C3.2 is NOT done.
+
+### 7.1 The unsatisfiability (machine-checked: `lemma_sigma_sat_upto_unsatisfiable`, `phi_l_iso_unsat.rs` 3/0)
+
+The finite-slice requires, at level `j = 1`, for every `γ ∈ betas(alphas) = [0]++alphas`:
+`m·γ + 1 ∈ alphas`. With `γ = betas[0] = 0` this forces `1 ∈ alphas`; then `γ = 1` forces `m+1 ∈ alphas`;
+then `m²+m+1`, … — a strictly increasing infinite chain into a finite `Seq`. Proof: take `M = max(alphas)`
+(exists, alphas∋1); `M ∈ betas` ⟹ `m·M+1 ∈ alphas`; but `m·M+1 > M = max`. Contradiction. The "bounded
+σ-orbit" idea (§3 consequence 4–5) is **wrong**: only the *backward* (digit-strip) orbit is finite; the
+finite-slice is a *forward* (digit-append) requirement, so it inherits the original infinity.
+
+### 7.2 Root cause — a finite presentation cannot host a universal HNN iso here
+
+`hnn_associations_isomorphic(phi_l_data)` is `∀ww. emb(a_words,ww)≡_base ε ⟺ emb(b_words,ww)≡_base ε`.
+The `⟸`/von-Dyck-backward direction needs `family_II_relator(m·β+l) ≡_base ε` (= `emb(b_words, β-relator)`),
+which the finite base `h3_II` (= `h2_pres` + a FINITE family-(II) slice over `alphas`) derives ONLY when
+`m·β+l ∈ alphas` (`lemma_b_words_relator_trivial` → `lemma_phi_l_relator_equiv_empty`). Since the iso is
+universal over `ww`, it ranges over β-relators for **every** `β` the base covers (all of `alphas`), so it
+needs `σ_l(alphas) ⊆ alphas` — forward-closure — infinite. **Decoupling the source index set from the
+base coverage does NOT help** (the universal `ww` produces relators over all of `alphas`, not just the
+source set). A finite presentation simply cannot carry the full (infinite) family (II); the a-level
+associations are therefore **virtual isos** (true in the *group* `h3_pres`, false in the *base
+presentation*), EXACTLY the situation `brick5-completeness-plan.md` §2.2/§2.3 already names for the
+k-level. **§2.2ter's premise — "a finite family-(II) augmentation makes the a-levels LITERAL isos" — is
+false.**
+
+### 7.3 The reframe (Danielle-confirmed): a-levels get the virtual-iso / Fork-B treatment too
+
+Faithfulness is **per-α** (a fixed `w_α(c)`), whose Britton analysis touches **finitely many** β's. So:
+
+- **Do NOT target the universal `hnn_associations_isomorphic`.** Target a **word-restricted** a-level
+  faithfulness: the iso need only hold for the pinches actually arising in peeling the fixed word.
+- **The R1–R4 directional machinery is REUSABLE** (Danielle: "the correct tool"). `lemma_map_a_forward`,
+  `lemma_map_b_forward_rt`, `lemma_map_*_von_dyck_backward`, and the pinch-descents are real per-direction
+  Britton pieces. What is wrong is ONLY (i) the *universal* packaging `lemma_phi_l_iso_at_h2II` (`∀ww`),
+  and (ii) the `britton_lemma_full`-based tower lift `lemma_h3_II_upto_faithful` (which consumes the
+  universal `hnn_associations_isomorphic`).
+- **Concretely**, the directional lemmas' precondition `∀γ∈betas. σ_l(γ)∈alphas` must be **weakened to
+  the betas the specific `w` touches** (a satisfiable, word-relative finite-slice; `alphas` = bounded
+  σ-orbit of `w`'s betas, which IS finite for a fixed word). Then a word-restricted Britton variant
+  (the same engine Fork-B budgets for the k-level) replaces the universal `britton_lemma_full` so the
+  whole tower (a-levels AND k-level) runs on **one** virtual-iso engine.
+
+### 7.4 Suggested next steps (fresh arc; co-design the engine signature with Danielle)
+
+1. **Pin the word-restricted iso notion** — an analog of `hnn_associations_isomorphic` quantified over a
+   *given finite set of association-words* (or a bound on the config-indices touched), satisfiable by a
+   bounded `alphas`. This is the Fork-B engine's input shape; design it once, use it at every tower level.
+2. **Bounded σ-orbit + satisfiability** — `sigma_orbit(D, m, depth)` (D closed under `σ_1..σ_{2n}` up to
+   `depth` applications), prove finite + number-words + the word-relative finite-slice it satisfies. The
+   clean self-contained combinatorial brick; build it first to de-risk.
+3. **Weaken + re-verify the directional lemmas** to the word-relative finite-slice (they already only USE
+   it at the pinches encountered; the `∀γ∈betas` precondition is gratuitously strong).
+4. **Word-restricted tower lift** replacing `lemma_h3_II_upto_faithful`'s `britton_lemma_full` with the
+   virtual-iso engine. Then C3.2 (word-restricted), C2, C4 (k-level), C5 assembly all share it.
+
+**Status:** keep `phi_l_iso_tower.rs` / the R1–R4 modules — they verify and the directional pieces are
+reused. `lemma_phi_l_iso` / `lemma_h3_II_upto_faithful` remain in-tree, **marked vacuous** (their
+hypothesis is `lemma_sigma_sat_upto_unsatisfiable`-refuted); do NOT build on them as written.

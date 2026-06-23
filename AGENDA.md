@@ -407,13 +407,13 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       `lemma_map_b_forward` (= M1 factoring + map_a fwd + M2) + `lemma_phi_l_iso_at_h2II` (C-asm = map_a fwd/bwd
       + map_b fwd/bwd glued through `w≡_{P_A}ε`). Side conds = `sigma_backsat(betas)` + `sigma_fwdsat(betas)`
       (the σ-forward-saturation dual, new); finite-slice for map_b-bwd derived from fwd-sat + l≥1.
-      **C3.2d COMPLETE 2026-06-22 (session 6): `phi_l_iso_tower.rs` 2/0 — C3.2 IS FULLY DONE.** The a-tower
+      **C3.2d (session 6): `phi_l_iso_tower.rs` 2/0 — [⚠ later found VACUOUS, see session-8 block below].** The a-tower
       lift: `lemma_h3_II_upto_faithful` (an h2-word trivial in `h3_II_upto(l)` ⟹ trivial in `h2_II`, a
       `decreases l` faithfulness induction DIRECTLY mirroring `lemma_b_m_upto_faithful`, inline-building the
       per-step iso from the bottom crux + IH-descent + `lemma_h2II_equiv_lifts_to_tower`) + `lemma_phi_l_iso`
       (the C3.2 GOAL: `hnn_associations_isomorphic(phi_l_data(..,l))` at every a-tower level, standalone).
-      `sigma_sat_upto(alphas,m,l)` bundles the per-level σ-saturation side conditions. **C3.2 (the φ_l
-      a-level iso at every tower level) is COMPLETE.**
+      `sigma_sat_upto(alphas,m,l)` bundles the per-level σ-saturation side conditions. **[⚠ `sigma_sat_upto`
+      later proven UNSATISFIABLE ⟹ these isos are vacuous; see the session-8 BLOCKER block below.]**
       **C4 σ-CLOSURE BLOCKER FOUND 2026-06-22 (session 7), `docs/brick5-c4-plan.md`.** The C3.2 side
       condition `sigma_sat_upto` is **UNSATISFIABLE for any finite `alphas`**: it requires `sigma_fwdsat`
       (forward-closure `σ(betas)⊆betas`), and since `betas∋0` and `σ_j(β)=mβ+j` strictly grows (appends a
@@ -432,10 +432,27 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       `lemma_phi_l_src_on_pa_relator_retarget` (von-Dyck automatic); R2 `lemma_{pa_rhs,config}_reflect_intersection`
       (σbet→bet via intersection property, replaces (R)/(R)_b) + `lemma_mapb_pinch_spanning_rt` +
       `lemma_mapb_pinch_descends_rt`; R3 `lemma_mapb_M2_rt`. Old self-endo chain kept (parallel; swap at R5/R6).
-      **NEXT = C4 R4** (retargeted map_b fwd = the index-set-GENERALIZATION layer: `lemma_map_a_forward` gives
-      P_A(betas(alphas)) but M2_rt wants P_A(σbet) ⟹ generalize `lemma_map_a_forward` + `lemma_pa_data_isomorphic`
-      to arbitrary number-word no-dup S⊆alphas, instantiate at S=σbet ⟹ σbet⊆alphas = R6 bounded-orbit alphas)
-      → R5 crux → R6 `h3_II` bounded-orbit alphas → R7 instantiation / C2 / C5.**
+      **R4 DONE 2026-06-22** via a DIFFERENT route than the doc anticipated — the **direct `b_words` Britton
+      peel** `lemma_map_b_forward_rt` (`phi_l_mapb_fwd.rs` 18/0): peel `b_words` directly over `recog_data`(=`h2_II`)
+      composing `lemma_map_a_pinch_descends ∘ lemma_mapb_pinch_descends` (backsat-only), final target `betas(alphas)`,
+      `sigma_fwdsat` eliminated; `sigma_sat_upto` redefined to `backsat + finite-slice (m·γ+l∈alphas)`.
+      **❌ BLOCKER, REOPENED 2026-06-22 (session 8): C3.2 IS VACUOUS — the finite-slice is STILL UNSATISFIABLE.**
+      The R4 redefinition merely RELOCATED the infinity: `sigma_sat_upto`'s finite-slice (`∀γ∈betas. m·γ+1∈alphas`)
+      forces `1→m+1→m²+m+1→…`, an infinite chain into a finite `Seq` (MACHINE-CHECKED:
+      `lemma_sigma_sat_upto_unsatisfiable`, `phi_l_iso_unsat.rs` 3/0). So `lemma_phi_l_iso` /
+      `lemma_h3_II_upto_faithful` are **vacuously verified — C3.2 was NEVER actually done.** Root cause (confirmed
+      w/ Danielle): a finite presentation cannot host the UNIVERSAL HNN iso — the von-Dyck-backward needs
+      `family_II_relator(m·β+l)≡_base ε` for every β the base covers ⟹ `σ_l(alphas)⊆alphas` ⟹ infinite. The
+      a-level associations are **virtual isos** (true in the group `h3_pres`, false in the base presentation), the
+      SAME situation as the k-level — so **§2.2ter ("finite family-(II) makes a-levels LITERAL isos") is FALSE.**
+      **REFRAME (Danielle-confirmed, `docs/brick5-c4-plan.md` §7): a-levels get the word-restricted virtual-iso /
+      Fork-B treatment too; the R1–R4 directional machinery (map_a/map_b fwd+bwd, pinch-descents) is REUSABLE —
+      only the universal-iso packaging (`lemma_phi_l_iso_at_h2II` ∀ww) + the `britton_lemma_full` tower lift are
+      wrong.** **NEXT = a fresh C-reframe arc** (co-design engine sig w/ Danielle): (1) pin the word-restricted iso
+      notion (quantified over a given finite set of association-words) = the Fork-B engine input for the WHOLE tower;
+      (2) bounded σ-orbit `sigma_orbit(D,m,depth)` + its word-relative finite-slice (finite, satisfiable — build
+      first to de-risk); (3) weaken+re-verify the directional lemmas to the word-relative slice; (4) word-restricted
+      tower lift replacing `britton_lemma_full`. Then C3.2 (word-restricted), C2, C4 (k-level), C5 share one engine.
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).
