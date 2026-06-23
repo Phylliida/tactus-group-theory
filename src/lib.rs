@@ -93,6 +93,12 @@ pub mod higman_operations;
 #[cfg(verus_keep_ghost)]
 pub mod free_word_problem;
 
+// conj_free: Layer 0.5 crux (Miller §4.1) — `{a⁻ⁱbaⁱ}` free in F₂. The counting infra (`count1`,
+// `lemma_count1_emb`: count1(φ(w)) = |w|) + family defs; the core "central b survives" is the
+// remaining work (blueprint plan).
+#[cfg(verus_keep_ghost)]
+pub mod conj_free;
+
 #[cfg(verus_keep_ghost)]
 pub mod tietze;
 
