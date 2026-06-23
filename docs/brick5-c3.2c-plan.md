@@ -563,7 +563,18 @@ the eventual C4 side-condition need the saturation hypothesis threaded through.
 - C-asm `lemma_phi_l_iso_at_h2II` = map_a (DONE) + map_b (von-Dyck DONE + forward) chained through `w ≡_{P_A} ε`.
 - C3.2d outer induction → C2/C4/C5.
 
-## 7. (R') — the canw index-tracking core (ARCHITECTURE LOCKED, session 5, companion-validated)
+## 7. (R') — the canw index-tracking core ✅ **COMPLETE (session 5, `r_prime.rs` ~52 fns / 0 errors)**
+
+**ALL steps below are implemented and verified.**  Headline `lemma_r_prime` (the §7 assembly) +
+`lemma_config_reflect_full` (= (R), composes (R') with the DONE `lemma_config_reflect_a`).  The
+σ-backward-saturation side condition is `sigma_backsat(bet,m,l)`.  This closes the lone remaining hole
+of map_b forward's M2 step case — (R) is now the M2 pinch-middle consumable.  Verified pieces:
+`lemma_phi_canon_invariant` (CENTERPIECE coordinate-tracking), `lemma_phi_canon_acc_coords` (cong_l),
+`lemma_sat_bridge`, `lemma_gexp1_canw_zero`, `lemma_retraction` (kill_db), `lemma_membership_to_canon`,
+`lemma_free_to_base_A`, `lemma_coords_in_sigma`, `lemma_free_cw_reduce_eval` (kill_y),
+`lemma_canw_in_config_subgroup`, `lemma_r_prime`, `lemma_config_reflect_full`.
+
+### Original architecture (for reference — all realized as above)
 
 **Goal** (`r_prime.rs`, NEW module).  With σ-backward-saturation `∀β. (mβ+l)∈bet ⟹ β∈bet`:
 > **(R')**: `emb(φ_F, u) ∈ ⟨config_emb(bet)⟩_{free(n+3)} ⟹ emb(φ_F, u) ∈ ⟨config_emb(σ(bet))⟩_{free(n+3)}`,

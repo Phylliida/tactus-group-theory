@@ -383,11 +383,23 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       the piece the template's trivial-assoc case didn't need); and the `decreases stable_count` induction
       assembling britton_lemma_full + pinch-descent + pinch-out + emb-respects. **With the von-Dyck backward,
       map_a is a FAITHFUL embedding P_A↔h2_II (both directions).**
-      **NEXT** (§5 checklist): **map_b forward** = ψ_a-faithful + **φ_l-injective-on-FREE-F** (a fresh
-      `lemma_psi_A_injective`-style scaling peel over the FREE group F — cleaner, no machine relators; `map_b=ψ_a∘φ_l`)
-      → **C-asm** (`lemma_phi_l_iso_at_h2II`: the crux biconditional `emb(a_words,w)≡ε ⟺ emb(b_words,w)≡ε` from
-      map_a both + map_b both, through `w≡_{P_A}ε`) → **C3.2d** (`decreases l` outer induction, mirror
-      `lemma_b_m_upto_faithful`) → C2/C4/C5.
+      **MAP_B FORWARD — (R') THE INDEX-TRACKING CORE COMPLETE 2026-06-22 (session 5, `r_prime.rs` ~52/0).**
+      `lemma_r_prime` + `lemma_config_reflect_full` (= (R)): under σ-backward-saturation `sigma_backsat(bet,m,l)`
+      (`∀b. (mβ+l)∈bet ⟹ β∈bet` — without it (R') is FALSE, §6 counterexample), `emb(φ_F,u)∈⟨config(bet)⟩ ⟹
+      u∈⟨config(bet)⟩`.  This was THE hardest remaining piece (agenda: 'the irreducible index-tracking core ≈ the
+      Layer-1 t-freeness/config-injectivity arc').  Architecture (`docs/brick5-c3.2c-plan.md` §7, companion-validated):
+      kill_db retraction `G≡emb(φ',u)` → **CENTERPIECE coordinate-tracking** `lemma_phi_canon_invariant`
+      (`x^{mE}·emb(φ',u) ≡ canw_eval(phi_canon_acc(u,E))·x^{m(E+xexp)}`, every config coord `≡ l (mod m)` =
+      `cong_l`) → xexp=0 (gexp) → free→base_A → coord-restrict (reuse Layer-1 `lemma_tfree_coord_restrict`) +
+      `lemma_sat_bridge` (coords ⊆ bet∩σ(ℤ) ⊆ σ(bet)) → free cw_reduce eval (kill_y retraction of base_A
+      `lemma_cw_reduce_eval`) → reconstruction (`gsconfig` power-in-subgroup recursion).  Reused config_reduce's
+      coordinate-SURVIVAL crux (no full normal-form uniqueness needed).
+      **NEXT** (§5/§6 checklists): wire (R) into **M2 step case** (Britton-peel `emb(φ_l_src,w)` over `pa_data`,
+      `decreases stable_count`: base case = φ_F-injective-on-free-F = DONE `lemma_phi_F_family_free`; step case
+      pinch-middle now closes via `lemma_config_reflect_full`) → **map_b forward** (`emb(b_words,w)≡_{h2_II}ε ⟹
+      w≡_{P_A}ε`, via M1 factoring DONE + map_a forward DONE + M2) → **C-asm** (`lemma_phi_l_iso_at_h2II`: crux
+      biconditional from map_a both + map_b both through `w≡_{P_A}ε`) → **C3.2d** (`decreases l` outer induction)
+      → C2/C4/C5.  **C4 must pick the finite `alphas` σ-CLOSED (both directions) to satisfy `sigma_backsat`.**
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).
