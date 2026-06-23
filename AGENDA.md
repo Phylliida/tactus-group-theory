@@ -361,15 +361,33 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       (`φ_l(relator(β))≡_{h2_II}ε` when mβ+l∈alphas) + `lemma_family_II_relator_in_h2_II`. **ASSOCIATION-PRESERVATION DONE** (`phi_l_maps.rs` 10/0, +3 commits): `lemma_a_words_relabel_wc` (the
       `w_c`-relabel b-block-shift induction = the hard atom) + `lemma_a_words_fixes_config` (a-column) +
       `lemma_a_words_on_pa_rhs` (b-column → `family_II_rhs`); full map `a_words=a_words_F.push([p])` defined.
-      **NEXT** (§5 checklist): **von-Dyck backwards** (remaining wiring: `hnn_relator` assembly `ae(a_words,
-      hnn_relator(pa_data,j))=~=family_II_relator(γ)` + `family_II_relator(0)≡_{h2_II}ε` β=0 case +
-      `lemma_emb_respects_source_equiv`) → **C-lift forward**
-      (the BOTTLENECK = deep Britton-peel, mirror `lemma_psi_A_injective`+`lemma_psi_A_pinch_descends`; base case via
-      B4+ψ-faithful+`lemma_base_embeds_in_hnn`, step via `britton_lemma_full`+pinch-descent; **intersection property**
-      `ψ(F)∩AssocSub(h2_II)=ψ(AssocSub(P_A))` is the real content in the spanning case; GENERIC reusable helpers
-      `lemma_strip_prefix_preserves_pinch`/`_prepend_preserves_pinch`/`lemma_base_embeds_in_hnn` confirmed; **map_b
-      faithful = ψ_a faithful + φ_l-injective-on-FREE-F**, a real simplification since map_b=ψ_a∘φ_l and φ_l-injectivity
-      over free F avoids the K_M machine relators) → C-asm → C3.2d → C2/C4/C5.
+      **VON-DYCK BACKWARDS COMPLETE 2026-06-22 (session 3)** (`phi_l_lift.rs` 5/0): generic
+      `lemma_pa_von_dyck_backward` (P_A's free base ⟹ `src.relators` = the p-conjugation `hnn_relator`s ⟹
+      `lemma_emb_respects_source_equiv` discharges the homomorphism condition) + both maps:
+      `lemma_map_a_von_dyck_backward` (`lemma_a_words_on_hnn_relator` goal-i + `lemma_family_II_relator_head_in_h2_II`
+      β=0 head) and `lemma_map_b_von_dyck_backward` (via B1.5 bridge + C-b relator core, finite-slice side
+      condition `{l}∪{mα+l}⊆alphas`). `lemma_a_words_is_phi_col0` bridges `a_words` to `phi_assoc`'s `.0` column.
+      **MAP_A FORWARD (FAITHFUL) COMPLETE 2026-06-22 (session 3) — THE BOTTLENECK CRACKED.** `lemma_map_a_forward`
+      (`phi_l_pinch.rs` 16/0): `emb(a_words,w)≡_{h2_II}ε ⟹ w≡_{P_A}ε`, the Britton-peel injectivity. **KEY
+      SIMPLIFICATION (peer-confirmed):** `a_words` maps every gen to a SINGLE gen (relabeling ρ), so it is
+      length-preserving ⟹ the pinch-descent is SAME-INDEX (no template spanning/run analysis). Built bottom-up
+      across `phi_l_forward.rs` (10/0, generic leaves) + `phi_l_pinch.rs` (16/0, map_a assembly):
+      F1 `lemma_free_family_injective` (free family ⟹ injective on equiv) + F3 `lemma_apply_embedding_concat_all`
+      + `lemma_cancel_inverse_to_equiv`; F2 `lemma_single_gen_relabel` (+ `_subrange`) + `lemma_a_words_relabel_sym`
+      (ρ sends P_A stable Gen(n+3)↔recog stable Gen(p_idx), F-gens→non-stable); **F4 `lemma_intersection_property`**
+      (the heart: ψ(u)∈⟨recog_gens=compose(ψ,pa_gens)⟩ ⟹ u∈⟨pa_gens⟩, via `lemma_subgroup_to_k_word` pullback +
+      compose + injectivity — the deep pullback machinery already existed); the `a_words`/`a_words_F` bridge +
+      column correspondence (`lemma_a_col/b_col_correspondence`: recog cols = `a_words_F`-images of pa cols over
+      betas); per-side `lemma_middle_descent_a/_b`; `lemma_map_a_pinch_descends` (same-index); **generic
+      `lemma_pd_pinch_out`** (non-trivial-association pinch-out via `lemma_stable_conj_factorization`/`_rev` —
+      the piece the template's trivial-assoc case didn't need); and the `decreases stable_count` induction
+      assembling britton_lemma_full + pinch-descent + pinch-out + emb-respects. **With the von-Dyck backward,
+      map_a is a FAITHFUL embedding P_A↔h2_II (both directions).**
+      **NEXT** (§5 checklist): **map_b forward** = ψ_a-faithful + **φ_l-injective-on-FREE-F** (a fresh
+      `lemma_psi_A_injective`-style scaling peel over the FREE group F — cleaner, no machine relators; `map_b=ψ_a∘φ_l`)
+      → **C-asm** (`lemma_phi_l_iso_at_h2II`: the crux biconditional `emb(a_words,w)≡ε ⟺ emb(b_words,w)≡ε` from
+      map_a both + map_b both, through `w≡_{P_A}ε`) → **C3.2d** (`decreases l` outer induction, mirror
+      `lemma_b_m_upto_faithful`) → C2/C4/C5.
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).

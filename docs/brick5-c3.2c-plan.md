@@ -412,7 +412,25 @@ Proof = the Britton-peel induction on `w.len()` (mirror `lemma_psi_A_injective`)
     For **map_b**: the b-side column translations are the C-b word cores (`lemma_phi_l_on_family_II_rhs` etc.,
     DONE); the relator triviality is the C-b group lift (`lemma_phi_l_relator_equiv_empty`, DONE) `≡_{h2_II} ε`
     when `m·γ+l ∈ alphas`.
-- [ ] **C-lift forward — the unified HNN lifting lemma** (the deep Britton-peel, the BOTTLENECK). Mirror
+- [x] **von-Dyck backwards — DONE** (2026-06-22, session 3, `phi_l_lift.rs` 5/0). Generic
+  `lemma_pa_von_dyck_backward` (P_A free base ⟹ relators = the p-conjugations ⟹ `lemma_emb_respects_source_equiv`)
+  + `lemma_map_a_von_dyck_backward` (goal-i `lemma_a_words_on_hnn_relator` + β=0 head `lemma_family_II_relator_head_in_h2_II`)
+  + `lemma_map_b_von_dyck_backward` (B1.5 bridge + C-b relator core, finite-slice `{l}∪{mα+l}⊆alphas`). `b_words` =
+  the `.1` column; `lemma_a_words_is_phi_col0` bridges `a_words` to the `.0` column.
+- [x] **C-lift forward (map_a) — DONE 2026-06-22 (session 3) — THE BOTTLENECK CRACKED.** `lemma_map_a_forward`
+  (`phi_l_pinch.rs` 16/0). **KEY SIMPLIFICATION:** `a_words` maps every gen to a SINGLE gen (a relabeling), so it is
+  length-preserving ⟹ the pinch-descent is SAME-INDEX — no spanning/run analysis. Bottom-up: `phi_l_forward.rs` (10/0)
+  generic leaves (F1 `lemma_free_family_injective`, F3 `lemma_apply_embedding_concat_all`, `lemma_cancel_inverse_to_equiv`,
+  F2 `lemma_single_gen_relabel`/`_subrange`, `lemma_a_words_relabel_sym`, **F4 `lemma_intersection_property`** = the heart,
+  via `lemma_subgroup_to_k_word`+compose+injectivity); `phi_l_pinch.rs` (16/0) the map_a assembly (a_words/a_words_F bridge,
+  `lemma_a_col/b_col_correspondence`, `lemma_middle_descent_a/_b`, `lemma_map_a_pinch_descends`, **generic
+  `lemma_pd_pinch_out`** via `lemma_stable_conj_factorization`/`_rev`, and the `decreases stable_count` injectivity peel).
+  **map_a is now FAITHFUL P_A↔h2_II (both directions).**
+- [ ] **C-lift forward (map_b)** = ψ_a-faithful + **φ_l-injective-on-FREE-F** (`map_b=ψ_a∘φ_l`; the φ_l-injectivity is a
+  fresh `lemma_psi_A_injective`-style scaling peel over the FREE group F — cleaner, no machine relators). Then `emb(b_words,w)
+  ≡_{h2_II}ε ⟹ (ψ_a faithful = map_a forward) φ_l(w)≡_{?} ... ⟹ (φ_l inj on free F) w≡_{P_A}ε`. *(Original generic-lifting
+  note retained below for reference.)*
+- [ ] **(reference) the unified HNN lifting lemma** (the deep Britton-peel, the BOTTLENECK). Mirror
   `lemma_psi_A_injective` (`machine_group.rs:6265`) + `lemma_psi_A_pinch_descends` (`:5893`):
   `emb(map,w) ≡_{h2_II} ε ⟹ w ≡_{P_A} ε`, `decreases w.len()`.  Recognize `h2_II = hnn_presentation(recog_data)`
   (B1), peel `p`-stable letters.  **Base case** (`stable_count(pa_data,w)==0`, w an F-word): `emb(ψ,w)≡_{h2_II}ε`
