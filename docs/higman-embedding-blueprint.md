@@ -119,8 +119,35 @@ generated**. So:
      representation-independent (pure `F₂`), but is a fresh from-scratch normal-form arc: the existing
      freeness machinery (`f_free.rs`) descends via *structured retractions* and never computes a free
      normal form, so it needs a new `equiv_in_presentation(free_group(n)) ⟺ free-reduction` bridge +
-     the b-survival cancellation analysis. Build only after the infinite-generator representation is
-     decided (the family-image shape depends on it).
+     the b-survival cancellation analysis. The crux is buildable now (representation-independent); the
+     *broader* Layer 0.5 (the `A`/`B` bases over the c's, `L`, `G`) is what waits on the infra decision.
+   - **PROGRESS (2026-06-23) + the executable plan for the crux `{a⁻ⁱbaⁱ}`-free lemma:**
+     - ✅ **The bridge DONE** (`free_word_problem.rs` 4/0, `lemma_free_group_equiv_freely_equivalent`):
+       `equiv_in_presentation(free_group(n), w1, w2) ⟹ freely_equivalent(w1, w2)` (relator-free ⟹ every
+       derivation step is a free reduction/expansion). The missing converse of
+       `lemma_freely_equivalent_implies_equiv`.
+     - **NEXT — the `{a⁻ⁱbaⁱ}`-free lemma** `is_free_family(free_group(2), conj_family(K))` where
+       `conj_word(i) = symbol_power(Inv(0),i) ++ [Gen(1)] ++ symbol_power(Gen(0),i)` (a=Gen0, b=Gen1).
+       Architecture for the forward obligation (build bottom-up; each sub-lemma verifies independently
+       so partial progress banks cleanly):
+       1. `w' = normal_form(w)` over `K` letters (`lemma_reduces_to_normal_form` / `_is_reduced`);
+          `equiv(free_group(K), w, w')` via `lemma_reduces_to_equiv`. Goal ⟸ `w' = ε`.
+       2. φ respects source equiv: `equiv(free_group(K), w, w') ⟹ equiv(free_group(2), φ(w), φ(w'))`
+          via `lemma_emb_respects_source_equiv` (machine_group.rs) — relator condition VACUOUS for a
+          free source. With the hypothesis `equiv(free_group(2), φ(w), ε)` ⟹ `equiv(·, φ(w'), ε)`.
+       3. Bridge (done) ⟹ `freely_equivalent(φ(w'), ε)` ⟹ `reduces_to(φ(w'), ε)` (ε is reduced) ⟹
+          `normal_form(φ(w')) = ε` (`lemma_reduces_to_reduced_unique`).
+       4. **THE CORE (B)** — `w'` reduced (`is_reduced`) ∧ `|w'|>0` ⟹ `normal_form(φ(w')) ≠ ε`,
+          contradicting 3 ⟹ `w' = ε`. **(B) is the real work** — the "central b survives" cancellation.
+          Two routes (both ~200–400 lines of `reduce_at`/`subrange` surgery):
+          • **spelled-form**: define `R(w') = a⁻ⁱ¹bᵉ¹a^(i₁−i₂)bᵉ²…bᵉⁿaⁱⁿ` (signed a-powers, recursive);
+            prove `φ(w') reduces_to R(w')` (each `aⁱᵏa⁻ⁱᵏ⁺¹` junction cancels — induction), then `R(w')`
+            `is_reduced` (a-blocks same-sign; empty-a junctions force same-sign b's since `w'` reduced)
+            and `|R(w')|>0` (leftmost `bᵉ¹` survives); conclude via `lemma_reduces_to_reduced_unique`.
+          • **count_b invariant**: `count_b(φ(w')) = |w'|` and free reduction of a φ-image never cancels
+            a b (opposite-sign b's never become adjacent — `w'` reduced rules out the only way), so
+            `count_b(normal_form(φ(w'))) = |w'| > 0`. Slicker counter, but the "never cancels a b"
+            invariant still needs the structural argument. Spelled-form is more explicit/likely easier.
 3. **Layer 2** — `H₁` (direct product), `H₂` (HNN, stable letter `p`), `H₃` (HNN, stable letters
    `a_i, k`); prove `C ↪ H₃` and `H₃` f.p. with relations (I). Re-read book p.279–281 (PDF 284–286)
    for the precise `A/A_i/A₊/A₋` generators and associations.
