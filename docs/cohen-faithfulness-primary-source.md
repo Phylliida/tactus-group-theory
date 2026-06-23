@@ -103,13 +103,37 @@ Dyck + endo) — so the "universal iso over an arbitrary derivation" that
   predicate-agnostic** (it acts inside one level's base copy, regardless of *which* base relator);
   only the hnn step uses the iso. So the proof *strategy* generalizes.
 
-### The genuine residual risk (the gating unknown)
-The **mechanical cost**: re-proving / generalizing `britton_via_tower` (8.7k lines) +
-`normal_form_afp_textbook` (12.4k lines) so the base is a predicate presentation. The math is
-agnostic to finiteness, but the *existing formalization* may have finiteness baked into the AFP
-normal-form mechanics — chiefly **how `shift`/the tower materializes a finite relator `Seq` per
-level**, and any spot that enumerates `base.relators`. **This is the one thing a prototype must
-check before committing the full build.**
+### The genuine residual risk (the gating unknown) — now CODE-LEVEL CONFIRMED
+The **mechanical cost**: re-deriving `britton_via_tower` (8.7k lines) + `normal_form_afp_textbook`
+(12.4k lines) so the base is a predicate presentation. **I checked how the machinery consumes
+`base.relators`, and it is index/`Seq`-based throughout, NOT membership-based:**
+- `data.base.relators.len()` (enumerate count) and `data.base.relators[r]` (index a specific
+  relator) — `britton_via_tower.rs:282, 309–311, 1273, 1419, 1503`.
+- the AFP free-product **builds** its relator list as `fp.relators = p1.relators ++
+  shift(p2.relators)`, indexed by position (`k < p1.relators.len()` vs `k - p1.relators.len()`) —
+  `amalgamated_free_product.rs:161–175`.
+- the tower materializes each level as `shift_word(data.base.relators[r], k·ng)` over `r <
+  base.relators.len()`.
+
+**Verdict: a predicate base is NOT a parameter swap — it is a re-architecture.** Conceptually it is
+clean (the base relators enter ONLY as `{ shift_word(w, k·ng) : P(w) }` = a shifted predicate, and
+the tower depth is finite, so the tower's relator set is a finite union of shifted base-predicates +
+finite junction relators). But mechanically, **every `relators[i]` / `relators.len()` site (dozens,
+across the 21k lines) must be rewritten to predicate-membership form.** Keeping `PredPresentation`
+*separate* from the finite `Presentation` protects the existing tower from regression but does NOT
+save the proof cost — you re-derive the tower over the predicate. This matches the re-evaluation's
+caution ("may be the bulk of the work") and is the honest cost of Fork-A. *(It is still far better
+than Fork-B, whose core is undesigned new math — here the math is standard, only the labor is large.)*
+
+### The finite-core escape hatch is a CONFIRMED dead end
+One might hope to dodge predicate-Britton: `h3_pres` (FINITE) literally *is*
+`HNN(H₂_fin, aᵢ, k | finite associations)` where `H₂_fin` = `h3_pres` minus the `aᵢ`/`k` stable
+letters and their relations (= K_M relations + `bᵢcⱼ=cⱼbᵢ` + `p⁻¹tp=td`, all finite). The EXISTING
+finite britton applies to this directly. **But** base-embeds-in-HNN needs the `aᵢ`/`k` associations
+to be isos *in `H₂_fin`* — and in `H₂_fin` (no family (II)) they are exactly the **"virtual" isos**
+that the C3.2/C4 sessions proved un-establishable (family (II) is a consequence of (I) only *with*
+the `aᵢ` present — circular). So the finite core cannot host the iso; the infinitely-presented `H₂`
+is genuinely required. This is *why* the previous sessions' route failed, restated cleanly.
 
 ---
 
@@ -132,12 +156,23 @@ check before committing the full build.**
    `brick5-fork-reevaluation.md` §2 already argued.
 
 ### Concrete first brick (de-risk #2, non-committing)
-Before the full build: **prototype `PredPresentation` + the predicate-shift, and attempt the
-base-relator case of `lemma_single_step_preserves_syls` over it.** If the base-relator step ports
-cleanly (it should — it's stable-letter-free), and `shift` generalizes to predicates without
-choking on the AFP normal form, scope #2 is answered "tractable" and the full build is justified. If
-the AFP machinery resists the predicate `shift`, that's the real cost signal and a reason to consider
-the lighter "embedding-direction-only" variant.
+The code survey above already shows the AFP/tower is index/`Seq`-based, so the residual question is
+no longer "does it port?" (it doesn't, trivially) but **"how big is the predicate re-derivation, and
+is the lighter embedding-only variant enough?"** The minimal non-committing probe:
+1. Define `PredPresentation { num_generators, relators: spec_fn(Word)->bool }` and
+   `equiv_in_pred_presentation` + predicate-`shift` (`Q_k(v) := P(unshift(v, k·ng))`). Signature
+   only — no proofs.
+2. State (not prove) `britton_pred_embeds`: the base-embeds direction
+   (`w` over base gens, `w ≡ ε` in `hnn_pred_presentation` ⟹ `w ≡ ε` in base) — this is ALL Layer-2
+   faithfulness needs; the full predicate normal form may be unnecessary.
+3. Re-state `lemma_single_step_preserves_syls` over a predicate base and *attempt only its
+   base-relator case* (stable-letter-free ⟹ should be predicate-agnostic). Whether this one case
+   ports cleanly is the cheapest real signal of the re-derivation's tractability.
+
+If (3) ports and (2)'s embedding-only statement looks self-contained, the full Fork-A build is
+justified and scoped. If even (3) drags in the indexed AFP construction, the cost is genuinely
+"re-derive the tower," and the co-design should weigh that against any alternative (e.g. a
+Bass–Serre / action-based base-embeds proof that sidesteps the AFP normal form entirely).
 
 ---
 
