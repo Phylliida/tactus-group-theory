@@ -259,3 +259,10 @@ pub mod phi_l_pinch;
 // φ_l_src injective on P_A. See docs/brick5-c3.2c-plan.md §5.
 #[cfg(verus_keep_ghost)]
 pub mod phi_l_mapb;
+
+// r_prime: Layer 2 / Brick 5, C3.2c / map_b forward — the (R') canw index-tracking core.
+// emb(φ_F,u) ∈ ⟨config_emb(bet)⟩ ⟹ ∈ ⟨config_emb(σ(bet))⟩ (σ(β)=mβ+l), under σ-backward-saturation.
+// The irreducible "Image(φ_F)∩⟨t,x⟩ = config-products with indices ≡ l (mod m)" fact, via canw
+// coordinate-tracking reusing lemma_tfree_coord_restrict. See docs/brick5-c3.2c-plan.md §7.
+#[cfg(verus_keep_ghost)]
+pub mod r_prime;
