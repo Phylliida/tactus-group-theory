@@ -144,13 +144,17 @@ to (residue facts, free basis `lemma_basis_elt_free`, `lemma_theorem1`) is alrea
   back-half is COMPLETE — no `p`-peel, no infinite-association Britton. Reusable atoms: `no_c_word`
   algebra, `lemma_w_c_in_block`, per-class no-c lemmas (`lemma_low_word_no_c`/`_config_word_no_c`/
   `_w_b_no_c`/`_family_ii_no_c`), `lemma_rho_kills_word`/`_fixes_c_word`/`_symbol_c`/`_symbol_noc`.
-- **CS-3 — the tower scaffold. ← NEXT.** `h3_pred_upto(mm,n,m,is_S,l)` (single-letter PredHNN tower,
-  mirror `h3_upto`, base `h2_pred`, level `l` adds `a_l` via `phi_assoc`), `h3_pred` (+k via
-  `psi_assoc`), `hnn_pred_data_valid`/`pred_presentation_valid`/num-gens/stable-letter facts. Reuse
-  `phi_assoc`/`psi_assoc` + their validity (`lemma_phi_assoc_valid`/`lemma_psi_assoc_valid`) verbatim.
-  FA-4-style defs+validity brick (recursion on `l`, low risk).
-- **CS-4 — the a_i iso (§4 §1a).** `hnn_pred_associations_isomorphic` at each a-level. Reduces to
-  the b-augmented residue facts. `tower_peel`-scale.
+- **CS-3 — the tower scaffold. ✅ DONE (`cohen_h3.rs` 7/0, commit d4a7985).** `h3_pred_upto`
+  (single-letter PredHNN tower, base `h2_pred`, level `l` adds `a_l` via `phi_assoc`), `h3_pred_data`
+  (+k via `psi_assoc`), `h3_pred`; num-gens (`lemma_h3_pred_upto_num_generators`/`_num_generators`)
+  + validity (`lemma_h3_pred_level_data_valid` [takes base-validity as hyp to break mutual recursion],
+  `lemma_h3_pred_upto_valid`, `lemma_h3_pred_data_valid` = `hnn_pred_data_valid` for the top,
+  `lemma_h3_pred_valid`). `phi_assoc`/`psi_assoc` + their validity reused verbatim from `h3.rs`.
+- **CS-4 — the a_i iso (§4 §1a). ← NEXT.** `hnn_pred_associations_isomorphic` at each a-level — i.e.
+  for each level `l`, the single-letter datum `PredHNNData{base: h3_pred_upto(l-1), associations:
+  phi_assoc(nk,n,m,l)}`. Reduces (base-faithfulness up the tower) to the iso over `h2_pred`, genuine
+  because `h2_pred` carries family (II); recognition (Prop 1.34) + relabeling (`lemma_w_b_snoc`) +
+  b-augmented residue facts (`prop_v`/`tower_peel`/`ii_subset`). `tower_peel`-scale. THE hard arc.
 - **CS-5 — the k iso (§4 §1b).** von Dyck forward (uses `s_realizes` + `lemma_theorem1`) + c-kill
   endo backward.
 - **CS-6 — assembly.** Britton descent (step 1) ∘ retraction (step 2) ⟹ `lemma_C_faithful`.
