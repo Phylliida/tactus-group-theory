@@ -202,6 +202,17 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > friction), so Fork-A is a **large MECHANICAL port, not a mathematical re-derivation**. The gating
 > unknown narrows to "how many compile-fix cycles does the type-swapped parallel tower take" —
 > measurable by the §4 one-lemma prototype, still gated on Danielle's go/no-go.
+>
+> **HOLD RE-CONFIRMED 2026-06-23 (fresh session, no code touched):** no go/no-go has arrived — latest
+> `MESSAGES_FROM_USER.md` is the 06-22 "follow the textbook, don't reinvent" reminder, which *reinforces*
+> Fork-A but is not a decision. Working tree clean; baseline re-verified GREEN (`conj_free_core` 34/0
+> under the Lean backend, toolchain intact). Surveyed the whole remaining tree: every Layer-2 and
+> Layer-0.5 next-step routes through the SAME reserved foundational decision (the predicate/countable
+> presentation); §3.3's machine reduction is premature + undocumented (an unconfirmed-direction dragon
+> risk per Danielle's standing warning); the §4 prototype *is* the first brick of Fork-A. **Deliberately
+> HELD — did not unilaterally start the gated prototype.** The decision is fully scoped (this block +
+> `cohen-faithfulness-primary-source.md` §3–§7 + `brick5-fork-reevaluation.md`); there is nothing further
+> to recon. Waiting on Danielle's Fork-A go/no-go.
 
 - [ ] **Layer 0.5** — Higman–Neumann–Neumann: embed the (countable, recursively presented) CEER
       group into a **f.g.** recursively presented `C=⟨c₁,…,cₙ;S⟩`. **SOURCE LOCATED 2026-06-23**:
