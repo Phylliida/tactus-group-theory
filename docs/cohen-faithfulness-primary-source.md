@@ -603,9 +603,40 @@ genuinely hand-rewritten. The "68 vs 191" gap was tedium, not difficulty.
 - Plus `lemma_afp_num_gens_pred` (definitional `add_relators_pred` num_generators), replacing the
   finite `lemma_add_relators_num_generators` call sites.
 
-**NEXT = FA-9.** Port the `britton_via_tower` base-embeds direction (`lemma_single_hnn_base_faithful`
-analog) over the predicate base — the LAST normal-form brick. After it, Cohen §1 (recognize
-A/Aᵢ/A₊/A₋ as p-HNN-of-free, read isos off, base-embeds-in-HNN) assembles Layer-2 completeness. The
-FA-8 recipe above should transfer: britton_via_tower is presentation-heavy but the same mechanical
-swap + localized-friction shape is expected. Gating unknown = whether the HNN base-embeds reverse
-direction has its own `.relators[i]`-style index friction beyond the AFP classification.
+**NEXT = FA-9 — now precisely DECOMPOSED (session 16 structural scan).** Port the `britton_via_tower`
+base-embeds direction over the predicate base (main theorem = `britton_lemma_full` @8678, +
+`britton_lemma`/`britton_lemma_unconditional`) — the LAST normal-form brick. After it, Cohen §1
+(recognize A/Aᵢ/A₊/A₋ as p-HNN-of-free, read isos off, base-embeds-in-HNN) assembles Layer-2
+completeness. Scan of the dependency tree:
+
+- **`pred_hnn` ALREADY DONE** (foundation arc, 18 fns): `PredHNNData`, `hnn_relator_pred`,
+  `hnn_pred_presentation`, `lemma_base_embeds_in_pred_hnn`, `lemma_hnn_pred_conjugation`, etc. The HNN
+  layer needs nothing.
+- **`reduction.rs` (889 lines) is FULLY presentation-AGNOSTIC** (0 Presentation/HNNData/AmalgamatedData/
+  equiv refs) ⟹ **REUSE VERBATIM** (`use crate::reduction::*`), NO pred_reduction port.
+- **`Syllable`** already ported (in `pred_normal_form_afp_textbook`).
+- **FA-9a — port `tower.rs` (411 lines, 18 fns) → `pred_tower.rs`** FIRST. Presentation-dependent
+  (15 HNNData, 7 equiv_in_presentation, 2 AmalgamatedData) but **NO `.relators[i]`/`get_relator`/
+  `DerivationStep` index-friction** ⟹ pure mechanical FA-8-recipe type-swap, NO hand-rewrites expected.
+  Deps all in hand (pred_hnn, pred_amalgamated_free_product, pred_normal_form_amalgamated, FA-8). Main
+  theorem `britton_lemma_via_tower` @393; on-path spec fns are the **textbook** variants
+  (`tower_textbook_chain`/`lemma_g0_embeds_in_tower_textbook`). **NUANCE:** tower.rs also carries the
+  **Cayley-path** fns (`tower_cayley_chain`, `tower_h_prereqs_at`, `lemma_g0_embeds_in_tower`) which may
+  depend on the leapfrogged Cayley machinery (no pred analog) — apply the **same Cayley leapfrog**:
+  port only the textbook-chain fns britton actually consumes; drop/skip the Cayley-chain fns. Confirm by
+  tracing which chain `britton_lemma_full` uses before porting.
+- **FA-9b — port `britton_via_tower.rs` (8.7k, 169 proof + 32 spec)** — the big mechanical port,
+  dominant type `HNNData→PredHNNData` (172 refs), reuses reduction verbatim, consumes pred_tower (FA-9a)
+  + pred_hnn + FA-8. Header "key insight": the HNN relator `t⁻¹aᵢt·inv(bᵢ)` at level k ≡ the AFP
+  identification relator at junction (k-1)↔k — i.e. britton BUILDS ON the FA-8 AFP machinery (why FA-8
+  came first). Apply the FA-8 recipe + the FA-9a Cayley leapfrog. Gating unknown (now narrowed):
+  whether the HNN→tower translation has its own `.relators[i]`-style index friction beyond the AFP
+  classification — check `get_relator`/`relator_index`/`DerivationStep` density in britton_via_tower
+  before estimating hand-rewrites.
+
+**Session-16 stop note (honest, not manufactured).** FA-8 — the explicitly-scoped task — is COMPLETE
+(234/0, crate GREEN 2146/20, committed `4341ff7`/`b71aaea`, no regression). Stopped at this seam rather
+than half-opening FA-9a, because FA-9a's first real question (the tower Cayley-path dependency) deserves
+a focused trace, not a session-tail rush — the exact failure mode the session-15 note flagged. The FA-9
+decomposition above is the precise handoff; pred_hnn + reduction-reuse + FA-8 mean FA-9a is a small
+clean brick and FA-9b is the last big one.
