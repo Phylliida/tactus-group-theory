@@ -29,7 +29,20 @@ use crate::phi_l_maps::{a_words, lemma_a_words_fixes_config, lemma_a_words_on_al
 use crate::phi_l_iso::lemma_apply_embedding_fixes;
 use crate::phi_l_lift::b_words;
 use crate::h3::phi_assoc;
-use crate::h3_ii::{compose_embeddings, lemma_apply_embedding_compose, lemma_phi_assoc_index};
+use crate::h3_ii::{compose_embeddings, lemma_apply_embedding_compose, lemma_phi_assoc_index,
+    recog_data};
+use crate::pa_data::{pa_data, lemma_pa_data_valid, lemma_pa_data_shape};
+use crate::phi_l_maps::{a_words_F, lemma_map_a_faithful};
+use crate::phi_l_pinch::{lemma_a_col_correspondence, lemma_b_col_correspondence};
+use crate::f_free_a1::{betas, lemma_betas_index, lemma_recog_associations_isomorphic};
+use crate::phi_l_forward::lemma_free_family_injective;
+use crate::free_basis::lemma_free_to_embedding;
+use crate::h1::{h1_base, lemma_h1_base_valid, lemma_h1_base_num_generators};
+use crate::higman_operations::free_group;
+use crate::hnn::hnn_associations_isomorphic;
+use crate::presentation::equiv_in_presentation;
+use crate::word_numbering::numbers_word;
+use crate::machine_group::mod_machine_wf;
 
 verus! {
 
@@ -263,6 +276,188 @@ proof fn lemma_apply_embedding_compose_eq(f: Seq<Word>, g: Seq<Word>, bw: Seq<Wo
         apply_embedding(compose_embeddings(f, g), w) =~= apply_embedding(bw, w),
 {
     assert(compose_embeddings(f, g) == bw);
+}
+
+// ----------------------------------------------------------------------------
+// pa_data iso — `hnn_associations_isomorphic(pa_data(betas))` over the FREE base.
+// ----------------------------------------------------------------------------
+
+/// **pa_data iso** — `hnn_associations_isomorphic(pa_data(n,m,betas(alphas)))`: for `w` over
+/// `k = |betas|` letters, `emb(pa a-col, w) ≡_{free(n+3)} ε ⟺ emb(pa b-col, w) ≡_{free(n+3)} ε`.
+///
+/// **Clean assembly — NO fresh free-group machinery.**  The column correspondences (`phi_l_pinch`)
+/// give `recog col = compose(a_words_F, pa col)`, `a_words_F` is free in `h1_base` (`map_a` faithful),
+/// and A1 (`lemma_recog_associations_isomorphic`) is the `recog`-iso.  Chain (a-side ⟹ b-side):
+///   `emb(pa a, w) ≡_free ε`
+///     ⟹ (F3 `lemma_free_to_embedding`) `emb(a_words_F, emb(pa a, w)) ≡_{h1} ε`
+///     = (compose) `emb(recog a, w) ≡_{h1} ε`
+///     ⟹ (A1) `emb(recog b, w) ≡_{h1} ε` = `emb(a_words_F, emb(pa b, w)) ≡_{h1} ε`
+///     ⟹ (a_words_F free ⟹ injective, `lemma_free_family_injective`) `emb(pa b, w) ≡_free ε`,
+/// and symmetric.  Needed for the M2 Britton peel (`britton_lemma_full` over `pa_data`).
+pub proof fn lemma_pa_data_isomorphic(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>)
+    requires
+        mod_machine_wf(mm),
+        2 * n < m,
+        !alphas.contains(0nat),
+        alphas.no_duplicates(),
+        forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]),
+    ensures
+        hnn_associations_isomorphic(pa_data(n, m, betas(alphas))),
+{
+    let bet = betas(alphas);
+    let pd = pa_data(n, m, bet);
+    let rd = recog_data(mm, n, m, alphas);
+    let awf = a_words_F(mm, n);
+    let h1 = h1_base(mm, n);
+    let k = pd.associations.len();
+
+    let pa_a = Seq::new(k, |i: int| pd.associations[i].0);
+    let pa_b = Seq::new(k, |i: int| pd.associations[i].1);
+    let rd_a = Seq::new(rd.associations.len(), |i: int| rd.associations[i].0);
+    let rd_b = Seq::new(rd.associations.len(), |i: int| rd.associations[i].1);
+
+    lemma_betas_index(alphas);
+    lemma_pa_data_shape(n, m, bet);                            // pd.base.num == n+3, assoc.len == |bet|
+    assert forall|i: int| 0 <= i < bet.len() implies numbers_word(n, m, #[trigger] bet[i]) by {
+        if i == 0 { assert(bet[0] == 0); } else { assert(bet[i] == alphas[i - 1]); }
+    }
+    lemma_pa_data_valid(n, m, bet);
+    assert(pd.base == free_group((n + 3) as nat));
+    assert(k == bet.len());
+    assert(rd.associations.len() == bet.len());
+
+    lemma_h1_base_valid(mm, n);
+    lemma_h1_base_num_generators(mm, n);
+    lemma_map_a_faithful(mm, n);                               // is_free_family(h1, awf)
+    assert(awf.len() == n + 3);
+    lemma_recog_associations_isomorphic(mm, n, m, alphas);     // A1
+    lemma_a_col_correspondence(mm, n, m, alphas);              // rd_a =~= compose(awf, pa_a)
+    lemma_b_col_correspondence(mm, n, m, alphas);              // rd_b =~= compose(awf, pa_b)
+    assert(rd_a =~= compose_embeddings(awf, pa_a));
+    assert(rd_b =~= compose_embeddings(awf, pa_b));
+
+    // awf images valid over h1's generators (first conjunct of is_free_family).
+    assert forall|i: int| 0 <= i < awf.len() implies word_valid(#[trigger] awf[i], h1.num_generators)
+        by {}
+    // pa columns valid over n+3 (= awf.len()), from pd validity.
+    assert forall|i: int| 0 <= i < k implies (word_valid(#[trigger] pa_a[i], (n + 3) as nat)
+        && word_valid(pa_b[i], (n + 3) as nat)) by {
+        assert(pa_a[i] == pd.associations[i].0);
+        assert(pa_b[i] == pd.associations[i].1);
+    }
+
+    assert forall|w: Word| word_valid(w, k as nat) implies (
+        equiv_in_presentation(pd.base, apply_embedding(pa_a, w), empty_word())
+        <==>
+        equiv_in_presentation(pd.base, apply_embedding(pa_b, w), empty_word())
+    ) by {
+        if equiv_in_presentation(pd.base, apply_embedding(pa_a, w), empty_word()) {
+            lemma_pa_iso_one_dir(mm, n, m, alphas, w, true);
+        }
+        if equiv_in_presentation(pd.base, apply_embedding(pa_b, w), empty_word()) {
+            lemma_pa_iso_one_dir(mm, n, m, alphas, w, false);
+        }
+    }
+}
+
+/// One direction of `lemma_pa_data_isomorphic` (a-side⟹b-side when `fwd`, else b-side⟹a-side).
+/// Factored out so each direction's chain (F3 → compose → A1 → free-family-injective) gets a clean
+/// context.
+proof fn lemma_pa_iso_one_dir(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, w: Word, fwd: bool)
+    requires
+        mod_machine_wf(mm),
+        2 * n < m,
+        !alphas.contains(0nat),
+        alphas.no_duplicates(),
+        forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]),
+        word_valid(w, pa_data(n, m, betas(alphas)).associations.len() as nat),
+        fwd ==> equiv_in_presentation(pa_data(n, m, betas(alphas)).base,
+            apply_embedding(Seq::new(pa_data(n, m, betas(alphas)).associations.len(),
+                |i: int| pa_data(n, m, betas(alphas)).associations[i].0), w), empty_word()),
+        !fwd ==> equiv_in_presentation(pa_data(n, m, betas(alphas)).base,
+            apply_embedding(Seq::new(pa_data(n, m, betas(alphas)).associations.len(),
+                |i: int| pa_data(n, m, betas(alphas)).associations[i].1), w), empty_word()),
+    ensures
+        fwd ==> equiv_in_presentation(pa_data(n, m, betas(alphas)).base,
+            apply_embedding(Seq::new(pa_data(n, m, betas(alphas)).associations.len(),
+                |i: int| pa_data(n, m, betas(alphas)).associations[i].1), w), empty_word()),
+        !fwd ==> equiv_in_presentation(pa_data(n, m, betas(alphas)).base,
+            apply_embedding(Seq::new(pa_data(n, m, betas(alphas)).associations.len(),
+                |i: int| pa_data(n, m, betas(alphas)).associations[i].0), w), empty_word()),
+{
+    let bet = betas(alphas);
+    let pd = pa_data(n, m, bet);
+    let rd = recog_data(mm, n, m, alphas);
+    let awf = a_words_F(mm, n);
+    let h1 = h1_base(mm, n);
+    let k = pd.associations.len();
+    let pa_a = Seq::new(k, |i: int| pd.associations[i].0);
+    let pa_b = Seq::new(k, |i: int| pd.associations[i].1);
+    let rd_a = Seq::new(rd.associations.len(), |i: int| rd.associations[i].0);
+    let rd_b = Seq::new(rd.associations.len(), |i: int| rd.associations[i].1);
+
+    lemma_betas_index(alphas);
+    lemma_pa_data_shape(n, m, bet);
+    assert forall|i: int| 0 <= i < bet.len() implies numbers_word(n, m, #[trigger] bet[i]) by {
+        if i == 0 { assert(bet[0] == 0); } else { assert(bet[i] == alphas[i - 1]); }
+    }
+    lemma_pa_data_valid(n, m, bet);
+    lemma_h1_base_valid(mm, n);
+    lemma_h1_base_num_generators(mm, n);
+    lemma_map_a_faithful(mm, n);
+    lemma_recog_associations_isomorphic(mm, n, m, alphas);
+    lemma_a_col_correspondence(mm, n, m, alphas);
+    lemma_b_col_correspondence(mm, n, m, alphas);
+    assert(rd_a == compose_embeddings(awf, pa_a));
+    assert(rd_b == compose_embeddings(awf, pa_b));
+    assert(awf.len() == n + 3);
+    assert(rd.associations.len() == bet.len() == k);
+    assert(rd.base == h1);
+
+    // awf images valid over h1, pa columns valid over n+3.
+    assert forall|i: int| 0 <= i < awf.len() implies word_valid(#[trigger] awf[i], h1.num_generators)
+        by {}
+    assert forall|i: int| 0 <= i < k implies (word_valid(#[trigger] pa_a[i], awf.len())
+        && word_valid(pa_b[i], awf.len())) by {
+        assert(pa_a[i] == pd.associations[i].0);
+        assert(pa_b[i] == pd.associations[i].1);
+    }
+    // the two embedded products valid over n+3 = awf.len().
+    lemma_apply_embedding_valid(pa_a, w, awf.len());
+    lemma_apply_embedding_valid(pa_b, w, awf.len());
+    assert(pd.base == free_group(awf.len()));                 // free_group(n+3)
+
+    // A1's iff is stated for words over rd.associations.len() == k.
+    assert(word_valid(w, rd.associations.len() as nat));
+
+    if fwd {
+        // emb(pa_a, w) ≡_free ε ⟹ F3 ⟹ emb(awf, emb(pa_a,w)) = emb(rd_a, w) ≡_{h1} ε.
+        lemma_free_to_embedding(awf, h1, apply_embedding(pa_a, w));
+        lemma_apply_embedding_compose(awf, pa_a, w);
+        assert(apply_embedding(awf, apply_embedding(pa_a, w))
+            == apply_embedding(compose_embeddings(awf, pa_a), w));
+        assert(apply_embedding(compose_embeddings(awf, pa_a), w) == apply_embedding(rd_a, w));
+        // A1: emb(rd_a, w) ≡ ε ⟺ emb(rd_b, w) ≡ ε.
+        assert(equiv_in_presentation(h1, apply_embedding(rd_b, w), empty_word()));
+        // emb(rd_b, w) = emb(awf, emb(pa_b, w)).
+        lemma_apply_embedding_compose(awf, pa_b, w);
+        assert(apply_embedding(rd_b, w) == apply_embedding(awf, apply_embedding(pa_b, w)));
+        // injectivity ⟹ emb(pa_b, w) ≡_free ε.
+        lemma_free_family_injective(h1, awf, apply_embedding(pa_b, w), empty_word());
+        assert(apply_embedding(awf, empty_word()) =~= empty_word());
+    } else {
+        // mirror: b-side ⟹ a-side.
+        lemma_free_to_embedding(awf, h1, apply_embedding(pa_b, w));
+        lemma_apply_embedding_compose(awf, pa_b, w);
+        assert(apply_embedding(awf, apply_embedding(pa_b, w))
+            == apply_embedding(compose_embeddings(awf, pa_b), w));
+        assert(apply_embedding(compose_embeddings(awf, pa_b), w) == apply_embedding(rd_b, w));
+        assert(equiv_in_presentation(h1, apply_embedding(rd_a, w), empty_word()));
+        lemma_apply_embedding_compose(awf, pa_a, w);
+        assert(apply_embedding(rd_a, w) == apply_embedding(awf, apply_embedding(pa_a, w)));
+        lemma_free_family_injective(h1, awf, apply_embedding(pa_a, w), empty_word());
+        assert(apply_embedding(awf, empty_word()) =~= empty_word());
+    }
 }
 
 } // verus!
