@@ -256,3 +256,82 @@ Scoping #2 splits into two questions, and 6a–6c **close the first**:
   base-relator case of `lemma_single_step_preserves_syls` — which 6a shows *should* port) remains the
   cheapest way to measure it, and the lighter **embedding-only** variant (§4 step 4 / §4-probe step 2)
   may shrink it. This is the piece to weigh in the co-design.
+
+---
+
+## 7. Critical-path + relator-consumption census (2026-06-23, session 11)
+
+A second read-only pass (no `.rs` touched, peer-reviewed against the local companion model) drilled
+the §6 "STILL OPEN" labor question two levels deeper: (a) the **exact Britton entry point** Layer-2
+faithfulness consumes and what it transitively needs, and (b) **where in the 21k lines the predicate
+change actually lands** vs. ports untouched. Four code-grounded results.
+
+### 7a. The embedding-only hope (§4 step 4) is largely FALSE — the normal form is on the critical path
+Layer-2 faithfulness (`f_free_a1.rs:357`, B4) calls **exactly one** Britton entry point:
+`lemma_single_hnn_base_faithful` (`machine_group.rs:4284`) — base-embeds-in-HNN, the *one* direction
+Cohen's §1 needs. Its body (read in full) routes through three britton_via_tower lemmas:
+`lemma_tower_textbook_chain_from_hnn_iso` (`:2086`), `lemma_hnn_derivation_to_tower_equiv`,
+`lemma_copy_s_embeds` (`:2130`). **All three reach into `normal_form_afp_textbook`:** the chain calls
+`lemma_iso_implies_apc` (action-preserves-canonical) and `copy_s_embeds` calls
+`lemma_afp_injectivity` + `lemma_afp_injectivity_right`. So the embedding direction **rests on the AFP
+normal-form injectivity** — you cannot drop the 12.4k-line normal form and keep base-embeds. *The §4
+"embedding-only may be lighter" optimism is refuted for the normal form itself* (it may still skip the
+two-sided/uniqueness packaging, but the core injectivity is load-bearing). Both files stay on the path.
+
+### 7b. But the predicate change lands on a THIN, localized layer — not the 21k lines of math
+Census of how the two big files touch **base** relators (the thing going predicate):
+| File | indexed `.relators[i]` | `.relators.len()` | abstract `equiv_in_presentation` |
+|---|---|---|---|
+| `normal_form_afp_textbook.rs` (12.4k) | 10 | 5 | **215** |
+| `britton_via_tower.rs` (8.7k) | 32 | 17 | **104** |
+
+The ~319 abstract sites carry the actual normal-form/injectivity **mathematics** and use
+`equiv_in_presentation(base,·,·)` as a **black box**. The 64 indexed/enumeration sites are where a
+predicate base bites — and they **cluster**: in the normal form, ALL 15 sit in a **single** lemma
+(`:6023–6058`, the "is the i-th AFP relator a `p1` relator or a shifted `p2` relator" case-split),
+whose downstream consumer `lemma_g2_relator_acts_trivially` is **word-keyed, not index-keyed**. In the
+tower, the 49 sites spread over **~11 functions, all in the relator-bookkeeping layer**
+(`lemma_base_relator_in_tower`, `lemma_translate_relator_valid`, `lemma_net_level_get_relator`,
+`lemma_relator_insert_preserves`, …) — materialize / translate / validate a relator at a tower level.
+**None of the 64 sites are the injectivity argument itself.**
+
+### 7c. The relator-by-INDEX lookup is localized to ONE spec fn — predicate-ification has a small genuinely-new core
+`DerivationStep::RelatorInsert/Delete { position, relator_index: nat, inverted }` (`presentation.rs:35,37`)
+carries the relator **by index**; the index→word lookup happens **only** inside `apply_step`
+(`:68–78`, via `get_relator(p, idx, inverted)`). Everything above it — `derivation_produces`,
+`derivation_valid`, `equiv_in_presentation`, and the closure lemmas `lemma_equiv_refl` /
+`lemma_equiv_transitive` / `lemma_derivation_concat` (`:124–172`) — is **completely relator-set-agnostic**
+(touches `.relators` zero times; only calls `apply_step`). So the predicate core is small and concrete:
+change the step to carry the **word** guarded by `P(word)`, rewrite `apply_step`, and the entire
+equivalence/derivation algebra ports **verbatim** under `Presentation → PredPresentation`. This is the
+"genuinely-new but bounded" piece — a few hundred lines around `presentation.rs` / `presentation_lemmas.rs`,
+**not** spread through the 21k.
+
+### 7d. The peer's witness/decidability concern is real but CONFINED to relator-introduction sites
+The companion model flagged the sharpest risk: with `relators: spec_fn(Word)->bool`, any proof that
+relied on the solver to *find* a relator must now supply an explicit witness (`word` + `P(word)`).
+**Code check: there are ZERO `choose|r|…relators` / `relators.contains` sites in either 21k-line file.**
+The 319 abstract consumers never name a relator, so they incur **no** witness friction. The friction
+lands **only** where a `RelatorInsert`/`Delete` step is *constructed* (i.e. a proof must say *which*
+relator) — exactly the ~13 bookkeeping functions of 7b plus `lemma_relator_is_identity`
+(`presentation_lemmas.rs:347`). There, "supply the word + `P(word)`" is precisely §6a's "trivial"
+port (the defining closure axiom of a presentation). The peer's **second** caution stands honestly: a
+*separate* parallel predicate tower still has to be made to **compile** — ~21k lines copied with the
+type swapped is real keystroke/compile-fix labor even with **no new proof obligations** beyond 7c's
+core + the 7b bookkeeping rewrites. "Mechanical" ≠ "free."
+
+### Net (sharpens §6, does not overturn it)
+The honest re-estimate of scoping #2's open half: predicate-Britton for the embedding direction is a
+**large mechanical port, not a mathematical re-derivation**. Decomposition:
+1. **Genuinely-new core (small, ~hundreds of lines):** `PredPresentation` + word-carrying
+   `DerivationStep` + `apply_step` + the relator-introduction/`is_identity` axiom. (7c)
+2. **Bounded rewrite (~13 functions):** the relator-bookkeeping layer + the one normal-form
+   enumeration lemma, indexed→predicate-membership. (7b)
+3. **Mechanical type-swap (~319 sites + the injectivity math):** `equiv_in_presentation →
+   equiv_in_pred_presentation`; **no new math**, but real compile-fix labor on a parallel tower. (7b,7d)
+
+The gating unknown narrows to **"how many compile-fix cycles does the type-swapped parallel port take?"**
+— measurable, not open-ended. **Both this session and the peer independently converge on the same
+cheapest probe:** predicate-ify ONE `equiv_in_presentation`-using lemma and watch whether SMT still
+discharges it automatically; if it doesn't, the mechanical estimate is optimistic. This is the §4
+first-brick prototype — still the right first move, **still gated on Danielle's Fork-A go/no-go.**
