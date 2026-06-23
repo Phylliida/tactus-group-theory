@@ -27,9 +27,16 @@ use crate::machine_group::{config_word, symbol_power, signed_power, gsconfig, Ca
     canl_eval, canw_eval, gexp, sym_exp, lemma_signed_power_add, lemma_signed_power_valid,
     lemma_inverse_word_concat, lemma_gexp_concat, lemma_gexp_signed_power};
 use crate::ii_subset::lemma_signed_power_inverse;
-use crate::benign::{apply_embedding, apply_embedding_symbol};
+use crate::benign::{apply_embedding, apply_embedding_symbol, in_generated_subgroup,
+    factors_from_generators, concat_all, is_generator_or_inverse};
 use crate::config_reduce::lemma_canw_eval_concat;
-use crate::phi_l_mapb::sigma_betas;
+use crate::phi_l_mapb::{sigma_betas, phi_F_family};
+use crate::homomorphism::{HomomorphismData, apply_hom, apply_hom_symbol, is_valid_homomorphism,
+    lemma_hom_preserves_equiv};
+use crate::free_basis::{comp_images, lemma_apply_hom_embedding_compose, config_emb};
+use crate::higman_operations::{free_group, lemma_free_group_valid};
+use crate::word_numbering::alphabet_letter;
+use crate::pa_data::pa_b_base;
 
 verus! {
 
@@ -533,6 +540,300 @@ pub proof fn lemma_phi_canon_invariant(p: Presentation, n: nat, m: nat, l: nat, 
         lemma_equiv_transitive(p, lhs, y, z);
         assert(equiv_in_presentation(p, lhs, rhs)) by { assert(z =~= rhs); }
     }
+}
+
+// ----------------------------------------------------------------------------
+// kill_db retraction — π : free(n+3) → free(n+3) killing d, b (gens ≥ 2), fixing t, x.
+// π fixes ⟨config(bet)⟩ (a subgroup of ⟨t,x⟩); π∘φ_F = φ'.  So π(G) ≡ G and π(G) = emb(φ', u).
+// ----------------------------------------------------------------------------
+
+pub open spec fn kill_db(n: nat) -> HomomorphismData {
+    HomomorphismData {
+        source: free_group((n + 3) as nat),
+        target: free_group((n + 3) as nat),
+        generator_images: Seq::new((n + 3) as nat, |i: int|
+            if i == 0 {
+                seq![Symbol::Gen(0)]
+            } else if i == 1 {
+                seq![Symbol::Gen(1)]
+            } else {
+                empty_word()
+            }),
+    }
+}
+
+/// `kill_db` is a valid homomorphism (free target ⟹ the relator condition is vacuous).
+pub proof fn lemma_kill_db_valid(n: nat)
+    ensures
+        is_valid_homomorphism(kill_db(n)),
+{
+    let h = kill_db(n);
+    lemma_free_group_valid((n + 3) as nat);
+    assert(h.generator_images.len() == (n + 3) as nat);
+    assert forall|i: int| 0 <= i < h.generator_images.len()
+        implies word_valid(#[trigger] h.generator_images[i], h.target.num_generators) by {
+        if i == 0 {
+            assert(h.generator_images[0] == seq![Symbol::Gen(0)]);
+        } else if i == 1 {
+            assert(h.generator_images[1] == seq![Symbol::Gen(1)]);
+        } else {
+            assert(h.generator_images[i] == empty_word());
+        }
+    }
+    assert(h.source.relators.len() == 0);   // free group: relator condition vacuous
+}
+
+/// On a symbol over gens {0,1}, `kill_db` is the identity: `apply_hom_symbol(kill_db, s) = [s]`.
+proof fn lemma_kill_db_symbol_low(n: nat, s: Symbol)
+    requires
+        symbol_valid(s, 2),
+    ensures
+        apply_hom_symbol(kill_db(n), s) =~= seq![s],
+{
+    let h = kill_db(n);
+    match s {
+        Symbol::Gen(i) => {
+            assert(i < 2);
+            assert(h.generator_images[i as int] == seq![Symbol::Gen(i)]);
+        },
+        Symbol::Inv(i) => {
+            assert(i < 2);
+            assert(h.generator_images[i as int] == seq![Symbol::Gen(i)]);
+            assert(apply_hom_symbol(h, s) =~= inverse_word(seq![Symbol::Gen(i)]));
+            assert(inverse_word(seq![Symbol::Gen(i)]) =~= seq![Symbol::Inv(i)]) by {
+                reveal_with_fuel(inverse_word, 2);
+            }
+        },
+    }
+}
+
+/// `kill_db` fixes any word over gens {0,1}.
+pub proof fn lemma_kill_db_fixes_low(n: nat, w: Word)
+    requires
+        word_valid(w, 2),
+    ensures
+        apply_hom(kill_db(n), w) =~= w,
+    decreases w.len(),
+{
+    let h = kill_db(n);
+    if w.len() == 0 {
+        assert(apply_hom(h, w) =~= empty_word());
+        assert(w =~= empty_word());
+    } else {
+        let s = w.first();
+        let rest = w.drop_first();
+        assert(symbol_valid(s, 2)) by { assert(w[0] == s); }
+        assert(word_valid(rest, 2)) by {
+            assert forall|k: int| 0 <= k < rest.len() implies symbol_valid(#[trigger] rest[k], 2) by {
+                assert(rest[k] == w[k + 1]);
+            }
+        }
+        lemma_kill_db_symbol_low(n, s);
+        lemma_kill_db_fixes_low(n, rest);
+        assert(apply_hom(h, w) =~= concat(seq![s], rest));
+        assert(w =~= seq![s] + rest);
+    }
+}
+
+/// `config_word(r,0)` is valid over the 2 generators `{t, x}` (the `y`-powers vanish at `s = 0`).
+pub proof fn lemma_config_word_valid2(r: nat)
+    ensures
+        word_valid(config_word(r, 0), 2),
+{
+    lemma_config_word_zero_form(r);   // config_word(r,0) =~= sp(1,-r)+[Gen0]+sp(1,r)
+    lemma_signed_power_valid(1, -(r as int), 2);
+    lemma_signed_power_valid(1, r as int, 2);
+    let g0: Word = seq![Symbol::Gen(0)];
+    assert(word_valid(g0, 2));
+    lemma_concat_word_valid(signed_power(1, -(r as int)), g0, 2);
+    lemma_concat_word_valid(signed_power(1, -(r as int)) + g0, signed_power(1, r as int), 2);
+}
+
+/// A `config_emb(bet)` generator-or-inverse is a word over gens {0,1}.
+proof fn lemma_config_factor_valid2(bet: Seq<nat>, f: Word)
+    requires
+        is_generator_or_inverse(config_emb(bet), f),
+    ensures
+        word_valid(f, 2),
+{
+    let j = choose|j: int| 0 <= j < config_emb(bet).len()
+        && (f == #[trigger] config_emb(bet)[j] || f == inverse_word(config_emb(bet)[j]));
+    assert(0 <= j < config_emb(bet).len()
+        && (f == config_emb(bet)[j] || f == inverse_word(config_emb(bet)[j])));
+    assert(config_emb(bet)[j] == config_word(bet[j], 0));
+    lemma_config_word_valid2(bet[j]);
+    if f == config_emb(bet)[j] {
+    } else {
+        lemma_inverse_word_valid(config_word(bet[j], 0), 2);
+    }
+}
+
+/// `concat_all` of words over gens {0,1} is a word over gens {0,1}.
+proof fn lemma_concat_all_valid2(bet: Seq<nat>, factors: Seq<Word>)
+    requires
+        factors_from_generators(config_emb(bet), factors),
+    ensures
+        word_valid(concat_all(factors), 2),
+    decreases factors.len(),
+{
+    if factors.len() == 0 {
+        assert(concat_all(factors) =~= empty_word());
+    } else {
+        let rest = factors.drop_first();
+        assert(factors_from_generators(config_emb(bet), rest)) by {
+            assert forall|k: int| 0 <= k < rest.len()
+                implies is_generator_or_inverse(config_emb(bet), #[trigger] rest[k]) by {
+                assert(rest[k] == factors[k + 1]);
+            }
+        }
+        lemma_concat_all_valid2(bet, rest);
+        assert(is_generator_or_inverse(config_emb(bet), factors[0]));
+        lemma_config_factor_valid2(bet, factors.first());
+        assert(concat_all(factors) =~= factors.first() + concat_all(rest));
+        lemma_concat_word_valid(factors.first(), concat_all(rest), 2);
+    }
+}
+
+/// **Column computation**: `kill_db ∘ φ_F = φ'`.  Per index: t,x fixed; `b_l·d`, `b_j` (gens ≥ 2)
+/// killed to ε.  So `apply_hom(kill_db, emb(φ_F, u)) = emb(φ', u)` for `u` over `n+3` gens.
+pub proof fn lemma_kill_db_on_phi_F(n: nat, m: nat, l: nat, u: Word)
+    requires
+        1 <= l <= 2 * n,
+        word_valid(u, (n + 3) as nat),
+    ensures
+        apply_hom(kill_db(n), apply_embedding(phi_F_family(n, m, l), u))
+            =~= apply_embedding(phi_prime(n, m, l), u),
+{
+    let h = kill_db(n);
+    let pf = phi_F_family(n, m, l);
+    let pp = phi_prime(n, m, l);
+    assert(pf.len() == n + 3 && pp.len() == n + 3);
+    // comp_images(h, pf)[i] = apply_hom(h, pf[i]) =~= pp[i] for all i.
+    assert(comp_images(h, pf) =~= pp) by {
+        assert(comp_images(h, pf).len() == pp.len());
+        assert forall|i: int| 0 <= i < n + 3 implies comp_images(h, pf)[i] =~= pp[i] by {
+            assert(comp_images(h, pf)[i] == apply_hom(h, pf[i]));
+            if i == 0 {
+                assert(pf[0] == config_word(l, 0) && pp[0] == config_word(l, 0));
+                lemma_config_word_valid2(l);
+                lemma_kill_db_fixes_low(n, config_word(l, 0));
+            } else if i == 1 {
+                assert(pf[1] == symbol_power(Symbol::Gen(1), m) && pp[1] == symbol_power(Symbol::Gen(1), m));
+                assert(word_valid(symbol_power(Symbol::Gen(1), m), 2)) by {
+                    lemma_symbol_power_valid_local(Symbol::Gen(1), m, 2);
+                }
+                lemma_kill_db_fixes_low(n, symbol_power(Symbol::Gen(1), m));
+            } else if i == 2 {
+                lemma_kill_db_on_bd(n, m, l);
+                assert(pp[2] == empty_word());
+            } else {
+                // pf[i] = [Gen(i)] (the b-block tail), killed to ε; pp[i] = ε.
+                assert(pf[i] == seq![Symbol::Gen(i as nat)]);
+                reveal_with_fuel(apply_hom, 2);
+                lemma_concat_empty_right(h.generator_images[i]);
+                assert(apply_hom(h, seq![Symbol::Gen(i as nat)]) =~= h.generator_images[i]);
+                assert(h.generator_images[i] == empty_word());
+                assert(pp[i] == empty_word());
+            }
+        }
+    }
+    lemma_apply_hom_embedding_compose(h, pf, u);
+}
+
+/// `apply_hom(kill_db, [alphabet_letter(3,n,l), Gen2]) = ε` — the `b_l·d` image (gens ≥ 2) is killed.
+proof fn lemma_kill_db_on_bd(n: nat, m: nat, l: nat)
+    requires
+        1 <= l <= 2 * n,
+    ensures
+        apply_hom(kill_db(n), phi_F_family(n, m, l)[2]) =~= empty_word(),
+{
+    let h = kill_db(n);
+    let al = alphabet_letter(pa_b_base(), n, l);
+    let bd: Word = seq![al, Symbol::Gen(2)];
+    assert(phi_F_family(n, m, l)[2] == bd);
+    // al is a gen/inv with index in [3, n+2] ⊆ [2, n+3) ⟹ killed to ε.
+    let aidx = generator_index(al);
+    assert(2 <= aidx < n + 3) by {
+        if l <= n {
+            assert(al == Symbol::Gen((pa_b_base() + l - 1) as nat));
+            assert(aidx == pa_b_base() + l - 1);
+        } else {
+            assert(al == Symbol::Inv((pa_b_base() + (l - n) - 1) as nat));
+            assert(aidx == pa_b_base() + (l - n) - 1);
+        }
+    }
+    assert(apply_hom_symbol(h, al) =~= empty_word()) by {
+        match al {
+            Symbol::Gen(g) => { assert(g == aidx); assert(h.generator_images[g as int] == empty_word()); },
+            Symbol::Inv(g) => {
+                assert(g == aidx);
+                assert(h.generator_images[g as int] == empty_word());
+                lemma_inverse_empty();
+            },
+        }
+    }
+    assert(apply_hom_symbol(h, Symbol::Gen(2)) == h.generator_images[2]);
+    assert(h.generator_images[2] == empty_word());
+    // apply_hom(h, [al, Gen2]) = apply_hom_symbol(h,al) + apply_hom(h, [Gen2]) =~= ε + (ε + ε).
+    reveal_with_fuel(apply_hom, 3);
+}
+
+/// validity of `symbol_power` over `k` (local re-export to avoid an extra import).
+proof fn lemma_symbol_power_valid_local(s: Symbol, num: nat, k: nat)
+    requires
+        symbol_valid(s, k),
+    ensures
+        word_valid(symbol_power(s, num), k),
+{
+    crate::machine_group::lemma_symbol_power_valid(s, num, k);
+}
+
+/// **The retraction**: if `G = emb(φ_F, u)` lies in `⟨config_emb(bet)⟩` then `emb(φ', u) ≡_{free(n+3)} G`.
+/// (`G ≡ P` for a witness `P` over gens {0,1}; `kill_db` fixes `P`; `kill_db(G) = emb(φ', u)`.)
+pub proof fn lemma_retraction(n: nat, m: nat, l: nat, u: Word, bet: Seq<nat>)
+    requires
+        1 <= l <= 2 * n,
+        word_valid(u, (n + 3) as nat),
+        in_generated_subgroup(free_group((n + 3) as nat), config_emb(bet),
+            apply_embedding(phi_F_family(n, m, l), u)),
+    ensures
+        equiv_in_presentation(free_group((n + 3) as nat),
+            apply_embedding(phi_prime(n, m, l), u),
+            apply_embedding(phi_F_family(n, m, l), u)),
+{
+    let fg = free_group((n + 3) as nat);
+    let h = kill_db(n);
+    let g = apply_embedding(phi_F_family(n, m, l), u);
+    let pp_u = apply_embedding(phi_prime(n, m, l), u);
+    lemma_free_group_valid((n + 3) as nat);
+    lemma_kill_db_valid(n);
+
+    // witness P over gens {0,1} with concat_all(P) ≡ G.
+    let factors = choose|factors: Seq<Word>| #[trigger] factors_from_generators(config_emb(bet), factors)
+        && equiv_in_presentation(fg, concat_all(factors), g);
+    assert(factors_from_generators(config_emb(bet), factors)
+        && equiv_in_presentation(fg, concat_all(factors), g));
+    let pword = concat_all(factors);
+    lemma_concat_all_valid2(bet, factors);   // word_valid(pword, 2)
+
+    // kill_db fixes P:  apply_hom(h, pword) =~= pword.
+    lemma_kill_db_fixes_low(n, pword);
+
+    // apply_hom(h, G) =~= emb(φ', u)  (column computation).
+    lemma_kill_db_on_phi_F(n, m, l, u);
+    assert(apply_hom(h, g) =~= pp_u);
+
+    // apply_hom(h, ·) preserves P ≡ G:  apply_hom(h, pword) ≡ apply_hom(h, g).
+    lemma_hom_preserves_equiv(h, pword, g);
+    // ⟹ pword ≡ pp_u  (apply_hom(h,pword)=~=pword, apply_hom(h,g)=~=pp_u).
+    assert(equiv_in_presentation(fg, pword, pp_u)) by {
+        assert(apply_hom(h, pword) =~= pword);
+        assert(apply_hom(h, g) =~= pp_u);
+    }
+    // flip and chain: pp_u ≡ pword ≡ g.
+    crate::machine_group::lemma_word_valid_mono(pword, 2, (n + 3) as nat);
+    lemma_equiv_symmetric(fg, pword, pp_u);
+    lemma_equiv_transitive(fg, pp_u, pword, g);
 }
 
 // ----------------------------------------------------------------------------
