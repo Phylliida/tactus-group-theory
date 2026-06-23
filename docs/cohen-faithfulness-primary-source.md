@@ -186,3 +186,73 @@ Bass–Serre / action-based base-embeds proof that sidesteps the AFP normal form
   foundation (§4). The gating unknown is now narrowed to **one concrete question** — does the
   AFP-tower `shift`/normal-form machinery generalize to a predicate base, or do we need the lighter
   embedding-only variant? — answerable by the §4 first-brick prototype.
+
+---
+
+## 6. Non-committing code-level sharpening of scoping #2 (2026-06-23, session 10)
+
+A read-only investigation (no `.rs` touched) drilled past §3's *breadth* survey (how `base.relators`
+is consumed across the tower) into the *depth* of the single lemma the Fork-B re-evaluation flagged
+as the iso bottleneck — `lemma_single_step_preserves_syls` (`britton_via_tower.rs:8579`) — and read
+the literal definition of `hnn_associations_isomorphic` (`hnn.rs:74`). Three machine-grounded results,
+each **de-risking** the Fork-A scope:
+
+### 6a. The gating lemma's base-relator branch is *substantively* predicate-agnostic
+`lemma_single_step_preserves_syls` dispatches a relator-application step
+(`lemma_relator_insert_preserves`, `:8388`) into a base branch and an HNN branch. In the **base
+branch** (`:8440–8476`), `relator_index` enters in exactly **two** places, both with clean predicate
+analogs:
+  1. **Fetch the word** — `base_rel = data.base.relators[idx]`. Predicate analog: carry the relator
+     *word* on the derivation step, gated by `P(word)`.
+  2. **Assert triviality** — `lemma_relator_is_identity(data.base, idx)` ⟹ `equiv(base_rel, ε)`. That
+     lemma (`presentation_lemmas.rs:347`) derives the relator's triviality from a **one-step
+     `RelatorDelete` derivation** — i.e. it is just the *defining closure axiom* of a presentation.
+     Predicate analog: a `RelatorDelete` carrying the word, firing on any `w` with `P(w)`. Trivial.
+
+Everything downstream is **word-level and relator-set-agnostic**: `lemma_textbook_base_only`
+(`:4984`, precondition = "`w` is stable-free", zero reference to relators) and
+`lemma_trivial_middle_preserves_syls` (`:8158`, takes `middle` as a word with an "acts-trivially"
+precondition, **no** reference to indices / cardinality / the relator set). So the hard substance of
+the gating lemma **ports with no new math** — confirming §3's "standard math" verdict at the level of
+the actual proof, not just the consumption-site census.
+
+### 6b. The `hnn_associations_isomorphic` requirement is confined to the *finite* HNN branch — the Fork-B obstruction dissolves
+The `hnn_associations_isomorphic(data)` precondition (the Fork-B re-evaluation §1 obstruction: "the
+universal `∀w` iso over an arbitrary derivation") is consumed **only** in the HNN-relator branch
+(`:8477–8500`, via `lemma_hnn_relator_preserves`), **never** in the base branch. Under Fork-A the HNN
+associations stay finite and the iso is **genuinely true** (the base `H₂` carries family (II)), so the
+universal requirement is **satisfiable** — exactly what Fork-B could not supply. The base branch,
+where all the predicate-ness lives, is iso-free. Clean separation: predicate-ness ⊂ base; iso ⊂
+finite HNN branch.
+
+### 6c. Associations are INHERENTLY finite — no infinitely-generated-associated-subgroup machinery needed
+The literal spec (`hnn.rs:74–83`):
+```
+let k = data.associations.len();              // a Seq length — FINITE by construction
+forall|w| word_valid(w, k) ==>
+    equiv_in_presentation(base, apply_embedding(a_words, w), ε)
+    <==> equiv_in_presentation(base, apply_embedding(b_words, w), ε)
+```
+The iso side-condition quantifies over words on `k = associations.len()` generators and reduces
+**entirely** to `equiv_in_presentation(data.base, ·, ε)`. It is **not even well-formed** for infinitely
+many associations. So the H₃-level associations (`A↔Aᵢ`, `A₊↔A₋`, all between Cohen's *finitely
+generated* `A=⟨t,x,d,bⱼ,p⟩` etc.) are finite generator-tuples; the **only** thing needing predicate
+support is `data.base = H₂`'s relator set. A worry raised (and initially asserted by the companion
+model) — "Prop-1.34 recognition forces infinitely-generated associated subgroups as a literal object"
+— is a **false alarm**, refuted by the spec. The Prop-1.34 recognition is a *proof device* whose
+formal residue is (i) Layer-1 properties (ii)/(vi)/(vii) [DONE] and (ii) the von-Dyck *biconditional*
+above over the predicate base; injectivity (the "no-collapse" backward direction) comes free from the
+inverse homomorphism (c-killing endo), **not** from a normal form on `A₊`. *(Companion model agreed on
+the spec-grounded reading after the over-assertion was checked against the definition.)*
+
+### Net effect on the decision
+Scoping #2 splits into two questions, and 6a–6c **close the first**:
+- **"Is predicate-Britton new math (a Fork-B-style dragon)?"** — **NO, confirmed at code level.** The
+  gating lemma ports; the iso obstruction dissolves; associations stay finite; only the **base relator
+  set** goes predicate. Standard math.
+- **"How big is the mechanical labor?"** — **STILL OPEN, unchanged.** Re-deriving the index/`Seq`-based
+  tower (`britton_via_tower.rs` + `normal_form_afp_textbook.rs`, ~21k lines) over a predicate base is
+  the real cost (§3 verdict stands). The §4 first-brick prototype (steps 1–3, esp. porting the
+  base-relator case of `lemma_single_step_preserves_syls` — which 6a shows *should* port) remains the
+  cheapest way to measure it, and the lighter **embedding-only** variant (§4 step 4 / §4-probe step 2)
+  may shrink it. This is the piece to weigh in the co-design.
