@@ -112,6 +112,11 @@ pub mod conj_free;
 #[cfg(verus_keep_ghost)]
 pub mod conj_free_core;
 
+// conj_free_b: Layer 0.5 (Miller §4.1) SECOND free basis — `{b⁻ⁱabⁱ}` free in F₂, the swap-
+// automorphism image of `conj_free_core`'s `{a⁻ⁱbaⁱ}`. The F₂-part of Miller's `B = ⟨a, b⁻ⁱabⁱ⟩`.
+#[cfg(verus_keep_ghost)]
+pub mod conj_free_b;
+
 #[cfg(verus_keep_ghost)]
 pub mod tietze;
 

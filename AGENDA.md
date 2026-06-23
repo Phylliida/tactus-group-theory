@@ -259,8 +259,18 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       forward obligation `φ(w)≡_{F₂}ε ⟹ w≡_{free(k)}ε` reduces `w` to `w'=nf(w)`, pushes equiv through φ,
       uses the bridge to get `nf(φ(w'))=ε`, and `count1(ε)=count1(φ(w'))=|w'|` forces `w'=ε`. The crux is
       **representation-independent** (pure `F₂`), so it is done ahead of the infinitely-generated-`C` infra
-      decision (still ⚠ BLOCKED, co-design w/ Danielle). **NEXT = the infinite-gen representation decision**
-      (then `A`/`B` bases over the c's, `L=C⋆F₂`, the `t`-HNN `G`, 2-generation, `C↪G`).
+      decision (still ⚠ BLOCKED, co-design w/ Danielle).
+      **✅ SECOND (B) BASIS `{b⁻ⁱabⁱ}`-FREE LEMMA COMPLETE 2026-06-23** (`conj_free_b.rs` 12/0,
+      `lemma_conj_family_b_free`: `is_free_family(free_group(2), conj_family_b(k))`). Miller's HNN
+      embedding uses TWO free bases of `L=C⋆F₂` — `A=⟨b,cᵢa⁻ⁱbaⁱ⟩` and `B=⟨a,b⁻ⁱabⁱ⟩`; the A-crux above
+      gives the `F₂`-part of `A`, this gives the `F₂`-part of `B`. NOT a re-derivation: `b⁻ⁱabⁱ` is
+      `a⁻ⁱbaⁱ` under the generator-swap `a↔b`, an **involutive automorphism** of `F₂`, realized as the
+      `apply_embedding` image list `swap_emb=[[b],[a]]`. Transfer: `emb(conj_family_b,w)=
+      swap_emb(emb(conj_family,w))` (`compose_embeddings`) ⟹ swap is an iso (`lemma_swap_preserves_triv`
+      via `lemma_emb_respects_source_equiv`, free relators vacuous + `lemma_swap_involution`) ⟹ reduce to
+      the A-crux `lemma_conj_family_free`. Also representation-independent (pure `F₂`). **NEXT = the
+      infinite-gen representation decision** (still ⚠ BLOCKED, co-design w/ Danielle; then `A`/`B` bases
+      over the c's, `L=C⋆F₂`, the `t`-HNN `G`, 2-generation, `C↪G`).
 - [ ] **word-numbering bridge** — `wα(c)`, with `wα(c)∈S ⟺ (α,0)∈H₀(M)` (ties the relator set `S`
       to the machine, built from the reduction in §3.3).
 - [x] **H₁ = K_M ∗ (C × ⟨b_j⟩) ∗ ⟨d⟩** — literal finite `h1_base` built (`h1.rs`), and
