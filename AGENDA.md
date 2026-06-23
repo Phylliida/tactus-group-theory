@@ -237,10 +237,13 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > family (II) + the abstract c-block relator predicate `S` of `C=⟨c;S⟩`; `pred_presentation_valid`.
 > **CS-2 DONE** (`cohen_retraction.rs` 16/0, commit 309a741): `lemma_h2_pred_descends_to_c` — step (2)
 > COMPLETE (the iso-free half), via `c_retraction` validity (every relator class ↦ C-identity) +
-> fixes-c-words + `lemma_hom_pred_preserves_equiv`. Crate 2375/20 (+19, no regression). **NEXT = CS-3**
-> (the single-letter PredHNN tower `h3_pred_upto`/`h3_pred` + validity, low-risk defs brick) → **CS-4**
-> (a_i relabeling iso, §1a, Layer-1 residue facts) → **CS-5** (k iso, §1b, von Dyck + c-kill endo,
-> uses `s_realizes` + `lemma_theorem1`) → **CS-6** (assembly + transport to printable `h3_pres`).
+> fixes-c-words + `lemma_hom_pred_preserves_equiv`. **CS-3 DONE** (`cohen_h3.rs` 7/0, commit d4a7985):
+> the single-letter PredHNN tower `h3_pred_upto`/`h3_pred_data`/`h3_pred` + num-gens + validity
+> (reuses `phi_assoc`/`psi_assoc` verbatim). Crate 2382/20 (+26 over the FA-9b baseline, no regression).
+> **NEXT = CS-4** (a_i relabeling iso §1a — `hnn_pred_associations_isomorphic` per a-level, reduces to
+> Layer-1 residue facts b-augmented + `lemma_w_b_snoc`; THE hard arc) → **CS-5** (k iso §1b, von Dyck +
+> c-kill endo, uses `s_realizes` + `lemma_theorem1`) → **CS-6** (assembly: Britton descent ∘ CS-2
+> retraction, + transport to printable `h3_pres` via soundness `lemma_III`).
 >
 > **✅ FORK-A STARTED 2026-06-23 (session 14) — elementary foundation arc DONE, ports VERBATIM.**
 > The completeness route is **Fork-A** (predicate presentation; the textbook route per
