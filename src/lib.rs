@@ -393,3 +393,10 @@ pub mod phi_l_iso_unsat;
 // unsatisfiable universal σ-forward-closure (the word-restricted virtual-iso side condition).
 #[cfg(verus_keep_ghost)]
 pub mod sigma_orbit;
+
+// cohen_h2: Layer 2 — Cohen §1 assembly, brick CS-1. The PREDICATE base H₂ (carries the full
+// infinite family (II) + the relator set S of C=⟨c;S⟩, S an abstract c-block predicate) + validity.
+// The textbook completeness route over the now-complete predicate-Britton substrate.
+// docs/cohen-section1-assembly-plan.md.
+#[cfg(verus_keep_ghost)]
+pub mod cohen_h2;
