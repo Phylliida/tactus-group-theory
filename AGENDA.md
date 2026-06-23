@@ -240,10 +240,27 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > fixes-c-words + `lemma_hom_pred_preserves_equiv`. **CS-3 DONE** (`cohen_h3.rs` 7/0, commit d4a7985):
 > the single-letter PredHNN tower `h3_pred_upto`/`h3_pred_data`/`h3_pred` + num-gens + validity
 > (reuses `phi_assoc`/`psi_assoc` verbatim). Crate 2382/20 (+26 over the FA-9b baseline, no regression).
-> **NEXT = CS-4** (a_i relabeling iso §1a — `hnn_pred_associations_isomorphic` per a-level, reduces to
-> Layer-1 residue facts b-augmented + `lemma_w_b_snoc`; THE hard arc) → **CS-5** (k iso §1b, von Dyck +
-> c-kill endo, uses `s_realizes` + `lemma_theorem1`) → **CS-6** (assembly: Britton descent ∘ CS-2
-> retraction, + transport to printable `h3_pres` via soundness `lemma_III`).
+> **NEXT = CS-4** (a_i relabeling iso §1a — `hnn_pred_associations_isomorphic` per a-level) → **CS-5**
+> (k iso §1b, von Dyck + c-kill endo, uses `s_realizes` + `lemma_theorem1`) → **CS-6** (assembly:
+> Britton descent ∘ CS-2 retraction, + transport to printable `h3_pres` via soundness `lemma_III`).
+>
+> **⚠ CS-4 SCOPING (2026-06-23, session 19 — read `docs/cohen-cs4-architecture.md`).** A deep
+> read-only pass (companion-confirmed) found CS-4 is **NOT `tower_peel`-scale** as the CS-4 plan line
+> stated. The per-level iso `(★) emb(a_col,w) ≡_{h2_pred} ε ⟺ emb(b_col,w) ≡_{h2_pred} ε` factors via
+> `pa_pred=P_A` into **von-Dyck halves** (now EASY/UNCONDITIONAL over the predicate base — the σ-slice
+> side conditions that caused the finite-tower vacuity vanish, since `family_II_relator(mβ+l)` is an
+> `h2_pred` relator for ALL β) + two **faithfulness halves** (`map_a`/`map_b` faithful = Cohen
+> Prop-1.34 recognition). Faithfulness needs peeling `p` over `H₂=HNN(H₁,p|family II)` whose associated
+> subgroup `⟨t_α:α∈I⟩` is **infinitely generated**; the substrate's `britton_lemma_unconditional` is
+> **finite-association only**. `lemma_map_b_forward`/`lemma_mapb_M2` are **vacuous** (need `sigma_fwdsat`,
+> machine-refuted by `lemma_sigma_sat_upto_unsatisfiable`). **Two routes** (`cohen-cs4-architecture.md`
+> §3): **Route 1** — compactness-to-finite (reuse the REAL `lemma_map_a_forward`) for forward +
+> relabeling-iso `pa_data(G)≅pa_data(σ_l(G))` (σ-INJECTIVITY only, not σ-closure) for backward M2 —
+> may avoid new substrate; **Route 2** — unified predicate/infinite-association Britton (sound textbook
+> fallback, ≥FA-9b-scale). **HELD for a route decision** (prototype Route 1's M2 "irrelevant extra
+> relator" wrinkle first — cheap + decisive). No `.rs` touched session 19; the von-Dyck identities
+> already exist base-independent in `phi_l_iso.rs`. Shape-stable to build either way: `pa_pred` (flat
+> `PredPresentation`) + validity, and the von-Dyck halves.
 >
 > **✅ FORK-A STARTED 2026-06-23 (session 14) — elementary foundation arc DONE, ports VERBATIM.**
 > The completeness route is **Fork-A** (predicate presentation; the textbook route per

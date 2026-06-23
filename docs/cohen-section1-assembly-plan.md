@@ -150,11 +150,20 @@ to (residue facts, free basis `lemma_basis_elt_free`, `lemma_theorem1`) is alrea
   + validity (`lemma_h3_pred_level_data_valid` [takes base-validity as hyp to break mutual recursion],
   `lemma_h3_pred_upto_valid`, `lemma_h3_pred_data_valid` = `hnn_pred_data_valid` for the top,
   `lemma_h3_pred_valid`). `phi_assoc`/`psi_assoc` + their validity reused verbatim from `h3.rs`.
-- **CS-4 — the a_i iso (§4 §1a). ← NEXT.** `hnn_pred_associations_isomorphic` at each a-level — i.e.
-  for each level `l`, the single-letter datum `PredHNNData{base: h3_pred_upto(l-1), associations:
-  phi_assoc(nk,n,m,l)}`. Reduces (base-faithfulness up the tower) to the iso over `h2_pred`, genuine
-  because `h2_pred` carries family (II); recognition (Prop 1.34) + relabeling (`lemma_w_b_snoc`) +
-  b-augmented residue facts (`prop_v`/`tower_peel`/`ii_subset`). `tower_peel`-scale. THE hard arc.
+- **CS-4 — the a_i iso (§4 §1a). ← IN SCOPING (see `cohen-cs4-architecture.md`, session 19).**
+  `hnn_pred_associations_isomorphic` at each a-level. Reduces (base-faithfulness up the tower) to
+  the iso `(★)` over `h2_pred`. **SCOPE CORRECTION (2026-06-23):** this is NOT `tower_peel`-scale.
+  `(★)` factors via `pa_pred = P_A` into von-Dyck halves (EASY/unconditional — the predicate-base
+  win, no σ-slice) + two **faithfulness** halves (`map_a`/`map_b` faithful = Prop-1.34 recognition
+  of `A`/`A_i`). Faithfulness needs **peeling `p` over `H₂ = HNN(H₁, p | family (II))`**, whose
+  associated subgroup `⟨t_α:α∈I⟩` is **infinitely generated** — the substrate's Britton is
+  finite-association only. Two routes (`cohen-cs4-architecture.md` §3): **Route 1** = compactness-to
+  -finite-slice (reuse the REAL `lemma_map_a_forward`) for the forward + a relabeling-iso
+  `pa_data(G)≅pa_data(σ_l(G))` (needs σ-INJECTIVITY only, not the vacuous σ-closure) for the
+  backward M2 — may avoid new substrate; **Route 2** = a unified predicate/infinite-association
+  Britton (sound textbook fallback, FA-9b-scale+). **Held for the route decision** (prototype Route
+  1's M2 wrinkle first — cheap + decisive). Shape-stable pieces (`pa_pred` def + validity; the
+  von-Dyck halves) are safe to build under either route.
 - **CS-5 — the k iso (§4 §1b).** von Dyck forward (uses `s_realizes` + `lemma_theorem1`) + c-kill
   endo backward.
 - **CS-6 — assembly.** Britton descent (step 1) ∘ retraction (step 2) ⟹ `lemma_C_faithful`.
