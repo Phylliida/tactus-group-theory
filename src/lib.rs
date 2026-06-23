@@ -18,6 +18,11 @@ pub mod presentation;
 #[cfg(verus_keep_ghost)]
 pub mod pred_presentation;
 
+// FORK-A brick 2: predicate-base equivalence-congruence algebra
+// (analog of presentation_lemmas.rs core). Reversible, zero regression.
+#[cfg(verus_keep_ghost)]
+pub mod pred_presentation_lemmas;
+
 // FORK-A brick 1: predicate-base HNN extensions (analog of `hnn.rs`).
 // docs/FORK-DECISION.md, cohen-faithfulness-primary-source.md §1/§6c.
 // Separate from the verified finite `hnn` module: reversible, zero regression.
