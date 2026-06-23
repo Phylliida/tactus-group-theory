@@ -161,6 +161,32 @@ generated**. So:
        preserved by `reduce_at`, holds for `φ(w')`, and forbids any index-1 cancellation. The remaining
        work = formalize "net index-0 exponent between consecutive index-1 symbols" + its `reduce_at`
        invariance + the φ(w')-base-case. (~150–250 lines; the next iteration's task.)
+     - ✅ **CRUX COMPLETE 2026-06-23** (`conj_free_core.rs` 34/0, `lemma_conj_family_free`:
+       `is_free_family(free_group(2), conj_family(k))`). Implemented exactly the net-exponent invariant
+       above. Pieces (bottom-up, each banked independently):
+       1. **`asum`** = signed index-0 (a) exponent; additive over concat; a length-2 inverse pair has
+          `asum 0` (`lemma_asum_inverse_pair_zero`). Removing a non-b pair preserves `count1`
+          (`lemma_count1_reduce_non_b`).
+       2. **`bsep(w)`** = ∀ consecutive inverse-pair b-letters `p<q`: `asum(w[p+1..q]) ≠ 0`.
+          `lemma_bsep_no_b_cancel`: under `bsep` every cancellation is a non-b pair (an adjacent b-pair
+          would be a consecutive inverse-pair with empty `asum 0` block).
+       3. **`lemma_reduce_preserves_bsep`**: `bsep` survives removing any non-b pair. Proof via the
+          prefix-`asum` reformulation (`asum(w[a..b]) = pa(b) − pa(a)`) + `lemma_pa_reduce` (the removed
+          pair, having `asum 0`, doesn't shift prefix exponents past the hole) — no fragile "literal word
+          equality at the q==i boundary" needed.
+       4. **`lemma_count1_bsep_invariant`** (induction mirroring `reduce_n_steps`): under `bsep`, every
+          normal-form reduction step cancels a non-b pair, so `count1` and `bsep` both persist ⟹
+          `count1(normal_form(w)) = count1(w)`.
+       5. **Base case `lemma_bsep_emb`** (`bsep(φ(w'))` for reduced `w'`): `apply_embedding_symbol` of a
+          source letter is `phi_block(s) = a⁻ᶜ b^{±} aᶜ` (`lemma_phi_block` + `lemma_inverse_conj_word`);
+          head/tail induction (`lemma_emb_first_block`) with two consecutive-pair cases — boundary
+          (head-b vs first-b-of-rest: `asum = c − c'`, nonzero since `w'` reduced ⟹ same-index ⟹ same
+          sign) and inner (both in the rest, straight from the IH). Helpers `lemma_emb_first_b`,
+          `lemma_concat_subrange_{right,mid}`.
+       6. **Assembly `lemma_conj_family_free`**: the forward obligation `φ(w)≡_{F₂}ε ⟹ w≡_{free(k)}ε`
+          (reduce `w→w'=nf(w)`, push equiv through φ via `lemma_emb_respects_source_equiv`, bridge to
+          `nf(φ(w'))=ε`, then `|w'| = count1(φ(w')) = count1(ε) = 0`). Representation-independent — done
+          ahead of the infinite-gen-`C` infra decision.
 3. **Layer 2** — `H₁` (direct product), `H₂` (HNN, stable letter `p`), `H₃` (HNN, stable letters
    `a_i, k`); prove `C ↪ H₃` and `H₃` f.p. with relations (I). Re-read book p.279–281 (PDF 284–286)
    for the precise `A/A_i/A₊/A₋` generators and associations.
