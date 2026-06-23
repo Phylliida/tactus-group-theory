@@ -403,4 +403,33 @@ pub proof fn lemma_reduce_preserves_bsep(w: Word, i: int)
     }
 }
 
+// ----------------------------------------------------------------------------
+// `count1` is preserved through the entire reduction to normal form, under `bsep`.
+// ----------------------------------------------------------------------------
+
+/// **`count1` is a reduction invariant under `bsep`.**  Every step of the normal-form reduction
+/// cancels a non-b pair (by `bsep`), preserving the b-count and re-establishing `bsep`.
+pub proof fn lemma_count1_bsep_invariant(w: Word, fuel: nat)
+    requires
+        bsep(w),
+    ensures
+        count1(reduce_n_steps(w, fuel)) == count1(w),
+        bsep(reduce_n_steps(w, fuel)),
+    decreases fuel,
+{
+    if fuel == 0 {
+    } else {
+        let pos = find_cancellation_from(w, 0);
+        lemma_find_cancellation_from_valid(w, 0);
+        if pos >= w.len() {
+        } else {
+            // The found cancellation is a non-b pair, so b-count and bsep both survive.
+            lemma_bsep_no_b_cancel(w, pos as int);
+            lemma_count1_reduce_non_b(w, pos as int);
+            lemma_reduce_preserves_bsep(w, pos as int);
+            lemma_count1_bsep_invariant(reduce_at(w, pos as int), (fuel - 1) as nat);
+        }
+    }
+}
+
 } // verus!
