@@ -107,6 +107,17 @@ iso.**
 
 ### 2.2ter THE REROUTE: finite family-(II) augmentation ("Local Fork A"), virtuality re-isolated to k
 
+> **⚠ REFUTED 2026-06-22 (w/ Danielle, `brick5-c4-plan.md` §7).** The premise of this whole subsection —
+> "a FINITE family-(II) augmentation `h3_II` makes the a-levels **literal** isos" — is **FALSE**. The
+> a-level `hnn_associations_isomorphic` over a finite `h3_II` requires `σ_l(alphas) ⊆ alphas`
+> (von-Dyck-backward needs `family_II_relator(m·β+l) ≡_base ε` for every β the base covers), which is
+> forward-closure ⟹ **infinite**. Machine-checked: `lemma_sigma_sat_upto_unsatisfiable` (`phi_l_iso_unsat.rs`).
+> A finite presentation cannot carry the full family (II), so the a-levels are virtual isos too — the
+> SAME situation as the k-level. **C3.2 must be reframed to a word-restricted virtual iso (Fork B applied
+> to the a-levels as well).** The `h3_II` *group-preservation* infra (C3.0/C3.1, `lemma_same_group_iff`,
+> `lemma_h3_II_group_preserving`) and the R1–R4 directional Britton-peel machinery survive and are reused;
+> only the universal-iso target is wrong. Read `brick5-c4-plan.md` §7 before continuing C3.2/C4.
+
 The fix recovers the original "isolate the hard part to the k-level" plan **without** a uniform
 virtual-iso tower engine (which would mean re-deriving all of `britton_via_tower` for virtual
 associations — enormous). Instead, exploit that faithfulness is **per-α**: for a fixed `α`, `w_α(c)`
