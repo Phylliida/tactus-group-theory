@@ -176,6 +176,16 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 ### 3.2 — Layer 2: the Higman embedding `C ↪ H₃`
 *`docs/higman-embedding-blueprint.md` (Cohen §9.6). Build on the finished `G(M)=K_M`.*
 
+> **⚠ ARCHITECTURE RE-EVALUATION (2026-06-23) — read `docs/brick5-fork-reevaluation.md` FIRST.** The
+> completeness route (Fork B / route-A word-restricted virtual iso) was found to have an UNDESIGNED
+> CORE: the iso-consuming Britton calls route through `lemma_single_step_preserves_syls`, which needs
+> the *universal* iso over an *arbitrary derivation* — not restrictable to a fixed word's pinch-middles
+> — and "iso in the quotient" only feeds Britton circularly (would need a new "virtual Britton's
+> Lemma", no extant sketch). RECOMMENDATION (pending real-Danielle confirmation): pivot to **Fork A** —
+> build a predicate/countable presentation foundation, which is ALSO the common blocker for Layer 0.5
+> (infinite-gen `C`). One foundation unblocks both frontiers. The R1–R4 directional machinery stays
+> verified + reusable; the verified soundness (`lemma_III` etc.) is untouched.
+
 - [ ] **Layer 0.5** — Higman–Neumann–Neumann: embed the (countable, recursively presented) CEER
       group into a **f.g.** recursively presented `C=⟨c₁,…,cₙ;S⟩`. **SOURCE LOCATED 2026-06-23**:
       Cohen's book PDF is a SCANNED image (no text); use Miller `../verus-group-theory/CGTMiller.pdf`
