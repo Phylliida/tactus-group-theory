@@ -99,6 +99,11 @@ pub mod free_word_problem;
 #[cfg(verus_keep_ghost)]
 pub mod conj_free;
 
+// conj_free_core: the core "central b survives" — the net-exponent invariant `bsep`, its
+// preservation under reduction, the base case, and the assembled `{a⁻ⁱbaⁱ}`-free family lemma.
+#[cfg(verus_keep_ghost)]
+pub mod conj_free_core;
+
 #[cfg(verus_keep_ghost)]
 pub mod tietze;
 
