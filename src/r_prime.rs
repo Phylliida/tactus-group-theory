@@ -30,7 +30,10 @@ use crate::machine_group::{config_word, symbol_power, signed_power, gsconfig, Ca
     sconfig, lemma_sconfig_nat, base_A, lemma_base_A_valid,
     lemma_no_relator_equiv_implies_freely_equivalent};
 use crate::config_reduce::{is_canl_word, canon_represents, lemma_canon_represents_eval,
-    cw_reduce, coord_in, lemma_cw_reduce_coords, lemma_tfree_coord_restrict, lemma_cw_reduce_eval};
+    cw_reduce, coord_in, lemma_cw_reduce_coords, lemma_tfree_coord_restrict, lemma_cw_reduce_eval,
+    lemma_gsconfig_merge, lemma_sconfig_is_gsconfig1};
+use crate::benign::lemma_generator_in_generated_subgroup;
+use crate::machine_group::{lemma_product_in_subgroup, lemma_in_subgroup_respects_equiv};
 use crate::presentation_lemmas::lemma_freely_equivalent_implies_equiv;
 use crate::ii_subset::lemma_signed_power_inverse;
 use crate::benign::{apply_embedding, apply_embedding_symbol, in_generated_subgroup,
@@ -1143,6 +1146,177 @@ pub proof fn lemma_free_cw_reduce_eval(n: nat, cu: Seq<CanonLetter>)
     lemma_canw_eval_valid2(red);
     lemma_kill_y_fixes_low(n, canw_eval(red));
     lemma_kill_y_fixes_low(n, canw_eval(cu));
+}
+
+// ----------------------------------------------------------------------------
+// Step 7 — reconstruction: a canw with coords ⊆ σ(bet) lies in ⟨config_emb(σ(bet))⟩.
+// ----------------------------------------------------------------------------
+
+/// Free-level config merge: `gsconfig(γ,0,e₁)·gsconfig(γ,0,e₂) ≡_{free(n+3)} gsconfig(γ,0,e₁+e₂)`
+/// (base_A `lemma_gsconfig_merge` retracted through `kill_y`).
+pub proof fn lemma_gsconfig_merge_free(n: nat, g: int, e1: int, e2: int)
+    ensures
+        equiv_in_presentation(free_group((n + 3) as nat),
+            gsconfig(g, 0, e1) + gsconfig(g, 0, e2), gsconfig(g, 0, e1 + e2)),
+{
+    let h = kill_y(n);
+    lemma_gsconfig_merge(g, 0, e1, e2);   // ≡_base_A
+    lemma_kill_y_valid(n);
+    lemma_hom_preserves_equiv(h, gsconfig(g, 0, e1) + gsconfig(g, 0, e2), gsconfig(g, 0, e1 + e2));
+    lemma_gsconfig_zero_valid2(g, e1);
+    lemma_gsconfig_zero_valid2(g, e2);
+    lemma_concat_word_valid(gsconfig(g, 0, e1), gsconfig(g, 0, e2), 2);
+    lemma_kill_y_fixes_low(n, gsconfig(g, 0, e1) + gsconfig(g, 0, e2));
+    lemma_gsconfig_zero_valid2(g, e1 + e2);
+    lemma_kill_y_fixes_low(n, gsconfig(g, 0, e1 + e2));
+}
+
+/// `gsconfig(γ,0,0) ≡_{free(n+3)} ε`.
+pub proof fn lemma_gsconfig_zero_free(n: nat, g: int)
+    ensures
+        equiv_in_presentation(free_group((n + 3) as nat), gsconfig(g, 0, 0), empty_word()),
+{
+    let fg = free_group((n + 3) as nat);
+    lemma_free_group_valid((n + 3) as nat);
+    lemma_gsconfig_zero_form(g, 0);   // gsconfig(g,0,0) =~= sp(1,-g)+sp(0,0)+sp(1,g)
+    assert(signed_power(0, 0) =~= empty_word());
+    lemma_concat_empty_right(signed_power(1, -g));
+    assert(gsconfig(g, 0, 0) =~= signed_power(1, -g) + signed_power(1, g));
+    lemma_signed_power_add(fg, 1, -g, g);   // sp(1,-g)+sp(1,g) ≡ sp(1,0) = ε
+    assert(signed_power(1, 0) =~= empty_word());
+}
+
+/// `ε ∈ ⟨gens⟩` (the empty factor list).
+pub proof fn lemma_empty_in_subgroup(p: Presentation, gens: Seq<Word>)
+    requires
+        presentation_valid(p),
+    ensures
+        in_generated_subgroup(p, gens, empty_word()),
+{
+    let factors = Seq::<Word>::empty();
+    assert(factors_from_generators(gens, factors));
+    assert(concat_all(factors) =~= empty_word());
+    lemma_equiv_refl(p, empty_word());
+    assert(in_generated_subgroup(p, gens, empty_word())) by {
+        assert(factors_from_generators(gens, factors)
+            && equiv_in_presentation(p, concat_all(factors), empty_word()));
+    }
+}
+
+/// `inverse_word(gens[k]) ∈ ⟨gens⟩`.
+pub proof fn lemma_gen_inverse_in_subgroup(p: Presentation, gens: Seq<Word>, k: int)
+    requires
+        presentation_valid(p),
+        0 <= k < gens.len(),
+    ensures
+        in_generated_subgroup(p, gens, inverse_word(gens[k])),
+{
+    let factors = seq![inverse_word(gens[k])];
+    assert(factors_from_generators(gens, factors)) by {
+        assert(factors[0] == inverse_word(gens[k]));
+        assert(is_generator_or_inverse(gens, factors[0])) by {
+            assert(factors[0] == gens[k] || factors[0] == inverse_word(gens[k]));
+        }
+    }
+    assert(concat_all(factors) =~= inverse_word(gens[k])) by {
+        reveal_with_fuel(concat_all, 2);
+        lemma_concat_empty_right(inverse_word(gens[k]));
+    }
+    lemma_equiv_refl(p, inverse_word(gens[k]));
+    assert(in_generated_subgroup(p, gens, inverse_word(gens[k]))) by {
+        assert(factors_from_generators(gens, factors)
+            && equiv_in_presentation(p, concat_all(factors), inverse_word(gens[k])));
+    }
+}
+
+/// **Config power in subgroup**: `gsconfig(γ,0,e) ∈ ⟨config_emb(as)⟩` for `γ ∈ as` — recursion on `|e|`,
+/// each step a free merge with `config_word(γ,0) = gsconfig(γ,0,1)` (a generator) or its inverse.
+pub proof fn lemma_gsconfig_in_subgroup(as_: Seq<nat>, n: nat, g: int, e: int)
+    requires
+        exists|k: int| 0 <= k < as_.len() && as_[k] as int == g,
+    ensures
+        in_generated_subgroup(free_group((n + 3) as nat), config_emb(as_), gsconfig(g, 0, e)),
+    decreases (if e >= 0 { e } else { -e }),
+{
+    let fg = free_group((n + 3) as nat);
+    lemma_free_group_valid((n + 3) as nat);
+    let ce = config_emb(as_);
+    let k = choose|k: int| 0 <= k < as_.len() && as_[k] as int == g;
+    assert(0 <= k < as_.len() && as_[k] as int == g);
+    assert(ce[k] == config_word(as_[k], 0));
+    // config_word(as[k],0) =~= gsconfig(g,0,1).
+    lemma_sconfig_nat(g, 0);
+    lemma_sconfig_is_gsconfig1(g, 0);
+    assert(config_word(as_[k], 0) =~= gsconfig(g, 0, 1));
+
+    if e == 0 {
+        lemma_gsconfig_zero_free(n, g);   // equiv(gsconfig(g,0,0), ε)
+        lemma_empty_in_subgroup(fg, ce);
+        lemma_gsconfig_zero_valid2(g, 0);
+        crate::machine_group::lemma_word_valid_mono(gsconfig(g, 0, 0), 2, (n + 3) as nat);
+        lemma_equiv_symmetric(fg, gsconfig(g, 0, 0), empty_word());   // equiv(ε, gsconfig(g,0,0))
+        lemma_in_subgroup_respects_equiv(fg, ce, empty_word(), gsconfig(g, 0, 0));
+    } else if e > 0 {
+        // gsconfig(g,0,e-1) + gsconfig(g,0,1) ≡ gsconfig(g,0,e).
+        lemma_gsconfig_merge_free(n, g, e - 1, 1);
+        assert(e - 1 + 1 == e);
+        lemma_gsconfig_in_subgroup(as_, n, g, e - 1);             // IH
+        lemma_generator_in_generated_subgroup(fg, ce, k);        // config_word(as[k],0) ∈ ⟨ce⟩
+        assert(in_generated_subgroup(fg, ce, gsconfig(g, 0, 1)));  // =~= config_word(as[k],0)
+        lemma_product_in_subgroup(fg, ce, gsconfig(g, 0, e - 1), gsconfig(g, 0, 1));
+        lemma_in_subgroup_respects_equiv(fg, ce,
+            gsconfig(g, 0, e - 1) + gsconfig(g, 0, 1), gsconfig(g, 0, e));
+    } else {
+        // gsconfig(g,0,e+1) + gsconfig(g,0,-1) ≡ gsconfig(g,0,e); gsconfig(g,0,-1) =~= inverse(config_word).
+        lemma_gsconfig_merge_free(n, g, e + 1, -1);
+        assert(e + 1 + (-1) == e);
+        lemma_gsconfig_in_subgroup(as_, n, g, e + 1);            // IH
+        crate::config_reduce::lemma_gsconfig_inverse(g, 0, 1);   // inverse(gsconfig(g,0,1)) =~= gsconfig(g,0,-1)
+        assert(inverse_word(ce[k]) =~= gsconfig(g, 0, -1));
+        lemma_gen_inverse_in_subgroup(fg, ce, k);
+        assert(in_generated_subgroup(fg, ce, gsconfig(g, 0, -1)));  // =~= inverse(ce[k])
+        lemma_product_in_subgroup(fg, ce, gsconfig(g, 0, e + 1), gsconfig(g, 0, -1));
+        lemma_in_subgroup_respects_equiv(fg, ce,
+            gsconfig(g, 0, e + 1) + gsconfig(g, 0, -1), gsconfig(g, 0, e));
+    }
+}
+
+/// **Reconstruction**: a canw `D` (all `s=0`) with coords ⊆ `as` lies in `⟨config_emb(as)⟩`.
+pub proof fn lemma_canw_in_config_subgroup(as_: Seq<nat>, n: nat, d: Seq<CanonLetter>)
+    requires
+        forall|i: int| 0 <= i < d.len() ==> {
+            &&& (#[trigger] d[i]).s == 0
+            &&& (exists|k: int| 0 <= k < as_.len() && as_[k] as int == d[i].r)
+        },
+    ensures
+        in_generated_subgroup(free_group((n + 3) as nat), config_emb(as_), canw_eval(d)),
+    decreases d.len(),
+{
+    let fg = free_group((n + 3) as nat);
+    lemma_free_group_valid((n + 3) as nat);
+    let ce = config_emb(as_);
+    if d.len() == 0 {
+        assert(canw_eval(d) =~= empty_word());
+        lemma_empty_in_subgroup(fg, ce);
+    } else {
+        let rest = d.drop_first();
+        assert(forall|i: int| 0 <= i < rest.len() ==> {
+            &&& (#[trigger] rest[i]).s == 0
+            &&& (exists|k: int| 0 <= k < as_.len() && as_[k] as int == rest[i].r)
+        }) by {
+            assert forall|i: int| 0 <= i < rest.len() implies {
+                &&& (#[trigger] rest[i]).s == 0
+                &&& (exists|k: int| 0 <= k < as_.len() && as_[k] as int == rest[i].r)
+            } by { assert(rest[i] == d[i + 1]); }
+        }
+        lemma_canw_in_config_subgroup(as_, n, rest);            // IH
+        // canl_eval(d[0]) = gsconfig(d[0].r, 0, d[0].e) ∈ ⟨ce⟩.
+        assert(d[0].s == 0 && (exists|k: int| 0 <= k < as_.len() && as_[k] as int == d[0].r));
+        lemma_gsconfig_in_subgroup(as_, n, d[0].r, d[0].e);
+        assert(canl_eval(d[0]) =~= gsconfig(d[0].r, 0, d[0].e));
+        lemma_product_in_subgroup(fg, ce, canl_eval(d[0]), canw_eval(rest));
+        assert(canw_eval(d) =~= canl_eval(d[0]) + canw_eval(rest));
+    }
 }
 
 // ----------------------------------------------------------------------------
