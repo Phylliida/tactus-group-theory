@@ -1,5 +1,15 @@
 # Brick 5 — C4: the σ-closure blocker and the RETARGETING redesign
 
+> **⚠ SUPERSEDED in part (2026-06-23) — read `docs/brick5-fork-reevaluation.md` FIRST.** §8's
+> route-A ("surgically peel a fixed `w`, invoke the iso only at pinch-middles") was found to have an
+> UNDESIGNED CORE: pinch-existence/base-descent route through `lemma_single_step_preserves_syls`,
+> which needs the *universal* iso for *every step of an arbitrary derivation* of `wgi ≡ ε` — not just
+> the fixed word's pinch-middles. So the iso CANNOT be word-restricted, and the "virtual iso" substitute
+> would require a new "virtual Britton's Lemma" (research-level, no extant sketch). Recommendation
+> (pending real-Danielle confirmation): pivot to **Fork A** (a predicate/countable presentation
+> foundation, common to Layer 0.5). The R1–R4 directional machinery here is still verified + reusable;
+> only the route-A packaging is blocked.
+
 Companion to `brick5-completeness-plan.md` (the C-arc) and `brick5-c3.2c-plan.md` (map_a/map_b).
 Written 2026-06-22 after discovering that C3.2's side condition `sigma_sat_upto` is **unsatisfiable**
 and the root cause is architectural, not a missing lemma. Read this before touching C4.

@@ -176,6 +176,15 @@ engine wants a base that *already* has the iso; our finite-(I) base does not.
 
 Both bottom out at the same circularity-breaker (`lemma_theorem1`).
 
+> **⚠ DECISION RE-OPENED (2026-06-23) — see `docs/brick5-fork-reevaluation.md`.** The Fork-B "virtual
+> iso" core was found to be UNDESIGNED (the two iso-consuming Britton calls route through
+> `lemma_single_step_preserves_syls`, which needs the *universal* iso over an *arbitrary* derivation —
+> not word-restrictable; "iso in the quotient" feeds standard Britton only circularly). Combined with
+> the post-decision finding that the a-levels are virtual too (Fork B now needs the engine at all
+> `2n+1` levels, not one), the cost calculus that favored Fork B has flipped. RECOMMENDATION (pending
+> real-Danielle confirmation): pivot to **Fork A** — a predicate/countable presentation foundation,
+> which is ALSO the common blocker for Layer 0.5. Treat the decision below as historical.
+
 **DECISION (2026-06-21, w/ Danielle): Fork B.** Fork A is an architectural trap — making the base use
 predicate-relators triggers a cascade of refactoring across every lemma that assumes a concrete finite
 presentation (`hnn`, `britton_via_tower`, `quotient`, the whole tower). Fork B is the surgical strike:
