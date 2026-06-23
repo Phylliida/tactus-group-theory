@@ -35,6 +35,12 @@ pub mod pred_hnn;
 #[cfg(verus_keep_ghost)]
 pub mod pred_free_product;
 
+// FORK-A brick 4: predicate-base amalgamated free products + add_relators_pred
+// (analog of amalgamated_free_product.rs + quotient.rs add_relators). The last
+// piece of the relator-agnostic CONSTRUCTION layer. Reversible, zero regression.
+#[cfg(verus_keep_ghost)]
+pub mod pred_amalgamated_free_product;
+
 #[cfg(verus_keep_ghost)]
 pub mod presentation_lemmas;
 
