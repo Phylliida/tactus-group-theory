@@ -25,7 +25,7 @@ use crate::presentation::{Presentation, presentation_valid, equiv_in_presentatio
 use crate::presentation_lemmas::{lemma_equiv_concat_left, lemma_equiv_concat_right};
 use crate::machine_group::{config_word, symbol_power, signed_power, gsconfig, CanonLetter,
     canl_eval, canw_eval, gexp, sym_exp, lemma_signed_power_add, lemma_signed_power_valid,
-    lemma_inverse_word_concat};
+    lemma_inverse_word_concat, lemma_gexp_concat, lemma_gexp_signed_power};
 use crate::ii_subset::lemma_signed_power_inverse;
 use crate::benign::{apply_embedding, apply_embedding_symbol};
 use crate::config_reduce::lemma_canw_eval_concat;
@@ -399,6 +399,47 @@ pub proof fn lemma_phi_step(p: Presentation, n: nat, m: nat, l: nat, s: Symbol, 
                 assert(head_v + trail =~= signed_power(1, k));
             }
         },
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Net x-exponent of a canw word is 0 (each config x⁻ʳ·tᵉ·xʳ has zero gen-1 exponent).
+// ----------------------------------------------------------------------------
+
+/// `gexp(1, canl_eval(c)) == 0` — `gsconfig(r,s,e)`'s `x⁻ʳ … xʳ` cancel in the gen-1 exponent.
+pub proof fn lemma_gexp1_canl_zero(c: CanonLetter)
+    ensures
+        gexp(1, canl_eval(c)) == 0,
+{
+    let r = c.r;
+    let s = c.s;
+    let e = c.e;
+    // canl_eval(c) = gsconfig(r,s,e) = sp(2,-s)+sp(1,-r)+sp(0,e)+sp(1,r)+sp(2,s).
+    lemma_gexp_concat(1, signed_power(2, -s) + signed_power(1, -r) + signed_power(0, e)
+        + signed_power(1, r), signed_power(2, s));
+    lemma_gexp_concat(1, signed_power(2, -s) + signed_power(1, -r) + signed_power(0, e),
+        signed_power(1, r));
+    lemma_gexp_concat(1, signed_power(2, -s) + signed_power(1, -r), signed_power(0, e));
+    lemma_gexp_concat(1, signed_power(2, -s), signed_power(1, -r));
+    lemma_gexp_signed_power(2, 1, -s);   // 0
+    lemma_gexp_signed_power(1, 1, -r);   // -r
+    lemma_gexp_signed_power(0, 1, e);    // 0
+    lemma_gexp_signed_power(1, 1, r);    // r
+    lemma_gexp_signed_power(2, 1, s);    // 0
+}
+
+/// `gexp(1, canw_eval(w)) == 0` — a config product lives in the normal closure of `t`.
+pub proof fn lemma_gexp1_canw_zero(w: Seq<CanonLetter>)
+    ensures
+        gexp(1, canw_eval(w)) == 0,
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        assert(canw_eval(w) =~= empty_word());
+    } else {
+        lemma_gexp_concat(1, canl_eval(w[0]), canw_eval(w.drop_first()));
+        lemma_gexp1_canl_zero(w[0]);
+        lemma_gexp1_canw_zero(w.drop_first());
     }
 }
 
