@@ -149,6 +149,12 @@ pub mod pred_tower;
 #[cfg(verus_keep_ghost)]
 pub mod britton_via_tower;
 
+// FA-9b: predicate-base port of britton_via_tower (Fork-A, the LAST normal-form
+// brick). Britton's lemma over a PredHNNData base via the pred_tower textbook
+// chain + FA-8's pred AFP machinery. Reversible, additive.
+#[cfg(verus_keep_ghost)]
+pub mod pred_britton_via_tower;
+
 #[cfg(verus_keep_ghost)]
 pub mod higman_operations;
 
