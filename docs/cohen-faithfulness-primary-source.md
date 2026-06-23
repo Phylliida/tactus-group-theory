@@ -545,3 +545,67 @@ coherent ~68-lemma unit at a real architectural seam; cramming it at a session t
 worse work than a precise handoff. Stopping here is sound project management, distinct from the
 prior "hold and write another analysis doc" pattern — real forward motion into the hard arc, then a
 clean seam. NEXT = FA-8 per the scope above.
+
+## 12. FA-8 COMPLETE — the AFP injectivity engine ported (2026-06-23, session 16)
+
+**Result.** `src/pred_normal_form_afp_textbook.rs` (12.4k) verifies **234 verified, 0 errors**
+(`./check.sh --verify-module pred_normal_form_afp_textbook`). Committed (`4341ff7`), additive/reversible.
+
+**What the port actually was — scope correction to §11.** The §11 estimate ("68 take
+`AmalgamatedData` ⟹ type-swap; ~147 reusable verbatim") was empirically **~3× off**: a structural
+scan found **191** of 215 proof fns take `AmalgamatedData` (98 structural-only + 93 that also touch
+`equiv_in_presentation`); only ~13 of the remaining 24 are truly reusable-verbatim (the rest still
+reference `equiv_in_presentation`). **BUT the deeper §7b claim was correct and load-bearing:** all 17
+finite-Seq `.relators[i]` references localize to exactly two spots (the index ref @1940 in
+`action_well_defined`, and the relator-classification `lemma_action_well_defined_proof` @6019–6058).
+Everywhere else the presentation enters only through `equiv_in_presentation` as a black box. So the 191
+type-swaps are **mechanical** (a wholesale copy + ordered regex symbol-map), and only ~4 functions were
+genuinely hand-rewritten. The "68 vs 191" gap was tedium, not difficulty.
+
+**Method (reusable recipe for FA-9 / future pred ports):**
+1. Wholesale copy the finite file.
+2. Ordered regex symbol-map: `AmalgamatedData→PredAmalgamatedData`, `equiv_in_presentation→
+   equiv_in_pred_presentation`, `Presentation→PredPresentation`, `DerivationStep→PredDerivationStep`,
+   `derivation_produces/valid→pred_*`, `apply_step→apply_step_pred`, the `_pred`-suffixed lemma
+   renames (`lemma_equiv_refl→lemma_pred_equiv_refl`, etc.), `free_product(→free_product_pred(`,
+   `amalgamation_relator(s)→amalgamation_relator(s)_pred`, `in_*_subgroup→*_pred`,
+   `identifications_isomorphic→_pred`. Word-boundary `\b…\b` subs are superstring-safe because `_` is a
+   word char (so `\bamalgamated_free_product\b` never fires inside `pred_amalgamated_free_product`).
+   Context-sensitive for module-path-vs-call: `name::`→pred module, `name(`→pred call.
+3. Reuse agnostic helpers VERBATIM (don't reroute): `crate::word`, `crate::symbol`, `crate::benign`
+   (mostly), `crate::shortlex`, `crate::todd_coxeter`, and the free_product WORD ops
+   (`shift_word`/`shift_symbol`/`lemma_shift_inverse_word`) + `normal_form_amalgamated::unshift_sym`.
+4. Fix the import header by hand (the `_pred` symbols live in `pred_normal_form_amalgamated`, not
+   `normal_form_amalgamated`).
+5. Hand-rewrite the index→predicate friction (4 fns; see below).
+6. Iterate `--verify-module`. **One Rust-compile cycle** surfaced the only missed dep: three
+   presentation-dependent `benign` fns (`in_generated_subgroup`, `lemma_identity_in_generated_subgroup`,
+   `lemma_generator_in_generated_subgroup`) — `in_generated_subgroup_pred` already existed in FA-7; the
+   two tiny lemmas were ported as local helpers. **Second cycle = 234/0.**
+
+**The 4 hand-rewrites (the math):**
+- `action_well_defined`: index-forall `forall i<afp.relators.len() … get_relator(afp,i,inv)` →
+  word-pred-forall `forall r. (afp.relators)(r) … get_relator_pred(r,inv)` (trigger on the conclusion,
+  covering `inverted`).
+- `lemma_act_word_deriv`: `RelatorInsert/Delete` arms carry `relator: Word` (not `relator_index`);
+  `assert((afp.relators)(relator))` follows from the successful `apply_step_pred` and instantiates the
+  word-forall. Free*/inverse-pair arms unchanged.
+- `lemma_action_well_defined_proof` (the classification): the index-range split becomes the definitional
+  disjunction. `(afp.relators)(r)` auto-reduces (no reveal needed — confirmed; FA-7's
+  `lemma_amalgamated_pred_valid` uses the same idiom) to `added_relators_pred(fp,amalg_rs,r) =
+  (fp.relators)(r) ∨ ∃j. r=amalg_rs[j]`; `(fp.relators)(r) = (p1.relators)(r) ∨
+  shifted_pred(p2.relators,n1,r)`. The shifted-p2 branch extracts `r2 = choose|w0| (p2.relators)(w0) &&
+  r==shift_word(w0,n1)` and feeds `lemma_g2_relator_acts_trivially(data,r2,…)` (which proves the
+  *shifted* word acts trivially). `lemma_add_relators_concat` DROPPED — the disjunction is definitional,
+  so the Seq-concat bridge isn't needed (a simplification vs the finite proof).
+- `lemma_afp_injectivity`/`_right`: `choose|steps: Seq<PredDerivationStep>| pred_derivation_produces(…)
+  == Some(ε)` (the `equiv_in_pred_presentation` exists-witness ports verbatim).
+- Plus `lemma_afp_num_gens_pred` (definitional `add_relators_pred` num_generators), replacing the
+  finite `lemma_add_relators_num_generators` call sites.
+
+**NEXT = FA-9.** Port the `britton_via_tower` base-embeds direction (`lemma_single_hnn_base_faithful`
+analog) over the predicate base — the LAST normal-form brick. After it, Cohen §1 (recognize
+A/Aᵢ/A₊/A₋ as p-HNN-of-free, read isos off, base-embeds-in-HNN) assembles Layer-2 completeness. The
+FA-8 recipe above should transfer: britton_via_tower is presentation-heavy but the same mechanical
+swap + localized-friction shape is expected. Gating unknown = whether the HNN base-embeds reverse
+direction has its own `.relators[i]`-style index friction beyond the AFP classification.
