@@ -29,9 +29,11 @@ use crate::phi_l_mapb::{phi_l_src, phi_F_family, sigma_betas, lemma_phi_F_family
     lemma_phi_l_src_len, lemma_phi_l_src_valid, lemma_phi_F_on_config, lemma_mapb_factor_source,
     lemma_pa_data_isomorphic};
 use crate::phi_l_pinch::lemma_map_a_forward;
-use crate::phi_l_lift::b_words;
-use crate::phi_l_maps::a_words;
-use crate::h3_ii::h2_II;
+use crate::phi_l_lift::{b_words, lemma_map_a_von_dyck_backward, lemma_map_b_von_dyck_backward};
+use crate::phi_l_maps::{a_words, lemma_a_words_is_phi_col0};
+use crate::h3_ii::{h2_II, lemma_phi_assoc_len};
+use crate::h3::{phi_assoc, lemma_phi_assoc_valid};
+use crate::layout::h2_num_gens;
 use crate::f_free_a1::{betas, lemma_betas_index};
 use crate::r_prime::{sigma_backsat, lemma_config_reflect_full, lemma_config_word_valid2};
 use crate::r_prime_b::{pa_rhs_emb, sigma_fwdsat, lemma_pa_rhs_reflect_full, lemma_phi_F_on_pa_rhs};
@@ -708,6 +710,91 @@ pub proof fn lemma_map_b_forward(mm: ModMachine, n: nat, m: nat, l: nat, alphas:
 
     // M2 ⟹ w ≡_{P_A} ε.
     lemma_mapb_M2(mm, n, m, l, bet, w);
+}
+
+// ----------------------------------------------------------------------------
+// C-asm — the crux biconditional `lemma_phi_l_iso_at_h2II` (the bottom crux at base `h2_II`).
+// ----------------------------------------------------------------------------
+
+/// **C-asm — the per-level φ_l iso crux at `h2_II`** (`docs/brick5-c3.2c-plan.md` §5).  For every
+/// `w` over the `k = n+4` association slots,
+///   `emb(a_words, w) ≡_{h2_II} ε  ⟺  emb(b_words, w) ≡_{h2_II} ε`,
+/// both directions chained through `w ≡_{P_A} ε` via the two FAITHFUL embeddings `P_A ↪ h2_II`
+/// (`map_a` = inclusion, `map_b` = φ_l), each a biconditional `emb(map, w) ≡_{h2_II} ε ⟺ w ≡_{P_A} ε`
+/// (forward = Britton-peel injectivity, backward = von Dyck).  This is the bottom of the a-tower that
+/// C3.2d's `decreases l` induction descends to.
+pub proof fn lemma_phi_l_iso_at_h2II(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, l: nat)
+    requires
+        mod_machine_wf(mm),
+        1 <= l <= 2 * n,
+        2 * n < m,
+        !alphas.contains(0nat),
+        alphas.no_duplicates(),
+        forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]),
+        sigma_backsat(betas(alphas), m, l),
+        sigma_fwdsat(betas(alphas), m, l),
+    ensures
+        hnn_associations_isomorphic(HNNData {
+            base: h2_II(mm, n, m, alphas),
+            associations: phi_assoc(g_m(mm).num_generators, n, m, l),
+        }),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let data = HNNData { base: h2_II(mm, n, m, alphas), associations: phi_assoc(nk, n, m, l) };
+    let k = data.associations.len();
+    lemma_phi_assoc_len(nk, n, m, l);
+    assert(k == n + 4);
+    let a_col = Seq::new(k, |i: int| data.associations[i].0);
+    let b_col = Seq::new(k, |i: int| data.associations[i].1);
+
+    // a_col == a_words, b_col == b_words (the literal crux lists).
+    lemma_a_words_is_phi_col0(mm, n, m, l);
+    assert(a_col =~= a_words(mm, n));
+    assert(b_col =~= b_words(mm, n, m, l));
+
+    // a_words images valid over h2_num_gens (= the von-Dyck-backward precondition).
+    lemma_phi_assoc_valid(nk, n, m, l, h2_num_gens(nk, n));
+    assert(a_words(mm, n).len() == n + 4) by { assert(a_col =~= a_words(mm, n)); }
+    assert forall|i: int| 0 <= i < a_words(mm, n).len() implies
+        word_valid(#[trigger] a_words(mm, n)[i], h2_num_gens(nk, n)) by {
+        assert(a_words(mm, n)[i] == a_col[i]);
+        assert(a_col[i] == data.associations[i].0);
+    }
+
+    // finite-slice for map_b backward: m·γ+l ∈ alphas for each γ ∈ betas (from σ-fwd-sat + l ≥ 1).
+    let bet = betas(alphas);
+    lemma_betas_index(alphas);
+    assert forall|j: int| 0 <= j < bet.len() implies
+        exists|kk: int| 0 <= kk < alphas.len() && alphas[kk] == m * (#[trigger] bet[j]) + l by {
+        assert(sigma_betas(bet, m, l)[j] == (m * bet[j] + l) as nat);
+        assert(bet.contains((m * bet[j] + l) as nat));                  // σ-fwd-sat
+        let kk0 = choose|kk0: int| 0 <= kk0 < bet.len() && bet[kk0] == (m * bet[j] + l) as nat;
+        assert(0 <= kk0 < bet.len() && bet[kk0] == (m * bet[j] + l) as nat);
+        assert(m * bet[j] + l >= 1);                                    // l ≥ 1
+        assert(kk0 != 0) by { assert(bet[0] == 0); }
+        assert(bet[kk0] == alphas[kk0 - 1]);
+    }
+
+    // the biconditional, chained through w ≡_{P_A} ε.
+    assert forall|w: Word| word_valid(w, k as nat) implies (
+        equiv_in_presentation(data.base, apply_embedding(a_col, w), empty_word())
+        <==>
+        equiv_in_presentation(data.base, apply_embedding(b_col, w), empty_word())
+    ) by {
+        assert(apply_embedding(a_col, w) == apply_embedding(a_words(mm, n), w));
+        assert(apply_embedding(b_col, w) == apply_embedding(b_words(mm, n, m, l), w));
+        if equiv_in_presentation(h2_II(mm, n, m, alphas), apply_embedding(a_words(mm, n), w),
+            empty_word()) {
+            lemma_map_a_forward(mm, n, m, alphas, w);                   // w ≡_{P_A} ε
+            lemma_map_b_von_dyck_backward(mm, n, m, l, alphas, w);      // emb(b_words, w) ≡ ε
+        }
+        if equiv_in_presentation(h2_II(mm, n, m, alphas), apply_embedding(b_words(mm, n, m, l), w),
+            empty_word()) {
+            lemma_map_b_forward(mm, n, m, l, alphas, w);                // w ≡_{P_A} ε
+            lemma_map_a_von_dyck_backward(mm, n, m, alphas, w);         // emb(a_words, w) ≡ ε
+        }
+    }
 }
 
 } // verus!
