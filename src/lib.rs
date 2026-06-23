@@ -205,6 +205,13 @@ pub mod higman_completeness;
 #[cfg(verus_keep_ghost)]
 pub mod f_free_a1;
 
+// h2_faithful: Layer 2 / Brick 3 payoff — `H₂ = HNN(H₁, p)` faithfully contains `H₁` (hence `C`).
+// `lemma_h2_associations_isomorphic` (the single p-association `(t,t·d)` is a subgroup iso) +
+// `lemma_h1_faithful_in_h2_pres` (`H₁ ↪ H₂` faithful). Both = A1 (`f_free_a1`) at the empty index set
+// (`recog_data(…,[]) = h2_data`, `h2_II(…,[]) = h2_pres`). Closes AGENDA §3.2's H₂ checkbox.
+#[cfg(verus_keep_ghost)]
+pub mod h2_faithful;
+
 // pa_data: Layer 2 / Brick 5, C3.2c / the C-arc — the abstract source presentation
 // `P_A = HNN(F=free_group(n+3), p | family II over F)`. F-indexing matches the a_words order
 // [t=0,x=1,d=2,b_j=2+j,p=n+3]. Pins the definition + validity; both crux directions route through
