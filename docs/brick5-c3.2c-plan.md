@@ -500,25 +500,25 @@ a homomorphism `P_A → P_A` (sends the β-relator to the (mβ+l)-relator, a P_A
   middle `emb(φ_F, u) ∈ AssocSub(P_A)` forces **(R) the config-reflection** `u ∈ AssocSub(P_A)`; pinch
   out (`lemma_pd_pinch_out`, GENERIC, reused from map_a) + recurse.
 
-### The two genuinely-new hard sub-lemmas (each ~a session):
+### The two genuinely-new hard sub-lemmas:
 
 **(A) φ_F injective on free F** = `is_free_family(free(n+3), [config(l,0), xᵐ, b_l·d, b_1..b_n])`
-(= the φ_l-image family is free).  De-risked ladder (uses the f_free Britton-over-empty-HNN spanning
-tool, which already proved `[t,x,b,d]` free in the tower):
-  - (i) `[config(l,0), xᵐ]` free in `pres_tx = free(2)`: `psi_F_images(m)=[t,xᵐ]` free
-    (`lemma_psi_F_injective`) + a NEW **conjugate-free-family** lemma (`[g_i]` free ⟹ `[w g_i w⁻¹]`
-    free; here `config(l,0)=x⁻ˡ·t·xˡ`, `xᵐ=x⁻ˡ·xᵐ·xˡ`, so the family is `psi_F_images(m)` conjugated
-    by `x⁻ˡ` — `lemma_free_family_conjugate`, ~general, reusable).
-  - (ii)/(iii) extend by `b_1..b_n` then `d` as **free stable letters**
-    (`f_free::lemma_extend_free_by_stable`, iterated like `f_free_tower`) → `[config(l,0),xᵐ,b_1..b_n,d]`
-    free in `free(n+3)`.
-  - (iv) **Nielsen transvection**: replace `d` by `b_l·d` (`b_l` already in the family) → still free
-    (NEW `lemma_free_family_transvection`: `[..,g_i,..,g_j,..]` free ⟹ `[..,g_i,..,g_j·g_i,..]` free;
-    general, reusable).
-  - (v) permute to φ_F's order `[config(l,0),xᵐ,b_l·d,b_1..b_n]` (`lemma_free_family_permute`, DONE).
-  Equivalent restatement: `φ_F inj on free F ⟺ b_words_F free in h1` (circular — must prove via (A) directly).
+(= the φ_l-image family is free).  **✅ COMPLETE (session 4, `lemma_phi_F_family_free`, `phi_l_mapb`
+13/0).**  Built via the f_free Britton-over-empty-HNN spanning tool + two new general reusable
+free-family lemmas (`free_family_perm` 15/0):
+  - (i) `lemma_tx_image_free`: `[config(l,0), xᵐ]` free in `pres_tx = free(2)`.  `psi_F_images(m)=[t,xᵐ]`
+    free (`lemma_psi_F_injective`) + `lemma_free_family_conjugate` (NEW: uniform conjugation preserves
+    freeness; `[config(l,0),xᵐ] = conjugate_family(psi_F_images(m), x⁻ˡ)` per-gen) + `lemma_free_family_respects_equiv`
+    (NEW: freeness invariant under per-gen `≡`; handles `xᵐ ≡ x⁻ˡxᵐxˡ`).
+  - (ii)/(iii) `lemma_txd_b_free`: iterate `f_free_tower::lemma_free_stable_tower_extends` `n+1`× over
+    the rung-(i) seed → `[config(l,0),xᵐ,d,b_1..b_n]` free in `free(n+3)` (tower closed form gives the
+    base `== free(n+3)`).  Natural order = `d` at index 2 then `b_1..b_n`.
+  - (iv) `lemma_free_family_transvect` (NEW, general): `d ↦ b_l·d` (left-mult `Gen2` by the b-letter
+    `alphabet_letter(3,n,l)`) — a Nielsen transvection, preserves freeness (`compose(gens, transvect_emb)`;
+    `transvect_emb` injective via `τ⁻¹` + per-gen `≡_free` id).  Output IS `phi_F_family` (no permute (v)
+    needed — the tower order already matches φ_F's).
 
-**(R) config-reflection over free F** (the companion-confirmed crux): `emb(φ_F, u) ∈
+**(R) config-reflection over free F** — THE remaining hard sub-lemma (the companion-confirmed crux): `emb(φ_F, u) ∈
 ⟨config(β):β∈betas⟩_{free F} ⟹ u ∈ ⟨config(β):β∈betas⟩_{free F}` (a-side; b-side analog via `pa_rhs`).
 Route (companion 2026-06-22): (1) free-product retraction `F = ⟨t,x⟩ * ⟨d,b⟩` reduces `u` to `⟨t,x⟩`
 (`φ_F` diagonal; `A_low ⊂ ⟨t,x⟩`; `ρ_db∘φ_F = φ_db∘ρ_db`, `φ_db` inj on `⟨d,b⟩`); (2) within free
