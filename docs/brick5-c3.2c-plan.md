@@ -518,14 +518,29 @@ free-family lemmas (`free_family_perm` 15/0):
     `transvect_emb` injective via `τ⁻¹` + per-gen `≡_free` id).  Output IS `phi_F_family` (no permute (v)
     needed — the tower order already matches φ_F's).
 
-**(R) config-reflection over free F** — THE remaining hard sub-lemma (the companion-confirmed crux): `emb(φ_F, u) ∈
+**(R) config-reflection over free F** — THE remaining hard sub-lemma: `emb(φ_F, u) ∈
 ⟨config(β):β∈betas⟩_{free F} ⟹ u ∈ ⟨config(β):β∈betas⟩_{free F}` (a-side; b-side analog via `pa_rhs`).
-Route (companion 2026-06-22): (1) free-product retraction `F = ⟨t,x⟩ * ⟨d,b⟩` reduces `u` to `⟨t,x⟩`
-(`φ_F` diagonal; `A_low ⊂ ⟨t,x⟩`; `ρ_db∘φ_F = φ_db∘ρ_db`, `φ_db` inj on `⟨d,b⟩`); (2) within free
-`⟨t,x⟩`, the t-conjugate subgroup reflection via the **canw machinery** (`config_emb_eq_canw` +
-`lemma_canw_eval_nontrivial` injectivity): `φ_F` relabels the conjugating index `β↦mβ+l` (an injective
-σ, σ(betas)⊆betas by side cond), so reading canonical conjugating indices + matching against σ-image
-gives the descent.  **The hardest piece**; comparable to the Layer-1 t-freeness/config-injectivity arc.
+
+**REDUCED to (R') via the DONE generic intersection property (session 4 insight).** Apply
+`phi_l_forward::lemma_intersection_property(free(n+3), ψ=phi_F_family, pa_gens=config_emb(betas), u)`:
+its hypotheses are `phi_F_family` free (= (A), DONE) + `emb(phi_F_family, u) ∈ ⟨compose(phi_F_family,
+config_emb(betas))⟩`, and `compose(phi_F_family, config_emb(betas)) = config_emb(σ(betas))` where
+`σ(β)=mβ+l` (since `emb(phi_F_family, config(β,0)) = config(mβ+l,0)`, the digit-scaling, = the gens-0,1
+restriction of `lemma_phi_l_on_config_zero`).  Its conclusion is `u ∈ ⟨config_emb(betas)⟩` — exactly (R).
+So **(R) ⟸ (R')**:
+> **(R')**: `emb(φ_F, u) ∈ ⟨config_emb(betas)⟩ ⟹ emb(φ_F, u) ∈ ⟨config_emb(σ(betas))⟩`
+> (a config-product over `betas` that lies in `Image(φ_F)` actually lies in the σ-shifted sub-subgroup
+> `⟨config(mβ+l):β∈betas⟩`; note `σ(betas) ⊆ betas` by the side cond, so `⟨config_emb(σ(betas))⟩ ⊆
+> ⟨config_emb(betas)⟩`).
+
+(R') is the irreducible index-tracking core (no shortcut found — it is genuinely "which config-products
+lie in `Image(φ_F)∩⟨t,x⟩`": exactly those whose conjugating indices `≡ l (mod m)`, i.e. `∈ σ(ℕ)`).
+Route: free-product retraction `F = ⟨t,x⟩ * ⟨d,b⟩` (`free(n+3) == free_product(free(2), free(n+1))` via
+`lemma_free_stable_tower_is_free_product`; `φ_F` diagonal; `φ_db` inj on `⟨d,b⟩` = a transvection,
+reuse `lemma_free_family_transvect`) to reduce to `⟨t,x⟩`, then the **canw machinery** (`config_emb_eq_canw`
++ `lemma_canw_eval_nontrivial` injectivity) reads conjugating indices and matches against σ's image.
+CAVEAT: canw is built over `base_A` (has `[x,y]` relator), so adapting it to free `⟨t,x⟩` needs care.
+**The hardest remaining piece**; ≈ the Layer-1 t-freeness/config-injectivity arc. A fresh focused session.
 
 ### Then
 - C-asm `lemma_phi_l_iso_at_h2II` = map_a (DONE) + map_b (von-Dyck DONE + forward) chained through `w ≡_{P_A} ε`.
