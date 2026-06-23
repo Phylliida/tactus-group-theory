@@ -177,8 +177,16 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 *`docs/higman-embedding-blueprint.md` (Cohen §9.6). Build on the finished `G(M)=K_M`.*
 
 - [ ] **Layer 0.5** — Higman–Neumann–Neumann: embed the (countable, recursively presented) CEER
-      group into a **f.g.** recursively presented `C=⟨c₁,…,cₙ;S⟩`. (Locate Cohen's "Embedding
-      Theorem", p.278.)
+      group into a **f.g.** recursively presented `C=⟨c₁,…,cₙ;S⟩`. **SOURCE LOCATED 2026-06-23**:
+      Cohen's book PDF is a SCANNED image (no text); use Miller `../verus-group-theory/CGTMiller.pdf`
+      §4.1 Thm 4.1 (PDF pp.53–54) — exact construction `L=C⋆F₂`, free bases `A=⟨b,cᵢa⁻ⁱbaⁱ⟩`/`B=⟨a,
+      b⁻ⁱabⁱ⟩`, HNN over `L` with `t`, 2-generated `G=⟨a,t|D̄⟩⊇C` (`docs/higman-embedding-blueprint.md`
+      §"Build order" step 2). **⚠ BLOCKED on a foundational design decision (co-design w/ Danielle):**
+      the input is **infinitely generated** (CEER's `gₙ`, n∈ℕ) but `Presentation.num_generators` is a
+      finite `nat` — Layer 0.5 needs a representation for infinitely-generated groups before it can be
+      stated. Crux foundational lemma = `{a⁻ⁱbaⁱ}` free in `F₂` (representation-independent, but a
+      fresh from-scratch normal-form arc; the existing `f_free.rs` freeness descends via retractions,
+      never computing a free normal form).
 - [ ] **word-numbering bridge** — `wα(c)`, with `wα(c)∈S ⟺ (α,0)∈H₀(M)` (ties the relator set `S`
       to the machine, built from the reduction in §3.3).
 - [x] **H₁ = K_M ∗ (C × ⟨b_j⟩) ∗ ⟨d⟩** — literal finite `h1_base` built (`h1.rs`), and
@@ -196,8 +204,12 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
     ↔ `lemma_signed_power_add`; zero-cancellation ↔ free reduction) ⟹ `w ≡_free ε`.
   - **Assembly**: instantiate the engine at φ=`kill_hom`, whose image of `basis_elt` IS the
     config family (`lemma_comp_is_config_emb`, from `lemma_kill_on_basis_elt`), then F2.
-- [ ] **H₂ = HNN(H₁, p | p⁻¹ tα p = tα wα(b) d)** — contains `C`. (Literal single-relation
-      `h2.rs` built; the free basis above is the prerequisite for its HNN faithfulness.)
+- [x] **H₂ = HNN(H₁, p | p⁻¹ tα p = tα wα(b) d)** — contains `C` — **DONE** (`h2_faithful.rs` 4/0).
+      `lemma_h2_associations_isomorphic` (the single p-association `(t,t·d)` is a subgroup iso) +
+      `lemma_h1_faithful_in_h2_pres` (`H₁ ↪ H₂` faithful, hence `C ⊆ H₂` since `C ⊆ H₁`). Both are
+      clean corollaries of A1 (`f_free_a1`) at the **empty index set**: `recog_data(…,[]) = h2_data`
+      and `h2_II(…,[]) = h2_pres` (family (II) empty), so no new proof work — only the empty-index
+      identification (`m` free; pick `m=2n+1`). The free basis was the prerequisite, consumed inside A1.
 - [x] **H₃ = HNN(H₂, aᵢ (1≤i≤2n), k | aᵢ:A↔Aᵢ, k:A₊↔A₋)** — built as the literal finite
       presentation `h3_pres` (`h3.rs` 16/0), valid (`lemma_h3_pres_valid`).
 - [x] **finiteness of relations (I) — SOUNDNESS DONE** (`higman_consequences.rs` 60/0,
