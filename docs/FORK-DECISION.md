@@ -4,18 +4,33 @@
 `cohen-faithfulness-primary-source.md` (§1–§10), `brick5-fork-reevaluation.md`, `brick5-c4-plan.md`.
 Last updated 2026-06-23 (session 14).*
 
-> **STATUS UPDATE 2026-06-23 (session 14): Fork-A STARTED — the elementary foundation arc is DONE
-> and ports VERBATIM.** On the strength of the standing "follow the textbook" instruction (Fork-A IS
-> the textbook) + an explicit peer "Go", this session built the relator-agnostic foundation as
-> separate, reversible `pred_*` modules: `pred_presentation_lemmas` (15/0), `pred_hnn` (10/0),
-> `pred_free_product` (7/0), `pred_amalgamated_free_product` (11/0) — all FIRST TRY (joining
-> `pred_presentation` 8/0). This **answers the "does the type-swap port with SMT closing?" question =
-> YES across the whole elementary + CONSTRUCTION layer** (presentation, congruence, HNN, free product
-> incl. the predicate `shift`, AFP). **That layer is now exhausted** — every remaining brick is the
-> reserved multi-week **AFP normal-form / Britton-tower arc** (the hard reverse base-embeds
-> faithfulness, `cohen-faithfulness-primary-source.md` §10). **The ask below now reads: confirm
-> continuing into the normal-form arc** (the foundation is a clean reversible down-payment; redirect
-> if you'd scope it differently).
+> **STATUS UPDATE 2026-06-23 (session 15): the NORMAL-FORM ARC IS UNDER WAY — bottom 3 layers port
+> verbatim, and a CAYLEY LEAPFROG cut the scope.** Session 15 took the go on continuing the port
+> (the *direction* is settled by the standing "follow the textbook" instruction — Cohen = AFP/Britton
+> = the existing substrate = the predicate port; the named Bass–Serre alternative would ABANDON that
+> substrate and is itself the warned-against reinvention; companion concurred). Shipped, all FIRST-TRY,
+> reversible modules, crate GREEN (1912 verified, 20 pre-existing errors): **`pred_homomorphism` (FA-5,
+> 19/0)**, **`pred_normal_form_free_product` (FA-6, 11/0)**, **`pred_normal_form_amalgamated` (FA-7,
+> spec-only interface)**. **CAYLEY LEAPFROG:** the heavy ~70-relator-site Cayley injectivity in
+> `normal_form_amalgamated.rs` is an ALTERNATE proof OFF the critical path — the file britton consumes
+> is `normal_form_afp_textbook.rs`, which needs only the thin spec interface (now FA-7) — so the port
+> skips it entirely. **NEXT = FA-8**: port `normal_form_afp_textbook.rs` (12.4k; only 68 of 215 proof
+> fns take `AmalgamatedData`, the other ~147 + specs are presentation-agnostic ⟹ reused verbatim; the
+> one rewritten lemma is the relator-classification @6019-6058 → predicate disjunction). Then FA-9 =
+> the `britton_via_tower` base-embeds direction. Full scope in `cohen-faithfulness-primary-source.md`
+> §11. **The reserved multi-week commit is now in progress as reversible bricks; the remaining bulk is
+> FA-8 (a fresh focused session) + FA-9.**
+
+> **(session 14): Fork-A STARTED — the elementary foundation arc is DONE and ports VERBATIM.** On the
+> strength of the standing "follow the textbook" instruction (Fork-A IS the textbook) + an explicit
+> peer "Go", this session built the relator-agnostic foundation as separate, reversible `pred_*`
+> modules: `pred_presentation_lemmas` (15/0), `pred_hnn` (10/0), `pred_free_product` (7/0),
+> `pred_amalgamated_free_product` (11/0) — all FIRST TRY (joining `pred_presentation` 8/0). This
+> **answers the "does the type-swap port with SMT closing?" question = YES across the whole elementary
+> + CONSTRUCTION layer** (presentation, congruence, HNN, free product incl. the predicate `shift`,
+> AFP). **That layer is now exhausted** — every remaining brick is the reserved **AFP normal-form /
+> Britton-tower arc** (the hard reverse base-embeds faithfulness, `cohen-faithfulness-primary-source.md`
+> §10), which session 15 then began (see top).
 
 ---
 
