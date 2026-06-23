@@ -394,12 +394,25 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       `lemma_sat_bridge` (coords ⊆ bet∩σ(ℤ) ⊆ σ(bet)) → free cw_reduce eval (kill_y retraction of base_A
       `lemma_cw_reduce_eval`) → reconstruction (`gsconfig` power-in-subgroup recursion).  Reused config_reduce's
       coordinate-SURVIVAL crux (no full normal-form uniqueness needed).
-      **NEXT** (§5/§6 checklists): wire (R) into **M2 step case** (Britton-peel `emb(φ_l_src,w)` over `pa_data`,
-      `decreases stable_count`: base case = φ_F-injective-on-free-F = DONE `lemma_phi_F_family_free`; step case
-      pinch-middle now closes via `lemma_config_reflect_full`) → **map_b forward** (`emb(b_words,w)≡_{h2_II}ε ⟹
-      w≡_{P_A}ε`, via M1 factoring DONE + map_a forward DONE + M2) → **C-asm** (`lemma_phi_l_iso_at_h2II`: crux
-      biconditional from map_a both + map_b both through `w≡_{P_A}ε`) → **C3.2d** (`decreases l` outer induction)
-      → C2/C4/C5.  **C4 must pick the finite `alphas` σ-CLOSED (both directions) to satisfy `sigma_backsat`.**
+      **C3.2c BOTTOM CRUX COMPLETE 2026-06-22 (session 6): `lemma_phi_l_iso_at_h2II` VERIFIED.** The entire
+      map_b-forward arc + the b-side reflection + C-asm landed (gate now 1731/20, +103 clean). New modules:
+      **`r_prime_b.rs` 17/0** = the b-side (R)_b/(R')_b reflection over `pa_rhs` (Danielle's route: kill_db
+      projection `pa_rhs↦config` → reuse a-side coord core `lemma_phi_prime_in_sigma_config` [=`lemma_r_prime`
+      steps 2-7 extracted] → generic `lemma_free_family_subgroup_transfer` carrying the σ-restriction from the
+      config_emb basis to the pa_rhs_emb basis; `lemma_pa_rhs_reflect_full` is the M2 b-column pinch-middle
+      consumable, mirror of `lemma_config_reflect_full`). **`phi_l_mapb_fwd.rs` 8/0** = M2 + map_b fwd + C-asm:
+      `lemma_mapb_pinch_descends` (the SPANNING pinch-descent, port of `lemma_extend_pinch_descends` since
+      `φ_l_src=stable_emb(free(n+3),φ_F_family)`, middle reflected via (R) a/b) + `lemma_phi_l_src_on_pa_relator`
+      (von-Dyck P_A→P_A) + `lemma_mapb_M2` (φ_l_src injective on P_A, Britton peel mirroring map_a fwd) +
+      `lemma_map_b_forward` (= M1 factoring + map_a fwd + M2) + `lemma_phi_l_iso_at_h2II` (C-asm = map_a fwd/bwd
+      + map_b fwd/bwd glued through `w≡_{P_A}ε`). Side conds = `sigma_backsat(betas)` + `sigma_fwdsat(betas)`
+      (the σ-forward-saturation dual, new); finite-slice for map_b-bwd derived from fwd-sat + l≥1.
+      **NEXT = C3.2d** (the ONLY remaining C3.2 item): the `decreases l` outer induction `lemma_phi_l_iso`
+      building `hnn_associations_isomorphic(phi_l_data(..,l))` (base = `h3_II_upto(l-1)`, NOT h2_II) at every
+      a-tower level, from C-asm (bottom crux at h2_II=h3_II_upto(0)) + IH-descent. **Mirror
+      `lemma_b_m_upto_faithful`.** C3.2d-infra DONE (`lemma_phi_l_emb_h2_valid`,
+      `lemma_h2II_equiv_lifts_to_tower`, `lemma_phi_l_data_{base,valid}`). Then C2(p-level)/C4/C5. **C4 must
+      pick the finite `alphas` σ-CLOSED BOTH directions to satisfy `sigma_backsat`+`sigma_fwdsat`.**
 
 ### 3.3 — The ZFC bridge + instantiation
 - [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).
