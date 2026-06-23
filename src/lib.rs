@@ -406,3 +406,9 @@ pub mod cohen_h2;
 // =1 in C, no infinite-association Britton needed. docs/cohen-section1-assembly-plan.md §3.
 #[cfg(verus_keep_ghost)]
 pub mod cohen_retraction;
+
+// cohen_h3: Layer 2 — Cohen §1 assembly, brick CS-3. The predicate H₃ tower scaffold: the
+// single-letter PredHNN tower h3_pred_upto (H₂ → +a_i → +k) over h2_pred, reusing phi_assoc/
+// psi_assoc verbatim; defs + validity + num-gens. docs/cohen-section1-assembly-plan.md §1/§5.
+#[cfg(verus_keep_ghost)]
+pub mod cohen_h3;
