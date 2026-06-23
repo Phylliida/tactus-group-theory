@@ -21,7 +21,7 @@ use crate::word::*;
 use crate::machine_group::{ModMachine, g_m, config_word, symbol_power, lemma_g_m_num_generators};
 use crate::layout::{d_idx, b_base, b_idx, p_idx};
 use crate::benign::{apply_embedding, apply_embedding_symbol, lemma_apply_embedding_concat,
-    lemma_apply_embedding_valid};
+    lemma_apply_embedding_valid, in_generated_subgroup};
 use crate::word_numbering::alphabet_letter;
 use crate::pa_data::pa_b_base;
 use crate::phi_l_maps::{a_words, lemma_a_words_fixes_config, lemma_a_words_on_alpha_letter,
@@ -49,7 +49,10 @@ use crate::presentation_lemmas::{lemma_equiv_concat_left, lemma_word_inverse_lef
 use crate::word_numbering::numbers_word;
 use crate::machine_group::{mod_machine_wf, pres_tx, psi_F_images, lemma_psi_F_injective,
     lemma_config_word_valid, lemma_symbol_power_merge, lemma_inverse_word_sympower,
-    lemma_symbol_power_valid};
+    lemma_symbol_power_valid, lemma_word_valid_mono};
+use crate::free_basis::config_emb;
+use crate::phi_l_forward::lemma_intersection_property;
+use crate::higman_operations::lemma_free_group_valid;
 use crate::phi_l_iso::lemma_config_zero_form;
 use crate::free_family_perm::{conjugate_family, lemma_free_family_conjugate,
     lemma_free_family_respects_equiv};
@@ -694,6 +697,76 @@ proof fn lemma_phi_F_compose_eq(n: nat, m: nat, l: nat)
             }
         }
     }
+}
+
+// ----------------------------------------------------------------------------
+// (R) config-reflection — the (R)⟸(R') glue via the DONE intersection property.
+// ----------------------------------------------------------------------------
+
+/// The index-shift `σ(β) = m·β + l` applied to a `betas` list.
+pub open spec fn sigma_betas(bet: Seq<nat>, m: nat, l: nat) -> Seq<nat> {
+    Seq::new(bet.len(), |i: int| (m * bet[i] + l) as nat)
+}
+
+/// `compose(phi_F_family, config_emb(bet)) =~= config_emb(σ(bet))` — `φ_F` carries each config
+/// generator `config(β,0)` to `config(mβ+l,0)` (`lemma_phi_F_on_config`).  The recog-vs-pa column
+/// relation for `ψ = φ_F`: the intersection property reads `φ_F`'s a-column image as `config_emb(σ(bet))`.
+pub proof fn lemma_compose_phi_F_config_emb(mm: ModMachine, n: nat, m: nat, l: nat, bet: Seq<nat>)
+    requires
+        1 <= l <= 2 * n,
+    ensures
+        compose_embeddings(phi_F_family(n, m, l), config_emb(bet))
+            =~= config_emb(sigma_betas(bet, m, l)),
+{
+    let pf = phi_F_family(n, m, l);
+    let ce = config_emb(bet);
+    let sb = sigma_betas(bet, m, l);
+    assert(compose_embeddings(pf, ce).len() == bet.len());
+    assert(config_emb(sb).len() == sb.len() == bet.len());
+    assert forall|i: int| 0 <= i < bet.len() implies
+        compose_embeddings(pf, ce)[i] =~= config_emb(sb)[i] by {
+        assert(compose_embeddings(pf, ce)[i] == apply_embedding(pf, ce[i]));
+        assert(ce[i] == config_word(bet[i], 0));
+        lemma_phi_F_on_config(mm, n, m, l, bet[i]);
+        assert(config_emb(sb)[i] == config_word(sb[i], 0));
+        assert(sb[i] == m * bet[i] + l);
+    }
+}
+
+/// **(R) ⟸ (R') — the config-reflection glue (a-side)**: given `(R')` (`emb(φ_F, u) ∈
+/// ⟨config_emb(σ(bet))⟩`, i.e. the `φ_F`-image lies in the σ-shifted config subgroup), conclude `u ∈
+/// ⟨config_emb(bet)⟩`.  Pure application of the DONE generic `lemma_intersection_property` with
+/// `ψ = φ_F` (free, = sub-lemma (A)) and `pa_gens = config_emb(bet)`: its column hypothesis
+/// `compose(φ_F, config_emb(bet)) = config_emb(σ(bet))` is `lemma_compose_phi_F_config_emb`, and the
+/// supplied `(R')` membership discharges its subgroup hypothesis.  **The lone remaining hole is `(R')`
+/// itself** (the canw index-tracking — a config-product over `bet` in `Image(φ_F)` lies in
+/// `⟨config_emb(σ(bet))⟩`), which this glue isolates.
+pub proof fn lemma_config_reflect_a(mm: ModMachine, n: nat, m: nat, l: nat, bet: Seq<nat>, u: Word)
+    requires
+        1 <= l <= 2 * n,
+        m >= 1,
+        word_valid(u, (n + 3) as nat),
+        in_generated_subgroup(free_group((n + 3) as nat), config_emb(sigma_betas(bet, m, l)),
+            apply_embedding(phi_F_family(n, m, l), u)),                          // (R')
+    ensures
+        in_generated_subgroup(free_group((n + 3) as nat), config_emb(bet), u),  // (R)
+{
+    let fg = free_group((n + 3) as nat);
+    let pf = phi_F_family(n, m, l);
+    let ce = config_emb(bet);
+    lemma_free_group_valid((n + 3) as nat);
+    lemma_phi_F_family_free(n, m, l);                            // is_free_family(fg, pf)
+    assert(pf.len() == n + 3);
+    // config_emb(bet) entries valid over pf.len() = n+3.
+    assert forall|k: int| 0 <= k < ce.len() implies word_valid(#[trigger] ce[k], pf.len()) by {
+        assert(ce[k] == config_word(bet[k], 0));
+        lemma_config_word_valid(bet[k], 0);                     // word_valid(·, 3)
+        lemma_word_valid_mono(config_word(bet[k], 0), 3, (n + 3) as nat);
+    }
+    // compose(pf, ce) = config_emb(σ(bet)), so the (R') hypothesis IS the intersection hypothesis.
+    lemma_compose_phi_F_config_emb(mm, n, m, l, bet);
+    assert(compose_embeddings(pf, ce) == config_emb(sigma_betas(bet, m, l)));
+    lemma_intersection_property(fg, pf, ce, u);
 }
 
 /// One direction of `lemma_pa_data_isomorphic` (a-side⟹b-side when `fwd`, else b-side⟹a-side).
