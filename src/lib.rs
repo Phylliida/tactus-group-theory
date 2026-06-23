@@ -29,6 +29,12 @@ pub mod pred_presentation_lemmas;
 #[cfg(verus_keep_ghost)]
 pub mod pred_hnn;
 
+// FORK-A brick 3: predicate-base free products (analog of free_product.rs).
+// Introduces the predicate shift (§4); word-level shift reused from finite
+// free_product. Reversible, zero regression.
+#[cfg(verus_keep_ghost)]
+pub mod pred_free_product;
+
 #[cfg(verus_keep_ghost)]
 pub mod presentation_lemmas;
 
