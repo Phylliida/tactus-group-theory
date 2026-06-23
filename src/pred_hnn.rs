@@ -2,6 +2,7 @@ use vstd::prelude::*;
 use crate::symbol::*;
 use crate::word::*;
 use crate::pred_presentation::*;
+use crate::pred_presentation_lemmas::*;
 use crate::benign::apply_embedding;
 
 verus! {
@@ -300,6 +301,87 @@ pub proof fn lemma_base_embeds_in_pred_hnn(data: PredHNNData, w1: Word, w2: Word
     lemma_derivation_valid_in_pred_hnn(data, d.steps, w1, w2);
     let d_hnn = PredDerivation { steps: d.steps };
     assert(pred_derivation_valid(hnn_pred_presentation(data), d_hnn, w1, w2));
+}
+
+///  The HNN conjugation relation: t⁻¹·a_i·t ≡ b_i in the HNN presentation.
+///  By construction t⁻¹·a_i·t·b_i⁻¹ is a relator, so it equals ε, hence
+///  t⁻¹·a_i·t ≡ b_i.  Port of `lemma_hnn_conjugation` (`hnn.rs:173`), using
+///  FA-1's validity lemma + FA-2's congruence algebra.
+pub proof fn lemma_hnn_pred_conjugation(data: PredHNNData, i: int)
+    requires
+        0 <= i < data.associations.len(),
+        hnn_pred_data_valid(data),
+    ensures
+        equiv_in_pred_presentation(
+            hnn_pred_presentation(data),
+            Seq::new(1, |_j: int| stable_letter_inv_pred(data))
+                + data.associations[i].0
+                + Seq::new(1, |_j: int| stable_letter_pred(data)),
+            data.associations[i].1,
+        ),
+{
+    let hp = hnn_pred_presentation(data);
+    let ng = data.base.num_generators;
+    let n = (ng + 1) as nat;
+    let (a_i, b_i) = data.associations[i];
+    let t = stable_letter_pred(data);
+    let t_inv = stable_letter_inv_pred(data);
+    let lhs = Seq::new(1, |_j: int| t_inv) + a_i + Seq::new(1, |_j: int| t);
+
+    //  hp is valid (FA-1)
+    lemma_hnn_pred_presentation_valid(data);
+
+    //  relator ≡ ε (FA-2 word-carrying relator-is-identity)
+    let relator = hnn_relator_pred(data, i);
+    assert(hnn_extra_relator_pred(data, relator)) by {
+        assert(0 <= i < data.associations.len() && relator == hnn_relator_pred(data, i));
+    }
+    assert((hp.relators)(relator));
+    lemma_pred_relator_is_identity(hp, relator);
+
+    assert(relator =~= concat(lhs, inverse_word(b_i)));
+
+    //  concat(relator, b_i) ≡ b_i
+    lemma_pred_equiv_concat_left(hp, relator, empty_word(), b_i);
+    assert(concat(empty_word(), b_i) =~= b_i);
+    lemma_pred_equiv_refl(hp, b_i);
+    lemma_pred_equiv_transitive(hp, concat(relator, b_i), concat(empty_word(), b_i), b_i);
+
+    assert(concat(relator, b_i) =~= concat(lhs, concat(inverse_word(b_i), b_i)));
+
+    //  inv(b_i) · b_i ≡ ε
+    lemma_pred_word_inverse_left(hp, b_i);
+
+    //  lhs · (inv(b_i) · b_i) ≡ lhs · ε ≡ lhs
+    lemma_pred_equiv_concat_right(hp, lhs, concat(inverse_word(b_i), b_i), empty_word());
+    assert(concat(lhs, empty_word()) =~= lhs);
+    lemma_pred_equiv_refl(hp, lhs);
+    lemma_pred_equiv_transitive(hp, concat(lhs, concat(inverse_word(b_i), b_i)), concat(lhs, empty_word()), lhs);
+
+    //  word_valid pieces for the symmetric call
+    assert(word_valid(b_i, ng));
+    lemma_word_valid_succ(b_i, ng);
+    crate::word::lemma_inverse_word_valid(b_i, n);
+    crate::word::lemma_concat_word_valid(inverse_word(b_i), b_i, n);
+
+    assert(word_valid(a_i, ng));
+    lemma_word_valid_succ(a_i, ng);
+    assert(symbol_valid(t, n));
+    assert(symbol_valid(t_inv, n));
+    lemma_singleton_word_valid(t, n);
+    lemma_singleton_word_valid(t_inv, n);
+    let t_w = Seq::new(1, |_j: int| t);
+    let t_inv_w = Seq::new(1, |_j: int| t_inv);
+    crate::word::lemma_concat_word_valid(t_inv_w, a_i, n);
+    crate::word::lemma_concat_word_valid(t_inv_w + a_i, t_w, n);
+    assert(lhs =~= (t_inv_w + a_i) + t_w);
+    assert(word_valid(lhs, n));
+    crate::word::lemma_concat_word_valid(lhs, concat(inverse_word(b_i), b_i), n);
+
+    //  symmetric: lhs ≡ concat(lhs, concat(inv(b_i), b_i))
+    lemma_pred_equiv_symmetric(hp, concat(lhs, concat(inverse_word(b_i), b_i)), lhs);
+    //  chain: lhs ≡ concat(relator, b_i) ≡ b_i
+    lemma_pred_equiv_transitive(hp, lhs, concat(lhs, concat(inverse_word(b_i), b_i)), b_i);
 }
 
 } //  verus!
