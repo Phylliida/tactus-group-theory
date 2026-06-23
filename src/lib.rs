@@ -10,6 +10,14 @@ pub mod reduction;
 #[cfg(verus_keep_ghost)]
 pub mod presentation;
 
+// pred_presentation: FORK-A DE-RISK PROBE (non-committing). A faithful predicate-base port of
+// `presentation` with `relators: spec_fn(Word) -> bool`, kept SEPARATE from the verified finite
+// tower. Measures scoping #2 (does the derivation algebra port verbatim + does the word-carrying
+// relator core still close under the Lean backend?). See docs/cohen-faithfulness-primary-source.md
+// §4/§7. Reversible: delete the file + this line. Full Fork-A build remains gated on Danielle.
+#[cfg(verus_keep_ghost)]
+pub mod pred_presentation;
+
 #[cfg(verus_keep_ghost)]
 pub mod presentation_lemmas;
 
