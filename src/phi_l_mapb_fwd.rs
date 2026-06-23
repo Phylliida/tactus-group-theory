@@ -709,6 +709,128 @@ pub proof fn lemma_config_reflect_intersection(mm: ModMachine, n: nat, m: nat, l
     lemma_intersection_property(fg, pf, ce, mid);
 }
 
+/// **R2 — the retargeted cross-index pinch-descent**: a pinch of `pw = emb(φ_l_src, w)` over
+/// `pa_data(σbet)` descends to a pinch of `w` over `pa_data(bet)`.  Both bases are `free(n+3)` (common),
+/// so `is_stable` agrees and the generic strip/prepend helpers apply; the head-peel induction
+/// (`decreases w.len()`) threads BOTH datas (pinch ops over `pdt = pa_data(σbet)`, the assembled
+/// `w`-pinch over `pd = pa_data(bet)`).  The spanning case delegates to `lemma_mapb_pinch_spanning_rt`.
+/// **No σ-saturation** (the reflection is the saturation-free intersection property).
+pub proof fn lemma_mapb_pinch_descends_rt(mm: ModMachine, n: nat, m: nat, l: nat, bet: Seq<nat>,
+    w: Word)
+    requires
+        mod_machine_wf(mm),
+        1 <= l <= 2 * n,
+        2 * n < m,
+        bet.no_duplicates(),
+        forall|i: int| 0 <= i < bet.len() ==> numbers_word(n, m, #[trigger] bet[i]),
+        word_valid(w, (n + 4) as nat),
+        has_pinch(pa_data(n, m, sigma_betas(bet, m, l)), apply_embedding(phi_l_src(n, m, l), w)),
+    ensures
+        has_pinch(pa_data(n, m, bet), w),
+    decreases w.len(),
+{
+    let sbet = sigma_betas(bet, m, l);
+    let pd = pa_data(n, m, bet);
+    let pdt = pa_data(n, m, sbet);
+    let pf = phi_F_family(n, m, l);
+    let fg = free_group((n + 3) as nat);
+    let se = stable_emb(fg, pf);
+    let st = (n + 3) as nat;
+    lemma_phi_l_src_eq_stable_emb(n, m, l);
+    assert(phi_l_src(n, m, l) == se);
+    let pw = apply_embedding(se, w);
+
+    lemma_free_group_valid((n + 3) as nat);
+    lemma_pa_data_shape(n, m, bet);
+    lemma_sigma_betas_numbers_word(n, m, l, bet);
+    lemma_pa_data_shape(n, m, sbet);
+    assert(pd.base.num_generators == st && pdt.base.num_generators == st);
+    lemma_phi_F_family_free(n, m, l);
+    assert(pf.len() == n + 3);
+    assert(se == pf.push(seq![Symbol::Gen(st)]));
+    // is_stable agrees across pd / pdt (same base.num_generators).
+    assert forall|x: Symbol| is_stable(pdt, x) == is_stable(pd, x) by {}
+
+    let ij: (int, int) = choose|i: int, j: int| has_pinch_at(pdt, pw, i, j);
+    let bi = ij.0;
+    let bj = ij.1;
+    assert(has_pinch_at(pdt, pw, bi, bj));
+    assert(has_adjacent_opposite_at(pdt, pw, bi, bj));
+
+    assert(w.len() > 0) by { if w.len() == 0 { assert(pw =~= Seq::<Symbol>::empty()); } }
+    let c = w[0];
+    let w2 = w.drop_first();
+    assert(w =~= seq![c] + w2);
+    assert(word_valid(w2, (n + 4) as nat)) by {
+        assert forall|k: int| 0 <= k < w2.len() implies symbol_valid(#[trigger] w2[k], (n + 4) as nat)
+        by { assert(w2[k] == w[k + 1]); }
+    }
+    lemma_apply_embedding_concat(se, seq![c], w2);
+    let ec = apply_embedding(se, seq![c]);
+    let pw2 = apply_embedding(se, w2);
+    assert(ec =~= apply_embedding_symbol(se, c)) by { reveal_with_fuel(apply_embedding, 2); }
+    assert(pw =~= ec + pw2);
+    assert(symbol_valid(c, (n + 4) as nat)) by { assert(c == w[0]); }
+
+    if is_stable(pdt, c) {
+        assert(c == Symbol::Gen(st) || c == Symbol::Inv(st));
+        if c == Symbol::Gen(st) {
+            assert(ec =~= seq![Symbol::Gen(st)]) by { assert(se[st as int] == seq![Symbol::Gen(st)]); }
+        } else {
+            assert(se[st as int] == seq![Symbol::Gen(st)]);
+            assert(ec =~= inverse_word(seq![Symbol::Gen(st)]));
+            assert(ec =~= seq![Symbol::Inv(st)]) by { reveal_with_fuel(inverse_word, 2); }
+        }
+        assert(ec.len() == 1 && ec[0] == c);
+        assert(pw[0] == ec[0] && pw[0] == c);
+        if bi == 0 {
+            lemma_mapb_pinch_spanning_rt(mm, n, m, l, bet, w, w2, bi, bj);
+        } else {
+            assert(pw =~= ec + pw2);
+            lemma_strip_prefix_preserves_pinch(pdt, ec, pw2, bi, bj);
+            assert(apply_embedding(phi_l_src(n, m, l), w2) == pw2);
+            lemma_mapb_pinch_descends_rt(mm, n, m, l, bet, w2);
+            lemma_prepend_preserves_pinch(pd, c, w2);
+            assert(seq![c] + w2 =~= w);
+        }
+    } else {
+        assert(generator_index(c) < st) by {
+            assert(symbol_valid(c, (n + 4) as nat));
+            assert(generator_index(c) != st);
+        }
+        assert(generator_index(c) < pf.len());
+        let gi = generator_index(c) as int;
+        if c == Symbol::Gen(generator_index(c)) {
+            assert(ec =~= se[gi]) by { reveal_with_fuel(apply_embedding, 2); lemma_concat_empty_right(se[gi]); }
+            assert(se[gi] == pf[gi]);
+            lemma_word_valid_no_inner_stable(fg, pf[gi]);
+        } else {
+            assert(c == Symbol::Inv(generator_index(c)));
+            assert(ec =~= inverse_word(se[gi])) by {
+                reveal_with_fuel(apply_embedding, 2); lemma_concat_empty_right(inverse_word(se[gi]));
+            }
+            assert(se[gi] == pf[gi]);
+            crate::word::lemma_inverse_word_valid(pf[gi], (n + 3) as nat);
+            lemma_word_valid_no_inner_stable(fg, inverse_word(pf[gi]));
+        }
+        let elen = ec.len() as int;
+        assert(forall|k: int| 0 <= k < elen ==> !is_stable_at(pdt, ec, k, st));
+        assert(forall|k: int| 0 <= k < elen ==> #[trigger] pw[k] == ec[k]);
+        assert(is_stable(pdt, pw[bi]));
+        assert(bi >= elen) by {
+            if bi < elen {
+                assert(pw[bi] == ec[bi]);
+                assert(!is_stable(pdt, ec[bi])) by { assert(0 <= bi < elen); }
+            }
+        }
+        lemma_strip_prefix_preserves_pinch(pdt, ec, pw2, bi, bj);
+        assert(apply_embedding(phi_l_src(n, m, l), w2) == pw2);
+        lemma_mapb_pinch_descends_rt(mm, n, m, l, bet, w2);
+        lemma_prepend_preserves_pinch(pd, c, w2);
+        assert(seq![c] + w2 =~= w);
+    }
+}
+
 // ----------------------------------------------------------------------------
 // R2 spanning (retargeted) — the head IS the left endpoint; the INTERSECTION property descends the
 // middle.  The pinch of `pw = emb(φ_l_src, w)` is over `pa_data(σbet)` (the retargeted image); the
