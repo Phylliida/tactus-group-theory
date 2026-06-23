@@ -54,6 +54,13 @@ pub mod pred_homomorphism;
 #[cfg(verus_keep_ghost)]
 pub mod pred_normal_form_free_product;
 
+// FORK-A brick 7: the THIN predicate amalgamated-coset interface (the spec fns
+// normal_form_afp_textbook imports from normal_form_amalgamated). The heavy
+// Cayley-action injectivity (~70 relator sites) is an alternate proof OFF the
+// critical path and is leapfrogged. Reversible, zero regression.
+#[cfg(verus_keep_ghost)]
+pub mod pred_normal_form_amalgamated;
+
 #[cfg(verus_keep_ghost)]
 pub mod presentation_lemmas;
 
