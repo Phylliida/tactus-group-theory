@@ -81,6 +81,32 @@ not a reinvention — but it is substantial substrate, not a residue-fact applic
 
 ---
 
+## 2b. KEY DE-RISKING (same session, after reading the directional lemmas): the cross-index core is ALREADY REAL
+
+The pessimism in §2 over-counted the wall. The session-7 **retarget** `φ_l_src : P_A(bet) ↪
+P_A(σ_l(bet))` (R1–R3) is **DONE and NON-VACUOUS**:
+- `lemma_mapb_M2_rt` (`phi_l_mapb_fwd.rs:1071`-ish, the R3 cross-index injectivity): from
+  `φ_l_src(w) ≡_{pa_data(sigma_betas(bet))} ε` derives `w ≡_{pa_data(bet)} ε`. Preconditions =
+  `bet` no-dup + number-words + `hnn_associations_isomorphic(pa_data(sigma_betas(bet)))` — **NO
+  `sigma_fwdsat`**. Source slice `bet` and target `sigma_betas(bet) = {mγ+l : γ∈bet}` are *distinct*
+  finite sets, so σ-INJECTIVITY (free) suffices; σ-closure never appears.
+- `lemma_map_a_forward` (`phi_l_pinch.rs:773`) is REAL (preconds satisfiable).
+- `lemma_pa_data_isomorphic` (`phi_l_mapb.rs:314`) gives `hnn_associations_isomorphic(pa_data(
+  betas(alphas)))` for any valid `alphas` — discharges M2_rt's iso precond (modulo a small
+  betas-vs-arbitrary-slice generalization).
+
+**The session-8 vacuity was PACKAGING-ONLY** — `lemma_map_b_forward_rt`'s redefined `sigma_sat_upto`
+finite-slice (`∀γ∈betas. mγ+l ∈ alphas`) and the tower lift `lemma_phi_l_iso`/
+`lemma_h3_II_upto_faithful` forced ONE σ-closed `alphas` for the WHOLE tower (infinite). The
+**predicate base removes exactly that** (every `family_II_relator(mγ+l)` is an `h2_pred` relator, so
+no σ-closed `alphas` is needed). The core directional lemmas underneath were always real.
+
+**Consequence: CS-4 needs NO new infinite-association Britton.** It reduces to a **compactness
+bridge** (a finite `≡_{h2_pred} ε` derivation is valid in a finite slice `h2_II(D)`) feeding the
+EXISTING real `lemma_map_a_forward` + `lemma_mapb_M2_rt`. Route 1 is the path; Route 2 is unnecessary.
+Route 1 works entirely with **finite `pa_data` slices** — even `pa_pred` (flat infinite
+`PredPresentation`) is NOT needed (the von-Dyck halves go `pa_data(slice) → h2_pred` directly).
+
 ## 3. Two candidate routes (the decision)
 
 ### Route 1 — compactness-to-finite for the FORWARD; relabeling-iso for the BACKWARD
@@ -98,58 +124,54 @@ are satisfiable):
 4. lift `pa_data(slice)`-triviality to `pa_pred` (easy forward — `pa_pred` has more relators).
 
 **Backward (`map_b` faithful = `map_a` faithful + M2).** `emb(b_col,w) = emb(a_col, φ_l_src(w))`
-(`lemma_mapb_factor_source`), so `map_a` faithful gives `φ_l_src(w) ≡_{pa_pred} ε`; the residue is
-**M2 = `φ_l_src` injective on `pa_pred`**: `φ_l_src(w) ≡_{pa_pred} ε ⟹ w ≡_{pa_pred} ε`. The
-existing `lemma_mapb_M2` needs `sigma_fwdsat` (vacuous) because it forces `φ_l_src` to be an endo of
-a **single** slice (`σ_l(slice)⊆slice`). **The escape:** as a relabeling *between* slices
-`φ_l_src : pa_data(G) → pa_data(σ_l(G))` it is an **isomorphism needing only σ-INJECTIVITY** (always
-true — `mγ+l` is injective in γ), NOT σ-closure. So a fresh per-word M2 ("`φ_l_src(w) ≡_{pa_data(E)} ε`
-⟹ `w ≡_{pa_data(G)} ε`" with `E = σ_l(G)`, then lift to `pa_pred`) plausibly closes M2 without the
-infinite Britton. ⚠ **Wrinkle to check:** a derivation of `φ_l_src(w) ≡ ε` may use an "irrelevant"
-family-(II) relator over `η ∉ σ_l(I)` (insert+delete); need to argue those can be confined to
-`σ_l(G)` or dropped. *(This route is PROMISING but unproven — the wrinkle is the gating unknown.)*
+(`lemma_mapb_factor_source`), so `map_a` faithful (via compactness, as above) gives
+`φ_l_src(w) ≡_{pa_data(betas(D))} ε`; the residue is **M2 = `φ_l_src` injective**, which is **already
+done and REAL**: `lemma_mapb_M2_rt` derives `w ≡_{pa_data(bet)} ε` from
+`φ_l_src(w) ≡_{pa_data(sigma_betas(bet))} ε` with NO σ-closure (see §2b). So backward = compactness +
+`lemma_map_a_forward` + `lemma_mapb_M2_rt` + the a-von-Dyck. ⚠ the one remaining wrinkle: matching
+`sigma_betas(bet) ⊇ betas(D)` (pick `bet` = the σ_l-preimage indices) and confining/dropping any
+"irrelevant" family-(II) relator over `η ∉ σ_l(I)` a derivation might insert+delete.
 
-- **Pros:** reuses the big finite `map_a`-forward + residue machinery (already verified, REAL);
-  no new 21k-line substrate. Forward arc is concrete and startable now.
-- **Cons:** the M2 relabeling-iso wrinkle is unverified; multiple new generic lemmas
-  (finite-support, c-strip, slice-building, relabeling-iso); intricate bookkeeping.
+- **Pros:** reuses the big finite `map_a`-forward + the REAL `lemma_mapb_M2_rt`; **no new substrate**.
+- **Cons:** the compactness bridge + slice bookkeeping are new generic lemmas; CS-4d's wrinkle is the
+  one open proof-design unknown.
 
-### Route 2 — a unified predicate/infinite-association Britton substrate
-Build `PredHNNData`-with-**predicate** associations (the associated subgroup as a predicate, or
-association-pairs as `spec_fn`) + its Britton lemma (FA-9b-scale or larger, since it generalizes
-associations on top of the base). Then recognize `h2_pred` and `pa_pred` as such p-HNNs and get
-`map_a` faithful + M2 + (★) natively; σ-closure is **automatic** over the infinite, σ-closed `I`.
-
-- **Pros:** uniform; the math is clean (σ-closure free over `I`); also the canonical Prop-1.34
-  formalization; reusable for any later infinite-base recognition.
-- **Cons:** large new substrate (re-derive Britton with predicate associations); companion estimates
-  ≥ FA-9b effort. Multi-week.
+### Route 2 — a unified predicate/infinite-association Britton substrate (RETIRED unless §2b is wrong)
+Build `PredHNNData`-with-**predicate** associations + its Britton lemma (≥ FA-9b-scale, multi-week).
+Sound textbook fallback (σ-closure automatic over the infinite, σ-closed `I`), but **unnecessary**
+given §2b — keep only as the fallback if CS-4d's wrinkle proves fatal.
 
 ---
 
-## 4. Recommendation (for the route decision)
+## 4. Recommendation: EXECUTE Route 1 (no architectural go/no-go needed — it reuses proven machinery)
 
-**Prototype Route 1's M2 relabeling-iso wrinkle first (cheap, decisive).** If `φ_l_src : pa_data(G)
-≅ pa_data(σ_l(G))` is establishable as a finite presentation iso and the "irrelevant extra relator"
-wrinkle resolves, Route 1 closes CS-4 by **reusing the already-verified finite forward machinery**
-and avoids the multi-week substrate entirely — a large win. If the wrinkle is fatal, Route 2 (the
-predicate-association Britton) is the textbook fallback and is sound (companion-confirmed).
+After §2b, Route 1 is a **compactness reduction** to the EXISTING, REAL finite directional lemmas,
+not a gamble. Compactness ("a finite derivation uses finitely many relators") is standard math.
+Concrete brick sequence:
 
-The forward half of Route 1 (compactness → `lemma_map_a_forward`) is independently valuable and
-startable regardless, BUT it should not be built before the route is chosen, since Route 2 would
-supersede the compactness plumbing. **Held for the route decision** (this note + the AGENDA update).
-
-### Shape-stable pieces (safe to build under either route)
-- `pa_pred` as a flat `PredPresentation` (free F + p, relators = family-(II) predicate) + validity.
-  Referenced by the von-Dyck statements and the final (★) either way.
-- The von-Dyck (easy) directions over `h2_pred` — unconditional; the predicate-base win made
-  concrete. Reusable building blocks for (★).
+- **CS-4a — von-Dyck over `h2_pred` (unconditional). ← clean first brick.** `emb(a_col, pa_relator(γ))
+  ≡_{h2_pred} ε` (image `= family_II_relator(γ)`) and `emb(b_col, pa_relator(γ)) ≡_{h2_pred} ε` (image
+  `= family_II_relator(mγ+l)` — `phi_l_iso.rs` identities, base-independent). Re-point the finite
+  `lemma_a_words_relator_trivial`/`lemma_b_words_relator_trivial` (over `h2_II`) to `h2_pred`; now
+  unconditional (no `alphas` slice). Shape-stable, high confidence.
+- **CS-4b — the compactness bridge (the genuinely new generic lemma).** `equiv_in_pred_presentation(
+  h2_pred,u,ε) ⟹ ∃ finite alphas (no-dup,∌0,number-words) . equiv_in_presentation(h2_II(alphas),u,ε)`.
+  (1) extract a `PredDerivation`'s finite relator-set, re-index as a finite `Derivation` over the slice;
+  (2) strip `S` first via a CS-2-style c-retraction `ρ_c` (a_col/b_col c-free ⟹ `ρ_c` fixes `u`);
+  (3) each used relator (K_M/comm/family-(II)) is an `h2_II(alphas)` relator by index. Generic; CS-5
+  reuses it.
+- **CS-4c — forward (a⟹b):** CS-4b → `lemma_map_a_forward` → CS-4a (b-von-Dyck).
+- **CS-4d — backward (b⟹a):** factor `emb(b_col,w)=emb(a_col,φ_l_src(w))` → CS-4b → `lemma_map_a_forward`
+  → `lemma_mapb_M2_rt` → CS-4a (a-von-Dyck). Resolve the σ_l-preimage / irrelevant-relator wrinkle.
+- **CS-4e — tower lift + iso:** package (★) at `h2_pred`, lift to `h3_pred_upto(l-1)` by
+  base-faithfulness (`britton_lemma_unconditional` down the a-levels, downward induction on `l`).
 
 ---
 
 ## 5. One-line status
 
-CS-4 = (★). von-Dyck halves: EASY/unconditional (predicate-base win). Faithfulness halves: the wall
-— need infinite-association handling. Route 1 (compactness-forward + relabeling-iso-backward) may
-avoid new substrate (prototype the M2 wrinkle to decide); Route 2 (predicate-association Britton) is
-the sound textbook fallback. **No code committed this session — surfaced for the route decision.**
+CS-4 = (★). von-Dyck halves EASY/unconditional (predicate-base win). Faithfulness halves reuse the
+REAL `lemma_map_a_forward` + `lemma_mapb_M2_rt` (the session-8 vacuity was packaging-only, §2b) via a
+**compactness bridge** to finite slices — **NO new infinite-association substrate**. Execute Route 1
+(CS-4a→e). Only open proof-design unknown = CS-4d's "irrelevant relator" wrinkle. Session 19: scoped
++ de-risked + docs corrected; **CS-4a is the clean next brick.**
