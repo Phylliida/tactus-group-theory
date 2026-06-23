@@ -255,12 +255,20 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > **finite-association only**. `lemma_map_b_forward`/`lemma_mapb_M2` are **vacuous** (need `sigma_fwdsat`,
 > machine-refuted by `lemma_sigma_sat_upto_unsatisfiable`). **Two routes** (`cohen-cs4-architecture.md`
 > §3): **Route 1** — compactness-to-finite (reuse the REAL `lemma_map_a_forward`) for forward +
-> relabeling-iso `pa_data(G)≅pa_data(σ_l(G))` (σ-INJECTIVITY only, not σ-closure) for backward M2 —
-> may avoid new substrate; **Route 2** — unified predicate/infinite-association Britton (sound textbook
-> fallback, ≥FA-9b-scale). **HELD for a route decision** (prototype Route 1's M2 "irrelevant extra
-> relator" wrinkle first — cheap + decisive). No `.rs` touched session 19; the von-Dyck identities
-> already exist base-independent in `phi_l_iso.rs`. Shape-stable to build either way: `pa_pred` (flat
-> `PredPresentation`) + validity, and the von-Dyck halves.
+> the REAL `lemma_mapb_M2_rt` for backward — and **DE-RISKED same session: Route 1 needs NO new
+> substrate.** The session-7 retarget `φ_l_src: P_A(bet)↪P_A(σ_l(bet))` (`lemma_mapb_M2_rt`) is REAL
+> (preconds = no-dup + number-words + `hnn_associations_isomorphic(pa_data(sigma_betas(bet)))` via
+> `lemma_pa_data_isomorphic`; NO `sigma_fwdsat` — source/target slices distinct ⟹ σ-INJECTIVITY only).
+> **The session-8 vacuity was PACKAGING-ONLY** (`lemma_map_b_forward_rt`'s finite-slice + the tower lift
+> forced one σ-closed `alphas`; the predicate base removes exactly that). **Route 2 (predicate-assoc
+> Britton) RETIRED** unless the one wrinkle is fatal. **CS-4 = compactness bridge + von-Dyck-over-h2_pred,
+> reusing proven REAL machinery — EXECUTE (no go/no-go needed).** Brick sequence CS-4a→e in
+> `cohen-cs4-architecture.md` §4: **CS-4a** (von-Dyck over h2_pred = re-point
+> `lemma_a_words_relator_trivial`/`_b_words_` to h2_pred, unconditional) ← clean next; **CS-4b**
+> (compactness bridge: pred-derivation finite-support → finite slice `h2_II(D)`, + S-strip via CS-2
+> c-retraction) = the one new generic lemma; **CS-4c/d** (forward/backward assembly); **CS-4d wrinkle**
+> = σ_l-preimage / "irrelevant family-(II) relator η∉σ_l(I)" matching = the only open proof-design
+> unknown; **CS-4e** (tower lift via `britton_lemma_unconditional`). No `.rs` touched session 19.
 >
 > **✅ FORK-A STARTED 2026-06-23 (session 14) — elementary foundation arc DONE, ports VERBATIM.**
 > The completeness route is **Fork-A** (predicate presentation; the textbook route per
