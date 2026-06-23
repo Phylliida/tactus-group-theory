@@ -277,3 +277,8 @@ pub mod r_prime_b;
 // the map_b forward assembly. Spanning Britton peel over pa_data, (R) a/b for the pinch middle.
 #[cfg(verus_keep_ghost)]
 pub mod phi_l_mapb_fwd;
+
+// phi_l_iso_tower: Layer 2 / Brick 5, C3.2d — lift the bottom crux up the a-tower (decreases-l
+// faithfulness induction, mirror lemma_b_m_upto_faithful) → lemma_phi_l_iso at every level.
+#[cfg(verus_keep_ghost)]
+pub mod phi_l_iso_tower;
