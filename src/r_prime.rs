@@ -28,7 +28,8 @@ use crate::machine_group::{config_word, symbol_power, signed_power, gsconfig, Ca
     lemma_inverse_word_concat, lemma_gexp_concat, lemma_gexp_signed_power, lemma_gexp_inverse,
     sconfig, lemma_sconfig_nat, base_A, lemma_base_A_valid,
     lemma_no_relator_equiv_implies_freely_equivalent};
-use crate::config_reduce::{is_canl_word, canon_represents, lemma_canon_represents_eval};
+use crate::config_reduce::{is_canl_word, canon_represents, lemma_canon_represents_eval,
+    cw_reduce, coord_in, lemma_cw_reduce_coords, lemma_tfree_coord_restrict};
 use crate::presentation_lemmas::lemma_freely_equivalent_implies_equiv;
 use crate::ii_subset::lemma_signed_power_inverse;
 use crate::benign::{apply_embedding, apply_embedding_symbol, in_generated_subgroup,
@@ -984,6 +985,60 @@ pub proof fn lemma_gexp1_config_factors(bet: Seq<nat>, factors: Seq<Word>)
             && (factors[0] == config_emb(bet)[j] || factors[0] == inverse_word(config_emb(bet)[j])));
         assert(config_emb(bet)[j] == config_word(bet[j], 0));
         lemma_gexp1_config_word(bet[j]);
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Step 5 — coordinate restriction: cw_reduce(C_u) coords ⊆ bet ∩ σ(ℤ) ⊆ σ(bet).
+// ----------------------------------------------------------------------------
+
+/// **Coordinate restriction**: if `canw_eval(C_u) ≡_A canw_eval(C_bet)` with `C_u`'s coords `≡ l (mod m)`
+/// and `C_bet`'s coords ⊆ `bet`, then under σ-saturation every coordinate of `cw_reduce(C_u)` is a
+/// `σ(bet)`-coordinate.  (`lemma_tfree_coord_restrict` lands the coord in `C_bet` ⊆ `bet`;
+/// `lemma_cw_reduce_coords` keeps it `≡ l (mod m)`; `lemma_sat_bridge` pulls it into `σ(bet)`.)
+pub proof fn lemma_coords_in_sigma(bet: Seq<nat>, m: nat, l: nat, cu: Seq<CanonLetter>,
+    cbet: Seq<CanonLetter>)
+    requires
+        m >= 1,
+        l < m,
+        sigma_backsat(bet, m, l),
+        equiv_in_presentation(base_A(), canw_eval(cu), canw_eval(cbet)),
+        forall|i: int| 0 <= i < cu.len() ==> (#[trigger] cu[i]).s == 0 && cong_l(cu[i].r, m, l),
+        forall|i: int| 0 <= i < cbet.len()
+            ==> exists|j: int| 0 <= j < bet.len() && bet[j] as int == (#[trigger] cbet[i]).r,
+    ensures
+        forall|idx: int| 0 <= idx < cw_reduce(cu).len() ==> {
+            &&& (#[trigger] cw_reduce(cu)[idx]).s == 0
+            &&& exists|k: int| 0 <= k < sigma_betas(bet, m, l).len()
+                    && sigma_betas(bet, m, l)[k] as int == cw_reduce(cu)[idx].r
+        },
+{
+    let red = cw_reduce(cu);
+    lemma_cw_reduce_coords(cu);   // ∀idx. coord_in(cu, red[idx].r, red[idx].s)
+    assert forall|idx: int| 0 <= idx < red.len() implies {
+        &&& (#[trigger] red[idx]).s == 0
+        &&& exists|k: int| 0 <= k < sigma_betas(bet, m, l).len()
+                && sigma_betas(bet, m, l)[k] as int == red[idx].r
+    } by {
+        let r = red[idx].r;
+        let s = red[idx].s;
+        assert(coord_in(red, r, s)) by { assert(red[idx].r == r && red[idx].s == s); }
+        // red[idx]'s coord appears in cu ⟹ s = 0 and cong_l(r).
+        assert(coord_in(cu, r, s));   // from lemma_cw_reduce_coords[idx]
+        let i2 = choose|i2: int| 0 <= i2 < cu.len() && cu[i2].r == r && cu[i2].s == s;
+        assert(0 <= i2 < cu.len() && cu[i2].r == r && cu[i2].s == s);
+        assert(cu[i2].s == 0 && cong_l(cu[i2].r, m, l));
+        assert(s == 0 && cong_l(r, m, l));
+        // restrict the coord into cbet ⊆ bet.
+        lemma_tfree_coord_restrict(cu, cbet, r, s);
+        assert(coord_in(cbet, r, s));
+        let i3 = choose|i3: int| 0 <= i3 < cbet.len() && cbet[i3].r == r && cbet[i3].s == s;
+        assert(0 <= i3 < cbet.len() && cbet[i3].r == r && cbet[i3].s == s);
+        assert(exists|j: int| 0 <= j < bet.len() && bet[j] as int == r) by {
+            assert(exists|j: int| 0 <= j < bet.len() && bet[j] as int == cbet[i3].r);
+        }
+        // saturation ⟹ r is a σ(bet)-coordinate.
+        lemma_sat_bridge(bet, m, l, r);
     }
 }
 
