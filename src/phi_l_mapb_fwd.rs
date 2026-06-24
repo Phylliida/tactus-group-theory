@@ -56,6 +56,9 @@ use crate::britton_infra::lemma_hnn_presentation_valid;
 use crate::machine_group::{lemma_emb_respects_source_equiv, lemma_stable_count_pos_has_stable,
     lemma_stable_count_zero_no_stable};
 use crate::phi_l_pinch::lemma_pd_pinch_out;
+use crate::cohen_cs4d::{bet_of, lemma_bet_of_number_words, lemma_bet_of_no_dup};
+use crate::cohen_cs4d_recog::lemma_phi_image_config_support;
+use crate::r_prime_b::lemma_phi_image_pa_rhs_support;
 
 verus! {
 
@@ -1039,6 +1042,340 @@ proof fn lemma_mapb_pinch_spanning_rt(mm: ModMachine, n: nat, m: nat, l: nat, be
         assert(has_pinch_at(pd, w, 0, lo));
     }
     assert(has_pinch(pd, w)) by { assert(has_pinch_at(pd, w, 0, lo)); }
+}
+
+// ----------------------------------------------------------------------------
+// CS-4d — the SUPERSET-SLICE pinch-descent (S → bet = bet_of(S)).  Additive copy of
+// `lemma_mapb_pinch_descends_rt` / `lemma_mapb_pinch_spanning_rt` whose Britton peel runs over the
+// SUPERSET slice `S` (so the pinch-middle lands in `⟨·_emb(S)⟩`); the §4.2 recognition cores
+// (`lemma_phi_image_config_support` / `lemma_phi_image_pa_rhs_support`) RECOGNIZE that the `φ_F`-image
+// middle actually sits in `⟨·_emb(σbet)⟩` (σbet = sigma_betas(bet_of(S)) = the ≡l elements of S),
+// after which the EXISTING saturation-free reflections (`lemma_config_reflect_intersection` /
+// `lemma_pa_rhs_reflect_intersection`, σbet → bet) descend it to `mid ∈ ⟨·_emb(bet)⟩`.  This is the
+// only place CS-4d's recognition enters; everything upstream/downstream reuses the proven `_rt`
+// machinery (the strip/prepend/spanning helpers are slice-generic).  See cohen-cs4d-blueprint.md §3.
+// ----------------------------------------------------------------------------
+
+/// The `bi == 0` spanning case of the superset-slice pinch-descent (mirror of
+/// `lemma_mapb_pinch_spanning_rt`, with the §4.2 recognition inserted before the reflection).
+proof fn lemma_mapb_pinch_spanning_S(mm: ModMachine, n: nat, m: nat, l: nat, s_slice: Seq<nat>,
+    w: Word, w2: Word, bi: int, bj: int)
+    requires
+        mod_machine_wf(mm),
+        1 <= l <= 2 * n,
+        2 * n < m,
+        s_slice.no_duplicates(),
+        forall|i: int| 0 <= i < s_slice.len() ==> numbers_word(n, m, #[trigger] s_slice[i]),
+        word_valid(w, (n + 4) as nat),
+        w.len() > 0,
+        w2 == w.drop_first(),
+        bi == 0,
+        has_pinch_at(pa_data(n, m, s_slice), apply_embedding(phi_l_src(n, m, l), w), bi, bj),
+        is_stable(pa_data(n, m, s_slice), apply_embedding(phi_l_src(n, m, l), w)[0]),
+        apply_embedding(phi_l_src(n, m, l), w)[0] == w[0],
+    ensures
+        has_pinch(pa_data(n, m, bet_of(s_slice, m, l)), w),
+{
+    let bet = bet_of(s_slice, m, l);
+    let sbet = sigma_betas(bet, m, l);
+    let pd = pa_data(n, m, bet);
+    let pdS = pa_data(n, m, s_slice);
+    let pf = phi_F_family(n, m, l);
+    let fg = free_group((n + 3) as nat);
+    let se = stable_emb(fg, pf);
+    let st = (n + 3) as nat;
+    lemma_phi_l_src_eq_stable_emb(n, m, l);
+    assert(phi_l_src(n, m, l) == se);
+    let pw = apply_embedding(se, w);
+    lemma_free_group_valid((n + 3) as nat);
+    lemma_bet_of_no_dup(s_slice, m, l);
+    lemma_bet_of_number_words(s_slice, n, m, l);
+    lemma_pa_data_shape(n, m, bet);
+    lemma_pa_data_shape(n, m, s_slice);
+    assert(pd.base.num_generators == st && pdS.base.num_generators == st);
+    assert(pd.base == fg && pdS.base == fg);
+    lemma_phi_F_family_free(n, m, l);
+    assert(pf.len() == n + 3);
+    assert(se == pf.push(seq![Symbol::Gen(st)]));
+    assert forall|x: Symbol| is_stable(pdS, x) == is_stable(pd, x) by {}
+
+    let c = w[0];
+    assert(word_valid(w2, (n + 4) as nat)) by {
+        assert forall|k: int| 0 <= k < w2.len() implies symbol_valid(#[trigger] w2[k], (n + 4) as nat)
+        by { assert(w2[k] == w[k + 1]); }
+    }
+    lemma_apply_embedding_concat(se, seq![c], w2);
+    let ec = apply_embedding(se, seq![c]);
+    let pw2 = apply_embedding(se, w2);
+    assert(ec =~= apply_embedding_symbol(se, c)) by { reveal_with_fuel(apply_embedding, 2); }
+    assert(pw =~= ec + pw2);
+    assert(c == Symbol::Gen(st) || c == Symbol::Inv(st));
+    if c == Symbol::Gen(st) {
+        assert(ec =~= seq![Symbol::Gen(st)]) by { assert(se[st as int] == seq![Symbol::Gen(st)]); }
+    } else {
+        assert(se[st as int] == seq![Symbol::Gen(st)]);
+        assert(ec =~= seq![Symbol::Inv(st)]) by { reveal_with_fuel(inverse_word, 2); }
+    }
+    assert(ec.len() == 1 && ec[0] == c && pw[0] == c);
+
+    // --- locate the right endpoint via the spanning correspondence (over pdS; same is_stable) ---
+    assert(forall|t: int| 0 <= t < pw2.len() ==> #[trigger] pw[1 + t] == pw2[t]);
+    assert(has_adjacent_opposite_at(pdS, pw, 0, bj));
+    assert(0 <= bj - 1 < pw2.len()) by { assert(0 < bj < pw.len()); }
+    assert(pw2[bj - 1] == pw[bj]);
+    assert(is_stable(pd, pw2[bj - 1]));
+    assert forall|k: int| 0 <= k < bj - 1 implies !is_stable(pd, #[trigger] pw2[k]) by {
+        assert(pw2[k] == pw[k + 1]);
+    }
+    assert forall|i: int| 0 <= i < pf.len() implies word_valid(#[trigger] pf[i], (n + 3) as nat) by {}
+    let lv = lemma_extend_spanning(fg, pf, w2, bj - 1);
+    let lo = lv + 1;
+    assert(0 <= lv < w2.len());
+    assert(is_stable(pd, w2[lv]));
+    assert(w[lo] == w2[lv]);
+    assert(forall|k: int| 0 <= k < lv ==> !is_stable(pd, #[trigger] w2[k]));
+    assert(apply_embedding_symbol(se, c) =~= seq![pw[0]]) by { assert(ec[0] == pw[0]); }
+    assert(apply_embedding_symbol(se, w2[lv]) =~= seq![pw2[bj - 1]]);
+    assert(pw2[bj - 1] == pw[bj]);
+    assert(pw[0] != pw[bj]);
+
+    assert(0 <= lo < w.len()) by { assert(lv < w2.len()); }
+    assert(w[lo] == w2[lv]);
+    assert(is_stable(pd, w[lo]));
+    assert(w[0] != w[lo]) by {
+        if w[0] == w[lo] {
+            assert(apply_embedding_symbol(se, c) =~= apply_embedding_symbol(se, w2[lv]));
+            assert(seq![pw[0]] =~= seq![pw[bj]]);
+            assert(pw[0] == pw[bj]);
+        }
+    }
+    assert forall|k: int| 0 < k < lo implies !is_stable(pd, #[trigger] w[k]) by {
+        assert(w[k] == w2[k - 1]);
+    }
+
+    // --- the middle, as emb(φ_F, mid) ---
+    let mid = w.subrange(1, lo);
+    assert(mid =~= w2.subrange(0, lv)) by {
+        assert(mid.len() == lv);
+        assert forall|k: int| 0 <= k < lv implies mid[k] == w2.subrange(0, lv)[k] by {
+            assert(mid[k] == w[k + 1]);
+            assert(w[k + 1] == w2[k]);
+        }
+    }
+    assert(word_valid(mid, (n + 3) as nat)) by {
+        assert forall|k: int| 0 <= k < mid.len() implies symbol_valid(#[trigger] mid[k], (n + 3) as nat)
+        by {
+            assert(mid[k] == w2[k]);
+            assert(!is_stable(pd, w2[k]));
+            assert(symbol_valid(w2[k], (n + 4) as nat));
+            assert(generator_index(w2[k]) != st);
+        }
+    }
+    lemma_apply_embedding_agree_prefix(se, pf, mid, (n + 3) as nat);
+    assert(apply_embedding(se, mid) =~= apply_embedding(pf, mid));
+    assert(apply_embedding(se, mid) =~= pw2.subrange(0, bj - 1)) by {
+        assert(mid =~= w2.subrange(0, lv));
+    }
+    let pinch_mid = pw.subrange(1, bj);
+    assert(pinch_mid =~= pw2.subrange(0, bj - 1)) by {
+        assert(pinch_mid.len() == bj - 1);
+        assert forall|k: int| 0 <= k < bj - 1 implies pinch_mid[k] == pw2.subrange(0, bj - 1)[k] by {
+            assert(pinch_mid[k] == pw[k + 1]);
+            assert(pw[k + 1] == pw2[k]);
+        }
+    }
+    assert(pinch_mid =~= apply_embedding(pf, mid));
+
+    // --- columns: pdS columns (S) for the middle, pd columns (bet) for the assembly ---
+    let a_col = Seq::new(pd.associations.len(), |k: int| pd.associations[k].0);
+    let b_col = Seq::new(pd.associations.len(), |k: int| pd.associations[k].1);
+    let a_col_S = Seq::new(pdS.associations.len(), |k: int| pdS.associations[k].0);
+    let b_col_S = Seq::new(pdS.associations.len(), |k: int| pdS.associations[k].1);
+    assert(pd.associations =~= pa_assoc(n, m, bet) && pd.associations.len() == bet.len());
+    assert(pdS.associations =~= pa_assoc(n, m, s_slice) && pdS.associations.len() == s_slice.len());
+    assert(a_col =~= config_emb(bet)) by {
+        assert(config_emb(bet).len() == bet.len());
+        assert forall|k: int| 0 <= k < bet.len() implies a_col[k] == config_emb(bet)[k] by {
+            assert(pd.associations[k] == (crate::machine_group::config_word(bet[k], 0), pa_rhs(n, m, bet[k])));
+        }
+    }
+    assert(b_col =~= pa_rhs_emb(n, m, bet)) by {
+        assert(pa_rhs_emb(n, m, bet).len() == bet.len());
+        assert forall|k: int| 0 <= k < bet.len() implies b_col[k] == pa_rhs_emb(n, m, bet)[k] by {
+            assert(pd.associations[k] == (crate::machine_group::config_word(bet[k], 0), pa_rhs(n, m, bet[k])));
+        }
+    }
+    assert(a_col_S =~= config_emb(s_slice)) by {
+        assert(config_emb(s_slice).len() == s_slice.len());
+        assert forall|k: int| 0 <= k < s_slice.len() implies a_col_S[k] == config_emb(s_slice)[k] by {
+            assert(pdS.associations[k] == (crate::machine_group::config_word(s_slice[k], 0), pa_rhs(n, m, s_slice[k])));
+        }
+    }
+    assert(b_col_S =~= pa_rhs_emb(n, m, s_slice)) by {
+        assert(pa_rhs_emb(n, m, s_slice).len() == s_slice.len());
+        assert forall|k: int| 0 <= k < s_slice.len() implies b_col_S[k] == pa_rhs_emb(n, m, s_slice)[k] by {
+            assert(pdS.associations[k] == (crate::machine_group::config_word(s_slice[k], 0), pa_rhs(n, m, s_slice[k])));
+        }
+    }
+
+    // --- middle (over pdS = S) recognized in σbet, reflected to mid (over pd = bet), then assemble ---
+    assert(has_adjacent_opposite_at(pd, w, 0, lo)) by {
+        assert(is_stable(pd, w[0]) && is_stable(pd, w[lo]) && w[0] != w[lo]);
+    }
+    if pw[0] == Symbol::Gen(st) {
+        assert(pw[bj] == Symbol::Inv(st)) by { assert(pw[0] != pw[bj]); assert(is_stable(pd, pw[bj])); }
+        assert(w[0] == Symbol::Gen(st) && w[lo] == Symbol::Inv(st)) by {
+            assert(w[0] == pw[0]);
+            assert(seq![w[lo]] =~= seq![pw[bj]]) by { assert(apply_embedding_symbol(se, w2[lv]) =~= seq![pw2[bj-1]]); }
+        }
+        // middle ∈ ⟨b_col_S = pa_rhs_emb(S)⟩  (from has_pinch_at(pdS, pw, 0, bj)).
+        assert(in_generated_subgroup(pdS.base, b_col_S, pinch_mid));
+        assert(in_generated_subgroup(fg, pa_rhs_emb(n, m, s_slice), apply_embedding(pf, mid)));
+        // §4.2 b-side recognition: ⟨pa_rhs_emb(S)⟩ ⟹ ⟨pa_rhs_emb(σbet)⟩.
+        lemma_phi_image_pa_rhs_support(mm, n, m, l, mid, s_slice);
+        assert(in_generated_subgroup(fg, pa_rhs_emb(n, m, sbet), apply_embedding(pf, mid)));
+        lemma_pa_rhs_reflect_intersection(mm, n, m, l, mid, bet);
+        assert(in_generated_subgroup(fg, pa_rhs_emb(n, m, bet), mid));
+        assert(in_generated_subgroup(pd.base, b_col, w.subrange(1, lo)));
+        assert(has_pinch_at(pd, w, 0, lo));
+    } else {
+        assert(pw[0] == Symbol::Inv(st));
+        assert(pw[bj] == Symbol::Gen(st)) by { assert(pw[0] != pw[bj]); assert(is_stable(pd, pw[bj])); }
+        assert(w[0] == Symbol::Inv(st) && w[lo] == Symbol::Gen(st)) by {
+            assert(w[0] == pw[0]);
+            assert(seq![w[lo]] =~= seq![pw[bj]]) by { assert(apply_embedding_symbol(se, w2[lv]) =~= seq![pw2[bj-1]]); }
+        }
+        // middle ∈ ⟨a_col_S = config_emb(S)⟩.
+        assert(in_generated_subgroup(pdS.base, a_col_S, pinch_mid));
+        assert(in_generated_subgroup(fg, config_emb(s_slice), apply_embedding(pf, mid)));
+        // §4.2 a-side recognition: ⟨config_emb(S)⟩ ⟹ ⟨config_emb(σbet)⟩.
+        lemma_phi_image_config_support(n, m, l, mid, s_slice);
+        assert(in_generated_subgroup(fg, config_emb(sbet), apply_embedding(pf, mid)));
+        lemma_config_reflect_intersection(mm, n, m, l, mid, bet);
+        assert(in_generated_subgroup(fg, config_emb(bet), mid));
+        assert(in_generated_subgroup(pd.base, a_col, w.subrange(1, lo)));
+        assert(has_pinch_at(pd, w, 0, lo));
+    }
+    assert(has_pinch(pd, w)) by { assert(has_pinch_at(pd, w, 0, lo)); }
+}
+
+/// **CS-4d superset-slice pinch-descent**: a pinch of `pw = emb(φ_l_src, w)` over `pa_data(S)`
+/// descends to a pinch of `w` over `pa_data(bet_of(S))`.  Mirror of `lemma_mapb_pinch_descends_rt`
+/// with the peel running over `S` and the spanning case delegating to `lemma_mapb_pinch_spanning_S`.
+pub proof fn lemma_mapb_pinch_descends_S(mm: ModMachine, n: nat, m: nat, l: nat, s_slice: Seq<nat>,
+    w: Word)
+    requires
+        mod_machine_wf(mm),
+        1 <= l <= 2 * n,
+        2 * n < m,
+        s_slice.no_duplicates(),
+        forall|i: int| 0 <= i < s_slice.len() ==> numbers_word(n, m, #[trigger] s_slice[i]),
+        word_valid(w, (n + 4) as nat),
+        has_pinch(pa_data(n, m, s_slice), apply_embedding(phi_l_src(n, m, l), w)),
+    ensures
+        has_pinch(pa_data(n, m, bet_of(s_slice, m, l)), w),
+    decreases w.len(),
+{
+    let bet = bet_of(s_slice, m, l);
+    let pd = pa_data(n, m, bet);
+    let pdS = pa_data(n, m, s_slice);
+    let pf = phi_F_family(n, m, l);
+    let fg = free_group((n + 3) as nat);
+    let se = stable_emb(fg, pf);
+    let st = (n + 3) as nat;
+    lemma_phi_l_src_eq_stable_emb(n, m, l);
+    assert(phi_l_src(n, m, l) == se);
+    let pw = apply_embedding(se, w);
+
+    lemma_free_group_valid((n + 3) as nat);
+    lemma_bet_of_no_dup(s_slice, m, l);
+    lemma_bet_of_number_words(s_slice, n, m, l);
+    lemma_pa_data_shape(n, m, bet);
+    lemma_pa_data_shape(n, m, s_slice);
+    assert(pd.base.num_generators == st && pdS.base.num_generators == st);
+    lemma_phi_F_family_free(n, m, l);
+    assert(pf.len() == n + 3);
+    assert(se == pf.push(seq![Symbol::Gen(st)]));
+    assert forall|x: Symbol| is_stable(pdS, x) == is_stable(pd, x) by {}
+
+    let ij: (int, int) = choose|i: int, j: int| has_pinch_at(pdS, pw, i, j);
+    let bi = ij.0;
+    let bj = ij.1;
+    assert(has_pinch_at(pdS, pw, bi, bj));
+    assert(has_adjacent_opposite_at(pdS, pw, bi, bj));
+
+    assert(w.len() > 0) by { if w.len() == 0 { assert(pw =~= Seq::<Symbol>::empty()); } }
+    let c = w[0];
+    let w2 = w.drop_first();
+    assert(w =~= seq![c] + w2);
+    assert(word_valid(w2, (n + 4) as nat)) by {
+        assert forall|k: int| 0 <= k < w2.len() implies symbol_valid(#[trigger] w2[k], (n + 4) as nat)
+        by { assert(w2[k] == w[k + 1]); }
+    }
+    lemma_apply_embedding_concat(se, seq![c], w2);
+    let ec = apply_embedding(se, seq![c]);
+    let pw2 = apply_embedding(se, w2);
+    assert(ec =~= apply_embedding_symbol(se, c)) by { reveal_with_fuel(apply_embedding, 2); }
+    assert(pw =~= ec + pw2);
+    assert(symbol_valid(c, (n + 4) as nat)) by { assert(c == w[0]); }
+
+    if is_stable(pdS, c) {
+        assert(c == Symbol::Gen(st) || c == Symbol::Inv(st));
+        if c == Symbol::Gen(st) {
+            assert(ec =~= seq![Symbol::Gen(st)]) by { assert(se[st as int] == seq![Symbol::Gen(st)]); }
+        } else {
+            assert(se[st as int] == seq![Symbol::Gen(st)]);
+            assert(ec =~= inverse_word(seq![Symbol::Gen(st)]));
+            assert(ec =~= seq![Symbol::Inv(st)]) by { reveal_with_fuel(inverse_word, 2); }
+        }
+        assert(ec.len() == 1 && ec[0] == c);
+        assert(pw[0] == ec[0] && pw[0] == c);
+        if bi == 0 {
+            lemma_mapb_pinch_spanning_S(mm, n, m, l, s_slice, w, w2, bi, bj);
+        } else {
+            assert(pw =~= ec + pw2);
+            lemma_strip_prefix_preserves_pinch(pdS, ec, pw2, bi, bj);
+            assert(apply_embedding(phi_l_src(n, m, l), w2) == pw2);
+            lemma_mapb_pinch_descends_S(mm, n, m, l, s_slice, w2);
+            lemma_prepend_preserves_pinch(pd, c, w2);
+            assert(seq![c] + w2 =~= w);
+        }
+    } else {
+        assert(generator_index(c) < st) by {
+            assert(symbol_valid(c, (n + 4) as nat));
+            assert(generator_index(c) != st);
+        }
+        assert(generator_index(c) < pf.len());
+        let gi = generator_index(c) as int;
+        if c == Symbol::Gen(generator_index(c)) {
+            assert(ec =~= se[gi]) by { reveal_with_fuel(apply_embedding, 2); lemma_concat_empty_right(se[gi]); }
+            assert(se[gi] == pf[gi]);
+            lemma_word_valid_no_inner_stable(fg, pf[gi]);
+        } else {
+            assert(c == Symbol::Inv(generator_index(c)));
+            assert(ec =~= inverse_word(se[gi])) by {
+                reveal_with_fuel(apply_embedding, 2); lemma_concat_empty_right(inverse_word(se[gi]));
+            }
+            assert(se[gi] == pf[gi]);
+            crate::word::lemma_inverse_word_valid(pf[gi], (n + 3) as nat);
+            lemma_word_valid_no_inner_stable(fg, inverse_word(pf[gi]));
+        }
+        let elen = ec.len() as int;
+        assert(forall|k: int| 0 <= k < elen ==> !is_stable_at(pdS, ec, k, st));
+        assert(forall|k: int| 0 <= k < elen ==> #[trigger] pw[k] == ec[k]);
+        assert(is_stable(pdS, pw[bi]));
+        assert(bi >= elen) by {
+            if bi < elen {
+                assert(pw[bi] == ec[bi]);
+                assert(!is_stable(pdS, ec[bi])) by { assert(0 <= bi < elen); }
+            }
+        }
+        lemma_strip_prefix_preserves_pinch(pdS, ec, pw2, bi, bj);
+        assert(apply_embedding(phi_l_src(n, m, l), w2) == pw2);
+        lemma_mapb_pinch_descends_S(mm, n, m, l, s_slice, w2);
+        lemma_prepend_preserves_pinch(pd, c, w2);
+        assert(seq![c] + w2 =~= w);
+    }
 }
 
 // ----------------------------------------------------------------------------
