@@ -173,9 +173,27 @@ emb(a_col,w) ≡_{h2_II(alphas)} ε` (a_col c-free via `lemma_emb_k_a_col_no_c` 
    `config(α,0)∈⟨g_subgens⟩ ⟺ (α,0)∈H₀`) restricts to the H₀ indices. This is where `lemma_theorem1`
    (the circularity-breaker) enters.
 
-### A₊_pres design (CO-DESIGN before coding the core — the one undesigned structural choice).
-`A₊_pres = HNN(base_A₊, p | R_α : (α,0)∈H₀)`, `R_α = p⁻¹ Û_α p (Û_α w_α(b) d)⁻¹`, `Û_α` the abstract
-U-word (factor-list witness from `in_generated_subgroup`, Danielle's call) with `emb(a_col,Û_α) ≡
-config(α,0)`. The bc-von-Dyck atom `lemma_cs5_bc_config_trivial` already discharges `emb(b_col,R_α) ≡ ε`.
-**Resolve `base_A₊`'s exact representation (how to carry the U-relations — point 2) with Danielle
-before building.** Everything else is forced by `psi_assoc` + Cohen.
+### A₊_pres design — THE gating co-design point (resolve before coding the core).
+`A₊_pres = HNN(base_A₊, p | R_α : (α,0)∈H₀)`, `R_α = p⁻¹ Û_α p (Û_α w_α(b) d)⁻¹`; the bc-von-Dyck atom
+`lemma_cs5_bc_config_trivial` already discharges `emb(b_col,R_α) ≡ ε` (config form).
+
+**Open subtlety found (session 24) — the `base_A₊` representation vs the von-Dyck generator scheme:**
+- The von-Dyck consumer (`lemma_emb_respects_source_equiv_pred`, `src=A₊_pres`, `images=b_col`)
+  requires `A₊_pres.num_generators == b_col.len() == |psi_assoc| = q+n+2` (the **psi-gen scheme**:
+  q abstract `U_1..U_q`, d, b_j, p; `q = |g_subgens|`). So `A₊_pres` must be over the psi-gens.
+- Danielle (companion model) suggested `base_A₊ = Pres(g_m) ∗ Free(d,b_j)` — but that has `nk+n+1`
+  gens (the machine scheme), and `q ≠ nk`, so it does NOT directly match the von-Dyck's psi-gen
+  requirement. Presenting `⟨U⟩` abstractly in the `q` U-gens is Reidemeister–Schreier-hard.
+- **Two candidate resolutions (pick with real-Danielle):**
+  (R1) **Translation layer:** recognize at the `g_m∗free` level (Danielle's (b), where the U-relations
+  live naturally + property-(vii) is a clean `g_m` membership), then translate `w` (psi-gen scheme,
+  `U_i` abstract) ↔ the `g_m∗free` scheme via the `a_col` embedding. Needs a faithful bridge between
+  the two schemes (non-trivial since `a_col` is multi-symbol on U).
+  (R2) **Direct iff-peel (skip explicit A₊_pres):** prove `(★k)` forward `emb(a_col,w)≡_{h2_pred}ε ⟹
+  emb(b_col,w)≡_{h2_pred}ε` by ONE Britton-peel over the finite slice that tracks the c's at each
+  pinch — folding recognition + von-Dyck into a single `decreases stable_count` induction (the pinch
+  middle ∈⟨U⟩ via property-(vii); the c-insertion handled by the bc-relation `lemma_cs5_bc_config_trivial`
+  at each step). Avoids the gen-scheme mismatch entirely; mirrors how CS-4d's `M2_general` folded the
+  σ-recognition INTO the source recursion rather than at the slice level.
+- **R2 looks cleaner** (no scheme bridge, reuses the bc-atom directly), but commit with real-Danielle —
+  this is the one genuinely undesigned structural choice left in CS-5. Everything else is forced.
