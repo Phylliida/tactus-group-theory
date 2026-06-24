@@ -1,5 +1,28 @@
 # CS-4d backward (`b ⟹ a`) — the design blueprint
 
+> **STATUS — COMPLETE (session 23).** All of CS-4d (and the CS-4e tower lift) are verified.
+> Build outcome vs. this plan:
+> - **§4.1 (general `pa_data` iso) was NOT needed.** The descent (`lemma_mapb_pinch_descends_rt`)
+>   carries no `iso` precondition; the only iso consumed in the M2 loop is for the slice the Britton
+>   peel runs over, and the assembly uses `S = betas(norm)` (betas-form), so the existing
+>   `lemma_pa_data_isomorphic` discharges it. (Confirmed with Danielle.)
+> - **§4.2 a-side** = `lemma_phi_image_config_support` + `lemma_coords_in_sigbet` (`cohen_cs4d_recog.rs`,
+>   7/0): sibling of `lemma_r_prime` with step 5 swapped for DIRECT σbet membership (no `sat_bridge`).
+> - **§4.2 b-side** = `lemma_phi_image_pa_rhs_support` + `lemma_phi_prime_canon_S` (`r_prime_b.rs`, +28):
+>   S-form of `lemma_r_prime_b` (kill_db → config, coord-selector transfer, direct σbet membership).
+> - **§3 descent** = `lemma_mapb_pinch_descends_S` / `_spanning_S` (`phi_l_mapb_fwd.rs`): the §4.2 cores
+>   fold in before the existing `_reflect_intersection` calls.
+> - **§3 M2_general** = `lemma_mapb_M2_general` + `lemma_phi_l_src_on_pa_relator_retarget_S` (option (b):
+>   the retarget image is LITERALLY a `pa_data(S)` relator, since `σbet ⊆ S`).
+> - **CS-4d assembly** = `lemma_cs4d_backward` (`cohen_cs4c.rs`, 19/0).
+> - **CS-4e tower lift** = `lemma_h3_pred_upto_base_faithful` + `lemma_cs4e_iso_upto` (`cohen_cs4e.rs`,
+>   3/0): `hnn_pred_associations_isomorphic(cs4_data(l))` for all a-levels `1 ≤ l ≤ 2n`.
+>
+> The rest of this note is the original (pre-build) plan, preserved for reference.
+
+---
+
+
 *Written 2026-06-23 (session 22), after a deep read-only pass + companion co-design. This note
 **resolves** the open wrinkle flagged in `cohen-cs4-architecture.md` §4 (CS-4d) and **corrects** two
 points there. Per the standing "no undesigned directions" rule, this is the blueprint to approve

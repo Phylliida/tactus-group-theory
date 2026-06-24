@@ -239,6 +239,17 @@ Concrete brick sequence:
 
 ## 5. One-line status
 
+> **UPDATE (session 23): CS-4 COMPLETE.** CS-4d backward (`cohen_cs4c.rs::lemma_cs4d_backward`, 19/0)
+> + CS-4e tower lift (`cohen_cs4e.rs::lemma_cs4e_iso_upto`, 3/0) are verified. The 0-head/σ-preimage
+> wrinkle was resolved by `M2_general` (recognize the σ-restriction INSIDE the source-recursion via the
+> §4.2 cores, `cohen_cs4d_recog.rs` + `r_prime_b.rs`), NOT at the slice level. §4.1 (general iso) turned
+> out unneeded (S = betas(norm) is betas-form). Full crate gate: 2458 verified, 20 errors (all the
+> pre-existing runtime/lake-spawn baseline). `hnn_pred_associations_isomorphic(cs4_data(l))` now holds
+> for every a-level `1 ≤ l ≤ 2n`. See `docs/cohen-cs4d-blueprint.md` for the build map. NEXT = CS-5 (the
+> `k` von-Dyck iso, independent) → `h3_pred` full iso → Higman C↪H₃ completeness.
+
+
+
 CS-4 = (★). von-Dyck halves EASY/unconditional (predicate-base win). Faithfulness halves reuse the
 REAL `lemma_map_a_forward` + `lemma_mapb_M2_rt` (the session-8 vacuity was packaging-only, §2b) via a
 **compactness bridge** to finite slices — **NO new infinite-association substrate**. Session 19:
