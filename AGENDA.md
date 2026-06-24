@@ -295,6 +295,25 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > von-Dyck wiring (`emb(a_col,w)` c-free → CS-4b → normalize → `lemma_map_a_forward` →
 > `lemma_emb_respects_source_equiv_pred` + CS-4a).
 >
+> **✅ CS-4c FORWARD DONE 2026-06-23 (session 21, `cohen_cs4c.rs` 18/0, commit 87c4a67).**
+> `lemma_cs4c_forward`: `emb(a_col,w) ≡_{h2_pred} ε ⟹ emb(b_col,w) ≡_{h2_pred} ε` (the `⟹` half of
+> the a_i iso `(★)`). The full planned chain landed first-try (after one import fix): c-freeness of
+> `emb(a_words,w)` (`lemma_emb_a_words_no_c` — every `a_col` image generator is outside the c-block
+> `[nk,nk+n)`; atoms `lemma_no_c_single_gen`/`lemma_a_words_img_no_c`) → `lemma_cs4b_compactness`
+> (finite slice) → `lemma_h2_II_normalize_equiv` (no-dup/∌0/number-words) → `lemma_map_a_forward`
+> (`w ≡_{pa_data(betas(norm))} ε`) → `lemma_emb_respects_source_equiv_pred` over the `b_words`
+> homomorphism, its relator condition discharged per-`j` by `lemma_b_col_relator_trivial_pred`
+> (CS-4a). Additive; no signature changes; no regression. **NEXT = CS-4d (backward b⟹a) — BLOCKED on
+> a real design question, see `docs/cohen-cs4-architecture.md` §4 CS-4d + §5.** `lemma_mapb_M2_rt`
+> needs input `pw=emb(φ_l_src,w) ≡_{pa_data(sigma_betas(bet))} ε`, but compactness+`map_a_forward`
+> yields `pw ≡_{pa_data(betas(norm))} ε`; the forced **0-head** (β=0, the intrinsic `t↦td` p-relator)
+> is never a σ-image `mβ+l≥1`, so `betas(norm) ⊄ sigma_betas(bet)` for any `bet` — the matching is
+> structurally impossible (and `pa_data(sigma_betas(bet))` has no β=0 association, a different group).
+> Resolution needs an irrelevant-relator recognition lemma (φ_l-image words don't need non-σ
+> p-conjugations — Cohen Prop-1.34 content) OR a 0-head-free `map_a` variant. Co-design w/ Danielle
+> before building (the "no undesigned directions" rule). The a-von-Dyck tail itself is free (CS-4a's
+> `lemma_a_col_relator_trivial_pred` works for ANY number-word slice).
+>
 > **✅ FORK-A STARTED 2026-06-23 (session 14) — elementary foundation arc DONE, ports VERBATIM.**
 > The completeness route is **Fork-A** (predicate presentation; the textbook route per
 > `docs/cohen-faithfulness-primary-source.md` §1/§10). Go taken on the standing "follow the textbook"

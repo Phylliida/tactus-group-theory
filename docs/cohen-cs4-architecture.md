@@ -201,12 +201,37 @@ Concrete brick sequence:
   quirk:** `relators_included`'s `forall i. ∃ j` does NOT fold under the tactus Lean backend
   (`assert(relators_included(..))` fails even with both conjuncts proven), so the equiv is replayed
   DIRECTLY (per-element `lemma_h2_II_relator_in_norm` + single-step + derivation induction), NOT via
-  `lemma_relator_inclusion_preserves_equiv`. **Remaining CS-4c = the von-Dyck wiring:** `emb(a_col,w)`
-  c-free ⟹ CS-4b ⟹ normalize ⟹ `lemma_map_a_forward` ⟹ `w ≡_{pa_data(betas)} ε` ⟹
-  `lemma_emb_respects_source_equiv_pred` (CS-4a′) with `lemma_b_col_relator_trivial_pred` (CS-4a)
-  ⟹ `emb(b_col,w) ≡_{h2_pred} ε`.
-- **CS-4d — backward (b⟹a):** factor `emb(b_col,w)=emb(a_col,φ_l_src(w))` → CS-4b → `lemma_map_a_forward`
-  → `lemma_mapb_M2_rt` → CS-4a (a-von-Dyck). Resolve the σ_l-preimage / irrelevant-relator wrinkle.
+  `lemma_relator_inclusion_preserves_equiv`. **✅ FORWARD WIRING DONE (session 21, `cohen_cs4c.rs`
+  18/0, commit 87c4a67): `lemma_cs4c_forward`.** `emb(a_col,w) ≡_{h2_pred} ε ⟹ emb(b_col,w)
+  ≡_{h2_pred} ε`, chained exactly as planned: (a) `lemma_emb_a_words_no_c` — `emb(a_words,w)` is
+  c-free (every `a_col` image generator lands in `{0,1} ∪ [b_base,∞)`, all outside the c-block
+  `[nk,nk+n)`; new atoms `lemma_no_c_single_gen` / `lemma_a_words_img_no_c`) + word-valid
+  (`lemma_a_words_img_valid` + `lemma_apply_embedding_valid`); (b) `lemma_cs4b_compactness` → finite
+  slice `alphas`; (c) `lemma_h2_II_normalize_equiv` → `norm` (no-dup/∌0/number-words); (d)
+  `lemma_map_a_forward(norm, w)` → `w ≡_{pa_data(betas(norm))} ε`; (e) `lemma_emb_respects_source_equiv_pred`
+  with `src = hnn_presentation(pa_data(betas(norm)))`, `tgt = h2_pred`, `images = b_words`, the relator
+  condition discharged per-`j` by `lemma_b_col_relator_trivial_pred` (CS-4a) ⟹ `emb(b_col,w) ≡_{h2_pred}
+  emb(b_col,ε)=ε`. First-try clean after the import fix; additive, no signature changes.
+- **CS-4d — backward (b⟹a) — ⚠ THE OPEN WRINKLE, sharpened (session 21).** Plan: factor
+  `emb(b_col,w)=emb(a_col,φ_l_src(w))` (`lemma_mapb_factor_source`, M1) → compactness+normalize+
+  `lemma_map_a_forward` on `pw := emb(φ_l_src,w)` → `lemma_mapb_M2_rt` → CS-4a (a-von-Dyck via
+  `lemma_emb_respects_source_equiv_pred` with `lemma_a_col_relator_trivial_pred`, ANY number-word
+  slice — the final a-slice need NOT be σ-shaped, so the a-von-Dyck tail is free). **The blocker is
+  the M2_rt input form.** `lemma_mapb_M2_rt` consumes `pw ≡_{pa_data(sigma_betas(bet))} ε`
+  (`sigma_betas(bet)=[mβ+l : β∈bet]`), but compactness+`map_a_forward` only ever yields
+  `pw ≡_{pa_data(betas(norm))} ε` with `betas(norm)=[0]++norm`. The **0-head** (β=0 = the intrinsic
+  `p`-HNN relator `p⁻¹ t p (td)⁻¹`, config(0,0)=`[t]`) can NEVER equal a σ-image `mβ+l ≥ 1` (since
+  `1≤l≤2n<m`), so `betas(norm) ⊄ sigma_betas(bet)` for ANY `bet` — the `sigma_betas(bet) ⊇ betas(D)`
+  matching is structurally impossible at the 0-head. Worse, `pa_data(sigma_betas(bet))` has NO β=0
+  association at all (it lacks the defining `C`-relation `t↦td`), so it is a different group; the
+  forward succeeded only because the b-von-Dyck maps the 0-head relator to `family_II_relator(l)` (a
+  number-word relator present in `h2_pred`), a luxury M2_rt's exact-σ-form input does not grant.
+  **Resolution candidates (co-design w/ Danielle, per the "no undesigned directions" rule):** (1) an
+  "irrelevant-relator" recognition lemma — for a `φ_l_src`-image word `pw`, `pw ≡_{pa_data(gammas)} ε
+  ⟺ pw ≡_{pa_data(gammas ∩ σ-images)} ε` (the non-σ p-conjugations, incl. the 0-head, are never
+  needed; this is Cohen Prop-1.34 recognition content, substantial); or (2) a 0-head-free `map_a`
+  variant whose output slice carries no forced β=0 (refactor of the 234-line `map_a` arc). Both are
+  multi-hundred-line efforts with design risk — NOT a mechanical wiring like CS-4c forward.
 - **CS-4e — tower lift + iso:** package (★) at `h2_pred`, lift to `h3_pred_upto(l-1)` by
   base-faithfulness (`britton_lemma_unconditional` down the a-levels, downward induction on `l`).
 
@@ -216,10 +241,13 @@ Concrete brick sequence:
 
 CS-4 = (★). von-Dyck halves EASY/unconditional (predicate-base win). Faithfulness halves reuse the
 REAL `lemma_map_a_forward` + `lemma_mapb_M2_rt` (the session-8 vacuity was packaging-only, §2b) via a
-**compactness bridge** to finite slices — **NO new infinite-association substrate**. Execute Route 1
-(CS-4a→e). Only open proof-design unknown = CS-4d's "irrelevant relator" wrinkle. Session 19: scoped
-+ de-risked + docs corrected + **CS-4a (3/0) + CS-4a′ (7/0) DONE**. Session 20: **CS-4b (compactness
-bridge) DONE** (`cohen_cs4b.rs` 20/0, `lemma_cs4b_compactness` = S-strip homomorphism + derivation
-re-indexing). **NEXT = CS-4c** (forward a⟹b: CS-4b → `lemma_map_a_forward` → CS-4a b-von-Dyck via
-`lemma_emb_respects_source_equiv_pred`) → **CS-4d** (backward, the σ_l-preimage wrinkle) → **CS-4e**
-(tower lift).
+**compactness bridge** to finite slices — **NO new infinite-association substrate**. Session 19:
+scoped + de-risked + docs corrected + **CS-4a (3/0) + CS-4a′ (7/0) DONE**. Session 20: **CS-4b
+(compactness bridge) DONE** (`cohen_cs4b.rs` 20/0). Session 21: **CS-4c FORWARD (a⟹b) DONE**
+(`cohen_cs4c.rs` 18/0, `lemma_cs4c_forward` = c-freeness + CS-4b + normalize + `lemma_map_a_forward`
++ b-von-Dyck push). **NEXT = CS-4d** (backward b⟹a) — but it is **BLOCKED on a real design question**,
+NOT mechanical: the M2_rt input must be `pa_data(sigma_betas(bet))`-trivial, yet `map_a_forward` only
+yields `pa_data(betas(norm))`-trivial, and the forced **0-head** β=0 is never a σ-image, so the
+σ-preimage matching is structurally impossible (§4 CS-4d). Needs an irrelevant-relator recognition
+lemma OR a 0-head-free `map_a` variant — co-design w/ Danielle before building. Then **CS-4e** (tower
+lift via `britton_lemma_unconditional` down the a-levels).
