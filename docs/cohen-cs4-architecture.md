@@ -165,13 +165,30 @@ Concrete brick sequence:
   `lemma_emb_inverse_pair_trivial_pred`, `lemma_emb_inverse_word_trivial_pred`) + 3 induction lemmas
   (`lemma_emb_step_respects_pred` [4 cases] / `_derivation_respects_pred` / the top). This is what
   CS-4c/d call with the CS-4a relator-trivialities (`src = pa_data`, `tgt = h2_pred`).
-- **CS-4b — the compactness bridge (the genuinely new generic lemma). ← NEXT.**
-  `equiv_in_pred_presentation(h2_pred,u,ε) ⟹ ∃ finite alphas (no-dup,∌0,number-words) .
-  equiv_in_presentation(h2_II(alphas),u,ε)`.
-  (1) extract a `PredDerivation`'s finite relator-set, re-index as a finite `Derivation` over the slice;
-  (2) strip `S` first via a CS-2-style c-retraction `ρ_c` (a_col/b_col c-free ⟹ `ρ_c` fixes `u`);
-  (3) each used relator (K_M/comm/family-(II)) is an `h2_II(alphas)` relator by index. Generic; CS-5
-  reuses it.
+- **CS-4b — the compactness bridge (the genuinely new generic lemma). ✅ DONE
+  (`cohen_cs4b.rs` 20/0, commit 1a3ac69).**
+  `lemma_cs4b_compactness`: `equiv_in_pred_presentation(h2_pred,u,ε)` + `u` c-free ⟹
+  `∃ finite alphas (number-words) . equiv_in_presentation(h2_II(alphas),u,ε)`.
+  **Two stages, as designed:**
+  (1) **S-strip** — the homomorphism `s_strip` (kill every c gen, fix every non-c gen) maps
+  `h2_pred → h2_noS_pred` (the predicate base WITHOUT `S`): K_M / family-(II) relators (c-free) ↦
+  themselves, comm relator `b_i c_j b_i⁻¹ c_j⁻¹` ↦ `b_i b_i⁻¹ ≡ ε`, S relator (pure-c) ↦ `ε`. Since
+  `u` is c-free, `s_strip` FIXES it (`lemma_s_strip_descends`; this is the DUAL of CS-2's
+  `c_retraction`, "kill c" instead of "keep c"). NB the architecture line above said "CS-2-style
+  c-retraction ρ_c fixes u" — the actual fixer is the **non-c retraction** `s_strip` (CS-2's `ρ_c`
+  KILLS c-free words; the one that FIXES them keeps non-c).
+  (2) **compactness** — a finite `h2_noS_pred` derivation `u →* ε` uses finitely many relators, each
+  K_M / comm / `family_II_relator(β)`. The generic single-step lifter `lemma_finite_step_from_pred`
+  replays a pred step as a finite `Derivation` step (free moves verbatim; relator steps re-index by
+  `choose`ing the word's index in the finite relator list); the relator-arm `lemma_relator_arm`
+  threads `alphas` — K_M/comm keep `alphas` (they sit in `h2_pres`, present for every slice),
+  family-(II) PUSHES `β` and lifts the tail's equivalence over the larger slice by `add_relator`
+  monotonicity (`lemma_h2_II_extends_push` + `lemma_quotient_preserves_equiv`); the induction core
+  `lemma_compactness_core` walks the derivation.
+  **Output is number-word `alphas` only** — NOT no-dup / ∌0. Those normalizations (dropping the
+  always-present `family_II_relator(0)` ∈ `h2_pres` + dedup via `relators_included`) belong to CS-4c
+  where `lemma_map_a_forward`'s `!contains(0)/no_duplicates` preconditions are consumed; deferred.
+  Generic; CS-5 reuses the bridge.
 - **CS-4c — forward (a⟹b):** CS-4b → `lemma_map_a_forward` → CS-4a (b-von-Dyck).
 - **CS-4d — backward (b⟹a):** factor `emb(b_col,w)=emb(a_col,φ_l_src(w))` → CS-4b → `lemma_map_a_forward`
   → `lemma_mapb_M2_rt` → CS-4a (a-von-Dyck). Resolve the σ_l-preimage / irrelevant-relator wrinkle.
@@ -186,5 +203,8 @@ CS-4 = (★). von-Dyck halves EASY/unconditional (predicate-base win). Faithfuln
 REAL `lemma_map_a_forward` + `lemma_mapb_M2_rt` (the session-8 vacuity was packaging-only, §2b) via a
 **compactness bridge** to finite slices — **NO new infinite-association substrate**. Execute Route 1
 (CS-4a→e). Only open proof-design unknown = CS-4d's "irrelevant relator" wrinkle. Session 19: scoped
-+ de-risked + docs corrected + **CS-4a (3/0) + CS-4a′ (7/0) DONE**; **CS-4b (compactness bridge) is
-the next brick.**
++ de-risked + docs corrected + **CS-4a (3/0) + CS-4a′ (7/0) DONE**. Session 20: **CS-4b (compactness
+bridge) DONE** (`cohen_cs4b.rs` 20/0, `lemma_cs4b_compactness` = S-strip homomorphism + derivation
+re-indexing). **NEXT = CS-4c** (forward a⟹b: CS-4b → `lemma_map_a_forward` → CS-4a b-von-Dyck via
+`lemma_emb_respects_source_equiv_pred`) → **CS-4d** (backward, the σ_l-preimage wrinkle) → **CS-4e**
+(tower lift).
