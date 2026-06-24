@@ -418,3 +418,8 @@ pub mod cohen_h3;
 // finite-tower σ-slice obstruction is gone). docs/cohen-cs4-architecture.md §4.
 #[cfg(verus_keep_ghost)]
 pub mod cohen_cs4;
+
+// pred_emb_respects: Layer 2 — CS-4a'. The von-Dyck "hom extends" tool over a predicate target
+// (finite source -> pred target) + 4 predicate atoms. docs/cohen-cs4-architecture.md §4.
+#[cfg(verus_keep_ghost)]
+pub mod pred_emb_respects;
