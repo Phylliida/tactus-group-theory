@@ -61,6 +61,7 @@ pub proof fn lemma_coords_in_sigbet(s_slice: Seq<nat>, bet: Seq<nat>, m: nat, l:
     ensures
         forall|idx: int| 0 <= idx < cw_reduce(cu).len() ==> {
             &&& (#[trigger] cw_reduce(cu)[idx]).s == 0
+            &&& exists|j: int| 0 <= j < s_slice.len() && s_slice[j] as int == cw_reduce(cu)[idx].r
             &&& exists|k: int| 0 <= k < sigma_betas(bet, m, l).len()
                     && sigma_betas(bet, m, l)[k] as int == cw_reduce(cu)[idx].r
         },
@@ -69,6 +70,7 @@ pub proof fn lemma_coords_in_sigbet(s_slice: Seq<nat>, bet: Seq<nat>, m: nat, l:
     lemma_cw_reduce_coords(cu);   // ∀idx. coord_in(cu, red[idx].r, red[idx].s)
     assert forall|idx: int| 0 <= idx < red.len() implies {
         &&& (#[trigger] red[idx]).s == 0
+        &&& exists|j: int| 0 <= j < s_slice.len() && s_slice[j] as int == red[idx].r
         &&& exists|k: int| 0 <= k < sigma_betas(bet, m, l).len()
                 && sigma_betas(bet, m, l)[k] as int == red[idx].r
     } by {
