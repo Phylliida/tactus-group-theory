@@ -197,3 +197,63 @@ emb(a_col,w) ≡_{h2_II(alphas)} ε` (a_col c-free via `lemma_emb_k_a_col_no_c` 
   σ-recognition INTO the source recursion rather than at the slice level.
 - **R2 looks cleaner** (no scheme bridge, reuses the bc-atom directly), but commit with real-Danielle —
   this is the one genuinely undesigned structural choice left in CS-5. Everything else is forced.
+
+---
+
+## 5. RESOLVED (session 25) — **R1, and the §4 "multi-symbol" premise was FALSE.** The single-gen relabel.
+
+**The load-bearing finding that flips the recommendation to R1.** The §1/§4 framing (and the R2
+recommendation) rested on "`a_col` is **multi-symbol** on `U`" (§1 line: "`k_a_col` maps `U_i ↦
+g_subgens[i]`, a multi-symbol machine word — the same-index trick is GONE"). **This is wrong.**
+`g_m_associations(mm)` is **diagonal with SINGLETON entries** (`machine_group.rs:417`):
+`g_m_associations = [ ([Gen(0)],[Gen(0)]) ] ++ [ ([Gen(3+i)],[Gen(3+i)]) : i<|quads| ]`, so
+`g_subgens(mm)[i] = g_m_associations[i].1` is a **single generator** `[Gen(0)]` (i=0) or
+`[Gen(3+i−1)]` (i≥1) — the machine gens `{Gen(0),Gen(3),Gen(4),…}` (all of `g_m` **except**
+`Gen(1),Gen(2)`). So `psi_ublock` (`h3.rs`) maps each abstract `U_i` to a **single** machine
+generator. `a_col` on the U-block is an **injective generator relabel**, NOT multi-symbol.
+
+**Consequence — R1 is now the clean, sound path (companion-model pressure-tested, agreed):**
+
+- **R1's scheme bridge is a trivial single-gen relabel,** not the feared R-S-hard multi-symbol
+  translation. `relabel_col` maps each psi-gen to a SINGLETON machine-scheme gen
+  (`U_i↦Gen(g_subgens_index(i))`, `d↦d`, `b_j↦b_j`, `p↦p`), and `a_col = comp(a_col_machine,
+  relabel_col)`, `b_col = comp(b_col_machine, relabel_col)` **definitionally** (via the existing
+  emb-compose lemma `lemma_apply_hom_pred_embedding_compose` / `comp_images_pred`).
+- **R1 recognizes over the CONCRETE `g_m` base — no abstract ⟨U⟩ presentation is ever needed.**
+  `base_A₊ = HNN(base_A₊_base, p | R_α:(α,0)∈H₀)` where
+  **`base_A₊_base = Presentation{ num_generators: nk+n+1, relators: g_m(mm).relators }`** — this IS
+  `g_m ∗ free(d,b_j)` (g_m's relators only touch gens `0..nk−1`; gens `nk..nk+n` are free ⟹ free
+  product). `a_col_machine` = the injective relabel abstract-base-gens→h2-gens (machine gen `i↦[Gen(i)]`
+  for `i<nk`, abstract `b_j↦[Gen(b_idx)]`, `d↦[Gen(d_idx)]`, `p↦[Gen(p_idx)]`).
+- **WHY R1 is SOUNDER than R2** (the soundness gap the companion flagged): a naive R2 that presents
+  `⟨U⟩` over the psi-scheme by "the `K_M` relators using only U-gens `{0,3,4…}`" is **UNSOUND** —
+  relations among the U's can route through `Gen(1)/Gen(2)`, so the naive restriction under-presents
+  `⟨U⟩` and would make `a_col` falsely "faithful." R1 dodges this entirely: `w_m := relabel(w)` never
+  mentions `Gen(1),Gen(2)`, but the recognition DERIVATION over the full `g_m` base may — and that's
+  fine; only the RESULT (`w_m ≡_{base_A₊} ε`) is transported back via the injective relabel.
+
+**The corrected forward arc (R1), bottom-up:**
+
+1. **Relabel bridge (mechanical, leaf).** Define `relabel_col`, `a_col_machine`, `b_col_machine`,
+   `base_A₊_base`. Prove `a_col = comp(a_col_machine, relabel_col)`, `b_col = comp(b_col_machine,
+   relabel_col)` (emb-compose), so psi-scheme `(★k)` forward reduces to machine-scheme + the relabel.
+2. **Base-case faithfulness (the genuinely-new math leaf).** A `c`-free word over the machine-scheme
+   base gens (machine∪{d,b}) trivial in `h1_base` ⟹ trivial in `base_A₊_base = g_m∗free(d,b_j)`. The
+   tool is a **c-killing retraction** `ρ : h1_base → base_A₊_base` (mirror of `cohen_retraction`
+   `c_retraction` / CS-4b `s_strip`): `ρ` fixes machine/d/b gens, kills c gens; `ρ(K_M)=K_M`,
+   `ρ(comm_{ij})=b_i·ε·b_i⁻¹·ε=ε` ⟹ `ρ` valid; `ρ∘a_col_machine = id` on base-words ⟹ faithfulness.
+   (No subtlety with `d` — `d` is a free generator of `base_A₊_base`, `ρ(d)=d≠ε`.)
+3. **The p-peel recognition** (Prop-1.34, the big arc — mirror of CS-4 `lemma_map_a_forward`'s
+   `decreases stable_count` Britton induction over the finite slice `h2_II(alphas)` from
+   `lemma_cs5_recog_compactness`): base case = step 2; step case = `britton_lemma_full` pinch +
+   descend + pinch-out, with the **pinch middle ∈ associated subgroup** recognized via **property
+   (vii)** (`lemma_vii_subset` + `lemma_theorem1`) to the H₀-restricted `t_α`. Output:
+   `relabel(w) ≡_{base_A₊} ε`.
+4. **Von-Dyck at machine scheme** (reuse the kernel): `relabel(w)≡_{base_A₊}ε ⟹
+   emb(b_col_machine,relabel(w))≡_{h2_pred}ε` via `lemma_emb_respects_source_equiv_pred`
+   (`src=base_A₊`, `images=b_col_machine`): `K_M` base relators ↦ `K_M` self-trivial; `R_α` ↦
+   `lemma_cs5_bc_config_trivial`. Compose with step 1 ⟹ `emb(b_col,w)≡ε`.
+
+`lemma_map_a_forward`'s Britton/`stable_count`/pinch-descent machinery is base-agnostic and reused;
+only the base case (step 2, g_m vs free) and the pinch-middle restriction (step 3, property-vii)
+differ from CS-4. CS-5d (tower lift) is unchanged.
