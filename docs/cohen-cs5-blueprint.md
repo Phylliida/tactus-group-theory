@@ -146,9 +146,36 @@ family-(II) relator (an `h2_pred` relator), powering the von-Dyck.
   (vi)/(vii) (`lemma_vi`/`lemma_vii_subset`) give the H₀-restriction. `lemma_w_bc_split` (w_α(bc) =
   w_α(b)·w_α(c)) + `s_realizes` (w_α(c)≡ε) discharge the bc-von-Dyck.
 
-### Open design question (CO-DESIGN before building).
-The concrete `A₊_pres` representation (how to encode "abstract U-word for t_α" / the H₀-restricted
-p-relations) is the single structural choice — analogous to CS-4's `pa_data`. Resolve with Danielle
-before coding (the "no undesigned directions" rule). Candidate: `A₊_pres = HNN(base_A₊, p | R_α)`
-where `base_A₊` = a free-product-style presentation on `U_1..U_q, d, b_j` and `R_α` (for `(α,0)∈H₀`,
-`numbers_word`) = `p⁻¹ Û_α p (Û_α w_α(b) d)⁻¹`, `Û_α` the abstract U-word with `a_col(Û_α) ≡ config(α,0)`.
+### Status: recognition OPENING DONE (`cohen_cs5.rs` 18/0, commit b9ce70d).
+`lemma_cs5_recog_compactness`: `emb(a_col,w) ≡_{h2_pred} ε ⟹ ∃ number-word slice `alphas`.
+emb(a_col,w) ≡_{h2_II(alphas)} ε` (a_col c-free via `lemma_emb_k_a_col_no_c` + CS-4b compactness).
+
+### The recognition CORE (next, the hard arc) — code-grounded from `lemma_map_a_forward`.
+`lemma_map_a_forward` (`phi_l_pinch.rs:773`) is a `decreases stable_count(pa_data, w)` induction:
+- **base case** (`stable_count==0`): `w` is an F-word; `map_a_faithful` (F=`a_words_F` FREE in
+  `h1_base`) + `lemma_h1_faithful_in_h2_II` + `lemma_base_embeds_in_hnn` ⟹ `w ≡_{pa_data} ε`.
+- **step case**: `emb(a_words,w)` has a `recog_data` pinch (`britton_lemma_full` +
+  `lemma_map_a_pinch_descends`); `lemma_pd_pinch_out` removes it; recurse on fewer stable letters.
+
+**Three real adaptations for A₊ (the k-iso):**
+1. **Multi-symbol column.** `a_words` maps each gen to ONE h1_base gen (relabeling ⟹ same-index
+   pinch-descent, `lemma_single_gen_relabel`). `k_a_col` maps `U_i ↦ g_subgens[i]`, a **multi-symbol**
+   machine word — the same-index trick is GONE. Reuse the **spanning** pinch-descent that already
+   handles run-valued columns: `lemma_mapb_pinch_descends`/`_spanning_rt` (`phi_l_mapb_fwd.rs`).
+2. **Non-free base.** map_a's base case needs `F` FREE. A₊'s base `⟨U⟩∗⟨d,b_j⟩` is NON-free (U carries
+   K_M relations). `A₊_pres` MUST carry those U-relations (else `a_col` isn't faithful — a free-U
+   `A₊_pres` has the machine relations in `a_col`'s kernel but underivable). This is the genuinely-new
+   piece: recognize `⟨U,d,b_j⟩` (d,b_j free; U = machine subgroup, relations = K_M restricted to
+   `g_subgens`).
+3. **Intersection at the pinch middle.** map_a's F4 (`lemma_intersection_property`,
+   `phi_l_forward.rs:420`) recognizes the middle ∈ ⟨config-family⟩. For A₊ it must recognize
+   middle ∈ ⟨U⟩, which by **property (vii)** (`lemma_vii_subset` + `lemma_theorem1`:
+   `config(α,0)∈⟨g_subgens⟩ ⟺ (α,0)∈H₀`) restricts to the H₀ indices. This is where `lemma_theorem1`
+   (the circularity-breaker) enters.
+
+### A₊_pres design (CO-DESIGN before coding the core — the one undesigned structural choice).
+`A₊_pres = HNN(base_A₊, p | R_α : (α,0)∈H₀)`, `R_α = p⁻¹ Û_α p (Û_α w_α(b) d)⁻¹`, `Û_α` the abstract
+U-word (factor-list witness from `in_generated_subgroup`, Danielle's call) with `emb(a_col,Û_α) ≡
+config(α,0)`. The bc-von-Dyck atom `lemma_cs5_bc_config_trivial` already discharges `emb(b_col,R_α) ≡ ε`.
+**Resolve `base_A₊`'s exact representation (how to carry the U-relations — point 2) with Danielle
+before building.** Everything else is forced by `psi_assoc` + Cohen.
