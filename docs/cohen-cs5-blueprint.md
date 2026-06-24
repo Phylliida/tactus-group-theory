@@ -260,18 +260,36 @@ differ from CS-4. CS-5d (tower lift) is unchanged.
 
 ---
 
-## 6. Step-1/2 DONE; the step-3 build map (code-grounded, session 25). NEXT.
+## 6. Steps 1/2/3a/3b-a DONE; the remaining step-3 build map (code-grounded, session 25). NEXT.
 
-**Shipped (session 25, `src/cohen_cs5_recog.rs`, crate gate GREEN 2494/20):**
-- **Step 1 — relabel bridge (9/0, commit after blueprint flip).** `base_A_plus_base`, `a_col_machine`,
-  `b_col_machine`, `relabel_col`, `comp_emb`+`lemma_emb_emb_compose`, `lemma_a_col_factors`/`_b_`,
-  and `lemma_emb_a_col_via_relabel`/`_b_` (`emb(k_a_col,w) = emb(a_col_machine, relabel(w))`).
-- **Step 2 — base-case faithfulness (18/0).** `base_retraction` (ρ: h1_base→base_A_plus_base, kill c,
-  fix machine, shift b/d down by n), `lemma_base_retraction_valid` (K_M ρ-fixed = base relators; comm
-  ρ-killed to `[Gen,Inv]≡ε`), `lemma_comp_rho_acol_identity` (ρ∘a_col_machine = id on base gens), and
-  **`lemma_cs5_base_case_faithful`**: `emb(a_col_machine, w_base)≡_{h1_base}ε ⟹ w_base≡_{base_A_plus_base}ε`.
+**Shipped (session 25, `src/cohen_cs5_recog.rs`, 27/0, crate gate GREEN 2503/20):**
+- **Step 1 — relabel bridge (9/0).** `base_A_plus_base`, `a_col_machine`, `b_col_machine`,
+  `relabel_col`, `comp_emb`+`lemma_emb_emb_compose`, `lemma_a_col_factors`/`_b_`, and
+  `lemma_emb_a_col_via_relabel`/`_b_` (`emb(k_a_col,w) = emb(a_col_machine, relabel(w))`).
+- **Step 2 — base-case faithfulness (→18/0).** `base_retraction` (ρ: h1_base→base_A_plus_base),
+  `lemma_base_retraction_valid`, `lemma_comp_rho_acol_identity`, and **`lemma_cs5_base_case_faithful`**:
+  `emb(a_col_machine, w_base)≡_{h1_base}ε ⟹ w_base≡_{base_A_plus_base}ε`.
+- **Step 3a — `base_A_plus_data` (→20/0).** `assoc_rhs_machine`, `base_A_plus_assoc`,
+  `base_A_plus_data`, `lemma_base_A_plus_data_shape`, `lemma_base_A_plus_data_valid` (mirror
+  `lemma_pa_data_valid`).
+- **Machine-fixes + step-4 K_M relator (→23/0).** `lemma_a_col_machine_fixes_machine_word` /
+  `lemma_b_col_machine_fixes_machine_word` (both columns = id on gens `<nk`); **`lemma_cs5_vondyck_KM_relator`**
+  (`emb(b_col_machine, K_M_rel) ≡_{h2_pred} ε` — the base-relator half of step-4 von-Dyck).
+- **Step 3b a-side — the descent bridge (→27/0).** `lemma_a_col_machine_bblock`,
+  `lemma_a_col_machine_on_alpha_letter` (digit relabel), `lemma_a_col_machine_relabel_wc`
+  (`emb(a_col_machine, w_c(nk,…)) = w_c(nk+n,…)`, mirror CS-4 `lemma_a_words_relabel_wc`), and
+  **`lemma_a_col_machine_assoc_rhs`**: `emb(a_col_machine, assoc_rhs_machine(β)) = family_II_rhs(β)`.
 
-### Step 3 — the p-peel recognition. The big arc (CS-4 `lemma_map_a_forward`-scale). Build map:
+### Step 3 — what REMAINS (3b-b-side, 3c, 3d). The hard arc (CS-4 `lemma_map_a_forward`-scale).
+
+**3b-b-side (NEXT, mechanical):** `emb(b_col_machine, assoc_rhs_machine(β)) = family_II_bc_rhs(β)`
+(`family_II_bc_rhs` in `cohen_cs5.rs`, the bc-config form). More involved than the a-side: `b_col_machine`
+maps machine-b `nk+j ↦ [Gen(b),Gen(c)]`, so `w_b(nk,…)` relabels to **`w_bc(nk+n, nk, …)`** (b's gain
+c's), NOT a pure base-shift. Mirror `lemma_a_col_machine_relabel_wc` but the digit-letter image is the
+2-symbol `[b_j, c_j]`/`[c_j⁻¹, b_j⁻¹]`; reuse `lemma_w_bc_split`/`w_bc` structure. Powers the step-4
+**HNN** relator (the bc-atom `lemma_cs5_bc_config_trivial` then closes it).
+
+Build map for the remaining (3a's HNN object is DONE; the bridge identities are 3b):
 
 **3a. `base_A_plus_data` (the machine-scheme HNN) — the LAYOUT is the subtlety.** Mirror
 `pa_data`/`recog_data` (`pa_data.rs`, `h3_ii.rs:739`) but over `base_A_plus_base`:
