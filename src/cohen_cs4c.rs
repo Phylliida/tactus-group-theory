@@ -43,8 +43,12 @@ use crate::f_free_a1::{betas, lemma_betas_index};
 use crate::pred_emb_respects::lemma_emb_respects_source_equiv_pred;
 use crate::cohen_h2::{h2_pred, lemma_h2_pred_valid, s_relators_valid, c_symbol};
 use crate::cohen_retraction::{no_c_word, lemma_no_c_inverse, lemma_no_c_concat};
-use crate::cohen_cs4::lemma_b_col_relator_trivial_pred;
+use crate::cohen_cs4::{lemma_b_col_relator_trivial_pred, lemma_a_col_relator_trivial_pred};
 use crate::cohen_cs4b::lemma_cs4b_compactness;
+use crate::phi_l_mapb::{phi_l_src, lemma_phi_l_src_valid, lemma_phi_l_src_len,
+    lemma_mapb_factor_source, lemma_pa_data_isomorphic};
+use crate::phi_l_mapb_fwd::lemma_mapb_M2_general;
+use crate::cohen_cs4d::{bet_of, lemma_bet_of_number_words, lemma_bet_of_no_dup};
 
 verus! {
 
@@ -691,6 +695,145 @@ pub proof fn lemma_cs4c_forward(
     lemma_emb_respects_source_equiv_pred(src, h2_pred(mm, n, m, is_S), bw, w, empty_word());
 
     assert(apply_embedding(bw, empty_word()) =~= empty_word());
+}
+
+// ============================================================================
+// CS-4d — the von-Dyck BACKWARD wiring (`b ⟹ a`) — the previously-blocked half
+// ============================================================================
+//
+// `docs/cohen-cs4d-blueprint.md`. The `⟸` half of the a_i iso `(★)`:
+//
+//   emb(b_col, w) ≡_{h2_pred} ε   ⟹   emb(a_col, w) ≡_{h2_pred} ε
+//
+// Chained:
+//   (M1) factor `emb(b_col, w) = emb(a_col, pw)`, `pw = emb(φ_l_src, w)` (lemma_mapb_factor_source);
+//   (a–c) CS-4b compactness + normalize on `emb(a_col, pw)` (mirrors CS-4c forward, applied to `pw`);
+//   (d) `lemma_map_a_forward` on `pw`: `pw ≡_{pa_data(betas(norm))} ε`;
+//   (e–g) **M2_general** over the superset slice `S = betas(norm)` (the σ-recognition engine):
+//         `w ≡_{pa_data(bet_of(S))} ε`.  The `iso(pa_data(S))` precondition is discharged by
+//         `lemma_pa_data_isomorphic` since `S = betas(norm)` is betas-form (blueprint: §4.1 not needed);
+//   (h) the a_col von-Dyck push (`lemma_emb_respects_source_equiv_pred` + CS-4a a-relator-triviality).
+
+/// **CS-4d BACKWARD (`b ⟹ a`).** If `emb(a_col=a_words, w)`'s sibling `emb(b_col=b_words, w)` is
+/// trivial in `h2_pred`, then `emb(a_col, w)` is too — closing the a_i association iso `(★)` over the
+/// predicate base.  The piece that was blocked on the 0-head / σ-preimage design question, resolved by
+/// recognizing the σ-restriction inside `M2_general` rather than at the slice level.
+pub proof fn lemma_cs4d_backward(
+    mm: ModMachine, n: nat, m: nat, is_S: spec_fn(Word) -> bool, l: nat, w: Word,
+)
+    requires
+        mod_machine_wf(mm),
+        2 * n < m,
+        1 <= l <= 2 * n,
+        s_relators_valid(is_S, g_m(mm).num_generators, n),
+        word_valid(w, (n + 4) as nat),
+        equiv_in_pred_presentation(h2_pred(mm, n, m, is_S),
+            apply_embedding(b_words(mm, n, m, l), w), empty_word()),
+    ensures
+        equiv_in_pred_presentation(h2_pred(mm, n, m, is_S),
+            apply_embedding(a_words(mm, n), w), empty_word()),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let aw = a_words(mm, n);
+    let bw = b_words(mm, n, m, l);
+    let phi = phi_l_src(n, m, l);
+    let pw = apply_embedding(phi, w);
+    let apw = apply_embedding(aw, pw);
+
+    // (M1) emb(b_words, w) = emb(a_words, pw) ⟹ emb(a_words, pw) ≡_{h2_pred} ε.
+    lemma_mapb_factor_source(mm, n, m, l, w);
+    assert(apply_embedding(bw, w) =~= apw);
+    assert(equiv_in_pred_presentation(h2_pred(mm, n, m, is_S), apw, empty_word()));
+
+    // pw valid over n+4.
+    lemma_phi_l_src_valid(n, m, l);
+    lemma_phi_l_src_len(n, m, l);
+    lemma_apply_embedding_valid(phi, w, (n + 4) as nat);
+
+    // (a) apw is c-free and valid over h2_num_gens.
+    lemma_emb_a_words_no_c(mm, n, pw);                     // no_c_word(nk, n, apw)
+    lemma_a_words_single_gen(mm, n);                       // aw.len() == n + 4
+    assert forall|i: int| 0 <= i < aw.len()
+        implies word_valid(#[trigger] aw[i], h2_num_gens(nk, n)) by {
+        lemma_a_words_img_valid(mm, n, i);
+    }
+    assert(word_valid(pw, aw.len()));                      // aw.len() == n + 4
+    lemma_apply_embedding_valid(aw, pw, h2_num_gens(nk, n));  // word_valid(apw, h2_num_gens)
+
+    // (b) compactness: a finite slice `alphas` with apw ≡_{h2_II(alphas)} ε.
+    lemma_cs4b_compactness(mm, n, m, is_S, apw);
+    let alphas = choose|a: Seq<nat>|
+        (forall|i: int| 0 <= i < a.len() ==> numbers_word(n, m, #[trigger] a[i]))
+        && equiv_in_presentation(h2_II(mm, n, m, a), apw, empty_word());
+    assert(forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]));
+    assert(equiv_in_presentation(h2_II(mm, n, m, alphas), apw, empty_word()));
+
+    // (c) normalize: no-dup, ∌0, number-words.
+    lemma_h2_II_normalize_equiv(mm, n, m, alphas, apw, empty_word());
+    let norm = normalize_alphas(alphas);
+
+    // (d) map_a forward on pw: pw ≡_{P_A = pa_data(betas(norm))} ε.
+    lemma_map_a_forward(mm, n, m, norm, pw);
+    let bigS = betas(norm);
+    assert(equiv_in_presentation(hnn_presentation(pa_data(n, m, bigS)), pw, empty_word()));
+
+    // (e) bigS = betas(norm) is no-dup + number-words (the M2_general superset slice S).
+    lemma_betas_index(norm);
+    assert forall|i: int| 0 <= i < bigS.len() implies numbers_word(n, m, #[trigger] bigS[i]) by {
+        if i == 0 { assert(bigS[0] == 0); } else { assert(bigS[i] == norm[i - 1]); }
+    }
+    assert(bigS.no_duplicates()) by {
+        assert forall|i: int, j: int|
+            0 <= i < bigS.len() && 0 <= j < bigS.len() && i != j implies bigS[i] != bigS[j] by {
+            if i == 0 {
+                assert(bigS[j] == norm[j - 1]);
+                assert(norm.contains(norm[j - 1]));
+            } else if j == 0 {
+                assert(bigS[i] == norm[i - 1]);
+                assert(norm.contains(norm[i - 1]));
+            } else {
+                assert(bigS[i] == norm[i - 1] && bigS[j] == norm[j - 1]);
+            }
+        }
+    }
+
+    // (f) iso(pa_data(bigS)) — bigS = betas(norm) is betas-form (§4.1 not needed).
+    lemma_pa_data_isomorphic(mm, n, m, norm);             // hnn_associations_isomorphic(pa_data(betas(norm)))
+
+    // (g) M2_general: w ≡_{pa_data(bet_of(bigS))} ε.
+    lemma_mapb_M2_general(mm, n, m, l, bigS, w);
+    let bet = bet_of(bigS, m, l);
+    let pd = pa_data(n, m, bet);
+    let src = hnn_presentation(pd);
+    assert(equiv_in_presentation(src, w, empty_word()));
+
+    // (h) a_col von-Dyck push: w ≡_{pa_data(bet)} ε ⟹ emb(a_words, w) ≡_{h2_pred} ε.
+    lemma_bet_of_number_words(bigS, n, m, l);             // bet number-words
+    lemma_bet_of_no_dup(bigS, m, l);
+    lemma_pa_data_shape(n, m, bet);
+    lemma_pa_data_valid(n, m, bet);
+    lemma_hnn_presentation_valid(pd);
+    assert(src.relators =~= hnn_relators(pd)) by {
+        assert(pd.base.relators == Seq::<Word>::empty());
+    }
+    assert(src.num_generators == n + 4);
+    assert(src.relators.len() == bet.len());
+
+    // each src relator maps to ε in h2_pred (CS-4a a-von-Dyck).
+    assert forall|j: int| 0 <= j < src.relators.len() implies
+        equiv_in_pred_presentation(h2_pred(mm, n, m, is_S),
+            apply_embedding(aw, #[trigger] src.relators[j]), empty_word()) by {
+        assert(src.relators[j] == hnn_relators(pd)[j]);
+        assert(hnn_relators(pd)[j] == hnn_relator(pd, j));
+        lemma_a_col_relator_trivial_pred(mm, n, m, is_S, bet, j);
+    }
+
+    lemma_h2_pred_valid(mm, n, m, is_S);
+    assert(h2_pred(mm, n, m, is_S).num_generators == h2_num_gens(nk, n));
+    assert(word_valid(empty_word(), src.num_generators));
+    lemma_emb_respects_source_equiv_pred(src, h2_pred(mm, n, m, is_S), aw, w, empty_word());
+    assert(apply_embedding(aw, empty_word()) =~= empty_word());
 }
 
 } // verus!
