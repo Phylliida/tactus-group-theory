@@ -36,6 +36,9 @@ use crate::h1::{h1_base, comm_relators, comm_relator, lemma_h1_base_valid, lemma
 use crate::h3::{psi_assoc, psi_ublock, psi_bcblock, lemma_single_gen_valid};
 use crate::word_numbering::{w_b, numbers_word, lemma_w_c_valid};
 use crate::hnn::{HNNData, hnn_data_valid};
+use crate::pred_presentation::equiv_in_pred_presentation;
+use crate::pred_presentation_lemmas::lemma_pred_relator_is_identity;
+use crate::cohen_h2::{h2_pred, h2_pred_relator};
 use crate::cohen_cs5::{k_a_col, k_b_col};
 
 verus! {
@@ -738,6 +741,70 @@ proof fn lemma_comp_rho_acol_identity(mm: ModMachine, n: nat, i: int)
         reveal_with_fuel(apply_hom, 2);
         assert(apply_hom(rho, am[i]) =~= seq![Symbol::Gen(i as nat)]);
     }
+}
+
+// ============================================================================
+// `a_col_machine` / `b_col_machine` fix machine words (gens `< nk`) — both columns are the identity
+// on the machine block. Subsumes config-fix (config ⊂ machine) and powers step-4 K_M base relators.
+// ============================================================================
+
+/// `a_col_machine` fixes any machine word (valid over `nk`): `emb(a_col_machine, r) = r`.
+pub proof fn lemma_a_col_machine_fixes_machine_word(mm: ModMachine, n: nat, r: Word)
+    requires
+        word_valid(r, g_m(mm).num_generators),
+    ensures
+        apply_embedding(a_col_machine(mm, n), r) =~= r,
+{
+    let nk = g_m(mm).num_generators;
+    let am = a_col_machine(mm, n);
+    lemma_machine_col_len(mm, n);
+    assert forall|i: int| 0 <= i < nk implies #[trigger] am[i] =~= seq![Symbol::Gen(i as nat)] by {
+        assert(am[i] == Seq::new(nk, |i2: int| seq![Symbol::Gen(i2 as nat)])[i]);
+    }
+    lemma_emb_identity_prefix(am, r, nk);
+}
+
+/// `b_col_machine` fixes any machine word (the machine block of `b_col_machine` is also the identity).
+pub proof fn lemma_b_col_machine_fixes_machine_word(mm: ModMachine, n: nat, r: Word)
+    requires
+        word_valid(r, g_m(mm).num_generators),
+    ensures
+        apply_embedding(b_col_machine(mm, n), r) =~= r,
+{
+    let nk = g_m(mm).num_generators;
+    let bm = b_col_machine(mm, n);
+    lemma_machine_col_len(mm, n);
+    assert forall|i: int| 0 <= i < nk implies #[trigger] bm[i] =~= seq![Symbol::Gen(i as nat)] by {
+        assert(bm[i] == Seq::new(nk, |i2: int| seq![Symbol::Gen(i2 as nat)])[i]);
+    }
+    lemma_emb_identity_prefix(bm, r, nk);
+}
+
+/// **Step-4 von-Dyck, base K_M relators.** For a `g_m` (K_M) relator `r`, `emb(b_col_machine, r) =
+/// r ≡_{h2_pred} ε` (b_col_machine fixes machine words; `r` is an `h2_pred` relator via its K_M
+/// clause). The base-relator half of the von-Dyck homomorphism condition (step 4).
+pub proof fn lemma_cs5_vondyck_KM_relator(
+    mm: ModMachine, n: nat, m: nat, is_S: spec_fn(Word) -> bool, r: Word,
+)
+    requires
+        g_m(mm).relators.contains(r),
+    ensures
+        equiv_in_pred_presentation(h2_pred(mm, n, m, is_S),
+            apply_embedding(b_col_machine(mm, n), r), empty_word()),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_valid(mm);
+    reveal(presentation_valid);
+    let idx = choose|i: int| 0 <= i < g_m(mm).relators.len() && g_m(mm).relators[i] == r;
+    assert(word_valid(g_m(mm).relators[idx], nk));
+    assert(word_valid(r, nk));
+    lemma_b_col_machine_fixes_machine_word(mm, n, r);     // emb(b_col_machine, r) = r
+    // r is an h2_pred relator (K_M clause).
+    assert((h2_pred(mm, n, m, is_S).relators)(r)) by {
+        assert((h2_pred(mm, n, m, is_S).relators)(r) == h2_pred_relator(mm, n, m, is_S, r));
+        assert(g_m(mm).relators.contains(r));
+    }
+    lemma_pred_relator_is_identity(h2_pred(mm, n, m, is_S), r);
 }
 
 // ============================================================================
