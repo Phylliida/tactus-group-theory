@@ -189,7 +189,22 @@ Concrete brick sequence:
   always-present `family_II_relator(0)` ∈ `h2_pres` + dedup via `relators_included`) belong to CS-4c
   where `lemma_map_a_forward`'s `!contains(0)/no_duplicates` preconditions are consumed; deferred.
   Generic; CS-5 reuses the bridge.
-- **CS-4c — forward (a⟹b):** CS-4b → `lemma_map_a_forward` → CS-4a (b-von-Dyck).
+- **CS-4c — forward (a⟹b):** CS-4b → [normalize] → `lemma_map_a_forward` → CS-4a (b-von-Dyck).
+  **PREP DONE (`cohen_cs4c.rs` 14/0, commit 7ea0be8): slice normalization.** CS-4b emits a
+  number-word `alphas` that may have duplicates and the index `0`; `lemma_map_a_forward` wants
+  `no_duplicates()` ∧ `!contains(0)`. `normalize_alphas` drops `0` + de-dups;
+  `lemma_h2_II_normalize_equiv` lifts triviality to the normalized slice with all three properties.
+  Equivalence preserved because the relator SET is unchanged — a dropped duplicate
+  `family_II_relator(β)` is re-derived by the survivor, and `family_II_relator(0)` is ALREADY a
+  relator of `h2_pres` (it equals the single `p`-HNN relator `p⁻¹ t p (td)⁻¹`, since
+  `config_word(0,0)=[t]` and `w_b(0)=ε`; `lemma_family_II_relator_0_in_h2_pres`). **NB substrate
+  quirk:** `relators_included`'s `forall i. ∃ j` does NOT fold under the tactus Lean backend
+  (`assert(relators_included(..))` fails even with both conjuncts proven), so the equiv is replayed
+  DIRECTLY (per-element `lemma_h2_II_relator_in_norm` + single-step + derivation induction), NOT via
+  `lemma_relator_inclusion_preserves_equiv`. **Remaining CS-4c = the von-Dyck wiring:** `emb(a_col,w)`
+  c-free ⟹ CS-4b ⟹ normalize ⟹ `lemma_map_a_forward` ⟹ `w ≡_{pa_data(betas)} ε` ⟹
+  `lemma_emb_respects_source_equiv_pred` (CS-4a′) with `lemma_b_col_relator_trivial_pred` (CS-4a)
+  ⟹ `emb(b_col,w) ≡_{h2_pred} ε`.
 - **CS-4d — backward (b⟹a):** factor `emb(b_col,w)=emb(a_col,φ_l_src(w))` → CS-4b → `lemma_map_a_forward`
   → `lemma_mapb_M2_rt` → CS-4a (a-von-Dyck). Resolve the σ_l-preimage / irrelevant-relator wrinkle.
 - **CS-4e — tower lift + iso:** package (★) at `h2_pred`, lift to `h3_pred_upto(l-1)` by

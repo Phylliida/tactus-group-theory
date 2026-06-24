@@ -285,7 +285,15 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > `lemma_emb_respects_source_equiv_pred` with CS-4a relator-trivialities); **CS-4d wrinkle** = σ_l
 > -preimage / "irrelevant family-(II) relator η∉σ_l(I)" matching = the only open proof-design unknown;
 > **CS-4e** (tower lift via `britton_lemma_unconditional`). Session 19: scope correction + de-risk +
-> CS-4a (3/0) + CS-4a′ (7/0). Session 20: CS-4b (20/0).
+> CS-4a (3/0) + CS-4a′ (7/0). Session 20: CS-4b (20/0) + **CS-4c-prep slice normalization
+> (`cohen_cs4c.rs` 14/0, commit 7ea0be8)**: `normalize_alphas` drops 0 + de-dups so CS-4b's
+> number-word slice meets `lemma_map_a_forward`'s `no_duplicates`/`!contains(0)` preconds;
+> `lemma_h2_II_normalize_equiv` lifts triviality (relator SET unchanged — duplicate `family_II_relator(β)`
+> re-derived, `family_II_relator(0)` already ∈ `h2_pres`). NB `relators_included`'s `∀i∃j` does NOT fold
+> under the Lean backend ⟹ direct per-element replay instead. Crate 2426/20 (no regression; the 20 are
+> the pre-existing runtime/todd_coxeter exec-rejections + transient lake-spawns). Remaining CS-4c = the
+> von-Dyck wiring (`emb(a_col,w)` c-free → CS-4b → normalize → `lemma_map_a_forward` →
+> `lemma_emb_respects_source_equiv_pred` + CS-4a).
 >
 > **✅ FORK-A STARTED 2026-06-23 (session 14) — elementary foundation arc DONE, ports VERBATIM.**
 > The completeness route is **Fork-A** (predicate presentation; the textbook route per
