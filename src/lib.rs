@@ -448,3 +448,8 @@ pub mod cohen_cs4d_recog;
 // (h3_pred_upto(k) ⟺ h2_pred for h2-gen words, given level isos) lifts (★) over h2_pred to each tower
 // level, by induction on l. Closes hnn_pred_associations_isomorphic(cs4_data(l)) for all a-levels.
 pub mod cohen_cs4e;
+
+// cohen_cs5: Layer 2 — CS-5a/CS-5b. The k von-Dyck iso A₊≅A₋ scaffold + BACKWARD (c-killing endo via
+// s_strip): k_a_col/k_b_col, generic pred hom∘embedding compose + relator monotonicity, and the
+// backward half of (★k). docs/cohen-cs5-blueprint.md.
+pub mod cohen_cs5;
