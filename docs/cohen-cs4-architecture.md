@@ -156,19 +156,18 @@ Concrete brick sequence:
   `lemma_b_col_relator_trivial_pred` (`emb(b_col, ·) ≡ ε` via `lemma_phi_l_factor_through_subst` +
   `lemma_phi_l_on_family_II_relator` digit-scaling + `lemma_sigma_numbers_word`). Unconditional — no
   `alphas` slice. Reuses only base-independent word identities + `lemma_pred_relator_is_identity`.
-- **CS-4a′ — the von-Dyck "homomorphism extends" tool (finite-source → pred-target). ← NEXT.** To
-  *use* CS-4a, CS-4c/d need `lemma_emb_respects_source_equiv_pred(src: Presentation, tgt:
-  PredPresentation, images, w1, w2)`: `w1 ≡_{src} w2` + `∀j. emb(images, src.relators[j]) ≡_{tgt} ε`
-  ⟹ `emb(images, w1) ≡_{tgt} emb(images, w2)`. Port of `lemma_emb_respects_source_equiv`
-  (`machine_group.rs:3441`) keeping `src` FINITE (apply_step/derivation_produces unchanged) and only
-  `tgt` predicate. 3 lemmas (step/derivation/top, mirror `lemma_emb_step_respects` /
-  `lemma_emb_derivation_respects`) + **4 MISSING pred helpers to build first**:
-  `lemma_pred_delete_equiv_empty`/`lemma_pred_insert_equiv_empty` (delete/insert a trivial middle —
-  from `lemma_pred_equiv_concat_left/right` + refl/trans), `lemma_emb_inverse_pair_trivial_pred`,
-  `lemma_emb_inverse_word_trivial_pred` (from `lemma_pred_word_inverse_left` + the pred algebra). All
-  provable from the existing pred closure algebra (`pred_presentation_lemmas.rs`). Bounded, mechanical.
-- **CS-4b — the compactness bridge (the genuinely new generic lemma).** `equiv_in_pred_presentation(
-  h2_pred,u,ε) ⟹ ∃ finite alphas (no-dup,∌0,number-words) . equiv_in_presentation(h2_II(alphas),u,ε)`.
+- **CS-4a′ — the von-Dyck "homomorphism extends" tool (finite-source → pred-target). ✅ DONE
+  (`pred_emb_respects.rs` 7/0, commit 3d41331).** `lemma_emb_respects_source_equiv_pred(src:
+  Presentation, tgt: PredPresentation, images, w1, w2)`: `w1 ≡_{src} w2` + `∀j. emb(images,
+  src.relators[j]) ≡_{tgt} ε` ⟹ `emb(images, w1) ≡_{tgt} emb(images, w2)`. Port of
+  `lemma_emb_respects_source_equiv` keeping `src` FINITE, `tgt` predicate. Built bottom-up: 4 pred
+  atoms (`lemma_pred_delete_equiv_empty`/`lemma_pred_insert_equiv_empty`,
+  `lemma_emb_inverse_pair_trivial_pred`, `lemma_emb_inverse_word_trivial_pred`) + 3 induction lemmas
+  (`lemma_emb_step_respects_pred` [4 cases] / `_derivation_respects_pred` / the top). This is what
+  CS-4c/d call with the CS-4a relator-trivialities (`src = pa_data`, `tgt = h2_pred`).
+- **CS-4b — the compactness bridge (the genuinely new generic lemma). ← NEXT.**
+  `equiv_in_pred_presentation(h2_pred,u,ε) ⟹ ∃ finite alphas (no-dup,∌0,number-words) .
+  equiv_in_presentation(h2_II(alphas),u,ε)`.
   (1) extract a `PredDerivation`'s finite relator-set, re-index as a finite `Derivation` over the slice;
   (2) strip `S` first via a CS-2-style c-retraction `ρ_c` (a_col/b_col c-free ⟹ `ρ_c` fixes `u`);
   (3) each used relator (K_M/comm/family-(II)) is an `h2_II(alphas)` relator by index. Generic; CS-5
@@ -187,4 +186,5 @@ CS-4 = (★). von-Dyck halves EASY/unconditional (predicate-base win). Faithfuln
 REAL `lemma_map_a_forward` + `lemma_mapb_M2_rt` (the session-8 vacuity was packaging-only, §2b) via a
 **compactness bridge** to finite slices — **NO new infinite-association substrate**. Execute Route 1
 (CS-4a→e). Only open proof-design unknown = CS-4d's "irrelevant relator" wrinkle. Session 19: scoped
-+ de-risked + docs corrected; **CS-4a is the clean next brick.**
++ de-risked + docs corrected + **CS-4a (3/0) + CS-4a′ (7/0) DONE**; **CS-4b (compactness bridge) is
+the next brick.**
