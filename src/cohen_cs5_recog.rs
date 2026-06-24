@@ -34,7 +34,8 @@ use crate::machine_group::{ModMachine, g_m, g_subgens, g_m_associations, config_
 use crate::layout::{h1_num_gens, h2_num_gens, c_base, b_base, d_idx, p_idx, b_idx, c_idx};
 use crate::h1::{h1_base, comm_relators, comm_relator, lemma_h1_base_valid, lemma_h1_base_num_generators};
 use crate::h3::{psi_assoc, psi_ublock, psi_bcblock, lemma_single_gen_valid};
-use crate::word_numbering::{w_b, numbers_word, lemma_w_c_valid};
+use crate::word_numbering::{w_b, w_c, numbers_word, alphabet_letter, lemma_w_c_valid};
+use crate::h3_ii::{family_II_rhs};
 use crate::hnn::{HNNData, hnn_data_valid};
 use crate::pred_presentation::equiv_in_pred_presentation;
 use crate::pred_presentation_lemmas::lemma_pred_relator_is_identity;
@@ -874,6 +875,156 @@ pub proof fn lemma_base_A_plus_data_valid(mm: ModMachine, n: nat, m: nat, slice:
         assert(assoc_rhs_machine(mm, n, m, beta)
             =~= (config_word(beta, 0) + w_b(nk, n, m, beta)) + seq![Symbol::Gen((nk + n) as nat)]);
     }
+}
+
+// ============================================================================
+// Step 3b (a-side) — `a_col_machine` carries the machine-scheme `assoc_rhs_machine` to the h2
+// `family_II_rhs` (the descent bridge). The core is the `w_c` base-relabel `nk → nk+n` (mirror of
+// CS-4 `lemma_a_words_relabel_wc`).
+// ============================================================================
+
+/// `a_col_machine`'s b-block: `a_col_machine[nk+j] = [Gen(b_idx(nk,n,j+1))]` for `0 ≤ j < n`.
+proof fn lemma_a_col_machine_bblock(mm: ModMachine, n: nat, j: int)
+    requires
+        0 <= j < n,
+    ensures
+        a_col_machine(mm, n)[(g_m(mm).num_generators + j) as int]
+            =~= seq![Symbol::Gen(b_idx(g_m(mm).num_generators, n, (j + 1) as nat))],
+{
+    let nk = g_m(mm).num_generators;
+    let am = a_col_machine(mm, n);
+    lemma_machine_col_len(mm, n);
+    let blk_m: Seq<Word> = Seq::new(nk, |i2: int| seq![Symbol::Gen(i2 as nat)]);
+    let blk_b: Seq<Word> = Seq::new(n, |jj: int| seq![Symbol::Gen(b_idx(nk, n, (jj + 1) as nat))]);
+    let blk_d: Seq<Word> = seq![ seq![Symbol::Gen(d_idx(nk, n))] ];
+    assert(am == ((blk_m + blk_b) + blk_d) + seq![ seq![Symbol::Gen(p_idx(nk, n))] ]);
+    assert(((blk_m + blk_b) + blk_d)[(nk + j) as int] == (blk_m + blk_b)[(nk + j) as int]);
+    assert((blk_m + blk_b)[(nk + j) as int] == blk_b[j]);
+    assert(blk_b[j] == seq![Symbol::Gen(b_idx(nk, n, (j + 1) as nat))]);
+}
+
+/// Digit relabel: `emb(a_col_machine, [al(nk,n,d)]) = [al(nk+n,n,d)]` (mirror of
+/// `lemma_a_words_on_alpha_letter`; machine-scheme b-base `nk` → h2 b-base `nk+n`).
+proof fn lemma_a_col_machine_on_alpha_letter(mm: ModMachine, n: nat, d: nat)
+    requires
+        1 <= d <= 2 * n,
+    ensures
+        apply_embedding(a_col_machine(mm, n), seq![alphabet_letter(g_m(mm).num_generators, n, d)])
+            =~= seq![alphabet_letter((g_m(mm).num_generators + n) as nat, n, d)],
+{
+    let nk = g_m(mm).num_generators;
+    let am = a_col_machine(mm, n);
+    let bb = (nk + n) as nat;
+    reveal_with_fuel(apply_embedding, 2);
+    if d <= n {
+        // al(nk,n,d) = Gen(nk+d-1); j = d-1 ∈ [0,n).
+        let jj = (d - 1) as int;
+        assert(alphabet_letter(nk, n, d) == Symbol::Gen((nk + d - 1) as nat));
+        assert((nk + d - 1) as nat == (nk + jj) as nat);
+        lemma_a_col_machine_bblock(mm, n, jj);
+        assert(am[(nk + jj) as int] =~= seq![Symbol::Gen(b_idx(nk, n, d))]);
+        assert(b_idx(nk, n, d) == bb + d - 1);
+        lemma_concat_empty_right(am[(nk + jj) as int]);
+        assert(apply_embedding(am, seq![Symbol::Gen((nk + d - 1) as nat)]) =~= am[(nk + jj) as int]);
+        assert(alphabet_letter(bb, n, d) == Symbol::Gen((bb + d - 1) as nat));
+    } else {
+        // al(nk,n,d) = Inv(nk+(d-n)-1); e = d-n ∈ [1,n], j = e-1.
+        let e = (d - n) as nat;
+        let jj = (e - 1) as int;
+        assert(alphabet_letter(nk, n, d) == Symbol::Inv((nk + e - 1) as nat));
+        assert((nk + e - 1) as nat == (nk + jj) as nat);
+        lemma_a_col_machine_bblock(mm, n, jj);
+        assert(am[(nk + jj) as int] =~= seq![Symbol::Gen(b_idx(nk, n, e))]);
+        assert(b_idx(nk, n, e) == bb + e - 1);
+        assert(apply_embedding_symbol(am, Symbol::Inv((nk + e - 1) as nat))
+            =~= inverse_word(am[(nk + jj) as int]));
+        reveal_with_fuel(inverse_word, 2);
+        lemma_concat_empty_right(inverse_word(am[(nk + jj) as int]));
+        assert(apply_embedding(am, seq![Symbol::Inv((nk + e - 1) as nat)])
+            =~= inverse_word(am[(nk + jj) as int]));
+        assert(inverse_word(seq![Symbol::Gen((bb + e - 1) as nat)]) =~= seq![Symbol::Inv((bb + e - 1) as nat)])
+        by { lemma_inverse_word_singleton(Symbol::Gen((bb + e - 1) as nat)); }
+        assert(alphabet_letter(bb, n, d) == Symbol::Inv((bb + (d - n) - 1) as nat));
+    }
+}
+
+/// **The `w_c` base-relabel** `emb(a_col_machine, w_c(nk,n,m,γ)) = w_c(nk+n,n,m,γ)` (mirror of
+/// `lemma_a_words_relabel_wc`; induction on `γ`'s digit recursion).
+pub proof fn lemma_a_col_machine_relabel_wc(mm: ModMachine, n: nat, m: nat, gamma: nat)
+    requires
+        numbers_word(n, m, gamma),
+        2 * n < m,
+    ensures
+        apply_embedding(a_col_machine(mm, n), w_c(g_m(mm).num_generators, n, m, gamma))
+            =~= w_c((g_m(mm).num_generators + n) as nat, n, m, gamma),
+    decreases gamma,
+{
+    let nk = g_m(mm).num_generators;
+    let am = a_col_machine(mm, n);
+    let bb = (nk + n) as nat;
+    if gamma == 0 || m <= 1 {
+        assert(w_c(nk, n, m, gamma) =~= empty_word());
+        assert(w_c(bb, n, m, gamma) =~= empty_word());
+        assert(apply_embedding(am, empty_word()) =~= empty_word());
+    } else {
+        let d = (gamma % m) as nat;
+        assert(1 <= d <= 2 * n);
+        assert(numbers_word(n, m, (gamma / m) as nat));
+        let pre = w_c(nk, n, m, (gamma / m) as nat);
+        let letter: Word = Seq::new(1, |_i: int| alphabet_letter(nk, n, d));
+        assert(w_c(nk, n, m, gamma) =~= pre + letter);
+        lemma_apply_embedding_concat(am, pre, letter);
+        lemma_a_col_machine_relabel_wc(mm, n, m, (gamma / m) as nat);
+        assert(letter =~= seq![alphabet_letter(nk, n, d)]);
+        lemma_a_col_machine_on_alpha_letter(mm, n, d);
+        let preB = w_c(bb, n, m, (gamma / m) as nat);
+        let letterB: Word = Seq::new(1, |_i: int| alphabet_letter(bb, n, d));
+        assert(w_c(bb, n, m, gamma) =~= preB + letterB);
+        assert(letterB =~= seq![alphabet_letter(bb, n, d)]);
+    }
+}
+
+/// **Step-3b descent bridge (a-side):** `emb(a_col_machine, assoc_rhs_machine(β)) = family_II_rhs(β)`.
+/// `a_col_machine` fixes the config (machine), relabels `w_b(nk,…)→w_b(nk+n,…)`, and maps machine-d
+/// `Gen(nk+n) ↦ h2-d Gen(nk+2n)`.
+pub proof fn lemma_a_col_machine_assoc_rhs(mm: ModMachine, n: nat, m: nat, beta: nat)
+    requires
+        numbers_word(n, m, beta),
+        2 * n < m,
+    ensures
+        apply_embedding(a_col_machine(mm, n), assoc_rhs_machine(mm, n, m, beta))
+            =~= family_II_rhs(mm, n, m, beta),
+{
+    let nk = g_m(mm).num_generators;
+    let am = a_col_machine(mm, n);
+    lemma_machine_col_len(mm, n);
+    lemma_g_m_num_generators(mm);                  // nk = 4 + |quads| ≥ 4 > 3
+    let cfg = config_word(beta, 0);
+    let wb_m = w_b(nk, n, m, beta);
+    let dw_m: Word = seq![Symbol::Gen((nk + n) as nat)];
+    assert(assoc_rhs_machine(mm, n, m, beta) =~= (cfg + wb_m) + dw_m);
+    // distribute apply_embedding over the two concats.
+    lemma_apply_embedding_concat(am, cfg + wb_m, dw_m);
+    lemma_apply_embedding_concat(am, cfg, wb_m);
+    // config: fixed (machine word over 3 ≤ nk).
+    lemma_config_word_valid(beta, 0);
+    lemma_word_valid_mono(cfg, 3, nk);
+    lemma_a_col_machine_fixes_machine_word(mm, n, cfg);
+    // w_b(nk,…) = w_c(nk,…) relabels to w_b(nk+n,…).
+    lemma_a_col_machine_relabel_wc(mm, n, m, beta);
+    // machine-d → h2-d.
+    assert(am[(nk + n) as int] =~= seq![Symbol::Gen(d_idx(nk, n))]) by {
+        assert(am[(nk + n) as int]
+            == ((Seq::new(nk, |i2: int| seq![Symbol::Gen(i2 as nat)])
+                + Seq::new(n, |jj: int| seq![Symbol::Gen(b_idx(nk, n, (jj + 1) as nat))]))
+                + seq![ seq![Symbol::Gen(d_idx(nk, n))] ])[(nk + n) as int]);
+    }
+    lemma_emb_single_gen(am, (nk + n) as nat);
+    assert(apply_embedding(am, dw_m) =~= seq![Symbol::Gen(d_idx(nk, n))]);
+    // assemble: family_II_rhs = config + w_b(nk+n,…) + [Gen(d_idx)].
+    assert(family_II_rhs(mm, n, m, beta)
+        =~= (cfg + w_b(b_base(nk, n), n, m, beta)) + seq![Symbol::Gen(d_idx(nk, n))]);
+    assert(b_base(nk, n) == nk + n);
 }
 
 /// **CS-5c base-case faithfulness.** A machine-scheme base-word whose `a_col_machine`-image is trivial
