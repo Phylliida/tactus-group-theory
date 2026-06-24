@@ -443,3 +443,8 @@ pub mod cohen_cs4d;
 // (direct-membership coord restriction, no sat_bridge) + lemma_phi_image_config_support (a-side
 // φ_F recognition: ⟨config_emb(S)⟩ ⟹ ⟨config_emb(σbet)⟩). Sibling of lemma_r_prime.
 pub mod cohen_cs4d_recog;
+
+// cohen_cs4e: Layer 2 — CS-4e. The a_i association iso up the predicate H₃ tower: base-faithfulness
+// (h3_pred_upto(k) ⟺ h2_pred for h2-gen words, given level isos) lifts (★) over h2_pred to each tower
+// level, by induction on l. Closes hnn_pred_associations_isomorphic(cs4_data(l)) for all a-levels.
+pub mod cohen_cs4e;
