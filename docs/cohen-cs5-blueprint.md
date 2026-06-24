@@ -103,7 +103,15 @@ forward bc-von-Dyck. Defined in `cohen_h2.rs` next to `s_relators_valid`.
 - **CS-5b — BACKWARD (c-kill). ✅ DONE (`cohen_cs5.rs` 6/0, commit 540cba7).** `lemma_cs5_backward`:
   `(★k)` ⟸ via REUSE of CS-4b `s_strip` (`lemma_s_strip_psi_entry`: s_strip∘b_col = a_col pointwise
   — 4-block index dispatch over psi_assoc) + compose + monotonicity lift `h2_noS → h2_pred`.
-- **CS-5c — FORWARD (recognition + bc-von-Dyck). ← NEXT, the hard arc (see §4 below).**
+- **CS-5c — FORWARD (recognition + bc-von-Dyck).** The hard arc (see §4 below).
+  - **von-Dyck KERNEL ✅ DONE (`cohen_cs5.rs` 15/0, commit e92e776).** The clearly-correct, reusable
+    half: `lemma_pred_equiv_from_finite` (generic finite→pred equivalence lift),
+    `lemma_pred_cancel_inverse_right` (a·b⁻¹≡ε ⟹ a≡b), `lemma_cs5_wc_trivial` (w_α(c)≡ε via
+    `s_realizes`), `lemma_cs5_wbc_split_pred` (w_α(bc)≡w_α(b)·w_α(c), lifting `lemma_w_bc_split`),
+    `lemma_w_bc_valid`, and **`lemma_cs5_bc_config_trivial`** — the bc-von-Dyck atom
+    `p⁻¹t_α p·(t_α w_α(bc) d)⁻¹ ≡_{h2_pred} ε` for `(α,0)∈H₀` (= `emb(b_col, R_α)` in config form).
+  - **← NEXT: the RECOGNITION** `emb(a_col,w)≡_{h2_pred}ε ⟹ w≡_{A₊_pres}ε` — adapt CS-4's
+    `lemma_map_a_forward` Britton-peel with property-(vii) at the pinch middle (§4). The genuine work.
 - **CS-5d — tower lift + iso.** Package `(★k)` to `hnn_pred_associations_isomorphic(h3_pred_data)`
   via CS-4e's `lemma_h3_pred_upto_base_faithful` at `k=2n`. Mirror of `lemma_cs4e_iso_upto`'s top.
 

@@ -164,8 +164,13 @@ to (residue facts, free basis `lemma_basis_elt_free`, `lemma_theorem1`) is alrea
   Britton (sound textbook fallback, FA-9b-scale+). **Held for the route decision** (prototype Route
   1's M2 wrinkle first — cheap + decisive). Shape-stable pieces (`pa_pred` def + validity; the
   von-Dyck halves) are safe to build under either route.
-- **CS-5 — the k iso (§4 §1b).** von Dyck forward (uses `s_realizes` + `lemma_theorem1`) + c-kill
-  endo backward.
+- **CS-5 — the k iso (§4 §1b). ← IN PROGRESS (`docs/cohen-cs5-blueprint.md`, session 24).** von Dyck
+  forward (uses `s_realizes` + `lemma_theorem1`) + c-kill endo backward. Reduces (CS-4e
+  base-faithfulness at `k=2n`) to `(★k)` over `h2_pred`. **DONE (`cohen_cs5.rs` 15/0):** the BACKWARD
+  (c-kill via CS-4b `s_strip`, `lemma_cs5_backward`) + the von-Dyck KERNEL (a generic finite→pred
+  equivalence lift + the bc-von-Dyck atom `lemma_cs5_bc_config_trivial`). **NEXT:** the von-Dyck
+  RECOGNITION (`emb(a_col,w)≡ε ⟹ w≡_{A₊_pres}ε`) — adapt CS-4 `lemma_map_a_forward` with property
+  (vii) (`config∈⟨U⟩ ⟺ H₀`) at the pinch middle — then CS-5d tower lift (mirror CS-4e).
 - **CS-6 — assembly.** Britton descent (step 1) ∘ retraction (step 2) ⟹ `lemma_C_faithful`.
   Transport to the printable finite `h3_pres` via soundness (`lemma_III`: the predicate H₃ and the
   finite `h3_pres` are the same group — all predicate relators are consequences of finite set (I)).
