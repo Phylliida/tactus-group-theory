@@ -257,3 +257,74 @@ generator. `a_col` on the U-block is an **injective generator relabel**, NOT mul
 `lemma_map_a_forward`'s Britton/`stable_count`/pinch-descent machinery is base-agnostic and reused;
 only the base case (step 2, g_m vs free) and the pinch-middle restriction (step 3, property-vii)
 differ from CS-4. CS-5d (tower lift) is unchanged.
+
+---
+
+## 6. Step-1/2 DONE; the step-3 build map (code-grounded, session 25). NEXT.
+
+**Shipped (session 25, `src/cohen_cs5_recog.rs`, crate gate GREEN 2494/20):**
+- **Step 1 — relabel bridge (9/0, commit after blueprint flip).** `base_A_plus_base`, `a_col_machine`,
+  `b_col_machine`, `relabel_col`, `comp_emb`+`lemma_emb_emb_compose`, `lemma_a_col_factors`/`_b_`,
+  and `lemma_emb_a_col_via_relabel`/`_b_` (`emb(k_a_col,w) = emb(a_col_machine, relabel(w))`).
+- **Step 2 — base-case faithfulness (18/0).** `base_retraction` (ρ: h1_base→base_A_plus_base, kill c,
+  fix machine, shift b/d down by n), `lemma_base_retraction_valid` (K_M ρ-fixed = base relators; comm
+  ρ-killed to `[Gen,Inv]≡ε`), `lemma_comp_rho_acol_identity` (ρ∘a_col_machine = id on base gens), and
+  **`lemma_cs5_base_case_faithful`**: `emb(a_col_machine, w_base)≡_{h1_base}ε ⟹ w_base≡_{base_A_plus_base}ε`.
+
+### Step 3 — the p-peel recognition. The big arc (CS-4 `lemma_map_a_forward`-scale). Build map:
+
+**3a. `base_A_plus_data` (the machine-scheme HNN) — the LAYOUT is the subtlety.** Mirror
+`pa_data`/`recog_data` (`pa_data.rs`, `h3_ii.rs:739`) but over `base_A_plus_base`:
+```
+  base_A_plus_data(mm,n,m, h0_slice: Seq<nat>) = HNNData{
+      base: base_A_plus_base(mm,n),                       // nk+n+1 gens
+      associations: [ (config_word(α,0),  config_word(α,0) ++ w_b(nk, n, m, α) ++ [Gen(nk+n)])
+                      : α ∈ h0_slice ] }                  // p-assoc head (α=0) ++ the H₀ family-(II)
+```
+**Machine-scheme layout ≠ h2 layout.** `base_A_plus_base` puts b's at `nk..nk+n−1` and d at `nk+n`
+(NO c-block). So the association rhs MUST use the **machine-scheme `w_b(b_base=nk, …)`** and `d=Gen(nk+n)`
+— NOT the h2 `w_b(b_base=nk+n)`/`d=Gen(nk+2n)`. The slice `h0_slice` carries only `α` with `(α,0)∈H₀`
+(needed by 3d's von-Dyck + 3c's intersection). Validity (`hnn_data_valid`): mirror `lemma_pa_data_valid`
+— config uses gens {0,1}⊂nk; `w_b(nk,…)` the b-block `[nk,nk+n)`; d=`nk+n`; all `< nk+n+1`. ✓
+
+**3b. `a_col_machine` carries `base_A_plus_data` → `recog_data` (the descent bridge).** Prove
+`emb(a_col_machine, assoc_rhs_machine(α)) = family_II_rhs(mm,n,m,α)` (the h2 rhs): `a_col_machine`
+relabels machine-scheme b `nk+j ↦ h2 b `nk+n+j`, turning `w_b(nk,…)`→`w_b(nk+n,…)`, and `d nk+n ↦
+h2 d nk+2n`. So `a_col_machine` maps the machine-scheme HNN to the slice HNN `recog_data` whose
+presentation is `h2_II(slice)` — the peel runs over `recog_data` exactly as CS-4. (One new relabeling
+identity per association column; reuse `lemma_emb_emb_compose`/`lemma_w_b` index lemmas.)
+
+**3c. The pinch-middle intersection (THE crux, property vi/vii).** In the step case the
+`britton_lemma_full` pinch over `recog_data` has middle `∈ ⟨t_α : α∈slice⟩` (the family-(II) associated
+subgroup — NOT H₀-restricted). But the middle is also `∈ ⟨U,d,b⟩` (the base of `a_col_machine`'s image)
+and `t_α` is machine-only, so middle `∈ ⟨U⟩ ∩ ⟨t_α:α∈slice⟩ = ⟨t_α:(α,0)∈H₀⟩` by **property (vi)**
+(`tower_peel.rs:533 lemma_vi`) + **`lemma_theorem1`** (`prop_v.rs:1800`, the circularity-breaker:
+`config(α,0)∈⟨g_subgens⟩ ⟺ (α,0)∈H₀`). So the recog pinch middle is AUTOMATICALLY a valid
+`base_A_plus_data` association ((α,0)∉H₀ can't arise for an `a_col_machine`-image word's pinch) — this
+is how the H₀-restriction is forced. Analog of CS-4 `lemma_intersection_property` (`phi_l_forward.rs:420`),
+but the recognition target is `∈⟨U⟩` via property-(vii) instead of `∈⟨config-family⟩`.
+
+**3d. The induction (`decreases stable_count(base_A_plus_data, relabel(w))`).** Mirror
+`lemma_map_a_forward` (`phi_l_pinch.rs:773`): **base case** (stable_count==0) = step 2
+(`lemma_cs5_base_case_faithful`, descend h2_II→h1_base via `lemma_h1_faithful_in_h2_II`, then ρ);
+**step case** = 3b descent of the `britton_lemma_full` pinch (3c gives the middle ∈ H₀-assoc) → pinch-out
+(`lemma_pd_pinch_out` analog) → recurse. Output: `relabel(w) ≡_{hnn_presentation(base_A_plus_data(H₀-slice))} ε`.
+
+### Step 4 — von-Dyck at machine scheme + assembly. (Mostly ready; needs 3a's HNN object.)
+`lemma_emb_respects_source_equiv_pred(src = hnn_presentation(base_A_plus_data(H₀-slice)),
+tgt = h2_pred, images = b_col_machine, relabel(w), ε)`. Relator conditions:
+- **base K_M relators:** `emb(b_col_machine, K_M_rel) = K_M_rel` (b_col_machine fixes machine gens —
+  same proof shape as step-2 `lemma_rho_fixes_machine_word`) ⟹ an `h2_pred` relator ⟹ `≡ε`.
+- **HNN relators `R_α` (α∈H₀-slice):** `emb(b_col_machine, hnn_relator(base_A_plus_data,j))` is the
+  bc-config form `p⁻¹ t_α p (t_α w_α(bc) d)⁻¹` ⟹ `lemma_cs5_bc_config_trivial` (DONE) ⟹ `≡ε`. (One
+  relabeling identity: `emb(b_col_machine, assoc_rhs_machine(α)) = family_II_bc_rhs(mm,n,m,α)`, the
+  b-block `nk+j ↦ [b,c]` turning machine-scheme `w_b` into `w_bc`.)
+Then compose with step-1 bridges: `emb(k_b_col,w) = emb(b_col_machine, relabel(w)) ≡ ε` ⟹ **(★k) forward**.
+Glue forward (step 3+4) + backward (`lemma_cs5_backward`, DONE) ⟹ `(★k)` ⟹ **CS-5d** tower lift (reuse
+CS-4e `lemma_h3_pred_upto_base_faithful` at k=2n) ⟹ `hnn_pred_associations_isomorphic(h3_pred_data)`.
+
+**Risk note:** 3c (property vi/vii at the pinch middle) is the one genuinely-new proof vs CS-4's
+free-base `lemma_intersection_property`; everything else is the CS-4 peel structure with the
+machine-scheme layout translation (3a/3b) and the step-2 base case swapped in. The layout translation
+(machine-scheme `w_b(nk)` vs h2 `w_b(nk+n)`) is mechanical but pervasive — define the `assoc_rhs_machine`
+↔ `family_II_rhs`/`family_II_bc_rhs` relabeling identities (3b, 4) once and reuse.
