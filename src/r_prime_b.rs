@@ -46,6 +46,8 @@ use crate::r_prime::{phi_prime, phi_canon_acc, kill_db, sigma_backsat,
     lemma_canw_in_config_subgroup, lemma_kill_db_valid, lemma_kill_db_fixes_low,
     lemma_config_word_valid2};
 use crate::normal_form_afp_textbook::lemma_subgroup_to_k_word;
+use crate::cohen_cs4d_recog::lemma_coords_in_sigbet;
+use crate::cohen_cs4d::{bet_of, is_sigma_image, lemma_bet_of_all_preimages};
 
 verus! {
 
@@ -1007,6 +1009,231 @@ pub proof fn lemma_pa_rhs_reflect_full(mm: ModMachine, n: nat, m: nat, l: nat, u
     lemma_compose_phi_F_pa_rhs_emb(mm, n, m, l, bet);
     assert(compose_embeddings(pf, pr) == pa_rhs_emb(n, m, sb));
     lemma_intersection_property(fg, pf, pr, u);
+}
+
+// ----------------------------------------------------------------------------
+// CS-4d §4.2 b-side core — the superset-slice recognition `⟨pa_rhs_emb(S)⟩ ⟹ ⟨pa_rhs_emb(σbet)⟩`.
+//
+// The S-variant of `lemma_r_prime_b`: where that proves `bet → σ(bet)` under `sigma_backsat(bet)`
+// (the σ-SHIFT), this proves `S → σbet = sigma_betas(bet_of(S))` (the ≡l elements of S) DIRECTLY,
+// using `lemma_coords_in_sigbet` (no `sigma_backsat`).  The kill_db projection and the coord-selector
+// transfer machinery are reused verbatim with `S` in place of `bet`.  Blueprint §4.2 b-side.
+// ----------------------------------------------------------------------------
+
+/// **φ' canonical-coordinate reader (S-variant)** — the S-form of `lemma_phi_prime_canon`: certifies
+/// `canw_eval(cw_reduce(cu)) ≡_fg pp_u` and that every coordinate of `cw_reduce(cu)` is `s = 0`, lies
+/// IN `S`, and is a `σbet`-value (`σbet = sigma_betas(bet_of(S))`) — via direct membership
+/// (`lemma_coords_in_sigbet`), NOT `sigma_backsat`.
+pub proof fn lemma_phi_prime_canon_S(n: nat, m: nat, l: nat, u: Word, s_slice: Seq<nat>)
+    -> (cu: Seq<CanonLetter>)
+    requires
+        1 <= l <= 2 * n,
+        2 * n < m,
+        word_valid(u, (n + 3) as nat),
+        in_generated_subgroup(free_group((n + 3) as nat), config_emb(s_slice),
+            apply_embedding(phi_prime(n, m, l), u)),
+    ensures
+        cu == phi_canon_acc(l, m, u, 0),
+        equiv_in_presentation(free_group((n + 3) as nat), canw_eval(cw_reduce(cu)),
+            apply_embedding(phi_prime(n, m, l), u)),
+        forall|idx: int| 0 <= idx < cw_reduce(cu).len() ==> {
+            &&& (#[trigger] cw_reduce(cu)[idx]).s == 0
+            &&& exists|j: int| 0 <= j < s_slice.len() && s_slice[j] as int == cw_reduce(cu)[idx].r
+            &&& exists|k: int| 0 <= k < sigma_betas(bet_of(s_slice, m, l), m, l).len()
+                    && sigma_betas(bet_of(s_slice, m, l), m, l)[k] as int == cw_reduce(cu)[idx].r
+        },
+{
+    let fg = free_group((n + 3) as nat);
+    let pp_u = apply_embedding(phi_prime(n, m, l), u);
+    let cu = phi_canon_acc(l, m, u, 0);
+    let mmi = m as int;
+    let gx = gexp(1, u);
+    let bet = bet_of(s_slice, m, l);
+    lemma_free_group_valid((n + 3) as nat);
+    lemma_phi_prime_emb_valid(n, m, l, u);    // word_valid(pp_u, n+3)
+
+    // ---- config witness for pp_u + its canon (coords ⊆ S) ----
+    let factors = choose|f: Seq<Word>| #[trigger] factors_from_generators(config_emb(s_slice), f)
+        && equiv_in_presentation(fg, concat_all(f), pp_u);
+    assert(factors_from_generators(config_emb(s_slice), factors)
+        && equiv_in_presentation(fg, concat_all(factors), pp_u));
+    let cs = lemma_membership_to_canon(s_slice, factors);
+    assert(concat_all(factors) =~= canw_eval(cs));
+    assert(equiv_in_presentation(fg, canw_eval(cs), pp_u));
+
+    // ---- Step 2: coordinate-tracking at xe=0. ----
+    lemma_phi_canon_invariant(fg, n, m, l, u, 0);
+    let rhs2 = canw_eval(cu) + signed_power(1, mmi * gx);
+    assert(mmi * 0 == 0 && signed_power(1, mmi * 0) =~= empty_word());
+    lemma_concat_empty_left(pp_u);
+    assert(signed_power(1, mmi * 0) + pp_u =~= pp_u);
+    assert(mmi * (0 + gx) == mmi * gx);
+    assert(equiv_in_presentation(fg, pp_u, rhs2));
+
+    // ---- Step 3: xexp(u) = 0. ----
+    lemma_gexp1_config_factors(s_slice, factors);
+    lemma_equiv_preserves_gexp(fg, concat_all(factors), pp_u, 1);
+    assert(gexp(1, pp_u) == 0);
+    lemma_gexp1_canw_zero(cu);
+    lemma_gexp_concat(1, canw_eval(cu), signed_power(1, mmi * gx));
+    lemma_gexp_signed_power(1, 1, mmi * gx);
+    lemma_equiv_preserves_gexp(fg, pp_u, rhs2, 1);
+    assert(mmi * gx == 0);
+    assert(gx == 0) by(nonlinear_arith) requires mmi * gx == 0, mmi >= 1;
+    assert(mmi * gx == 0 && signed_power(1, mmi * gx) =~= empty_word());
+    lemma_concat_empty_right(canw_eval(cu));
+    assert(rhs2 =~= canw_eval(cu));
+    assert(equiv_in_presentation(fg, canw_eval(cu), pp_u)) by {
+        assert(equiv_in_presentation(fg, pp_u, rhs2));
+        assert(rhs2 =~= canw_eval(cu));
+        lemma_equiv_symmetric(fg, pp_u, rhs2);
+    }
+
+    // ---- Step 4: free→base_A. ----
+    lemma_phi_canon_acc_coords(l, m, u, 0);
+    lemma_canw_eval_valid2(cu);
+    lemma_canw_eval_valid2(cs);
+    lemma_word_valid_mono(canw_eval(cu), 2, 3);
+    lemma_word_valid_mono(canw_eval(cs), 2, 3);
+    lemma_equiv_symmetric(fg, canw_eval(cs), pp_u);
+    lemma_word_valid_mono(canw_eval(cs), 2, (n + 3) as nat);
+    lemma_equiv_transitive(fg, canw_eval(cu), pp_u, canw_eval(cs));
+    lemma_free_to_base_A((n + 3) as nat, canw_eval(cu), canw_eval(cs));
+
+    // ---- Step 5: coordinate restriction (DIRECT membership, no sat_bridge). ----
+    assert(l < m);
+    assert forall|gg: nat| s_slice.contains(gg) && gg % m == l implies bet.contains(gg / m) by {
+        assert(is_sigma_image(gg, m, l));
+        lemma_bet_of_all_preimages(s_slice, m, l, gg);
+    }
+    lemma_coords_in_sigbet(s_slice, bet, m, l, cu, cs);
+
+    // ---- Step 6: free cw_reduce. ----
+    lemma_free_cw_reduce_eval(n, cu);
+    lemma_equiv_transitive(fg, canw_eval(cw_reduce(cu)), canw_eval(cu), pp_u);
+    cu
+}
+
+/// **b-side recognition crux** — a `φ_F`-image in `⟨pa_rhs_emb(S)⟩` over a no-dup number-word slice
+/// `S` actually lies in the σ-restricted `⟨pa_rhs_emb(σbet)⟩`, `σbet = sigma_betas(bet_of(S))`.
+/// S-form of `lemma_r_prime_b`: kill_db down to config, read the σ-restricted coords
+/// (`lemma_phi_prime_canon_S`), transfer config→pa_rhs along the coord-selector, identify each coord
+/// with a `σbet`-value (direct membership).  No `sigma_backsat`.
+pub proof fn lemma_phi_image_pa_rhs_support(mm: ModMachine, n: nat, m: nat, l: nat, u: Word,
+    s_slice: Seq<nat>)
+    requires
+        mod_machine_wf(mm),
+        1 <= l <= 2 * n,
+        2 * n < m,
+        s_slice.no_duplicates(),
+        forall|i: int| 0 <= i < s_slice.len() ==> numbers_word(n, m, #[trigger] s_slice[i]),
+        word_valid(u, (n + 3) as nat),
+        in_generated_subgroup(free_group((n + 3) as nat), pa_rhs_emb(n, m, s_slice),
+            apply_embedding(phi_F_family(n, m, l), u)),
+    ensures
+        in_generated_subgroup(free_group((n + 3) as nat),
+            pa_rhs_emb(n, m, sigma_betas(bet_of(s_slice, m, l), m, l)),
+            apply_embedding(phi_F_family(n, m, l), u)),
+{
+    let fg = free_group((n + 3) as nat);
+    let g = apply_embedding(phi_F_family(n, m, l), u);
+    let pp_u = apply_embedding(phi_prime(n, m, l), u);
+    let pr = pa_rhs_emb(n, m, s_slice);
+    let ce = config_emb(s_slice);
+    let bet = bet_of(s_slice, m, l);
+    let sbet = sigma_betas(bet, m, l);
+    let h = kill_db(n);
+    lemma_free_group_valid((n + 3) as nat);
+    lemma_kill_db_valid(n);
+    lemma_phi_F_emb_valid(n, m, l, u);                     // word_valid(g, n+3)
+
+    // pr / ce columns valid over n+3; pp_u valid over n+3.
+    assert forall|i: int| 0 <= i < pr.len() implies word_valid(#[trigger] pr[i], (n + 3) as nat) by {
+        assert(pr[i] == pa_rhs(n, m, s_slice[i]));
+        lemma_pa_rhs_valid_n3(n, m, s_slice[i]);
+    }
+    assert forall|i: int| 0 <= i < ce.len() implies word_valid(#[trigger] ce[i], (n + 3) as nat) by {
+        assert(ce[i] == config_word(s_slice[i], 0));
+        lemma_config_word_valid(s_slice[i], 0);
+        lemma_word_valid_mono(config_word(s_slice[i], 0), 3, (n + 3) as nat);
+    }
+    lemma_phi_prime_emb_valid(n, m, l, u);
+
+    // (1) v over s_slice.len() with emb(pr, v) ≡_fg g.
+    lemma_subgroup_to_k_word(fg, pr, g);
+    let v = choose|v: Word| word_valid(v, pr.len())
+        && equiv_in_presentation(fg, apply_embedding(pr, v), g);
+    assert(word_valid(v, pr.len()) && equiv_in_presentation(fg, apply_embedding(pr, v), g));
+    assert(pr.len() == s_slice.len());
+    assert(word_valid(v, ce.len()));
+    lemma_apply_embedding_valid(ce, v, (n + 3) as nat);
+
+    // (2) kill_db:  emb(config_emb(S), v) ≡_fg emb(φ', u) = pp_u.
+    lemma_apply_hom_embedding_compose(h, pr, v);
+    lemma_kill_db_on_pa_rhs_emb(n, m, s_slice);            // comp_images(h, pr) =~= config_emb(S)
+    assert(apply_hom(h, apply_embedding(pr, v)) =~= apply_embedding(ce, v));
+    lemma_kill_db_on_phi_F(n, m, l, u);                    // apply_hom(h, g) =~= pp_u
+    lemma_hom_preserves_equiv(h, apply_embedding(pr, v), g);
+    assert(equiv_in_presentation(fg, apply_embedding(ce, v), pp_u));
+
+    // (3) emb(φ', u) ∈ ⟨config_emb(S)⟩.
+    lemma_apply_embedding_in_subgroup(fg, ce, v);
+    lemma_in_subgroup_respects_equiv(fg, ce, apply_embedding(ce, v), pp_u);
+
+    // (4) canon coordinates (s=0, in S, in σbet).
+    let cu = lemma_phi_prime_canon_S(n, m, l, u, s_slice);
+    let d = cw_reduce(cu);
+    let cv = coord_vals(d);
+    let sel = coord_sel(s_slice, d);
+
+    // (5) config membership: emb(ce, v) ∈ ⟨compose(ce, sel)⟩ = ⟨config_emb(cv)⟩.
+    assert forall|i: int| 0 <= i < d.len() implies {
+        &&& (#[trigger] d[i]).s == 0
+        &&& exists|k: int| 0 <= k < cv.len() && cv[k] as int == d[i].r
+    } by {
+        let j0 = choose|j: int| 0 <= j < s_slice.len() && s_slice[j] as int == d[i].r;
+        assert(s_slice[j0] as int == d[i].r && d[i].r >= 0);
+        assert(cv[i] == d[i].r as nat && cv[i] as int == d[i].r);
+    }
+    lemma_canw_in_config_subgroup(cv, n, d);               // canw_eval(d) ∈ ⟨config_emb(cv)⟩
+    assert forall|i: int| 0 <= i < d.len() implies
+        exists|j: int| 0 <= j < s_slice.len() && s_slice[j] as int == (#[trigger] d[i]).r by {}
+    lemma_compose_config_coord_sel(s_slice, d);            // compose(ce, sel) = config_emb(cv)
+    assert(compose_embeddings(ce, sel) =~= config_emb(cv));
+    lemma_equiv_symmetric(fg, apply_embedding(ce, v), pp_u);                  // pp_u ≡ emb(ce,v)
+    lemma_equiv_transitive(fg, canw_eval(d), pp_u, apply_embedding(ce, v));   // canw_eval(d) ≡ emb(ce,v)
+    lemma_in_subgroup_respects_equiv(fg, config_emb(cv), canw_eval(d), apply_embedding(ce, v));
+
+    // (6) free-family transfer ⟹ emb(pr, v) ∈ ⟨compose(pr, sel)⟩ = ⟨pa_rhs_emb(cv)⟩.
+    lemma_config_emb_free_in_free(mm, n, s_slice);         // is_free_family(fg, ce)
+    assert forall|k: int| 0 <= k < sel.len() implies word_valid(#[trigger] sel[k], ce.len()) by {
+        let j0 = choose|j: int| 0 <= j < s_slice.len() && s_slice[j] as int == d[k].r;
+        assert(s_slice[j0] as int == d[k].r && d[k].r >= 0);
+        let val = d[k].r as nat;
+        assert(s_slice.contains(val)) by { assert(s_slice[j0] == val); }
+        lemma_bet_pos_val(s_slice, val);
+        assert(sel[k] == seq![Symbol::Gen(bet_pos(s_slice, val) as nat)]);
+        assert(bet_pos(s_slice, val) < s_slice.len());
+    }
+    lemma_free_family_subgroup_transfer(fg, ce, pr, sel, v);
+    lemma_compose_pa_rhs_coord_sel(n, m, s_slice, d);      // compose(pr, sel) = pa_rhs_emb(cv)
+    assert(compose_embeddings(pr, sel) =~= pa_rhs_emb(n, m, cv));
+    assert(in_generated_subgroup(fg, pa_rhs_emb(n, m, cv), apply_embedding(pr, v)));
+
+    // (7) g ≡ emb(pr, v) ⟹ g ∈ ⟨pa_rhs_emb(cv)⟩.
+    lemma_in_subgroup_respects_equiv(fg, pa_rhs_emb(n, m, cv), apply_embedding(pr, v), g);
+
+    // (8) each coord cv[i] is a σbet-value ⟹ ⟨pa_rhs_emb(cv)⟩ ⊆ ⟨pa_rhs_emb(σbet)⟩.
+    assert forall|i: int| 0 <= i < pa_rhs_emb(n, m, cv).len() implies
+        exists|k: int| 0 <= k < pa_rhs_emb(n, m, sbet).len()
+            && (#[trigger] pa_rhs_emb(n, m, cv)[i]) == pa_rhs_emb(n, m, sbet)[k] by {
+        let k0 = choose|k: int| 0 <= k < sbet.len() && sbet[k] as int == d[i].r;
+        assert(0 <= k0 < sbet.len() && sbet[k0] as int == d[i].r);
+        assert(d[i].r >= 0 && cv[i] == d[i].r as nat && sbet[k0] == cv[i]);
+        assert(pa_rhs_emb(n, m, cv)[i] == pa_rhs(n, m, cv[i]));
+        assert(pa_rhs_emb(n, m, sbet)[k0] == pa_rhs(n, m, sbet[k0]));
+    }
+    lemma_in_subgroup_gens_superset(fg, pa_rhs_emb(n, m, cv), pa_rhs_emb(n, m, sbet), g);
 }
 
 } // verus!
