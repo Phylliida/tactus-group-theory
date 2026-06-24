@@ -270,14 +270,22 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > pred-target) ✅ **DONE** (`pred_emb_respects.rs` 7/0, commit 3d41331): 4 pred atoms
 > (`lemma_pred_delete/insert_equiv_empty`, `lemma_emb_inverse_pair/word_trivial_pred`) + 3 induction
 > lemmas (step/derivation/top), port of `lemma_emb_respects_source_equiv` keeping src FINITE, tgt
-> predicate. **NEXT = CS-4b** (compactness bridge: a finite `≡_{h2_pred}ε` derivation uses finitely
-> many relators ⟹ re-index its PredDerivation to a finite `Presentation` over the used relators, lift
-> to `h2_II(D)`; + S-strip via CS-2-style c-retraction) = the one genuinely new generic lemma; then
-> **CS-4c/d** (forward/backward assembly: CS-4b → `lemma_map_a_forward`/`lemma_mapb_M2_rt` →
+> predicate. **CS-4b ✅ DONE (session 20, `cohen_cs4b.rs` 20/0, commit 1a3ac69):** the compactness
+> bridge `lemma_cs4b_compactness` — a c-free word trivial in the infinite predicate base `h2_pred` is
+> trivial in SOME finite slice `h2_II(alphas)` (number-word `alphas`). Stage 1 = **S-strip**: the
+> homomorphism `s_strip` (kill c gens, fix non-c gens; the DUAL of CS-2's `c_retraction`) maps
+> `h2_pred → h2_noS_pred` and FIXES the c-free word (`lemma_s_strip_descends`). Stage 2 =
+> **compactness**: a finite `h2_noS_pred` derivation uses finitely many relators (K_M/comm/family-(II));
+> generic single-step lifter `lemma_finite_step_from_pred` (re-index a `PredDerivationStep` to a
+> finite `DerivationStep` by `choose`ing the relator word's index) + relator-arm `lemma_relator_arm`
+> (K_M/comm keep `alphas`; family-(II) push `β`, lift the tail over the bigger slice by `add_relator`
+> monotonicity) + induction core `lemma_compactness_core`. Output = number-word `alphas` only (no-dup/
+> ∌0 normalization deferred to CS-4c, where `lemma_map_a_forward`'s preconds need it). **NEXT =
+> CS-4c/d** (forward/backward assembly: CS-4b → `lemma_map_a_forward`/`lemma_mapb_M2_rt` →
 > `lemma_emb_respects_source_equiv_pred` with CS-4a relator-trivialities); **CS-4d wrinkle** = σ_l
 > -preimage / "irrelevant family-(II) relator η∉σ_l(I)" matching = the only open proof-design unknown;
 > **CS-4e** (tower lift via `britton_lemma_unconditional`). Session 19: scope correction + de-risk +
-> CS-4a (3/0) + CS-4a′ (7/0).
+> CS-4a (3/0) + CS-4a′ (7/0). Session 20: CS-4b (20/0).
 >
 > **✅ FORK-A STARTED 2026-06-23 (session 14) — elementary foundation arc DONE, ports VERBATIM.**
 > The completeness route is **Fork-A** (predicate presentation; the textbook route per
