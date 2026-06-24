@@ -23,14 +23,18 @@ use crate::word::*;
 use crate::symbol::*;
 use crate::presentation::{Presentation, presentation_valid, equiv_in_presentation};
 use crate::presentation_lemmas::lemma_relator_is_identity;
-use crate::benign::{apply_embedding, apply_embedding_symbol, lemma_apply_embedding_concat,
-    lemma_apply_embedding_inverse};
+use crate::benign::{apply_embedding, apply_embedding_symbol, in_generated_subgroup,
+    lemma_apply_embedding_concat, lemma_apply_embedding_inverse, lemma_apply_embedding_valid};
 use crate::homomorphism::{HomomorphismData, apply_hom, apply_hom_symbol, is_valid_homomorphism,
     lemma_hom_preserves_equiv};
 use crate::free_basis::{comp_images, lemma_apply_hom_embedding_compose};
+use crate::h3_ii::{compose_embeddings, lemma_apply_embedding_compose};
+use crate::normal_form_afp_textbook::lemma_subgroup_to_k_word;
+use crate::presentation::lemma_equiv_symmetric;
 use crate::machine_group::{ModMachine, g_m, g_subgens, g_m_associations, config_word, mod_machine_wf,
     mm_in_H0, lemma_g_m_num_generators, lemma_g_m_associations_valid, lemma_g_m_valid,
-    lemma_word_valid_mono, lemma_cancel_pair_equiv_empty, lemma_config_word_valid};
+    lemma_word_valid_mono, lemma_cancel_pair_equiv_empty, lemma_config_word_valid,
+    lemma_apply_embedding_in_subgroup, lemma_in_subgroup_respects_equiv};
 use crate::layout::{h1_num_gens, h2_num_gens, c_base, b_base, d_idx, p_idx, b_idx, c_idx};
 use crate::h1::{h1_base, comm_relators, comm_relator, lemma_h1_base_valid, lemma_h1_base_num_generators};
 use crate::h3::{psi_assoc, psi_ublock, psi_bcblock, lemma_single_gen_valid};
@@ -1386,6 +1390,110 @@ pub proof fn lemma_cs5_vondyck_relator(
         assert(hnn_relators(data)[i] == hnn_relator(data, i));
         lemma_cs5_vondyck_hnn_relator(mm, n, m, is_S, slice, i);
     }
+}
+
+// ============================================================================
+// Step 3c (C1) — the ρ-reflection: the NON-FREE-base analog of `lemma_intersection_property`.
+// CS-4's `lemma_intersection_property` reflects subgroup membership across a FREE family `a_words_F`
+// (via `lemma_free_family_injective`). A₊'s base `g_m∗free(d,b)` is non-free, so we use the c-killing
+// retraction `ρ` instead: `ρ∘a_col_machine = id` on base words makes `a_col_machine` injective, and
+// reflection composes exactly as in CS-4 (subgroup_to_k_word → compose → inject → in_subgroup).
+// ============================================================================
+
+/// `apply_hom(ρ, emb(a_col_machine, x)) = x` for any base word `x` (the retraction inverts the
+/// inclusion). Generalizes the second half of `lemma_cs5_base_case_faithful` to arbitrary base words.
+proof fn lemma_rho_acol_identity_word(mm: ModMachine, n: nat, x: Word)
+    requires
+        word_valid(x, (g_m(mm).num_generators + n + 1) as nat),
+    ensures
+        apply_hom(base_retraction(mm, n), apply_embedding(a_col_machine(mm, n), x)) =~= x,
+{
+    let nk = g_m(mm).num_generators;
+    let rho = base_retraction(mm, n);
+    let am = a_col_machine(mm, n);
+    lemma_machine_col_len(mm, n);
+    lemma_base_retraction_valid(mm, n);
+    assert(word_valid(x, am.len())) by {
+        lemma_word_valid_mono(x, (nk + n + 1) as nat, am.len());
+    }
+    lemma_apply_hom_embedding_compose(rho, am, x);
+    let comp = comp_images(rho, am);
+    assert forall|i: int| 0 <= i < nk + n + 1
+        implies #[trigger] comp[i] =~= seq![Symbol::Gen(i as nat)] by {
+        lemma_comp_rho_acol_identity(mm, n, i);
+    }
+    lemma_emb_identity_prefix(comp, x, (nk + n + 1) as nat);
+}
+
+/// **`a_col_machine` is injective on base words** (faithfulness): two base words with `≡_{h1_base}`-equal
+/// `a_col_machine`-images are `≡_{base_A_plus_base}`-equal. The non-free replacement for
+/// `lemma_free_family_injective` — via the retraction `ρ` (`apply_hom(ρ, ψ(·)) = id`).
+pub proof fn lemma_a_col_machine_injective(mm: ModMachine, n: nat, a: Word, b: Word)
+    requires
+        word_valid(a, (g_m(mm).num_generators + n + 1) as nat),
+        word_valid(b, (g_m(mm).num_generators + n + 1) as nat),
+        equiv_in_presentation(h1_base(mm, n),
+            apply_embedding(a_col_machine(mm, n), a), apply_embedding(a_col_machine(mm, n), b)),
+    ensures
+        equiv_in_presentation(base_A_plus_base(mm, n), a, b),
+{
+    let rho = base_retraction(mm, n);
+    let am = a_col_machine(mm, n);
+    lemma_base_retraction_valid(mm, n);
+    let ia = apply_embedding(am, a);
+    let ib = apply_embedding(am, b);
+    // ρ pushes the h1_base equiv to a base_A_plus_base equiv of the retracted images.
+    lemma_hom_preserves_equiv(rho, ia, ib);
+    lemma_rho_acol_identity_word(mm, n, a);            // apply_hom(ρ, ia) = a
+    lemma_rho_acol_identity_word(mm, n, b);            // apply_hom(ρ, ib) = b
+}
+
+/// **C1 — ρ-reflection (the non-free intersection).** If `emb(a_col_machine, u)` lies in the subgroup
+/// `⟨compose_embeddings(a_col_machine, cols)⟩` of `h1_base` (`cols` all base words), then `u` lies in
+/// `⟨cols⟩` of `base_A_plus_base`. Mirror of `lemma_intersection_property` with `ρ`-injectivity in
+/// place of free-family injectivity. The base-word reflection of a recog pinch-middle membership.
+pub proof fn lemma_cs5_middle_reflect(mm: ModMachine, n: nat, cols: Seq<Word>, u: Word)
+    requires
+        word_valid(u, (g_m(mm).num_generators + n + 1) as nat),
+        forall|k: int| 0 <= k < cols.len()
+            ==> word_valid(#[trigger] cols[k], (g_m(mm).num_generators + n + 1) as nat),
+        in_generated_subgroup(h1_base(mm, n),
+            compose_embeddings(a_col_machine(mm, n), cols),
+            apply_embedding(a_col_machine(mm, n), u)),
+    ensures
+        in_generated_subgroup(base_A_plus_base(mm, n), cols, u),
+{
+    let nk = g_m(mm).num_generators;
+    let ng = (nk + n + 1) as nat;
+    let am = a_col_machine(mm, n);
+    let bp = base_A_plus_base(mm, n);
+    let recog_gens = compose_embeddings(am, cols);
+    let psi_u = apply_embedding(am, u);
+    assert(recog_gens.len() == cols.len());
+
+    // pull ψ(u) back to a preimage word h over the recog gens.
+    lemma_subgroup_to_k_word(h1_base(mm, n), recog_gens, psi_u);
+    let h = choose|h: Word| word_valid(h, recog_gens.len())
+        && equiv_in_presentation(h1_base(mm, n), apply_embedding(recog_gens, h), psi_u);
+    assert(word_valid(h, recog_gens.len())
+        && equiv_in_presentation(h1_base(mm, n), apply_embedding(recog_gens, h), psi_u));
+    assert(word_valid(h, cols.len()));
+
+    // emb(recog_gens, h) = ψ(emb(cols, h)) = ψ(ph).
+    lemma_apply_embedding_compose(am, cols, h);
+    let ph = apply_embedding(cols, h);
+    assert(apply_embedding(recog_gens, h) =~= apply_embedding(am, ph));
+
+    // ψ(ph) ≡_{h1_base} ψ(u); ρ-injectivity ⟹ ph ≡_{base_A_plus_base} u.
+    lemma_apply_embedding_valid(cols, h, ng);                    // ph valid over ng
+    assert(equiv_in_presentation(h1_base(mm, n),
+        apply_embedding(am, ph), apply_embedding(am, u)));
+    lemma_a_col_machine_injective(mm, n, ph, u);
+    assert(equiv_in_presentation(bp, ph, u));
+
+    // ph ∈ ⟨cols⟩, ph ≡ u ⟹ u ∈ ⟨cols⟩.
+    lemma_apply_embedding_in_subgroup(bp, cols, h);
+    lemma_in_subgroup_respects_equiv(bp, cols, ph, u);
 }
 
 } // verus!
