@@ -79,6 +79,18 @@ pub open spec fn s_relators_valid(is_S: spec_fn(Word) -> bool, nk: nat, n: nat) 
     forall|w: Word| #[trigger] is_S(w) ==> is_c_word(nk, n, w)
 }
 
+/// The **realization hypothesis** (one direction of the §3.3 machine bridge, plan §2): the abstract
+/// relator set `S` of `C = ⟨c;S⟩` contains every c-word `w_α(c)` for `(α,0) ∈ H₀(M)`. Consumed ONLY
+/// by the CS-5 k-iso's von-Dyck-forward (`docs/cohen-cs5-blueprint.md` §1): there `w_α(c) ≡_{h2_pred}
+/// ε` must hold in the base, which follows because `is_S(w_α(c))` ⟹ `w_α(c)` is an `h2_pred` relator.
+/// The §3.3 instantiation (the machine side of the bridge) will discharge it.
+pub open spec fn s_realizes(is_S: spec_fn(Word) -> bool, mm: ModMachine, n: nat, m: nat) -> bool {
+    let nk = g_m(mm).num_generators;
+    forall|alpha: nat|
+        (numbers_word(n, m, alpha) && mm_in_H0(mm, alpha, 0))
+        ==> #[trigger] is_S(w_c(c_base(nk), n, m, alpha))
+}
+
 // ----------------------------------------------------------------------------
 // The predicate base presentation `H₂`
 // ----------------------------------------------------------------------------
