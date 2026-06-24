@@ -428,3 +428,8 @@ pub mod pred_emb_respects;
 // predicate base h2_pred is trivial in some finite slice h2_II(alphas). S-strip homomorphism +
 // derivation re-indexing. docs/cohen-cs4-architecture.md §4.
 pub mod cohen_cs4b;
+
+// cohen_cs4c: Layer 2 — CS-4c prep. Slice normalization: normalize_alphas drops 0 + de-dups so the
+// number-word slice from CS-4b meets lemma_map_a_forward's no_duplicates/!contains(0) preconds,
+// preserving equivalence via relators_included. docs/cohen-cs4-architecture.md §4.
+pub mod cohen_cs4c;
