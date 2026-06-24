@@ -423,3 +423,8 @@ pub mod cohen_cs4;
 // (finite source -> pred target) + 4 predicate atoms. docs/cohen-cs4-architecture.md §4.
 #[cfg(verus_keep_ghost)]
 pub mod pred_emb_respects;
+
+// cohen_cs4b: Layer 2 — CS-4b. The compactness bridge: a c-free word trivial in the infinite
+// predicate base h2_pred is trivial in some finite slice h2_II(alphas). S-strip homomorphism +
+// derivation re-indexing. docs/cohen-cs4-architecture.md §4.
+pub mod cohen_cs4b;
