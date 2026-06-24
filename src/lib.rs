@@ -438,3 +438,8 @@ pub mod cohen_cs4c;
 // of S (the σ-image elements). The pure-Seq scaffold for M2_general's superset-slice recognition.
 // docs/cohen-cs4d-blueprint.md §5.
 pub mod cohen_cs4d;
+
+// cohen_cs4d_recog: Layer 2 — CS-4d σ-recognition cores (blueprint §4.2). lemma_coords_in_sigbet
+// (direct-membership coord restriction, no sat_bridge) + lemma_phi_image_config_support (a-side
+// φ_F recognition: ⟨config_emb(S)⟩ ⟹ ⟨config_emb(σbet)⟩). Sibling of lemma_r_prime.
+pub mod cohen_cs4d_recog;
