@@ -21,14 +21,30 @@ use vstd::prelude::*;
 use crate::symbol::*;
 use crate::word::*;
 use crate::presentation::*;
+use crate::pred_presentation::equiv_in_pred_presentation;
 use crate::base_swap::{lemma_add_relators_relators, lemma_single_step_equiv};
 use crate::machine_group::*;
 use crate::layout::*;
 use crate::word_numbering::{numbers_word, w_b};
+use crate::benign::{apply_embedding, apply_embedding_symbol, lemma_apply_embedding_valid};
 use crate::h1::h1_base;
 use crate::h2::{h2_pres, h2_data, td_word, p_assoc, lemma_h2_stable_letter};
-use crate::hnn::{hnn_relators, hnn_relator, stable_letter, stable_letter_inv};
-use crate::h3_ii::{h2_II, family_II, family_II_relator, family_II_lhs, family_II_rhs};
+use crate::hnn::{hnn_relators, hnn_relator, hnn_presentation, stable_letter, stable_letter_inv};
+use crate::h3::{phi_assoc, lemma_phi_assoc_valid};
+use crate::h3_ii::{h2_II, family_II, family_II_relator, family_II_lhs, family_II_rhs,
+    lemma_phi_assoc_len};
+use crate::phi_l_maps::{a_words, a_words_F};
+use crate::phi_l_forward::lemma_a_words_single_gen;
+use crate::phi_l_lift::b_words;
+use crate::phi_l_pinch::{lemma_map_a_forward, lemma_a_words_img_valid};
+use crate::pa_data::{pa_data, lemma_pa_data_shape, lemma_pa_data_valid};
+use crate::britton_infra::lemma_hnn_presentation_valid;
+use crate::f_free_a1::{betas, lemma_betas_index};
+use crate::pred_emb_respects::lemma_emb_respects_source_equiv_pred;
+use crate::cohen_h2::{h2_pred, lemma_h2_pred_valid, s_relators_valid, c_symbol};
+use crate::cohen_retraction::{no_c_word, lemma_no_c_inverse, lemma_no_c_concat};
+use crate::cohen_cs4::lemma_b_col_relator_trivial_pred;
+use crate::cohen_cs4b::lemma_cs4b_compactness;
 
 verus! {
 
@@ -448,6 +464,233 @@ pub proof fn lemma_h2_II_normalize_equiv(
     lemma_normalize_number_words(alphas, n, m);
     let d = choose|d: Derivation| derivation_valid(h2_II(mm, n, m, alphas), d, w1, w2);
     lemma_h2_II_deriv_replay(mm, n, m, alphas, d.steps, w1, w2);
+}
+
+// ============================================================================
+// CS-4c — the von-Dyck FORWARD wiring (`a ⟹ b`)
+// ============================================================================
+//
+// `docs/cohen-cs4-architecture.md` §4 (CS-4c forward). The a_i iso half:
+//
+//   emb(a_col, w) ≡_{h2_pred} ε   ⟹   emb(b_col, w) ≡_{h2_pred} ε
+//
+// chained from the proven machinery:
+//   (a) emb(a_col, w) is c-free (a_col = a_words has no c-block image) and word-valid;
+//   (b) CS-4b compactness — a finite slice `alphas` with emb(a_col,w) ≡_{h2_II(alphas)} ε;
+//   (c) normalize `alphas` (drop 0, de-dup) to meet `lemma_map_a_forward`'s preconditions;
+//   (d) `lemma_map_a_forward` — the Britton-peel faithfulness of `map_a`: w ≡_{P_A = pa_data(betas)} ε;
+//   (e) push that `P_A`-triviality into `h2_pred` through the `b_col = b_words` homomorphism
+//       (`lemma_emb_respects_source_equiv_pred`), whose relator condition is the CS-4a b-von-Dyck
+//       (`lemma_b_col_relator_trivial_pred`).
+
+// ----------------------------------------------------------------------------
+// c-freeness of `emb(a_words, w)`
+// ----------------------------------------------------------------------------
+
+/// A single generator outside the c-block `[c_base, c_base+n)` is a c-free word.
+proof fn lemma_no_c_single_gen(nk: nat, n: nat, g: nat)
+    requires
+        g < nk || g >= nk + n,
+    ensures
+        no_c_word(nk, n, seq![Symbol::Gen(g)]),
+{
+    let w = seq![Symbol::Gen(g)];
+    assert forall|k: int| 0 <= k < w.len() implies !c_symbol(nk, n, #[trigger] w[k]) by {
+        assert(w[k] == Symbol::Gen(g));
+        assert(generator_index(Symbol::Gen(g)) == g);
+    }
+}
+
+/// Each `a_words` image is c-free: every column generator lands in `{0, 1} ∪ [b_base, ∞)`, all
+/// strictly outside the c-block `[nk, nk+n)` (`c_base = nk`).
+proof fn lemma_a_words_img_no_c(mm: ModMachine, n: nat, i: int)
+    requires
+        0 <= i < n + 4,
+    ensures
+        no_c_word(g_m(mm).num_generators, n, a_words(mm, n)[i]),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);                          // nk = 4 + |quads| ≥ 4
+    let aw = a_words(mm, n);
+    let awf = a_words_F(mm, n);
+    let head = seq![seq![Symbol::Gen(0)], seq![Symbol::Gen(1)], seq![Symbol::Gen(d_idx(nk, n))]];
+    let tail = Seq::new(n, |j: int| seq![Symbol::Gen(b_idx(nk, n, (j + 1) as nat))]);
+    assert(awf == head + tail);
+    assert(awf.len() == n + 3);
+    assert(aw == awf.push(seq![Symbol::Gen(p_idx(nk, n))]));
+
+    if i == n + 3 {
+        assert(aw[i] == seq![Symbol::Gen(p_idx(nk, n))]);
+        assert(p_idx(nk, n) == nk + 2 * n + 1);            // ≥ nk + n
+        lemma_no_c_single_gen(nk, n, p_idx(nk, n));
+    } else {
+        assert(aw[i] == awf[i]);                           // push only adds index n+3
+        if i == 0 {
+            assert(awf[i] == head[0]);
+            assert(aw[i] == seq![Symbol::Gen(0)]);
+            lemma_no_c_single_gen(nk, n, 0);               // 0 < nk
+        } else if i == 1 {
+            assert(awf[i] == head[1]);
+            assert(aw[i] == seq![Symbol::Gen(1)]);
+            lemma_no_c_single_gen(nk, n, 1);               // 1 < nk
+        } else if i == 2 {
+            assert(awf[i] == head[2]);
+            assert(aw[i] == seq![Symbol::Gen(d_idx(nk, n))]);
+            assert(d_idx(nk, n) == nk + 2 * n);            // ≥ nk + n
+            lemma_no_c_single_gen(nk, n, d_idx(nk, n));
+        } else {
+            assert(awf[i] == tail[i - 3]);
+            assert(tail[i - 3] == seq![Symbol::Gen(b_idx(nk, n, ((i - 3) + 1) as nat))]);
+            assert(((i - 3) + 1) as nat == (i - 2) as nat);
+            assert(aw[i] == seq![Symbol::Gen(b_idx(nk, n, (i - 2) as nat))]);
+            assert(b_idx(nk, n, (i - 2) as nat) == nk + n + (i - 3));   // ≥ nk + n
+            lemma_no_c_single_gen(nk, n, b_idx(nk, n, (i - 2) as nat));
+        }
+    }
+}
+
+/// `emb(a_words, w)` is c-free for any `w` valid over the `P_A` generators (`n+4`). Each symbol's
+/// image is a c-free single generator (`lemma_a_words_img_no_c`); inversion and concatenation
+/// preserve c-freeness.
+proof fn lemma_emb_a_words_no_c(mm: ModMachine, n: nat, w: Word)
+    requires
+        word_valid(w, (n + 4) as nat),
+    ensures
+        no_c_word(g_m(mm).num_generators, n, apply_embedding(a_words(mm, n), w)),
+    decreases w.len(),
+{
+    let nk = g_m(mm).num_generators;
+    let aw = a_words(mm, n);
+    lemma_a_words_single_gen(mm, n);                       // aw.len() == n + 4
+    if w.len() == 0 {
+        assert(apply_embedding(aw, w) =~= empty_word());
+    } else {
+        let s = w.first();
+        let rest = w.drop_first();
+        assert(symbol_valid(s, (n + 4) as nat)) by { assert(w[0] == s); }
+        let gi = generator_index(s);
+        assert(gi < n + 4);
+        lemma_a_words_img_no_c(mm, n, gi as int);          // no_c_word(nk, n, aw[gi])
+        assert(no_c_word(nk, n, apply_embedding_symbol(aw, s))) by {
+            match s {
+                Symbol::Gen(g) => {
+                    assert(apply_embedding_symbol(aw, s) == aw[g as int]);
+                },
+                Symbol::Inv(g) => {
+                    assert(apply_embedding_symbol(aw, s) == inverse_word(aw[g as int]));
+                    lemma_no_c_inverse(nk, n, aw[g as int]);
+                },
+            }
+        }
+        assert(word_valid(rest, (n + 4) as nat)) by {
+            assert forall|k: int| 0 <= k < rest.len()
+                implies symbol_valid(#[trigger] rest[k], (n + 4) as nat) by {
+                assert(rest[k] == w[k + 1]);
+            }
+        }
+        lemma_emb_a_words_no_c(mm, n, rest);
+        assert(apply_embedding(aw, w)
+            =~= concat(apply_embedding_symbol(aw, s), apply_embedding(aw, rest)));
+        lemma_no_c_concat(nk, n, apply_embedding_symbol(aw, s), apply_embedding(aw, rest));
+    }
+}
+
+// ----------------------------------------------------------------------------
+// CS-4c headline — the forward von-Dyck wiring
+// ----------------------------------------------------------------------------
+
+/// **CS-4c FORWARD (`a ⟹ b`).** If `emb(a_col, w) ≡_{h2_pred} ε` then `emb(b_col, w) ≡_{h2_pred} ε`
+/// (the `⟹` half of the a_i association iso `(★)` over the predicate base). Chains CS-4b compactness
+/// → slice normalization → `lemma_map_a_forward` (`map_a` faithful) → the `b_words` von-Dyck push
+/// (`lemma_emb_respects_source_equiv_pred` with the CS-4a relator-triviality).
+pub proof fn lemma_cs4c_forward(
+    mm: ModMachine, n: nat, m: nat, is_S: spec_fn(Word) -> bool, l: nat, w: Word,
+)
+    requires
+        mod_machine_wf(mm),
+        2 * n < m,
+        1 <= l <= 2 * n,
+        s_relators_valid(is_S, g_m(mm).num_generators, n),
+        word_valid(w, (n + 4) as nat),
+        equiv_in_pred_presentation(h2_pred(mm, n, m, is_S),
+            apply_embedding(a_words(mm, n), w), empty_word()),
+    ensures
+        equiv_in_pred_presentation(h2_pred(mm, n, m, is_S),
+            apply_embedding(b_words(mm, n, m, l), w), empty_word()),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let aw = a_words(mm, n);
+    let bw = b_words(mm, n, m, l);
+    let pw = apply_embedding(aw, w);
+
+    // (a) pw is c-free and valid over h2_num_gens.
+    lemma_emb_a_words_no_c(mm, n, w);                      // no_c_word(nk, n, pw)
+    lemma_a_words_single_gen(mm, n);                       // aw.len() == n + 4
+    assert forall|i: int| 0 <= i < aw.len()
+        implies word_valid(#[trigger] aw[i], h2_num_gens(nk, n)) by {
+        lemma_a_words_img_valid(mm, n, i);
+    }
+    assert(word_valid(w, aw.len()));                       // aw.len() == n + 4
+    lemma_apply_embedding_valid(aw, w, h2_num_gens(nk, n));   // word_valid(pw, h2_num_gens)
+
+    // (b) compactness: a finite slice `alphas` with pw ≡_{h2_II(alphas)} ε.
+    lemma_cs4b_compactness(mm, n, m, is_S, pw);
+    let alphas = choose|a: Seq<nat>|
+        (forall|i: int| 0 <= i < a.len() ==> numbers_word(n, m, #[trigger] a[i]))
+        && equiv_in_presentation(h2_II(mm, n, m, a), pw, empty_word());
+    assert(forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]));
+    assert(equiv_in_presentation(h2_II(mm, n, m, alphas), pw, empty_word()));
+
+    // (c) normalize: no-dup, ∌0, number-words.
+    lemma_h2_II_normalize_equiv(mm, n, m, alphas, pw, empty_word());
+    let norm = normalize_alphas(alphas);
+
+    // (d) map_a forward: w ≡_{P_A = pa_data(betas(norm))} ε.
+    lemma_map_a_forward(mm, n, m, norm, w);
+    let bet = betas(norm);
+    let pd = pa_data(n, m, bet);
+    let src = hnn_presentation(pd);
+    assert(equiv_in_presentation(src, w, empty_word()));
+
+    // (e) push through the `b_words` homomorphism into `h2_pred` (von-Dyck-b).
+    lemma_betas_index(norm);
+    assert forall|i: int| 0 <= i < bet.len() implies numbers_word(n, m, #[trigger] bet[i]) by {
+        if i == 0 { assert(bet[0] == 0); } else { assert(bet[i] == norm[i - 1]); }
+    }
+    lemma_pa_data_shape(n, m, bet);                        // base gens n+3, |assocs| == |bet|
+    lemma_pa_data_valid(n, m, bet);
+    lemma_hnn_presentation_valid(pd);                      // presentation_valid(src)
+    assert(src.relators =~= hnn_relators(pd)) by {
+        assert(pd.base.relators == Seq::<Word>::empty());
+    }
+    assert(src.num_generators == n + 4);
+    assert(src.relators.len() == bet.len());
+
+    // b_words images valid over h2_num_gens (= h2_pred.num_generators).
+    lemma_phi_assoc_len(nk, n, m, l);
+    lemma_phi_assoc_valid(nk, n, m, l, h2_num_gens(nk, n));
+    assert(bw.len() == n + 4);
+    assert forall|i: int| 0 <= i < bw.len()
+        implies word_valid(#[trigger] bw[i], h2_num_gens(nk, n)) by {
+        assert(bw[i] == phi_assoc(nk, n, m, l)[i].1);      // fires assocs_valid
+    }
+
+    // each `src` relator maps to ε in `h2_pred` (CS-4a b-von-Dyck).
+    assert forall|j: int| 0 <= j < src.relators.len() implies
+        equiv_in_pred_presentation(h2_pred(mm, n, m, is_S),
+            apply_embedding(bw, #[trigger] src.relators[j]), empty_word()) by {
+        assert(src.relators[j] == hnn_relators(pd)[j]);
+        assert(hnn_relators(pd)[j] == hnn_relator(pd, j));
+        lemma_b_col_relator_trivial_pred(mm, n, m, is_S, l, bet, j);
+    }
+
+    lemma_h2_pred_valid(mm, n, m, is_S);
+    assert(h2_pred(mm, n, m, is_S).num_generators == h2_num_gens(nk, n));
+    assert(word_valid(empty_word(), src.num_generators));
+    lemma_emb_respects_source_equiv_pred(src, h2_pred(mm, n, m, is_S), bw, w, empty_word());
+
+    assert(apply_embedding(bw, empty_word()) =~= empty_word());
 }
 
 } // verus!
