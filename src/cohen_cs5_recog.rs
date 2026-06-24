@@ -28,19 +28,20 @@ use crate::benign::{apply_embedding, apply_embedding_symbol, lemma_apply_embeddi
 use crate::homomorphism::{HomomorphismData, apply_hom, apply_hom_symbol, is_valid_homomorphism,
     lemma_hom_preserves_equiv};
 use crate::free_basis::{comp_images, lemma_apply_hom_embedding_compose};
-use crate::machine_group::{ModMachine, g_m, g_subgens, g_m_associations, config_word,
-    lemma_g_m_num_generators, lemma_g_m_associations_valid, lemma_g_m_valid, lemma_word_valid_mono,
-    lemma_cancel_pair_equiv_empty, lemma_config_word_valid};
+use crate::machine_group::{ModMachine, g_m, g_subgens, g_m_associations, config_word, mod_machine_wf,
+    mm_in_H0, lemma_g_m_num_generators, lemma_g_m_associations_valid, lemma_g_m_valid,
+    lemma_word_valid_mono, lemma_cancel_pair_equiv_empty, lemma_config_word_valid};
 use crate::layout::{h1_num_gens, h2_num_gens, c_base, b_base, d_idx, p_idx, b_idx, c_idx};
 use crate::h1::{h1_base, comm_relators, comm_relator, lemma_h1_base_valid, lemma_h1_base_num_generators};
 use crate::h3::{psi_assoc, psi_ublock, psi_bcblock, lemma_single_gen_valid};
 use crate::word_numbering::{w_b, w_c, w_bc, bc_letter, numbers_word, alphabet_letter, lemma_w_c_valid};
-use crate::h3_ii::{family_II_rhs};
-use crate::hnn::{HNNData, hnn_data_valid};
-use crate::pred_presentation::equiv_in_pred_presentation;
+use crate::h3_ii::{family_II_rhs, family_II_lhs};
+use crate::hnn::{HNNData, hnn_data_valid, hnn_relator, hnn_relators, hnn_presentation,
+    stable_letter, stable_letter_inv};
+use crate::pred_presentation::{equiv_in_pred_presentation, pred_presentation_valid};
 use crate::pred_presentation_lemmas::lemma_pred_relator_is_identity;
-use crate::cohen_h2::{h2_pred, h2_pred_relator};
-use crate::cohen_cs5::{k_a_col, k_b_col, family_II_bc_rhs};
+use crate::cohen_h2::{h2_pred, h2_pred_relator, s_relators_valid, s_realizes, lemma_h2_pred_valid};
+use crate::cohen_cs5::{k_a_col, k_b_col, family_II_bc_rhs, lemma_cs5_bc_config_trivial};
 
 verus! {
 
@@ -1242,6 +1243,149 @@ pub proof fn lemma_b_col_machine_assoc_rhs(mm: ModMachine, n: nat, m: nat, beta:
         =~= (cfg + w_bc(b_base(nk, n), c_base(nk), n, m, beta)) + seq![Symbol::Gen(d_idx(nk, n))]);
     assert(b_base(nk, n) == nk + n);
     assert(c_base(nk) == nk);
+}
+
+// ============================================================================
+// Step 4 — the von-Dyck homomorphism conditions for `b_col_machine : base_A_plus_data → h2_pred`.
+// Each relator of `hnn_presentation(base_A_plus_data(H0-slice))` maps to `≡_{h2_pred} ε`: base K_M
+// relators via `lemma_cs5_vondyck_KM_relator` (b_col_machine fixes machine words), HNN relators `R_α`
+// via the bc-atom `lemma_cs5_bc_config_trivial` (b_col_machine carries the machine-scheme `R_α` to the
+// bc-config form). This is the relator-condition of `lemma_emb_respects_source_equiv_pred` — the
+// well-definedness obligation of the forward von-Dyck (step 4), ready before the recognition (3c/3d).
+// ============================================================================
+
+/// `apply_embedding(images, [Inv(g)]) = inverse_word(images[g])` (single negative generator).
+proof fn lemma_emb_single_inv_gen(images: Seq<Word>, g: nat)
+    ensures
+        apply_embedding(images, seq![Symbol::Inv(g)]) =~= inverse_word(images[g as int]),
+{
+    let w: Word = seq![Symbol::Inv(g)];
+    assert(w.len() == 1);
+    assert(w.first() == Symbol::Inv(g));
+    assert(w.drop_first() =~= empty_word());
+    assert(apply_embedding(images, w.drop_first()) =~= empty_word());
+    assert(apply_embedding_symbol(images, w.first()) == inverse_word(images[g as int]));
+    assert(apply_embedding(images, w)
+        =~= concat(apply_embedding_symbol(images, w.first()), empty_word()));
+    lemma_concat_empty_right(inverse_word(images[g as int]));
+}
+
+/// **Step-4 von-Dyck, HNN relator.** For `α = slice[i]` with `(α,0)∈H₀`, the `b_col_machine`-image of
+/// the i-th HNN relator of `base_A_plus_data` is the bc-config relator `family_II_lhs(α) ·
+/// family_II_bc_rhs(α)⁻¹ ≡_{h2_pred} ε` (`lemma_cs5_bc_config_trivial`). The machine-scheme stable
+/// letter `Gen(nk+n+1)` is carried by `b_col_machine` to the h2 `Gen(p_idx)`; config/`w_b`→bc via 3b-b.
+pub proof fn lemma_cs5_vondyck_hnn_relator(
+    mm: ModMachine, n: nat, m: nat, is_S: spec_fn(Word) -> bool, slice: Seq<nat>, i: int,
+)
+    requires
+        mod_machine_wf(mm),
+        2 * n < m,
+        s_relators_valid(is_S, g_m(mm).num_generators, n),
+        s_realizes(is_S, mm, n, m),
+        0 <= i < slice.len(),
+        numbers_word(n, m, slice[i]),
+        mm_in_H0(mm, slice[i], 0),
+    ensures
+        equiv_in_pred_presentation(h2_pred(mm, n, m, is_S),
+            apply_embedding(b_col_machine(mm, n), hnn_relator(base_A_plus_data(mm, n, m, slice), i)),
+            empty_word()),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let bm = b_col_machine(mm, n);
+    lemma_machine_col_len(mm, n);
+    let data = base_A_plus_data(mm, n, m, slice);
+    let alpha = slice[i];
+    let t = stable_letter(data);          // Gen(nk+n+1)
+    let t_inv = stable_letter_inv(data);  // Inv(nk+n+1)
+    let a_i = config_word(alpha, 0);
+    let b_i = assoc_rhs_machine(mm, n, m, alpha);
+    assert(data.base.num_generators == nk + n + 1) by { lemma_base_A_plus_data_shape(mm, n, m, slice); }
+    assert(t == Symbol::Gen((nk + n + 1) as nat));
+    assert(t_inv == Symbol::Inv((nk + n + 1) as nat));
+    assert(data.associations[i] == (config_word(alpha, 0), assoc_rhs_machine(mm, n, m, alpha))) by {
+        assert(data.associations[i]
+            == (config_word(slice[i], 0), assoc_rhs_machine(mm, n, m, slice[i])));
+    }
+    // hnn_relator = [t_inv] + a_i + [t] + inverse_word(b_i).
+    let r = hnn_relator(data, i);
+    assert(r =~= ((seq![t_inv] + a_i) + seq![t]) + inverse_word(b_i)) by {
+        assert(r == Seq::new(1, |_j: int| t_inv) + a_i + Seq::new(1, |_j: int| t)
+            + inverse_word(b_i));
+        assert(Seq::new(1, |_j: int| t_inv) =~= seq![t_inv]);
+        assert(Seq::new(1, |_j: int| t) =~= seq![t]);
+    }
+    // distribute apply_embedding over the three concats.
+    lemma_apply_embedding_concat(bm, (seq![t_inv] + a_i) + seq![t], inverse_word(b_i));
+    lemma_apply_embedding_concat(bm, seq![t_inv] + a_i, seq![t]);
+    lemma_apply_embedding_concat(bm, seq![t_inv], a_i);
+    // emb(bm, [t_inv]) = inverse_word(bm[nk+n+1]) = [Inv(p_idx)].
+    assert(bm[(nk + n + 1) as int] =~= seq![Symbol::Gen(p_idx(nk, n))]);
+    lemma_emb_single_inv_gen(bm, (nk + n + 1) as nat);
+    lemma_inverse_word_singleton(Symbol::Gen(p_idx(nk, n)));
+    assert(apply_embedding(bm, seq![t_inv]) =~= seq![Symbol::Inv(p_idx(nk, n))]);
+    // emb(bm, a_i) = config(α,0) (machine word over 3 ≤ nk).
+    lemma_config_word_valid(alpha, 0);
+    lemma_word_valid_mono(a_i, 3, nk);
+    lemma_b_col_machine_fixes_machine_word(mm, n, a_i);
+    // emb(bm, [t]) = bm[nk+n+1] = [Gen(p_idx)].
+    lemma_emb_single_gen(bm, (nk + n + 1) as nat);
+    // emb(bm, inverse_word(b_i)) = inverse_word(emb(bm, b_i)) = inverse_word(family_II_bc_rhs(α)).
+    lemma_apply_embedding_inverse(bm, b_i);
+    lemma_b_col_machine_assoc_rhs(mm, n, m, alpha);
+    // assemble: emb(bm, r) = family_II_lhs(α) + inverse_word(family_II_bc_rhs(α)).
+    let lhs = family_II_lhs(mm, n, alpha);
+    let bcrhs = family_II_bc_rhs(mm, n, m, alpha);
+    assert(lhs =~= (seq![Symbol::Inv(p_idx(nk, n))] + a_i) + seq![Symbol::Gen(p_idx(nk, n))]);
+    assert(apply_embedding(bm, r) =~= lhs + inverse_word(bcrhs));
+    lemma_cs5_bc_config_trivial(mm, n, m, is_S, alpha);
+}
+
+/// **Step-4 von-Dyck relator condition.** Each relator of `hnn_presentation(base_A_plus_data(slice))`
+/// (slice all number-words AND `(·,0)∈H₀`) maps to `≡_{h2_pred} ε` under `b_col_machine`: base K_M
+/// relators (j < |g_m.relators|) via `lemma_cs5_vondyck_KM_relator`, HNN relators via
+/// `lemma_cs5_vondyck_hnn_relator`. The forward `lemma_emb_respects_source_equiv_pred` hypothesis.
+pub proof fn lemma_cs5_vondyck_relator(
+    mm: ModMachine, n: nat, m: nat, is_S: spec_fn(Word) -> bool, slice: Seq<nat>, j: int,
+)
+    requires
+        mod_machine_wf(mm),
+        2 * n < m,
+        s_relators_valid(is_S, g_m(mm).num_generators, n),
+        s_realizes(is_S, mm, n, m),
+        forall|k: int| 0 <= k < slice.len() ==> numbers_word(n, m, #[trigger] slice[k]),
+        forall|k: int| 0 <= k < slice.len() ==> mm_in_H0(mm, #[trigger] slice[k], 0),
+        0 <= j < hnn_presentation(base_A_plus_data(mm, n, m, slice)).relators.len(),
+    ensures
+        equiv_in_pred_presentation(h2_pred(mm, n, m, is_S),
+            apply_embedding(b_col_machine(mm, n),
+                hnn_presentation(base_A_plus_data(mm, n, m, slice)).relators[j]),
+            empty_word()),
+{
+    let data = base_A_plus_data(mm, n, m, slice);
+    let hp = hnn_presentation(data);
+    let glen = g_m(mm).relators.len();
+    assert(data.base == base_A_plus_base(mm, n));
+    assert(data.base.relators == g_m(mm).relators);
+    assert(hp.relators == data.base.relators + hnn_relators(data));
+    if j < glen {
+        // base K_M relator.
+        assert(hp.relators[j] == g_m(mm).relators[j]);
+        assert(g_m(mm).relators.contains(g_m(mm).relators[j])) by {
+            assert(g_m(mm).relators[j] == g_m(mm).relators[j]);
+        }
+        lemma_cs5_vondyck_KM_relator(mm, n, m, is_S, g_m(mm).relators[j]);
+    } else {
+        // HNN relator at index i = j - glen.
+        let i = j - glen;
+        assert(hnn_relators(data).len() == slice.len()) by {
+            lemma_base_A_plus_data_shape(mm, n, m, slice);
+        }
+        assert(0 <= i < slice.len());
+        assert(hp.relators[j] == hnn_relators(data)[i]);
+        assert(hnn_relators(data)[i] == hnn_relator(data, i));
+        lemma_cs5_vondyck_hnn_relator(mm, n, m, is_S, slice, i);
+    }
 }
 
 } // verus!
