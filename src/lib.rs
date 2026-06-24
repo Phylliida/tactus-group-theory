@@ -453,3 +453,9 @@ pub mod cohen_cs4e;
 // s_strip): k_a_col/k_b_col, generic pred hom∘embedding compose + relator monotonicity, and the
 // backward half of (★k). docs/cohen-cs5-blueprint.md.
 pub mod cohen_cs5;
+
+// cohen_cs5_recog: Layer 2 — CS-5c recognition core (Route R1, single-gen relabel). The relabel
+// bridge: base_A_plus_base (= g_m∗free(d,b_j)), a_col_machine/b_col_machine, relabel_col, the plain
+// emb∘emb compose, and the factoring a_col = comp_emb(a_col_machine, relabel_col). Reduces psi-scheme
+// (★k) forward to the machine-scheme recognition. docs/cohen-cs5-blueprint.md §5.
+pub mod cohen_cs5_recog;
