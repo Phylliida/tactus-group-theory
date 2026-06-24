@@ -433,3 +433,8 @@ pub mod cohen_cs4b;
 // number-word slice from CS-4b meets lemma_map_a_forward's no_duplicates/!contains(0) preconds,
 // preserving equivalence via relators_included. docs/cohen-cs4-architecture.md §4.
 pub mod cohen_cs4c;
+
+// cohen_cs4d: Layer 2 — CS-4d slice arithmetic. bet_of(S,m,l) = σ-preimages of the %m==l elements
+// of S (the σ-image elements). The pure-Seq scaffold for M2_general's superset-slice recognition.
+// docs/cohen-cs4d-blueprint.md §5.
+pub mod cohen_cs4d;
