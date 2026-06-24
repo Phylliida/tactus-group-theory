@@ -97,15 +97,50 @@ forward bc-von-Dyck. Defined in `cohen_h2.rs` next to `s_relators_valid`.
 
 ## 3. Brick sequence (bottom-up; each verifies & commits independently)
 
-- **CS-5a — scaffold + generic helpers.** `s_realizes` (cohen_h2.rs); `k_a_col`/`k_b_col`
-  (= psi_assoc cols) + lengths + validity; the two generic pred helpers
+- **CS-5a — scaffold + generic helpers. ✅ DONE (`cohen_cs5.rs`, commit 540cba7).** `s_realizes`
+  (cohen_h2.rs); `k_a_col`/`k_b_col` (= psi_assoc cols); the two generic pred helpers
   (`lemma_apply_hom_pred_embedding_compose`, `lemma_pred_equiv_relator_mono`).
-- **CS-5b — BACKWARD (c-kill).** `lemma_cs5_backward`: `(★k)` ⟸ via `s_strip` + compose +
-  monotonicity. Self-contained, high confidence.
-- **CS-5c — FORWARD (recognition + bc-von-Dyck).** The hard arc. bc-von-Dyck atom first
-  (analog of CS-4a, the easy half), then the Prop-1.34 recognition (compactness + Layer-1).
+- **CS-5b — BACKWARD (c-kill). ✅ DONE (`cohen_cs5.rs` 6/0, commit 540cba7).** `lemma_cs5_backward`:
+  `(★k)` ⟸ via REUSE of CS-4b `s_strip` (`lemma_s_strip_psi_entry`: s_strip∘b_col = a_col pointwise
+  — 4-block index dispatch over psi_assoc) + compose + monotonicity lift `h2_noS → h2_pred`.
+- **CS-5c — FORWARD (recognition + bc-von-Dyck). ← NEXT, the hard arc (see §4 below).**
 - **CS-5d — tower lift + iso.** Package `(★k)` to `hnn_pred_associations_isomorphic(h3_pred_data)`
   via CS-4e's `lemma_h3_pred_upto_base_faithful` at `k=2n`. Mirror of `lemma_cs4e_iso_upto`'s top.
 
-CS-5a/CS-5b are the FA-4-style high-confidence bricks (this session). CS-5c is the genuine work.
+CS-5a/CS-5b were the FA-4-style high-confidence bricks. CS-5c is the genuine work.
 No verifier bypasses (standing rule).
+
+---
+
+## 4. CS-5c — the FORWARD recognition (scoping, before building)
+
+The forward `emb(a_col,w) ≡_{h2_pred} ε ⟹ emb(b_col,w) ≡_{h2_pred} ε` splits as in §1:
+
+1. **Recognition (HARD):** `emb(a_col,w) ≡_{h2_pred} ε ⟹ w ≡_{A₊_pres} ε`.
+2. **bc-von-Dyck (easy, uses `s_realizes`):** `w ≡_{A₊_pres} ε ⟹ emb(b_col,w) ≡_{h2_pred} ε`.
+
+### The structural crux: `A₊_pres` and the "abstract U-word for t_α".
+`A₊_pres` has generators = the **psi_assoc generators** (abstract `U_1..U_q`, `d`, `b_1..b_n`, `p`),
+NOT the h2-generators. The embedding `a_col` maps abstract `U_i ↦ g_subgens[i]`. So a defining
+relation `R_α` of `A₊_pres` must express `t_α = config_word(α,0)` as an **abstract word in the `U_i`**
+— which exists only for `(α,0)∈H₀(M)` (Layer-1 property (vii): `config(α,0) ∈ ⟨g_subgens⟩` over the
+machine tower). This abstract-U-word is NOT canonical; getting it concretely is the crux that
+distinguishes A₊ recognition from CS-4's free-base `map_a`. Under `a_col`, `emb(a_col, R_α)` becomes a
+family-(II) relator (an `h2_pred` relator), powering the von-Dyck.
+
+### What is/ISN'T reusable.
+- **NOT directly reusable:** CS-4's `recog_data`/`pa_data`/`lemma_map_a_forward` — those recognize
+  `A`/`A_i` over the **free** base `F=⟨t,x,d,b_j⟩` with the residue/family-(II) structure. A₊'s base
+  is `⟨U⟩∗⟨d,b_j⟩` (non-free U) with the H₀-restriction — a different recognition.
+- **Reusable:** the **compactness bridge** `lemma_cs4b_compactness` (a c-free word trivial in the
+  infinite `h2_pred` is trivial in a finite slice) — `emb(a_col,w)` is c-free; CS-5c reduces to a
+  finite-slice recognition. Layer-1 `lemma_theorem1` (the H₀ circularity-breaker) + property
+  (vi)/(vii) (`lemma_vi`/`lemma_vii_subset`) give the H₀-restriction. `lemma_w_bc_split` (w_α(bc) =
+  w_α(b)·w_α(c)) + `s_realizes` (w_α(c)≡ε) discharge the bc-von-Dyck.
+
+### Open design question (CO-DESIGN before building).
+The concrete `A₊_pres` representation (how to encode "abstract U-word for t_α" / the H₀-restricted
+p-relations) is the single structural choice — analogous to CS-4's `pa_data`. Resolve with Danielle
+before coding (the "no undesigned directions" rule). Candidate: `A₊_pres = HNN(base_A₊, p | R_α)`
+where `base_A₊` = a free-product-style presentation on `U_1..U_q, d, b_j` and `R_α` (for `(α,0)∈H₀`,
+`numbers_word`) = `p⁻¹ Û_α p (Û_α w_α(b) d)⁻¹`, `Û_α` the abstract U-word with `a_col(Û_α) ≡ config(α,0)`.

@@ -20,16 +20,28 @@
 use vstd::prelude::*;
 use crate::word::*;
 use crate::symbol::*;
+use crate::presentation::{Presentation, DerivationStep, Derivation, get_relator, apply_step,
+    derivation_produces, derivation_valid, equiv_in_presentation};
 use crate::pred_presentation::*;
+use crate::pred_presentation_lemmas::{lemma_pred_equiv_concat_left, lemma_pred_equiv_concat_right,
+    lemma_pred_word_inverse_left, lemma_pred_word_inverse_right, lemma_pred_relator_is_identity};
 use crate::pred_homomorphism::{PredHomomorphismData, apply_hom_pred, apply_hom_symbol_pred,
     is_valid_pred_homomorphism, lemma_hom_pred_respects_concat, lemma_hom_pred_respects_inverse,
     lemma_hom_pred_preserves_equiv, lemma_hom_pred_empty, lemma_hom_pred_singleton};
 use crate::benign::{apply_embedding, apply_embedding_symbol};
-use crate::machine_group::{ModMachine, g_m, g_subgens, g_m_associations, lemma_g_m_num_generators,
-    lemma_g_m_associations_valid, lemma_word_valid_mono};
-use crate::layout::{h2_num_gens, d_idx, p_idx, c_base};
+use crate::machine_group::{ModMachine, g_m, g_subgens, g_m_associations, mod_machine_wf, mm_in_H0,
+    config_word, lemma_g_m_num_generators, lemma_g_m_associations_valid, lemma_word_valid_mono,
+    lemma_config_word_valid};
+use crate::layout::{h2_num_gens, h1_num_gens, d_idx, p_idx, c_base, b_base};
+use crate::word_numbering::{numbers_word, w_b, w_c, w_bc, bc_letter};
+use crate::h1::{h1_base, comm_relators};
 use crate::h3::{psi_assoc, psi_ublock, psi_bcblock, lemma_psi_assoc_valid};
-use crate::cohen_h2::{h2_pred, c_symbol, s_relators_valid};
+use crate::h3_ii::{family_II_lhs, family_II_rhs, family_II_relator};
+use crate::higman_consequences::lemma_w_bc_split;
+use crate::cohen_h2::{h2_pred, h2_pred_relator, c_symbol, s_relators_valid, s_realizes,
+    lemma_h2_pred_valid};
+use crate::h3_ii::lemma_family_II_relator_valid;
+use crate::cohen_cs4::lemma_family_II_relator_in_h2_pred;
 use crate::cohen_cs4b::{s_strip, h2_noS_pred, h2_noS_pred_relator, lemma_s_strip_valid,
     lemma_strip_fixes_noc_word, lemma_strip_symbol_c, lemma_strip_symbol_noc};
 use crate::cohen_retraction::no_c_word;
@@ -336,6 +348,338 @@ pub proof fn lemma_cs5_backward(
         // h2_noS = K_M ∨ comm ∨ family_ii ⟹ h2_pred = K_M ∨ comm ∨ is_S ∨ family_ii.
     }
     lemma_pred_equiv_relator_mono(p1, p2, aw, empty_word());
+}
+
+// ============================================================================
+// CS-5c (von-Dyck kernel) — a finite→pred equivalence lift, and the bc-von-Dyck
+// word identity (the EASY half of the forward; the hard recognition is the next brick).
+// ============================================================================
+
+/// Convert one finite derivation step to a predicate step carrying the relator WORD.
+pub open spec fn pred_step_of_finite(fp: Presentation, step: DerivationStep) -> PredDerivationStep {
+    match step {
+        DerivationStep::FreeReduce { position } => PredDerivationStep::FreeReduce { position },
+        DerivationStep::FreeExpand { position, symbol } =>
+            PredDerivationStep::FreeExpand { position, symbol },
+        DerivationStep::RelatorInsert { position, relator_index, inverted } =>
+            PredDerivationStep::RelatorInsert {
+                position, relator: fp.relators[relator_index as int], inverted },
+        DerivationStep::RelatorDelete { position, relator_index, inverted } =>
+            PredDerivationStep::RelatorDelete {
+                position, relator: fp.relators[relator_index as int], inverted },
+    }
+}
+
+/// The step-by-step conversion of a finite derivation.
+pub open spec fn conv_steps(fp: Presentation, steps: Seq<DerivationStep>) -> Seq<PredDerivationStep> {
+    Seq::new(steps.len(), |i: int| pred_step_of_finite(fp, steps[i]))
+}
+
+/// A successful finite step replays as the converted predicate step (same result), when `pp` has at
+/// least as many generators and accepts every `fp` relator.
+proof fn lemma_apply_step_from_finite(
+    fp: Presentation, pp: PredPresentation, w: Word, step: DerivationStep,
+)
+    requires
+        fp.num_generators <= pp.num_generators,
+        forall|i: int| 0 <= i < fp.relators.len() ==> (pp.relators)(#[trigger] fp.relators[i]),
+        apply_step(fp, w, step) is Some,
+    ensures
+        apply_step_pred(pp, w, pred_step_of_finite(fp, step)) == apply_step(fp, w, step),
+{
+    match step {
+        DerivationStep::FreeReduce { position } => {},
+        DerivationStep::FreeExpand { position, symbol } => {
+            assert(symbol_valid(symbol, fp.num_generators));
+            assert(symbol_valid(symbol, pp.num_generators)) by {
+                assert(generator_index(symbol) < fp.num_generators);
+            }
+        },
+        DerivationStep::RelatorInsert { position, relator_index, inverted } => {
+            assert(0 <= relator_index < fp.relators.len());
+            assert((pp.relators)(fp.relators[relator_index as int]));
+            assert(get_relator_pred(fp.relators[relator_index as int], inverted)
+                == get_relator(fp, relator_index, inverted));
+        },
+        DerivationStep::RelatorDelete { position, relator_index, inverted } => {
+            assert(0 <= relator_index < fp.relators.len());
+            assert((pp.relators)(fp.relators[relator_index as int]));
+            assert(get_relator_pred(fp.relators[relator_index as int], inverted)
+                == get_relator(fp, relator_index, inverted));
+        },
+    }
+}
+
+/// A finite derivation replays as its converted predicate derivation.
+proof fn lemma_pred_produces_from_finite(
+    fp: Presentation, pp: PredPresentation, steps: Seq<DerivationStep>, start: Word, end: Word,
+)
+    requires
+        fp.num_generators <= pp.num_generators,
+        forall|i: int| 0 <= i < fp.relators.len() ==> (pp.relators)(#[trigger] fp.relators[i]),
+        derivation_produces(fp, steps, start) == Some(end),
+    ensures
+        pred_derivation_produces(pp, conv_steps(fp, steps), start) == Some(end),
+    decreases steps.len(),
+{
+    if steps.len() == 0 {
+        assert(conv_steps(fp, steps) =~= Seq::<PredDerivationStep>::empty());
+    } else {
+        let step = steps.first();
+        let next = apply_step(fp, start, step).unwrap();
+        assert(apply_step(fp, start, step) == Some(next));
+        lemma_apply_step_from_finite(fp, pp, start, step);
+        let cs = conv_steps(fp, steps);
+        assert(cs.first() == pred_step_of_finite(fp, step)) by { assert(steps[0] == step); }
+        assert(cs.drop_first() =~= conv_steps(fp, steps.drop_first())) by {
+            assert forall|k: int| 0 <= k < cs.drop_first().len()
+                implies cs.drop_first()[k] == conv_steps(fp, steps.drop_first())[k] by {
+                assert(cs.drop_first()[k] == cs[k + 1]);
+                assert(steps.drop_first()[k] == steps[k + 1]);
+            }
+        }
+        assert(apply_step_pred(pp, start, cs.first()) == Some(next));
+        lemma_pred_produces_from_finite(fp, pp, steps.drop_first(), next, end);
+    }
+}
+
+/// **Finite→pred equivalence lift.** If `pp` accepts every relator of the finite `fp` (and has at
+/// least as many generators), an `fp`-equivalence lifts to a `pp`-equivalence. Used to bring
+/// Layer-1 / soundness facts (proven over finite `h1_base` etc.) up to the predicate base `h2_pred`.
+pub proof fn lemma_pred_equiv_from_finite(
+    fp: Presentation, pp: PredPresentation, w1: Word, w2: Word,
+)
+    requires
+        fp.num_generators <= pp.num_generators,
+        forall|i: int| 0 <= i < fp.relators.len() ==> (pp.relators)(#[trigger] fp.relators[i]),
+        equiv_in_presentation(fp, w1, w2),
+    ensures
+        equiv_in_pred_presentation(pp, w1, w2),
+{
+    let d = choose|d: Derivation| derivation_valid(fp, d, w1, w2);
+    lemma_pred_produces_from_finite(fp, pp, d.steps, w1, w2);
+    let pd = PredDerivation { steps: conv_steps(fp, d.steps) };
+    assert(pred_derivation_valid(pp, pd, w1, w2));
+}
+
+/// `h2_pred` accepts every `h1_base` relator (K_M ∨ comm), and has one more generator (`p`) —
+/// so any `h1_base`-equivalence lifts to `h2_pred`.
+proof fn lemma_h1_base_lifts_to_h2_pred(
+    mm: ModMachine, n: nat, m: nat, is_S: spec_fn(Word) -> bool, w1: Word, w2: Word,
+)
+    requires
+        equiv_in_presentation(h1_base(mm, n), w1, w2),
+    ensures
+        equiv_in_pred_presentation(h2_pred(mm, n, m, is_S), w1, w2),
+{
+    let nk = g_m(mm).num_generators;
+    let fp = h1_base(mm, n);
+    let pp = h2_pred(mm, n, m, is_S);
+    lemma_g_m_num_generators(mm);
+    assert(fp.num_generators == h1_num_gens(nk, n));
+    assert(pp.num_generators == h2_num_gens(nk, n));
+    assert(fp.num_generators <= pp.num_generators);   // nk+2n+1 ≤ nk+2n+2
+    assert(fp.relators == g_m(mm).relators + comm_relators(nk, n));
+    assert forall|i: int| 0 <= i < fp.relators.len()
+        implies (pp.relators)(#[trigger] fp.relators[i]) by {
+        let r = fp.relators[i];
+        assert((pp.relators)(r) == h2_pred_relator(mm, n, m, is_S, r));
+        if i < g_m(mm).relators.len() {
+            assert(r == g_m(mm).relators[i]);
+            assert(g_m(mm).relators.contains(r));   // witness i
+        } else {
+            let j = i - g_m(mm).relators.len();
+            assert(r == comm_relators(nk, n)[j]);
+            assert(comm_relators(nk, n).contains(r));   // witness j
+        }
+    }
+    lemma_pred_equiv_from_finite(fp, pp, w1, w2);
+}
+
+/// **`w_α(c) ≡_{h2_pred} ε`** for `(α,0)∈H₀` (via the realization hypothesis): `s_realizes` puts
+/// `w_α(c)` into `S`, hence it is an `h2_pred` relator, hence `≡ ε`.
+pub proof fn lemma_cs5_wc_trivial(
+    mm: ModMachine, n: nat, m: nat, is_S: spec_fn(Word) -> bool, alpha: nat,
+)
+    requires
+        s_realizes(is_S, mm, n, m),
+        numbers_word(n, m, alpha),
+        mm_in_H0(mm, alpha, 0),
+    ensures
+        equiv_in_pred_presentation(h2_pred(mm, n, m, is_S),
+            w_c(c_base(g_m(mm).num_generators), n, m, alpha), empty_word()),
+{
+    let nk = g_m(mm).num_generators;
+    let wc = w_c(c_base(nk), n, m, alpha);
+    assert(is_S(wc));                                  // s_realizes at alpha (trigger is_S(w_c(..)))
+    assert((h2_pred(mm, n, m, is_S).relators)(wc)) by {
+        assert((h2_pred(mm, n, m, is_S).relators)(wc) == h2_pred_relator(mm, n, m, is_S, wc));
+    }
+    lemma_pred_relator_is_identity(h2_pred(mm, n, m, is_S), wc);
+}
+
+/// **`w_α(bc) ≡_{h2_pred} w_α(b)·w_α(c)`** — the soundness split (`lemma_w_bc_split`, over `h1_base`)
+/// lifted to the predicate base.
+pub proof fn lemma_cs5_wbc_split_pred(
+    mm: ModMachine, n: nat, m: nat, is_S: spec_fn(Word) -> bool, alpha: nat,
+)
+    requires
+        numbers_word(n, m, alpha),
+        2 * n < m,
+    ensures
+        equiv_in_pred_presentation(h2_pred(mm, n, m, is_S),
+            w_bc(b_base(g_m(mm).num_generators, n), c_base(g_m(mm).num_generators), n, m, alpha),
+            w_b(b_base(g_m(mm).num_generators, n), n, m, alpha)
+                + w_c(c_base(g_m(mm).num_generators), n, m, alpha)),
+{
+    lemma_w_bc_split(mm, n, m, alpha);
+    lemma_h1_base_lifts_to_h2_pred(mm, n, m, is_S,
+        w_bc(b_base(g_m(mm).num_generators, n), c_base(g_m(mm).num_generators), n, m, alpha),
+        w_b(b_base(g_m(mm).num_generators, n), n, m, alpha)
+            + w_c(c_base(g_m(mm).num_generators), n, m, alpha));
+}
+
+/// **Generic right-cancel.** `a·b⁻¹ ≡ ε ⟹ a ≡ b` (in any valid predicate presentation, for valid
+/// words). Bridges a relator `≡ ε` to the equality of its two halves.
+pub proof fn lemma_pred_cancel_inverse_right(p: PredPresentation, a: Word, b: Word)
+    requires
+        equiv_in_pred_presentation(p, concat(a, inverse_word(b)), empty_word()),
+        word_valid(a, p.num_generators),
+        word_valid(b, p.num_generators),
+        pred_presentation_valid(p),
+    ensures
+        equiv_in_pred_presentation(p, a, b),
+{
+    let xx = concat(concat(a, inverse_word(b)), b);
+    // xx ≡ concat(ε, b) = b.
+    lemma_pred_equiv_concat_left(p, concat(a, inverse_word(b)), empty_word(), b);
+    assert(concat(empty_word(), b) =~= b);
+    // xx = concat(a, concat(b⁻¹, b))  [assoc];  b⁻¹·b ≡ ε ⟹ xx ≡ a·ε = a.
+    lemma_concat_assoc(a, inverse_word(b), b);
+    lemma_pred_word_inverse_left(p, b);
+    lemma_pred_equiv_concat_right(p, a, concat(inverse_word(b), b), empty_word());
+    assert(concat(a, empty_word()) =~= a);
+    // flip xx ≡ a → a ≡ xx (needs word_valid(xx)), then transitive a ≡ xx ≡ b.
+    lemma_inverse_word_valid(b, p.num_generators);
+    lemma_concat_word_valid(a, inverse_word(b), p.num_generators);
+    lemma_concat_word_valid(concat(a, inverse_word(b)), b, p.num_generators);
+    lemma_pred_equiv_symmetric(p, xx, a);
+    lemma_pred_equiv_transitive(p, a, xx, b);
+}
+
+/// `w_α(bc)` is a valid word over `ng ≥ max(b_base,c_base)+n` (recursive, mirror of `lemma_w_c_valid`;
+/// each `bc_letter(d)` is a ≤2-symbol word with indices in the `b`/`c` blocks).
+proof fn lemma_w_bc_valid(b_base: nat, c_base: nat, n: nat, m: nat, alpha: nat, ng: nat)
+    requires
+        numbers_word(n, m, alpha),
+        b_base + n <= ng,
+        c_base + n <= ng,
+        2 * n < m,
+    ensures
+        word_valid(w_bc(b_base, c_base, n, m, alpha), ng),
+    decreases alpha,
+{
+    if alpha == 0 || m <= 1 {
+        assert(w_bc(b_base, c_base, n, m, alpha) =~= empty_word());
+    } else {
+        let d = alpha % m;                                   // 1 ≤ d ≤ 2n
+        vstd::arithmetic::div_mod::lemma_div_decreases(alpha as int, m as int);
+        lemma_w_bc_valid(b_base, c_base, n, m, alpha / m, ng);
+        let pref = w_bc(b_base, c_base, n, m, alpha / m);
+        let last = bc_letter(b_base, c_base, n, d);
+        assert(w_bc(b_base, c_base, n, m, alpha) =~= pref + last);
+        assert(word_valid(last, ng)) by {
+            assert forall|k: int| 0 <= k < last.len()
+                implies symbol_valid(#[trigger] last[k], ng) by {
+                // d ∈ [1, 2n]: both letters land in the b/c blocks, indices < base+n ≤ ng.
+            }
+        }
+        assert forall|k: int| #![trigger (pref + last)[k]] 0 <= k < (pref + last).len()
+            implies symbol_valid((pref + last)[k], ng) by {
+            if k < pref.len() { assert((pref + last)[k] == pref[k]); }
+            else { assert((pref + last)[k] == last[k - pref.len()]); }
+        }
+    }
+}
+
+/// The `b_col`-image of the A₊ p-relation `R_α`, in config-form: `t_α w_α(bc) d` (vs the family-(II)
+/// rhs `t_α w_α(b) d`). The bc-von-Dyck atom shows the corresponding relator `≡ ε`.
+pub open spec fn family_II_bc_rhs(mm: ModMachine, n: nat, m: nat, alpha: nat) -> Word {
+    let nk = g_m(mm).num_generators;
+    config_word(alpha, 0) + w_bc(b_base(nk, n), c_base(nk), n, m, alpha)
+        + seq![Symbol::Gen(d_idx(nk, n))]
+}
+
+/// **CS-5c bc-von-Dyck atom (config form).** For `(α,0)∈H₀` and `numbers_word(α)`, the bc-version of
+/// the family-(II) relator `p⁻¹ t_α p · (t_α w_α(bc) d)⁻¹ ≡_{h2_pred} ε`. This is the image of the A₊
+/// p-relation `R_α` under `b_col` (`b_j ↦ b_j c_j`), the well-definedness obligation of the von-Dyck
+/// forward: `w_α(bc) = w_α(b) w_α(c)` and `w_α(c) ≡ ε` collapse it to the family-(II) relator (CS-4a).
+pub proof fn lemma_cs5_bc_config_trivial(
+    mm: ModMachine, n: nat, m: nat, is_S: spec_fn(Word) -> bool, alpha: nat,
+)
+    requires
+        mod_machine_wf(mm),
+        2 * n < m,
+        s_relators_valid(is_S, g_m(mm).num_generators, n),
+        s_realizes(is_S, mm, n, m),
+        numbers_word(n, m, alpha),
+        mm_in_H0(mm, alpha, 0),
+    ensures
+        equiv_in_pred_presentation(h2_pred(mm, n, m, is_S),
+            family_II_lhs(mm, n, alpha) + inverse_word(family_II_bc_rhs(mm, n, m, alpha)),
+            empty_word()),
+{
+    let nk = g_m(mm).num_generators;
+    let p2 = h2_pred(mm, n, m, is_S);
+    let lhs = family_II_lhs(mm, n, alpha);
+    let rhs = family_II_rhs(mm, n, m, alpha);
+    let bcrhs = family_II_bc_rhs(mm, n, m, alpha);
+    let config = config_word(alpha, 0);
+    let wb = w_b(b_base(nk, n), n, m, alpha);
+    let wc = w_c(c_base(nk), n, m, alpha);
+    let wbc = w_bc(b_base(nk, n), c_base(nk), n, m, alpha);
+    let dw: Word = seq![Symbol::Gen(d_idx(nk, n))];
+    assert(rhs == config + wb + dw);
+    assert(bcrhs == config + wbc + dw);
+
+    // --- Step A: lhs ≡ rhs, from family_II_relator(α) = lhs·rhs⁻¹ ≡ ε (CS-4a). ---
+    lemma_family_II_relator_in_h2_pred(mm, n, m, is_S, alpha);
+    assert(family_II_relator(mm, n, m, alpha) == concat(lhs, inverse_word(rhs)));
+    lemma_h2_pred_valid(mm, n, m, is_S);
+    lemma_g_m_num_generators(mm);
+    lemma_family_II_relator_valid(mm, n, m, alpha, h2_num_gens(nk, n));   // word_valid(lhs), (rhs)
+    assert(p2.num_generators == h2_num_gens(nk, n));
+    lemma_pred_cancel_inverse_right(p2, lhs, rhs);          // lhs ≡ rhs
+
+    // --- Step B: rhs ≡ bcrhs, from wbc ≡ wb (split + wc≡ε). ---
+    lemma_cs5_wbc_split_pred(mm, n, m, is_S, alpha);          // wbc ≡ wb·wc
+    lemma_cs5_wc_trivial(mm, n, m, is_S, alpha);             // wc ≡ ε
+    lemma_pred_equiv_concat_right(p2, wb, wc, empty_word());  // wb·wc ≡ wb·ε
+    assert(concat(wb, empty_word()) =~= wb);
+    lemma_pred_equiv_transitive(p2, wbc, concat(wb, wc), wb); // wbc ≡ wb
+    // config·wbc ≡ config·wb, then ·dw.
+    lemma_pred_equiv_concat_right(p2, config, wbc, wb);
+    lemma_pred_equiv_concat_left(p2, concat(config, wbc), concat(config, wb), dw);
+    assert(bcrhs == concat(concat(config, wbc), dw));
+    assert(rhs == concat(concat(config, wb), dw));
+    // bcrhs ≡ rhs.
+
+    // --- Step C: lhs ≡ rhs ≡ bcrhs, then lhs·bcrhs⁻¹ ≡ bcrhs·bcrhs⁻¹ ≡ ε. ---
+    // word_valid(bcrhs) for the symmetric flip: config (over 3) + w_bc + [d], all < h2_num_gens.
+    lemma_config_word_valid(alpha, 0);
+    lemma_word_valid_mono(config, 3, h2_num_gens(nk, n));
+    lemma_w_bc_valid(b_base(nk, n), c_base(nk), n, m, alpha, h2_num_gens(nk, n));
+    assert(word_valid(dw, h2_num_gens(nk, n))) by { assert(d_idx(nk, n) < h2_num_gens(nk, n)); }
+    lemma_concat_word_valid(config, wbc, h2_num_gens(nk, n));
+    lemma_concat_word_valid(concat(config, wbc), dw, h2_num_gens(nk, n));
+    assert(word_valid(bcrhs, h2_num_gens(nk, n)));
+    lemma_pred_equiv_symmetric(p2, bcrhs, rhs);
+    lemma_pred_equiv_transitive(p2, lhs, rhs, bcrhs);        // lhs ≡ bcrhs
+    lemma_pred_equiv_concat_left(p2, lhs, bcrhs, inverse_word(bcrhs));
+    lemma_pred_word_inverse_right(p2, bcrhs);                // bcrhs·bcrhs⁻¹ ≡ ε
+    lemma_pred_equiv_transitive(p2, concat(lhs, inverse_word(bcrhs)),
+        concat(bcrhs, inverse_word(bcrhs)), empty_word());
+    assert(lhs + inverse_word(bcrhs) == concat(lhs, inverse_word(bcrhs)));
 }
 
 } // verus!
