@@ -28,11 +28,14 @@ use crate::benign::{apply_embedding, apply_embedding_symbol, lemma_apply_embeddi
 use crate::homomorphism::{HomomorphismData, apply_hom, apply_hom_symbol, is_valid_homomorphism,
     lemma_hom_preserves_equiv};
 use crate::free_basis::{comp_images, lemma_apply_hom_embedding_compose};
-use crate::machine_group::{ModMachine, g_m, g_subgens, g_m_associations, lemma_g_m_num_generators,
-    lemma_g_m_associations_valid, lemma_g_m_valid, lemma_word_valid_mono, lemma_cancel_pair_equiv_empty};
+use crate::machine_group::{ModMachine, g_m, g_subgens, g_m_associations, config_word,
+    lemma_g_m_num_generators, lemma_g_m_associations_valid, lemma_g_m_valid, lemma_word_valid_mono,
+    lemma_cancel_pair_equiv_empty, lemma_config_word_valid};
 use crate::layout::{h1_num_gens, h2_num_gens, c_base, b_base, d_idx, p_idx, b_idx, c_idx};
 use crate::h1::{h1_base, comm_relators, comm_relator, lemma_h1_base_valid, lemma_h1_base_num_generators};
-use crate::h3::{psi_assoc, psi_ublock, psi_bcblock};
+use crate::h3::{psi_assoc, psi_ublock, psi_bcblock, lemma_single_gen_valid};
+use crate::word_numbering::{w_b, numbers_word, lemma_w_c_valid};
+use crate::hnn::{HNNData, hnn_data_valid};
 use crate::cohen_cs5::{k_a_col, k_b_col};
 
 verus! {
@@ -734,6 +737,75 @@ proof fn lemma_comp_rho_acol_identity(mm: ModMachine, n: nat, i: int)
         }
         reveal_with_fuel(apply_hom, 2);
         assert(apply_hom(rho, am[i]) =~= seq![Symbol::Gen(i as nat)]);
+    }
+}
+
+// ============================================================================
+// Step 3a — `base_A_plus_data` : the machine-scheme HNN (analog of `pa_data`/`recog_data`).
+// Base = `base_A_plus_base` (= g_m∗free(d,b_j)); one p-association per `slice` index, in the
+// MACHINE-SCHEME layout (b's at `nk..nk+n−1`, d at `nk+n`) — so the rhs uses `w_b(nk, …)` and
+// `[Gen(nk+n)]`, NOT the h2 `w_b(nk+n, …)`/`[Gen(nk+2n)]`. The peel (step 3d) produces
+// `relabel(w) ≡_{hnn_presentation(base_A_plus_data(H₀-slice))} ε`; `a_col_machine` carries it to the
+// h2-layout `recog_data` (step 3b). The `slice` is H₀-restricted (needed by step-4 von-Dyck + the
+// step-3c intersection); validity needs only `numbers_word` per index.
+// ============================================================================
+
+/// The machine-scheme family-(II) rhs `t_β · w_β(b) · d` over the `base_A_plus_base` layout
+/// (b-base `nk`, d at `nk+n`). Maps under `a_col_machine` to the h2 `family_II_rhs` (step 3b).
+pub open spec fn assoc_rhs_machine(mm: ModMachine, n: nat, m: nat, beta: nat) -> Word {
+    let nk = g_m(mm).num_generators;
+    config_word(beta, 0) + w_b(nk, n, m, beta) + seq![Symbol::Gen((nk + n) as nat)]
+}
+
+/// The machine-scheme p-associations: `(t_β, t_β w_β(b) d)` for each `β` in `slice`.
+pub open spec fn base_A_plus_assoc(mm: ModMachine, n: nat, m: nat, slice: Seq<nat>) -> Seq<(Word, Word)> {
+    Seq::new(slice.len(), |i: int| (config_word(slice[i], 0), assoc_rhs_machine(mm, n, m, slice[i])))
+}
+
+/// **`base_A₊ = HNN(g_m∗free(d,b_j), p | R_β : β∈slice)`** — the recognized group (machine scheme).
+pub open spec fn base_A_plus_data(mm: ModMachine, n: nat, m: nat, slice: Seq<nat>) -> HNNData {
+    HNNData { base: base_A_plus_base(mm, n), associations: base_A_plus_assoc(mm, n, m, slice) }
+}
+
+/// Structural facts: base has `nk+n+1` gens, `|slice|` associations.
+pub proof fn lemma_base_A_plus_data_shape(mm: ModMachine, n: nat, m: nat, slice: Seq<nat>)
+    ensures
+        base_A_plus_data(mm, n, m, slice).base.num_generators == g_m(mm).num_generators + n + 1,
+        base_A_plus_data(mm, n, m, slice).associations.len() == slice.len(),
+{
+}
+
+/// **`base_A_plus_data` is a valid HNN datum.** Base valid (step-2 `lemma_base_A_plus_base_valid`);
+/// each association word valid over `nk+n+1`: `config(β,0)` uses gens {0,1}⊂nk; `w_b(nk,…)` the
+/// b-block `[nk, nk+n)`; `d = nk+n`. Mirror of `lemma_pa_data_valid`.
+pub proof fn lemma_base_A_plus_data_valid(mm: ModMachine, n: nat, m: nat, slice: Seq<nat>)
+    requires
+        2 * n < m,
+        forall|i: int| 0 <= i < slice.len() ==> numbers_word(n, m, #[trigger] slice[i]),
+    ensures
+        hnn_data_valid(base_A_plus_data(mm, n, m, slice)),
+{
+    let nk = g_m(mm).num_generators;
+    let ng = (nk + n + 1) as nat;
+    let data = base_A_plus_data(mm, n, m, slice);
+    lemma_base_A_plus_base_valid(mm, n);
+    assert(data.base.num_generators == ng);
+    let assocs = base_A_plus_assoc(mm, n, m, slice);
+    assert forall|i: int| #![trigger assocs[i]] 0 <= i < assocs.len() implies
+        word_valid(assocs[i].0, ng) && word_valid(assocs[i].1, ng) by {
+        let beta = slice[i];
+        assert(assocs[i] == (config_word(beta, 0), assoc_rhs_machine(mm, n, m, beta)));
+        // a-column: config(β,0) valid over 3 ≤ nk+n+1.
+        lemma_config_word_valid(beta, 0);                   // word_valid(·, 3)
+        lemma_word_valid_mono(config_word(beta, 0), 3, ng);
+        // b-column: config · w_b(nk,…) · [Gen(nk+n)].
+        lemma_w_c_valid(nk, n, m, beta, ng);                // w_b = w_c; nk + n ≤ ng
+        lemma_single_gen_valid((nk + n) as nat, ng);        // [Gen(nk+n)], nk+n < ng
+        lemma_concat_word_valid(config_word(beta, 0), w_b(nk, n, m, beta), ng);
+        lemma_concat_word_valid(config_word(beta, 0) + w_b(nk, n, m, beta),
+            seq![Symbol::Gen((nk + n) as nat)], ng);
+        assert(assoc_rhs_machine(mm, n, m, beta)
+            =~= (config_word(beta, 0) + w_b(nk, n, m, beta)) + seq![Symbol::Gen((nk + n) as nat)]);
     }
 }
 
