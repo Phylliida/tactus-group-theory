@@ -314,6 +314,33 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > before building (the "no undesigned directions" rule). The a-von-Dyck tail itself is free (CS-4a's
 > `lemma_a_col_relator_trivial_pred` works for ANY number-word slice).
 >
+> **✅ CS-4 COMPLETE 2026-06-23 (session 23) — `hnn_pred_associations_isomorphic(cs4_data(l))` for all
+> a-levels `1≤l≤2n`.** CS-4d backward (`cohen_cs4c.rs::lemma_cs4d_backward` 19/0) resolved the 0-head
+> /σ-preimage wrinkle via `M2_general` (σ-restriction recognized INSIDE the source-recursion,
+> `cohen_cs4d_recog.rs` + `r_prime_b.rs`); §4.1 turned out unneeded. CS-4e tower lift
+> (`cohen_cs4e.rs::lemma_cs4e_iso_upto` 3/0): base-faithfulness up the a-tower
+> (`lemma_h3_pred_upto_base_faithful`, downward induction in `l`) sandwiches `(★)` over `h2_pred`.
+> See `docs/cohen-cs4-architecture.md` §5 + `docs/cohen-cs4d-blueprint.md`.
+>
+> **✅ CS-5 STARTED 2026-06-23 (session 24) — the k von-Dyck iso `A₊≅A₋`, BACKWARD + von-Dyck KERNEL
+> DONE (`cohen_cs5.rs` 15/0).** `docs/cohen-cs5-blueprint.md` (Route 1 = full Prop-1.34 recognition,
+> co-designed w/ Danielle: the non-free `U`-base rules out a cheap predicate collapse). The target
+> `hnn_pred_associations_isomorphic(h3_pred_data)` reduces (CS-4e base-faithfulness at `k=2n`) to
+> `(★k): emb(a_col,w)≡_{h2_pred}ε ⟺ emb(b_col,w)≡_{h2_pred}ε`, `a_col=[U,d,b_j,p]`, `b_col=[U,d,b_jc_j,p]`.
+> Shipped: **CS-5a/b** (commit 540cba7) = scaffold (`s_realizes`, `k_a_col`/`k_b_col`) + two generic
+> pred helpers (`lemma_apply_hom_pred_embedding_compose`, `lemma_pred_equiv_relator_mono`) + **the
+> BACKWARD** `lemma_cs5_backward` = Cohen's c-killing endo, REUSING CS-4b `s_strip` (`s_strip∘b_col =
+> a_col` pointwise) + monotonicity lift `h2_noS→h2_pred`. **CS-5c von-Dyck KERNEL** (commit e92e776) =
+> the clearly-correct half of the FORWARD: a generic **finite→pred equivalence lift**
+> (`lemma_pred_equiv_from_finite`), `lemma_pred_cancel_inverse_right`, `lemma_cs5_wc_trivial`
+> (`w_α(c)≡ε` via `s_realizes`), `lemma_cs5_wbc_split_pred` (lifting the soundness `w_bc` split), and
+> **`lemma_cs5_bc_config_trivial`** = the bc-von-Dyck atom `p⁻¹t_α p·(t_α w_α(bc) d)⁻¹ ≡_{h2_pred} ε`
+> for `(α,0)∈H₀` (the `emb(b_col,R_α)` triviality). Crate gate 2473/20 (baseline-only errors). **NEXT =
+> CS-5c RECOGNITION** (`emb(a_col,w)≡_{h2_pred}ε ⟹ w≡_{A₊_pres}ε`, the HARD half): adapt CS-4's
+> `lemma_map_a_forward` Britton-peel of `p` over `h2_pred` with property-(vii) (`config(α,0)∈⟨U⟩ ⟺
+> (α,0)∈H₀`, via `lemma_vii_subset`+`lemma_theorem1`) at the pinch middle, in place of CS-4's
+> config-family membership (`docs/cohen-cs5-blueprint.md` §4) → **CS-5d** (tower lift, mirror CS-4e).
+>
 > **✅ FORK-A STARTED 2026-06-23 (session 14) — elementary foundation arc DONE, ports VERBATIM.**
 > The completeness route is **Fork-A** (predicate presentation; the textbook route per
 > `docs/cohen-faithfulness-primary-source.md` §1/§10). Go taken on the standing "follow the textbook"
