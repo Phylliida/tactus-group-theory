@@ -21,12 +21,17 @@
 use vstd::prelude::*;
 use crate::word::*;
 use crate::symbol::*;
-use crate::presentation::Presentation;
+use crate::presentation::{Presentation, presentation_valid, equiv_in_presentation};
+use crate::presentation_lemmas::lemma_relator_is_identity;
 use crate::benign::{apply_embedding, apply_embedding_symbol, lemma_apply_embedding_concat,
     lemma_apply_embedding_inverse};
+use crate::homomorphism::{HomomorphismData, apply_hom, apply_hom_symbol, is_valid_homomorphism,
+    lemma_hom_preserves_equiv};
+use crate::free_basis::{comp_images, lemma_apply_hom_embedding_compose};
 use crate::machine_group::{ModMachine, g_m, g_subgens, g_m_associations, lemma_g_m_num_generators,
-    lemma_g_m_associations_valid};
-use crate::layout::{h2_num_gens, d_idx, p_idx, b_idx, c_idx};
+    lemma_g_m_associations_valid, lemma_g_m_valid, lemma_word_valid_mono, lemma_cancel_pair_equiv_empty};
+use crate::layout::{h1_num_gens, h2_num_gens, c_base, b_base, d_idx, p_idx, b_idx, c_idx};
+use crate::h1::{h1_base, comm_relators, comm_relator, lemma_h1_base_valid, lemma_h1_base_num_generators};
 use crate::h3::{psi_assoc, psi_ublock, psi_bcblock};
 use crate::cohen_cs5::{k_a_col, k_b_col};
 
@@ -434,6 +439,337 @@ pub proof fn lemma_emb_b_col_via_relabel(mm: ModMachine, n: nat, w: Word)
     lemma_b_col_factors(mm, n);
     assert(apply_embedding(k_b_col(mm, n), w)
         =~= apply_embedding(comp_emb(b_col_machine(mm, n), relabel_col(mm, n)), w));
+}
+
+// ============================================================================
+// Step 2 — the base-case faithfulness retraction `ρ : h1_base → base_A_plus_base`.
+// A c-free machine-scheme base-word trivial in `h1_base` is trivial in `g_m∗free(d,b_j)`. The tool
+// is the c-killing retraction (kill c, fix machine, shift b/d down by n into the c-free layout).
+// ============================================================================
+
+/// `inverse_word([s]) = [inverse_symbol(s)]` (singleton, in `seq!` form).
+proof fn lemma_inverse_word_singleton(s: Symbol)
+    ensures
+        inverse_word(seq![s]) =~= seq![inverse_symbol(s)],
+{
+    assert(seq![s] =~= Seq::new(1, |_i: int| s));
+    lemma_inverse_singleton(s);
+    assert(Seq::new(1, |_i: int| inverse_symbol(s)) =~= seq![inverse_symbol(s)]);
+}
+
+/// Generic: `apply_hom(h, w) = apply_embedding(h.generator_images, w)` (same recursion).
+proof fn lemma_apply_hom_eq_emb(h: HomomorphismData, w: Word)
+    ensures
+        apply_hom(h, w) =~= apply_embedding(h.generator_images, w),
+    decreases w.len(),
+{
+    if w.len() == 0 {
+    } else {
+        lemma_apply_hom_eq_emb(h, w.drop_first());
+        assert(apply_hom_symbol(h, w.first()) == apply_embedding_symbol(h.generator_images, w.first()))
+        by {
+            match w.first() {
+                Symbol::Gen(i) => {},
+                Symbol::Inv(i) => {},
+            }
+        }
+    }
+}
+
+/// Generic: an embedding whose first `k` images are `[Gen(i)]` fixes any `k`-valid word.
+proof fn lemma_emb_identity_prefix(imgs: Seq<Word>, w: Word, k: nat)
+    requires
+        word_valid(w, k),
+        forall|i: int| 0 <= i < k ==> #[trigger] imgs[i] =~= seq![Symbol::Gen(i as nat)],
+    ensures
+        apply_embedding(imgs, w) =~= w,
+    decreases w.len(),
+{
+    if w.len() == 0 {
+        assert(apply_embedding(imgs, w) =~= empty_word());
+        assert(w =~= empty_word());
+    } else {
+        let s = w.first();
+        let rest = w.drop_first();
+        assert(symbol_valid(s, k)) by { assert(w[0] == s); }
+        assert(word_valid(rest, k)) by {
+            assert forall|j: int| 0 <= j < rest.len() implies symbol_valid(#[trigger] rest[j], k) by {
+                assert(rest[j] == w[j + 1]);
+            }
+        }
+        lemma_emb_identity_prefix(imgs, rest, k);
+        let g = generator_index(s);
+        assert(g < k);
+        assert(imgs[g as int] =~= seq![Symbol::Gen(g)]);
+        assert(apply_embedding_symbol(imgs, s) =~= seq![s]) by {
+            match s {
+                Symbol::Gen(gg) => { assert(apply_embedding_symbol(imgs, s) == imgs[gg as int]); },
+                Symbol::Inv(gg) => {
+                    assert(apply_embedding_symbol(imgs, s) == inverse_word(imgs[gg as int]));
+                    assert(imgs[gg as int] =~= seq![Symbol::Gen(g)]);
+                    lemma_inverse_word_singleton(Symbol::Gen(g));
+                    assert(inverse_symbol(Symbol::Gen(g)) == Symbol::Inv(g));
+                    assert(inverse_word(imgs[gg as int]) =~= seq![Symbol::Inv(g)]);
+                    assert(seq![s] =~= seq![Symbol::Inv(g)]);
+                },
+            }
+        }
+        assert(apply_embedding(imgs, w)
+            =~= concat(apply_embedding_symbol(imgs, s), apply_embedding(imgs, rest)));
+        assert(apply_embedding(imgs, w) =~= concat(seq![s], rest));
+        assert(concat(seq![s], rest) =~= w);
+    }
+}
+
+/// The c-killing retraction `ρ : h1_base → base_A_plus_base`. Machine gen `i<nk ↦ [Gen(i)]`;
+/// c gen (`nk≤i<nk+n`) `↦ ε`; b/d gen (`i≥nk+n`) `↦ [Gen(i−n)]` (down-shift into the c-free layout).
+pub open spec fn base_retraction(mm: ModMachine, n: nat) -> HomomorphismData {
+    let nk = g_m(mm).num_generators;
+    HomomorphismData {
+        source: h1_base(mm, n),
+        target: base_A_plus_base(mm, n),
+        generator_images: Seq::new(h1_num_gens(nk, n), |g: int| {
+            if g < nk {
+                seq![Symbol::Gen(g as nat)]
+            } else if g < nk + n {
+                empty_word()
+            } else {
+                seq![Symbol::Gen((g - n) as nat)]
+            }
+        }),
+    }
+}
+
+/// `base_A_plus_base` is a valid presentation (g_m's relators, lifted to `nk+n+1` gens).
+pub proof fn lemma_base_A_plus_base_valid(mm: ModMachine, n: nat)
+    ensures
+        presentation_valid(base_A_plus_base(mm, n)),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_valid(mm);
+    reveal(presentation_valid);
+    let p = base_A_plus_base(mm, n);
+    assert forall|i: int| 0 <= i < p.relators.len()
+        implies word_valid(#[trigger] p.relators[i], p.num_generators) by {
+        assert(p.relators[i] == g_m(mm).relators[i]);
+        assert(word_valid(g_m(mm).relators[i], nk));
+        lemma_word_valid_mono(g_m(mm).relators[i], nk, (nk + n + 1) as nat);
+    }
+}
+
+/// `ρ` fixes a machine word (valid over `nk`): `apply_hom(ρ, r) = r`.
+proof fn lemma_rho_fixes_machine_word(mm: ModMachine, n: nat, r: Word)
+    requires
+        word_valid(r, g_m(mm).num_generators),
+    ensures
+        apply_hom(base_retraction(mm, n), r) =~= r,
+{
+    let nk = g_m(mm).num_generators;
+    let rho = base_retraction(mm, n);
+    lemma_apply_hom_eq_emb(rho, r);
+    assert forall|i: int| 0 <= i < nk
+        implies #[trigger] rho.generator_images[i] =~= seq![Symbol::Gen(i as nat)] by {}
+    lemma_emb_identity_prefix(rho.generator_images, r, nk);
+}
+
+/// `ρ` sends a comm relator to a self-cancelling pair `[Gen(g), Inv(g)] ≡ ε` (`g = b_idx − n`).
+proof fn lemma_rho_on_comm(mm: ModMachine, n: nat, bi: nat, cj: nat)
+    requires
+        1 <= bi <= n,
+        1 <= cj <= n,
+    ensures
+        equiv_in_presentation(base_A_plus_base(mm, n),
+            apply_hom(base_retraction(mm, n), comm_relator(g_m(mm).num_generators, n, bi, cj)),
+            empty_word()),
+{
+    let nk = g_m(mm).num_generators;
+    let rho = base_retraction(mm, n);
+    let bb = b_idx(nk, n, bi);
+    let cc = c_idx(nk, cj);
+    let comm = comm_relator(nk, n, bi, cj);
+    assert(comm =~= seq![Symbol::Gen(bb), Symbol::Gen(cc), Symbol::Inv(bb), Symbol::Inv(cc)]);
+    // index ranges: bb ∈ [nk+n, nk+2n), cc ∈ [nk, nk+n).
+    assert(bb == b_base(nk, n) + (bi - 1) && b_base(nk, n) == nk + n);
+    assert(cc == c_base(nk) + (cj - 1) && c_base(nk) == nk);
+    assert(nk + n <= bb < nk + 2 * n);
+    assert(nk <= cc < nk + n);
+    let g = (bb - n) as nat;
+    // per-symbol action of ρ.
+    assert(rho.generator_images[bb as int] =~= seq![Symbol::Gen(g)]);
+    assert(rho.generator_images[cc as int] =~= empty_word());
+    assert(apply_hom_symbol(rho, Symbol::Gen(bb)) =~= seq![Symbol::Gen(g)]);
+    assert(apply_hom_symbol(rho, Symbol::Gen(cc)) =~= empty_word());
+    assert(apply_hom_symbol(rho, Symbol::Inv(bb)) =~= seq![Symbol::Inv(g)]) by {
+        assert(apply_hom_symbol(rho, Symbol::Inv(bb)) == inverse_word(rho.generator_images[bb as int]));
+        assert(rho.generator_images[bb as int] =~= seq![Symbol::Gen(g)]);
+        lemma_inverse_word_singleton(Symbol::Gen(g));
+        assert(inverse_symbol(Symbol::Gen(g)) == Symbol::Inv(g));
+    }
+    assert(apply_hom_symbol(rho, Symbol::Inv(cc)) =~= empty_word()) by {
+        assert(apply_hom_symbol(rho, Symbol::Inv(cc)) == inverse_word(rho.generator_images[cc as int]));
+        assert(inverse_word(empty_word()) =~= empty_word());
+    }
+    // unfold apply_hom over the 4-symbol word.
+    reveal_with_fuel(apply_hom, 5);
+    assert(apply_hom(rho, comm) =~= seq![Symbol::Gen(g), Symbol::Inv(g)]);
+    // self-cancelling pair ≡ ε.
+    assert(is_inverse_pair(Symbol::Gen(g), Symbol::Inv(g)));
+    lemma_cancel_pair_equiv_empty(base_A_plus_base(mm, n), Symbol::Gen(g), Symbol::Inv(g));
+}
+
+/// `ρ` is a valid homomorphism `h1_base → base_A_plus_base`.
+pub proof fn lemma_base_retraction_valid(mm: ModMachine, n: nat)
+    ensures
+        is_valid_homomorphism(base_retraction(mm, n)),
+{
+    let nk = g_m(mm).num_generators;
+    let rho = base_retraction(mm, n);
+    lemma_h1_base_valid(mm, n);
+    lemma_h1_base_num_generators(mm, n);
+    lemma_base_A_plus_base_valid(mm, n);
+    assert(rho.source.num_generators == h1_num_gens(nk, n));
+    assert(rho.generator_images.len() == h1_num_gens(nk, n));
+    assert(rho.target.num_generators == nk + n + 1);
+    // images valid over nk+n+1.
+    assert forall|i: int| 0 <= i < rho.generator_images.len()
+        implies word_valid(#[trigger] rho.generator_images[i], (nk + n + 1) as nat) by {
+        if i < nk {
+            assert(rho.generator_images[i] =~= seq![Symbol::Gen(i as nat)]);
+        } else if i < nk + n {
+            assert(rho.generator_images[i] =~= empty_word());
+        } else {
+            assert(rho.generator_images[i] =~= seq![Symbol::Gen((i - n) as nat)]);
+            assert(i - n < nk + n + 1);   // i < h1_num_gens = nk+2n+1 ⟹ i-n < nk+n+1
+        }
+    }
+    // relators map to ≡ ε.
+    let gr = g_m(mm).relators;
+    assert(rho.source.relators == gr + comm_relators(nk, n));
+    assert forall|i: int| 0 <= i < rho.source.relators.len()
+        implies equiv_in_presentation(rho.target, apply_hom(rho, #[trigger] rho.source.relators[i]),
+            empty_word()) by {
+        if i < gr.len() {
+            // K_M relator: ρ fixes it; it is a base_A_plus_base relator (index i).
+            assert(rho.source.relators[i] == gr[i]);
+            lemma_g_m_valid(mm);
+            reveal(presentation_valid);
+            assert(word_valid(gr[i], nk));
+            lemma_rho_fixes_machine_word(mm, n, gr[i]);
+            assert(base_A_plus_base(mm, n).relators[i] == gr[i]);
+            lemma_relator_is_identity(base_A_plus_base(mm, n), i);
+        } else {
+            // comm relator: ρ kills the c, leaves b·b⁻¹ ≡ ε.
+            let j = i - gr.len();
+            assert(rho.source.relators[i] == comm_relators(nk, n)[j]);
+            assert(comm_relators(nk, n)[j]
+                == comm_relator(nk, n, (j / (n as int) + 1) as nat, (j % (n as int) + 1) as nat));
+            let bi = (j / (n as int) + 1) as nat;
+            let cj = (j % (n as int) + 1) as nat;
+            assert(comm_relators(nk, n).len() == n * n);
+            assert(0 <= j < n * n);
+            assert(n > 0) by { if n == 0 { assert(n * n == 0); } }
+            vstd::arithmetic::div_mod::lemma_multiply_divide_lt(j, n as int, n as int);
+            vstd::arithmetic::div_mod::lemma_div_pos_is_pos(j, n as int);
+            vstd::arithmetic::div_mod::lemma_mod_bound(j, n as int);
+            assert(1 <= bi <= n);
+            assert(1 <= cj <= n);
+            lemma_rho_on_comm(mm, n, bi, cj);
+        }
+    }
+}
+
+/// `comp_images(ρ, a_col_machine)[i] = [Gen(i)]` for each base gen `i ≤ nk+n` (the retraction
+/// inverts the inclusion on the base generators).
+proof fn lemma_comp_rho_acol_identity(mm: ModMachine, n: nat, i: int)
+    requires
+        0 <= i < g_m(mm).num_generators + n + 1,
+    ensures
+        comp_images(base_retraction(mm, n), a_col_machine(mm, n))[i]
+            =~= seq![Symbol::Gen(i as nat)],
+{
+    let nk = g_m(mm).num_generators;
+    let rho = base_retraction(mm, n);
+    let am = a_col_machine(mm, n);
+    lemma_machine_col_len(mm, n);
+    assert(comp_images(rho, am)[i] == apply_hom(rho, am[i]));
+    if i < nk {
+        // a_col_machine[i] = [Gen(i)], ρ([Gen(i)]) = [Gen(i)].
+        assert(am[i] =~= seq![Symbol::Gen(i as nat)]) by {
+            assert(am[i] == Seq::new(nk, |i2: int| seq![Symbol::Gen(i2 as nat)])[i]);
+        }
+        assert(apply_hom_symbol(rho, Symbol::Gen(i as nat)) =~= seq![Symbol::Gen(i as nat)]) by {
+            assert(rho.generator_images[i] =~= seq![Symbol::Gen(i as nat)]);
+        }
+        reveal_with_fuel(apply_hom, 2);
+        assert(apply_hom(rho, am[i]) =~= seq![Symbol::Gen(i as nat)]);
+    } else if i < nk + n {
+        // a_col_machine[i] = [Gen(b_idx(.., i-nk+1))] = [Gen(n+i)]; ρ([Gen(n+i)]) = [Gen(i)].
+        let jj = (i - nk) as int;
+        assert(am[i] =~= seq![Symbol::Gen(b_idx(nk, n, (jj + 1) as nat))]) by {
+            assert(am[i] == Seq::new(n, |j2: int| seq![Symbol::Gen(b_idx(nk, n, (j2 + 1) as nat))])[jj]);
+        }
+        assert(b_idx(nk, n, (jj + 1) as nat) == nk + n + jj);
+        assert(b_idx(nk, n, (jj + 1) as nat) == n + i);
+        assert(apply_hom_symbol(rho, Symbol::Gen((n + i) as nat)) =~= seq![Symbol::Gen(i as nat)]) by {
+            assert(n + i >= nk + n);
+            assert(rho.generator_images[n + i] =~= seq![Symbol::Gen(((n + i) - n) as nat)]);
+            assert(((n + i) - n) as nat == i as nat);
+        }
+        reveal_with_fuel(apply_hom, 2);
+        assert(apply_hom(rho, am[i]) =~= seq![Symbol::Gen(i as nat)]);
+    } else {
+        // i == nk+n (d): a_col_machine[nk+n] = [Gen(d_idx=nk+2n)]; ρ([Gen(nk+2n)]) = [Gen(nk+n)].
+        assert(i == nk + n);
+        assert(am[i] =~= seq![Symbol::Gen(d_idx(nk, n))]) by {
+            assert(am[i] == ((Seq::new(nk, |i2: int| seq![Symbol::Gen(i2 as nat)])
+                + Seq::new(n, |j2: int| seq![Symbol::Gen(b_idx(nk, n, (j2 + 1) as nat))]))
+                + seq![ seq![Symbol::Gen(d_idx(nk, n))] ])[i]);
+        }
+        assert(d_idx(nk, n) == nk + 2 * n);
+        assert(apply_hom_symbol(rho, Symbol::Gen(d_idx(nk, n))) =~= seq![Symbol::Gen(i as nat)]) by {
+            assert(d_idx(nk, n) >= nk + n);
+            assert(rho.generator_images[d_idx(nk, n) as int]
+                =~= seq![Symbol::Gen((d_idx(nk, n) - n) as nat)]);
+            assert((d_idx(nk, n) - n) as nat == i as nat);
+        }
+        reveal_with_fuel(apply_hom, 2);
+        assert(apply_hom(rho, am[i]) =~= seq![Symbol::Gen(i as nat)]);
+    }
+}
+
+/// **CS-5c base-case faithfulness.** A machine-scheme base-word whose `a_col_machine`-image is trivial
+/// in `h1_base` is trivial in `base_A_plus_base = g_m∗free(d,b_j)`. (Apply `ρ`; `ρ∘a_col_machine = id`
+/// on base gens.) The base case of the step-3 p-peel.
+pub proof fn lemma_cs5_base_case_faithful(mm: ModMachine, n: nat, w_base: Word)
+    requires
+        word_valid(w_base, (g_m(mm).num_generators + n + 1) as nat),
+        equiv_in_presentation(h1_base(mm, n),
+            apply_embedding(a_col_machine(mm, n), w_base), empty_word()),
+    ensures
+        equiv_in_presentation(base_A_plus_base(mm, n), w_base, empty_word()),
+{
+    let nk = g_m(mm).num_generators;
+    let rho = base_retraction(mm, n);
+    let am = a_col_machine(mm, n);
+    let img = apply_embedding(am, w_base);
+    lemma_machine_col_len(mm, n);
+    lemma_base_retraction_valid(mm, n);
+    // push the h1_base-triviality through ρ.
+    lemma_hom_preserves_equiv(rho, img, empty_word());
+    assert(apply_hom(rho, empty_word()) =~= empty_word());
+    assert(equiv_in_presentation(base_A_plus_base(mm, n), apply_hom(rho, img), empty_word()));
+    // apply_hom(ρ, emb(am, w_base)) = emb(comp_images(ρ, am), w_base) = w_base.
+    assert(word_valid(w_base, am.len())) by {
+        lemma_word_valid_mono(w_base, (nk + n + 1) as nat, am.len());
+    }
+    lemma_apply_hom_embedding_compose(rho, am, w_base);
+    let comp = comp_images(rho, am);
+    assert forall|i: int| 0 <= i < nk + n + 1
+        implies #[trigger] comp[i] =~= seq![Symbol::Gen(i as nat)] by {
+        lemma_comp_rho_acol_identity(mm, n, i);
+    }
+    lemma_emb_identity_prefix(comp, w_base, (nk + n + 1) as nat);
+    assert(apply_hom(rho, img) =~= w_base);
 }
 
 } // verus!
