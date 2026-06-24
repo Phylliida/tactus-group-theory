@@ -43,8 +43,10 @@ use crate::cohen_h2::{h2_pred, h2_pred_relator, c_symbol, s_relators_valid, s_re
 use crate::h3_ii::lemma_family_II_relator_valid;
 use crate::cohen_cs4::lemma_family_II_relator_in_h2_pred;
 use crate::cohen_cs4b::{s_strip, h2_noS_pred, h2_noS_pred_relator, lemma_s_strip_valid,
-    lemma_strip_fixes_noc_word, lemma_strip_symbol_c, lemma_strip_symbol_noc};
-use crate::cohen_retraction::no_c_word;
+    lemma_strip_fixes_noc_word, lemma_strip_symbol_c, lemma_strip_symbol_noc, lemma_cs4b_compactness};
+use crate::cohen_retraction::{no_c_word, lemma_no_c_inverse, lemma_no_c_concat};
+use crate::h3_ii::h2_II;
+use crate::benign::lemma_apply_embedding_valid;
 
 verus! {
 
@@ -680,6 +682,164 @@ pub proof fn lemma_cs5_bc_config_trivial(
     lemma_pred_equiv_transitive(p2, concat(lhs, inverse_word(bcrhs)),
         concat(bcrhs, inverse_word(bcrhs)), empty_word());
     assert(lhs + inverse_word(bcrhs) == concat(lhs, inverse_word(bcrhs)));
+}
+
+// ============================================================================
+// CS-5c (recognition OPENING) — `emb(a_col, w)` is c-free, so the forward triviality
+// over the infinite `h2_pred` reduces to a finite slice (the compactness bridge).
+// The HARD recognition core (the Britton-peel of `p` with property-(vii) at the pinch
+// middle, blueprint §4) consumes this finite-slice triviality.
+// ============================================================================
+
+/// Each `a_col` (= `psi_assoc.0`) entry is a c-free word: U entries are machine words (index `< nk =
+/// c_base`); `d`, `b_j`, `p` are single gens at index `≥ c_base + n`.
+proof fn lemma_k_a_col_entry_no_c(mm: ModMachine, n: nat, i: int)
+    requires
+        0 <= i < psi_assoc(mm, n).len(),
+    ensures
+        no_c_word(g_m(mm).num_generators, n, k_a_col(mm, n)[i]),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    assert(c_base(nk) == nk);
+    let up = psi_ublock(mm);
+    let dpair: Seq<(Word, Word)> =
+        seq![(seq![Symbol::Gen(d_idx(nk, n))], seq![Symbol::Gen(d_idx(nk, n))])];
+    let bc = psi_bcblock(nk, n);
+    let ppair: Seq<(Word, Word)> =
+        seq![(seq![Symbol::Gen(p_idx(nk, n))], seq![Symbol::Gen(p_idx(nk, n))])];
+    let nu = g_subgens(mm).len();
+    assert(up.len() == nu);
+    assert(bc.len() == n);
+    assert(psi_assoc(mm, n) =~= ((up + dpair) + bc) + ppair);
+    assert(k_a_col(mm, n)[i] == psi_assoc(mm, n)[i].0);
+
+    if i < nu {
+        assert(((up + dpair) + bc)[i] == (up + dpair)[i]);
+        assert((up + dpair)[i] == up[i]);
+        assert(up[i] == (g_subgens(mm)[i], g_subgens(mm)[i]));
+        let u = g_subgens(mm)[i];
+        lemma_g_m_associations_valid(mm);
+        assert(u == g_m_associations(mm)[i].1);
+        assert(word_valid(u, (3 + mm.quads.len()) as nat));
+        assert(no_c_word(nk, n, u)) by {
+            assert forall|t: int| 0 <= t < u.len() implies !c_symbol(nk, n, #[trigger] u[t]) by {
+                assert(symbol_valid(u[t], (3 + mm.quads.len()) as nat));
+                assert(generator_index(u[t]) < (3 + mm.quads.len()) as nat);   // < nk = c_base
+            }
+        }
+    } else if i == nu {
+        assert(((up + dpair) + bc)[i] == (up + dpair)[i]);
+        assert((up + dpair)[i] == dpair[i - nu]);
+        let dw: Word = seq![Symbol::Gen(d_idx(nk, n))];
+        assert(k_a_col(mm, n)[i] == dw);
+        assert(no_c_word(nk, n, dw)) by {
+            assert(!c_symbol(nk, n, dw[0])) by { assert(generator_index(dw[0]) == d_idx(nk, n)); }
+        }
+    } else if i < nu + 1 + n {
+        assert(((up + dpair) + bc)[i] == bc[i - (nu + 1)]);
+        let j = (i - nu) as nat;
+        assert(i - (nu + 1) == (j - 1) as int);
+        let bj = Symbol::Gen(crate::layout::b_idx(nk, n, j));
+        let cj = Symbol::Gen(crate::layout::c_idx(nk, j));
+        assert(bc[(j - 1) as int] == (seq![bj], seq![bj, cj]));
+        assert(k_a_col(mm, n)[i] == seq![bj]);
+        assert(no_c_word(nk, n, seq![bj])) by {
+            assert(!c_symbol(nk, n, bj)) by {
+                assert(generator_index(bj) == crate::layout::b_idx(nk, n, j));
+                assert(crate::layout::b_idx(nk, n, j) == nk + n + (j - 1));   // ≥ c_base + n
+            }
+        }
+    } else {
+        assert(i == ((up + dpair) + bc).len());
+        let pw: Word = seq![Symbol::Gen(p_idx(nk, n))];
+        assert(psi_assoc(mm, n)[i] == ppair[0]);
+        assert(k_a_col(mm, n)[i] == pw);
+        assert(no_c_word(nk, n, pw)) by {
+            assert(!c_symbol(nk, n, pw[0])) by { assert(generator_index(pw[0]) == p_idx(nk, n)); }
+        }
+    }
+}
+
+/// `emb(a_col, w)` is c-free (each image entry is c-free; inversion/concatenation preserve it).
+/// Mirror of CS-4c's `lemma_emb_a_words_no_c`.
+proof fn lemma_emb_k_a_col_no_c(mm: ModMachine, n: nat, w: Word)
+    requires
+        word_valid(w, psi_assoc(mm, n).len()),
+    ensures
+        no_c_word(g_m(mm).num_generators, n, apply_embedding(k_a_col(mm, n), w)),
+    decreases w.len(),
+{
+    let nk = g_m(mm).num_generators;
+    let ac = k_a_col(mm, n);
+    assert(ac.len() == psi_assoc(mm, n).len());
+    if w.len() == 0 {
+        assert(apply_embedding(ac, w) =~= empty_word());
+    } else {
+        let s = w.first();
+        let rest = w.drop_first();
+        let g = generator_index(s);
+        assert(symbol_valid(s, ac.len())) by { assert(w[0] == s); }
+        assert(g < ac.len());
+        lemma_k_a_col_entry_no_c(mm, n, g as int);             // no_c_word(nk, n, ac[g])
+        assert(no_c_word(nk, n, apply_embedding_symbol(ac, s))) by {
+            match s {
+                Symbol::Gen(gg) => { assert(apply_embedding_symbol(ac, s) == ac[gg as int]); },
+                Symbol::Inv(gg) => {
+                    assert(apply_embedding_symbol(ac, s) == inverse_word(ac[gg as int]));
+                    lemma_no_c_inverse(nk, n, ac[gg as int]);
+                },
+            }
+        }
+        assert(word_valid(rest, ac.len())) by {
+            assert forall|k: int| 0 <= k < rest.len()
+                implies symbol_valid(#[trigger] rest[k], ac.len()) by {
+                assert(rest[k] == w[k + 1]);
+            }
+        }
+        lemma_emb_k_a_col_no_c(mm, n, rest);
+        assert(apply_embedding(ac, w)
+            =~= concat(apply_embedding_symbol(ac, s), apply_embedding(ac, rest)));
+        lemma_no_c_concat(nk, n, apply_embedding_symbol(ac, s), apply_embedding(ac, rest));
+    }
+}
+
+/// **CS-5c recognition opening.** A forward triviality `emb(a_col, w) ≡_{h2_pred} ε` reduces to a
+/// finite slice: `emb(a_col, w)` is c-free, so the compactness bridge (CS-4b) gives a number-word
+/// slice `alphas` with `emb(a_col, w) ≡_{h2_II(alphas)} ε`. The next brick (the recognition core,
+/// blueprint §4) peels `p` over this finite slice with property-(vii) at the pinch middle.
+pub proof fn lemma_cs5_recog_compactness(
+    mm: ModMachine, n: nat, m: nat, is_S: spec_fn(Word) -> bool, w: Word,
+)
+    requires
+        2 * n < m,
+        s_relators_valid(is_S, g_m(mm).num_generators, n),
+        word_valid(w, psi_assoc(mm, n).len()),
+        equiv_in_pred_presentation(h2_pred(mm, n, m, is_S),
+            apply_embedding(k_a_col(mm, n), w), empty_word()),
+    ensures
+        exists|alphas: Seq<nat>|
+            (forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]))
+            && equiv_in_presentation(h2_II(mm, n, m, alphas),
+                apply_embedding(k_a_col(mm, n), w), empty_word()),
+{
+    let nk = g_m(mm).num_generators;
+    let ac = k_a_col(mm, n);
+    let u = apply_embedding(ac, w);
+    lemma_g_m_num_generators(mm);
+    // u is c-free.
+    lemma_emb_k_a_col_no_c(mm, n, w);
+    // u is valid over h2_num_gens (each a_col entry is valid; w valid over ac.len()).
+    lemma_psi_assoc_valid(mm, n, h2_num_gens(nk, n));
+    assert(ac.len() == psi_assoc(mm, n).len());
+    assert forall|i: int| 0 <= i < ac.len()
+        implies word_valid(#[trigger] ac[i], h2_num_gens(nk, n)) by {
+        assert(ac[i] == psi_assoc(mm, n)[i].0);
+    }
+    assert(word_valid(w, ac.len()));
+    lemma_apply_embedding_valid(ac, w, h2_num_gens(nk, n));
+    // compactness.
+    lemma_cs4b_compactness(mm, n, m, is_S, u);
 }
 
 } // verus!
