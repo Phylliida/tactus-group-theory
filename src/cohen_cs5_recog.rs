@@ -72,6 +72,7 @@ use crate::f_free::is_free_family;
 use crate::free_basis::lemma_config_emb_free;
 use crate::higman_operations::lemma_free_group_valid;
 use crate::phi_l_forward::lemma_intersection_property;
+use crate::britton_via_tower::{is_stable, has_adjacent_opposite_at};
 
 verus! {
 
@@ -2889,6 +2890,71 @@ pub proof fn lemma_cs5_middle_h0_restrict_b(mm: ModMachine, n: nat, m: nat, slic
 
     // ---- 9. mid_w ≡_bp A ⟹ mid_w ∈ ⟨assoc_rhs_emb(hf)⟩ ----
     lemma_in_subgroup_respects_equiv(bp, assoc_rhs_emb(mm, n, m, hf), av, mid_w);
+}
+
+// ============================================================================
+// Brick D (3d) — the SEGMENT-WISE INVARIANT (blueprint §7.3).  Every maximal stable-free run of the
+// word being peeled lies in `⟨ublock_db_gens⟩` (= `⟨g_subgens,d,b⟩`) over `base_A_plus_base`. This is
+// the combinatorial property that supplies the `∈⟨U,d,b⟩` hypothesis for C2 / C2-b at each pinch
+// middle, WITHOUT circularity (it tracks the reduction-sequence's word structure, not group
+// membership in A₊).  This file defines the invariant + the middle-extraction (the direction Brick E
+// consumes); the base case + pinch-out preservation are the remaining Brick D work.
+// ============================================================================
+
+/// `s` is the `base_A_plus_data` stable letter `p^± = Gen/Inv(nk+n+1)` (slice/m-independent — every
+/// `base_A_plus_data(…,slice)` shares the base `base_A_plus_base(mm,n)` with `nk+n+1` generators).
+pub open spec fn seg_stable(mm: ModMachine, n: nat, s: Symbol) -> bool {
+    let p = (g_m(mm).num_generators + n + 1) as nat;
+    s == Symbol::Gen(p) || s == Symbol::Inv(p)
+}
+
+/// **The segment invariant.** Every maximal stable-free run `wm[a..b]` (bounded by `p^±` letters or
+/// the word ends, stable-free inside) lies in `⟨ublock_db_gens⟩` over `base_A_plus_base`.
+pub open spec fn seg_inv(mm: ModMachine, n: nat, wm: Word) -> bool {
+    forall|a: int, b: int|
+        (0 <= a <= b <= wm.len()
+            && (a == 0 || seg_stable(mm, n, wm[a - 1]))
+            && (b == wm.len() || seg_stable(mm, n, wm[b]))
+            && (forall|k: int| a <= k < b ==> !seg_stable(mm, n, wm[k])))
+        ==> #[trigger] in_generated_subgroup(base_A_plus_base(mm, n), ublock_db_gens(mm, n),
+                wm.subrange(a, b))
+}
+
+/// `seg_stable` agrees with `is_stable` over any `base_A_plus_data(…,slice)` (same base gen count).
+pub proof fn lemma_seg_stable_iff(mm: ModMachine, n: nat, m: nat, slice: Seq<nat>, s: Symbol)
+    ensures
+        seg_stable(mm, n, s) <==> is_stable(base_A_plus_data(mm, n, m, slice), s),
+{
+    lemma_base_A_plus_data_shape(mm, n, m, slice);
+    assert(base_A_plus_data(mm, n, m, slice).base.num_generators == g_m(mm).num_generators + n + 1);
+}
+
+/// **Middle extraction** (the direction Brick E consumes): the stable-free middle `wm[i+1..j]` of a
+/// `base_A_plus_data` pinch lies in `⟨ublock_db_gens⟩`, by instantiating `seg_inv` at `(i+1, j)`.
+pub proof fn lemma_seg_inv_middle(mm: ModMachine, n: nat, m: nat, slice: Seq<nat>, wm: Word,
+    i: int, j: int)
+    requires
+        seg_inv(mm, n, wm),
+        has_adjacent_opposite_at(base_A_plus_data(mm, n, m, slice), wm, i, j),
+    ensures
+        in_generated_subgroup(base_A_plus_base(mm, n), ublock_db_gens(mm, n), wm.subrange(i + 1, j)),
+{
+    let data = base_A_plus_data(mm, n, m, slice);
+    assert(0 <= i < j < wm.len());
+    // boundary stables (a-1 = i, b = j).
+    lemma_seg_stable_iff(mm, n, m, slice, wm[i]);
+    lemma_seg_stable_iff(mm, n, m, slice, wm[j]);
+    assert(seg_stable(mm, n, wm[(i + 1) - 1]));
+    assert(j == wm.len() || seg_stable(mm, n, wm[j]));
+    // interior stable-free.
+    assert forall|k: int| (i + 1) <= k < j implies !seg_stable(mm, n, wm[k]) by {
+        assert(i < k < j);
+        assert(!is_stable(data, wm[k]));                     // from has_adjacent_opposite_at
+        lemma_seg_stable_iff(mm, n, m, slice, wm[k]);
+    }
+    // instantiate seg_inv at (i+1, j).
+    assert(in_generated_subgroup(base_A_plus_base(mm, n), ublock_db_gens(mm, n),
+        wm.subrange(i + 1, j)));
 }
 
 } // verus!
