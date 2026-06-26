@@ -538,7 +538,40 @@ one-line corollary, but it REUSES the a-side C2 + config coordinate survival.
 analog, threading INV; per-orientation C1+C2 / C1+C2-b) → F (the `decreases stable_count` induction +
 compactness wiring + (★k)-forward glue + CS-5d tower lift).
 
-## 7.5 — BUILD STATUS (session 29, `cohen_cs5_recog` 102/0, gate GREEN, all additive).
+## 7.6 — ✅ CS-5 COMPLETE (session 30, `cohen_cs5_recog` 114/0, gate GREEN, all additive).
+
+**CS-5 IS DONE — `lemma_cs5_iso` = `hnn_pred_associations_isomorphic(h3_pred_data)` VERIFIED.** All four
+§7.5 REMAINING items landed (each verified, committed; no `assume`/`admit`/`external_body`):
+
+1. **`lemma_a_col_machine_relator_trivial`** (item #1) — the a-side von-Dyck over the FINITE `h2_II`.
+   `a_col_machine` sends every `hnn_presentation(base_A_plus_data(slice))` relator → ε in `h2_II`:
+   K_M base relators are fixed (`lemma_a_col_machine_fixes_machine_word`) and lie in `h2_II`
+   (`lemma_h2_II_contains_gm`, made pub); HNN p-relators map to `family_II_relator(slice[jj])` (new
+   `lemma_a_col_machine_on_hnn_relator`, mirror of `lemma_a_words_on_hnn_relator`) which is an `h2_II`
+   relator for `slice[jj] ∈ {0}∪alphas`. + `lemma_betas_member`.
+2. **`lemma_cs5_recognition_forward`** (item #2) — the `p`-peel injectivity, mirror `lemma_map_a_forward`.
+   `emb(a_col_machine, wm) ≡_{h2_II} ε` + `seg_inv(wm)` ⟹ `wm ≡_{base_A_plus_data(h0_filter(betas))} ε`.
+   Base case via `lemma_cs5_base_case_faithful` (+ new `lemma_a_col_machine_base_word_valid` via the
+   `p`-truncation + prefix-agree); step via `britton_lemma_full` → `lemma_cs5_pinch_descends` →
+   `lemma_cs5_pinch_out` → item #1 + `lemma_emb_respects_source_equiv` → recurse. + `lemma_a_col_machine_img_valid`;
+   strengthened `lemma_a_col_machine_entry` with `g ≤ p_idx`. Landed FIRST TRY.
+3. **`lemma_cs5_kforward`** (item #3) — the `(★k)` FORWARD `emb(k_a_col,w)≡_{h2_pred}ε ⟹
+   emb(k_b_col,w)≡ε`. Wires compactness (`lemma_cs5_recog_compactness`) → `normalize_alphas` →
+   a-relabel bridge (`lemma_emb_a_col_via_relabel`) → recognition_forward (#2) → b-von-Dyck
+   (`lemma_cs5_vondyck_relator` via `lemma_emb_respects_source_equiv_pred`) → b-relabel bridge. +
+   validity helpers `lemma_relabel_{col_img,word}_valid`, `lemma_b_col_machine_img_valid`.
+4. **`lemma_cs5_iso`** (item #4) — `hnn_pred_associations_isomorphic(h3_pred_data)`. `lemma_cs5d_level_iff`:
+   the level-`2n` k-iff via base-faithfulness (`lemma_h3_pred_upto_base_faithful` at `k=2n`, powered by
+   ALL a-level isos `lemma_cs4e_iso_upto`) sandwiching `(★k)` (kforward #3 + `lemma_cs5_backward`).
+   `lemma_cs5_iso` assembles the forall-`w` iso. Mirror of CS-4e's `lemma_cs4e_iso_upto`.
+
+**NEXT = CS-6** (Cohen §1 final assembly): Britton descent over `h3_pred_data` (now that BOTH the a-level
+isos `lemma_cs4e_iso_upto` AND the k-level iso `lemma_cs5_iso` give `hnn_pred_associations_isomorphic` at
+every level) ∘ the CS-2 c-retraction (`lemma_h2_pred_descends_to_c`) ⟹ `C ↪ H₃` faithfulness, then
+transport to the printable finite `h3_pres` via soundness `lemma_III`. The completeness direction of
+Layer 2 is now unblocked at the group-theory level — the hard recognition arc is finished.
+
+## 7.5 — BUILD STATUS (session 29, `cohen_cs5_recog` 102/0, gate GREEN, all additive). [SUPERSEDED by §7.6]
 
 **DONE session 29 (each verified & committed, no `assume`/`admit`/`external_body`; +19 over the
 session-28 83/0 baseline):**
