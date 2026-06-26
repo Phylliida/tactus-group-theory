@@ -1496,4 +1496,90 @@ pub proof fn lemma_cs5_middle_reflect(mm: ModMachine, n: nat, cols: Seq<Word>, u
     lemma_in_subgroup_respects_equiv(bp, cols, ph, u);
 }
 
+// ============================================================================
+// Step 3c (C2 groundwork) — the `d,b`-killing projection `π : base_A_plus_base → g_m`.
+// Kills the free factor (b-block `nk..nk+n-1`, d at `nk+n`), fixes the machine gens `0..nk-1`.
+// Blueprint §7.1 step 1: reduces a recog pinch-middle that is `∈ ⟨g_subgens,d,b⟩` (the 3d
+// `⟨U,d,b,p⟩`-subgroup INVARIANT) `∩ ⟨config:slice⟩` to a g_m element `∈ ⟨g_subgens⟩ ∩ ⟨config:slice⟩`,
+// where property (vii)/(vi) + coordinate survival force the H₀-restriction.
+// ============================================================================
+
+/// `π : base_A_plus_base → g_m` — machine gen `i<nk ↦ [Gen(i)]`; free gen (`nk ≤ i ≤ nk+n`,
+/// the b-block + d) `↦ ε`. (No `p` — `base_A_plus_base` is the HNN BASE, no stable letter.)
+pub open spec fn db_projection(mm: ModMachine, n: nat) -> HomomorphismData {
+    let nk = g_m(mm).num_generators;
+    HomomorphismData {
+        source: base_A_plus_base(mm, n),
+        target: g_m(mm),
+        generator_images: Seq::new((nk + n + 1) as nat, |g: int| {
+            if g < nk { seq![Symbol::Gen(g as nat)] } else { empty_word() }
+        }),
+    }
+}
+
+/// `π` fixes a machine word (valid over `nk`): `apply_hom(π, r) = r`. (Mirror of
+/// `lemma_rho_fixes_machine_word`; `π`'s first `nk` images are `[Gen(i)]`.)
+proof fn lemma_db_proj_fixes_machine_word(mm: ModMachine, n: nat, r: Word)
+    requires
+        word_valid(r, g_m(mm).num_generators),
+    ensures
+        apply_hom(db_projection(mm, n), r) =~= r,
+{
+    let nk = g_m(mm).num_generators;
+    let pi = db_projection(mm, n);
+    lemma_apply_hom_eq_emb(pi, r);
+    assert forall|i: int| 0 <= i < nk
+        implies #[trigger] pi.generator_images[i] =~= seq![Symbol::Gen(i as nat)] by {}
+    lemma_emb_identity_prefix(pi.generator_images, r, nk);
+}
+
+/// `π` fixes a config word `t_β = config_word(β,0)` (a machine word over `3 ≤ nk` gens).
+pub proof fn lemma_db_proj_fixes_config(mm: ModMachine, n: nat, beta: nat)
+    ensures
+        apply_hom(db_projection(mm, n), config_word(beta, 0)) =~= config_word(beta, 0),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_config_word_valid(beta, 0);                       // word_valid(·, 3)
+    lemma_g_m_num_generators(mm);                           // nk = 4 + |quads| ≥ 4 > 3
+    lemma_word_valid_mono(config_word(beta, 0), 3, nk);
+    lemma_db_proj_fixes_machine_word(mm, n, config_word(beta, 0));
+}
+
+/// **`π` is a valid homomorphism `base_A_plus_base → g_m`.** Images valid over `nk` (machine gens
+/// or `ε`); `base_A_plus_base.relators == g_m.relators` (machine words `< nk`), `π` fixes each, and
+/// it is a `g_m` relator ⟹ `≡_{g_m} ε`.
+pub proof fn lemma_db_projection_valid(mm: ModMachine, n: nat)
+    ensures
+        is_valid_homomorphism(db_projection(mm, n)),
+{
+    let nk = g_m(mm).num_generators;
+    let pi = db_projection(mm, n);
+    lemma_base_A_plus_base_valid(mm, n);
+    lemma_g_m_valid(mm);
+    assert(pi.source.num_generators == nk + n + 1);
+    assert(pi.generator_images.len() == nk + n + 1);
+    assert(pi.target.num_generators == nk);                // g_m(mm).num_generators == nk by def
+    // images valid over nk.
+    assert forall|i: int| 0 <= i < pi.generator_images.len()
+        implies word_valid(#[trigger] pi.generator_images[i], nk) by {
+        if i < nk {
+            assert(pi.generator_images[i] =~= seq![Symbol::Gen(i as nat)]);
+        } else {
+            assert(pi.generator_images[i] =~= empty_word());
+        }
+    }
+    // relators map to ≡ ε.
+    let gr = g_m(mm).relators;
+    assert(pi.source.relators == gr);
+    assert forall|i: int| 0 <= i < pi.source.relators.len()
+        implies equiv_in_presentation(pi.target, apply_hom(pi, #[trigger] pi.source.relators[i]),
+            empty_word()) by {
+        assert(pi.source.relators[i] == gr[i]);
+        reveal(presentation_valid);
+        assert(word_valid(gr[i], nk));
+        lemma_db_proj_fixes_machine_word(mm, n, gr[i]);    // apply_hom(π, gr[i]) = gr[i]
+        lemma_relator_is_identity(g_m(mm), i);             // gr[i] ≡_{g_m} ε
+    }
+}
+
 } // verus!
