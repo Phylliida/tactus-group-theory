@@ -537,3 +537,65 @@ one-line corollary, but it REUSES the a-side C2 + config coordinate survival.
 → C (C2-b, the b-side) → D (segment invariant + preservation) → E (machine-scheme `lemma_map_a_pinch_descends`
 analog, threading INV; per-orientation C1+C2 / C1+C2-b) → F (the `decreases stable_count` induction +
 compactness wiring + (★k)-forward glue + CS-5d tower lift).
+
+## 7.4 — BUILD STATUS + handoff (session 28, `cohen_cs5_recog` 83/0, gate GREEN, all additive).
+
+**DONE this session (each verified & committed, no `assume`/`admit`/`external_body`):**
+- **Brick A** — `assoc_rhs_emb` + `lemma_cs5_{a,b}_col_correspondence` (recog a-col =
+  `compose(a_col_machine, config_emb(betas))`, b-col = `compose(a_col_machine, assoc_rhs_emb(betas))`).
+- **Brick B** — `lemma_in_subgroup_gens_superset` (local generic; the gen-set permutation bridge).
+- **Brick C COMPLETE** — `lemma_cs5_middle_h0_restrict_b` (the b-side H₀-restriction). Prereqs:
+  `lemma_db_proj_assoc_rhs`/`lemma_comp_pi_assoc_is_config` (π carries assoc_rhs↦config),
+  `gm_incl_bp`+`lemma_machine_subgroup_gm_to_bp` (g_m→bp machine-word lift),
+  `lemma_pi_image_in_gsubgens`, `lemma_config_emb_is_free_family_gm`, `h0_sel`+`lemma_compose_{config,assoc}_h0_sel`.
+- **Brick D (partial)** — `seg_inv` predicate + `seg_stable` + `lemma_seg_stable_iff` +
+  `lemma_seg_inv_middle` (pinch middle `wm[i+1..j]∈⟨ublock_db_gens⟩` by instantiation) +
+  **base case `lemma_seg_inv_relabel`** (relabel(w) satisfies seg_inv; via `lemma_single_gen_relabel`
+  + `relabel_col` block decomposition `lemma_relabel_col_{blocks,single_gen,nonp}` + prefix-agreement +
+  superset).
+
+**REMAINING — exact plan (do bottom-up; each verifies & commits):**
+
+**D-preservation `lemma_seg_inv_pinch_out`** (the trickiest proof — the 3-way splice). Signature:
+`seg_inv(wm)` + `has_adjacent_opposite_at(data, wm, i, j)` + `phi_g` stable-free + `phi_g∈⟨ublock_db_gens⟩`
++ `wshort = wm.subrange(0,i) + phi_g + wm.subrange(j+1, wm.len())` ⟹ `seg_inv(wshort)`. Proof: take
+arbitrary `(a,b)` maximal-run of `wshort`; the stables of `wshort` = pre's stables (`<i`) ∪ suf's
+stables (`≥i+|phi_g|`); `phi_g` is stable-free. Three cases: **(1)** run ⊆ pre-interior = a maximal
+run of `wm` (`wm[s..t]`, `s,t<i`) → IH; **(2)** run ⊆ suf-interior = maximal run of `wm` → IH; **(3)**
+the MERGED run = `pre_tail · phi_g · suf_head` where `pre_tail = wm[s..i]` (maximal run of wm,
+`wm[i]` stable) and `suf_head = wm[j+1..e]` (maximal run of wm, `wm[j]` stable) → both IH ∈⟨ublock⟩,
+`phi_g`∈⟨ublock⟩, product ∈⟨ublock⟩ (subgroup closure: need `lemma_concat_in_subgroup` /
+`lemma_product_in_subgroup`). The work is the subrange arithmetic mapping `wshort`-positions to
+`wm`-positions across the splice + identifying which case `(a,b)` is in (compare `a,b` to `i`,
+`i+|phi_g|`). Helper worth extracting: "`wshort.subrange(a,b)` = the relevant concat of ≤3 wm/phi_g
+subranges" by position arithmetic. Closure `x,y∈⟨G⟩ ⟹ x·y∈⟨G⟩` — check for an existing lemma
+(`machine_group::lemma_product_in_subgroup` is imported).
+
+**Brick E `lemma_cs5_pinch_descends`** (~250 lines, mirror `lemma_map_a_pinch_descends` `phi_l_pinch.rs:353`).
+`has_pinch(recog_data(alphas), emb(a_col_machine, wm))` + `seg_inv(wm)` ⟹
+`has_pinch(base_A_plus_data(h0_filter(betas(alphas))), wm)`. Steps: relabel-correspondence
+(`a_col_machine` single-gen relabel — `lemma_a_col_machine_*` exist; need a `lemma_a_col_machine_single_gen`
++ the stable correspondence as in `lemma_map_a_pinch_descends`); find recog pinch `(i,j)`; `wm` has
+stables at `i,j`; middle `emb(a_col_machine, wm[i+1..j])`; **a-orientation** (p⁻¹·g·p): recog middle
+∈⟨recog a-col⟩ = ⟨compose(a_col_machine, config_emb(betas))⟩ (Brick A) → **C1** `lemma_cs5_middle_reflect`
+(cols=config_emb(betas)) ⟹ `wm[i+1..j]∈⟨config_emb(betas)⟩`; `lemma_seg_inv_middle` ⟹ ∈⟨ublock_db_gens⟩;
+**C2** `lemma_cs5_middle_h0_restrict` ⟹ ∈⟨config_emb(h0_filter(betas))⟩ = base_A_plus_data a-col ⟹
+`has_pinch_at(base_A_plus_data(h0_filter(betas)), wm, i, j)`. **b-orientation** (p·g·p⁻¹): recog middle
+∈⟨recog b-col⟩ = ⟨compose(a_col_machine, assoc_rhs_emb(betas))⟩ (Brick A) → C1 (cols=assoc_rhs_emb(betas))
++ `lemma_seg_inv_middle` + **C2-b** `lemma_cs5_middle_h0_restrict_b` ⟹ ∈⟨assoc_rhs_emb(h0_filter(betas))⟩
+= base_A_plus_data b-col. NB betas/h0_filter need `numbers_word`+`no_duplicates` (betas(alphas) has both
+when alphas does ∌0). Need a `lemma_cs5_middle_reflect`-feeding `recog cols = compose(a_col_machine, …)`
+which Brick A gives. C2-b also needs `mm_terminal(mm,0,0)` (thread it).
+
+**Brick F** — `lemma_cs5_recognition_forward` (`decreases stable_count(base_A_plus_data(h0_filter(betas)),
+wm)`, threading `seg_inv(wm)`): base case (stable_count 0) = `lemma_cs5_base_case_faithful` (descend
+h2_II→h1_base via `lemma_h1_faithful_in_h2_II`, then ρ); step = E (pinch) → `lemma_pd_pinch_out`
+(generic, gives wshort + equiv) → D-preservation (seg_inv(wshort)) → `lemma_a_col_machine`-respects-relators
+(`lemma_emb_respects_source_equiv` analog: a_col_machine sends base_A_plus_data relators to h2_II ε —
+the von-Dyck-trivial direction, K_M relators self-trivial + HNN relators = family_II via 3b
+`lemma_a_col_machine_assoc_rhs`) → recurse. Then **compactness wiring** (`lemma_cs5_recog_compactness`,
+already 18/0 in cohen_cs5.rs, gives the finite slice alphas) + the relabel bridges
+(`lemma_emb_{a,b}_col_via_relabel`) → **(★k) forward** `emb(k_a_col,w)≡_{h2_pred}ε ⟹ emb(k_b_col,w)≡ε`
+(step-4 von-Dyck `lemma_cs5_vondyck_relator` DONE) → glue with backward `lemma_cs5_backward` (DONE) ⟹
+`(★k)` ⟹ **CS-5d** tower lift (reuse CS-4e `lemma_h3_pred_upto_base_faithful` at k=2n) ⟹
+`hnn_pred_associations_isomorphic(h3_pred_data)`.
