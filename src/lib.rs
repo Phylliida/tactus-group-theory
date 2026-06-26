@@ -122,6 +122,12 @@ pub mod coset_group;
 #[cfg(verus_keep_ghost)]
 pub mod todd_coxeter;
 
+// Runtime/exec Todd-Coxeter showcase, split out of todd_coxeter.rs so the ghost spec
+// layer (CosetTable, symbol_to_column, trace_word, …) can live in the clean cross-crate
+// export cone (ceer_lib.rs) without dragging in runtime + the usize::MAX exec-rejections.
+#[cfg(verus_keep_ghost)]
+pub mod todd_coxeter_rt;
+
 #[cfg(verus_keep_ghost)]
 pub mod runtime;
 
