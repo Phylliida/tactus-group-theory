@@ -605,7 +605,10 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       theorems: `lemma_II` (`p⁻¹t_α p ≡ t_α w_α(b) d`) and the **headline `lemma_III`
       (`(α,0)∈H₀(M) ⟹ w_α(c) ≡ 1`)** — Cohen's "(II),(III) are consequences of (I)", fully
       machine-checked. So `h3_pres` really is the finitely presented Higman group.
-- [ ] **COMPLETENESS — `C ↪ H₃` faithful** (`docs/brick5-completeness-plan.md`, C0 started 62/0).
+- [x] **COMPLETENESS — `C ↪ H₃` faithful — ✅ DONE 2026-06-25 via Fork-A (CS-1…CS-7).** Closed by
+      `cohen_cs7::lemma_C_faithful_printable` / `cohen_bridge::lemma_C_faithful_printable_canonical`
+      (see the §3.2 top session-31/32 blocks). **The paragraph below is the SUPERSEDED Fork-B
+      (C0–C5 / σ-orbit / virtual-iso) routing, retained as historical record — Fork-A replaced it.**
       The deep faithfulness direction. **Target CORRECTED** (2026-06-21, w/ Danielle): it is
       `h3_pres ⊢ w_α(c)=1 ⟹ w_α(c)=1 in C`, **NOT** `⟹ (α,0)∈H₀` (which conflates `S` with `ncl(S)`;
       the `(α,0)∈H₀` link lives in soundness + the §3.3 machine bridge, not in the group-theoretic
