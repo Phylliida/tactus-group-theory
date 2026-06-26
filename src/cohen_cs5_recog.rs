@@ -66,7 +66,8 @@ use crate::cohen_h2::{h2_pred, h2_pred_relator, s_relators_valid, s_realizes, le
 use crate::cohen_cs5::{k_a_col, k_b_col, family_II_bc_rhs, lemma_cs5_bc_config_trivial};
 use crate::h3_ii::{recog_data, family_II_assoc};
 use crate::h2::{p_assoc, td_word};
-use crate::f_free_a1::{betas, lemma_betas_index};
+use crate::f_free_a1::{betas, lemma_betas_index, lemma_betas_numbers_word, lemma_betas_no_duplicates};
+use crate::britton_via_tower::{has_pinch, has_pinch_at};
 use crate::machine_group::lemma_config_word_zero;
 use crate::f_free::is_free_family;
 use crate::free_basis::lemma_config_emb_free;
@@ -3225,6 +3226,105 @@ proof fn lemma_seg_inv_run_in_ub(mm: ModMachine, n: nat, wm: Word, a: int, b: in
     assert(in_generated_subgroup(base_A_plus_base(mm, n), ublock_db_gens(mm, n), wm.subrange(a, b)));
 }
 
+// ----------------------------------------------------------------------------
+// Brick E groundwork — `a_col_machine` as a single-gen relabel (mirror `a_words`).
+// ----------------------------------------------------------------------------
+
+/// `a_col_machine[i]` is a single generator `[Gen(g)]`, and `g` is the recog stable letter `p_idx`
+/// IFF `i` is the machine stable letter index `nk+n+1`.  (The block layout: machine gens `0..nk`,
+/// b-block `nk..nk+n`, `d = nk+n`, `p = nk+n+1`; images stay `< p_idx` except at the `p` slot.)
+proof fn lemma_a_col_machine_entry(mm: ModMachine, n: nat, i: int) -> (g: nat)
+    requires
+        0 <= i < g_m(mm).num_generators + n + 2,
+    ensures
+        a_col_machine(mm, n)[i] == seq![Symbol::Gen(g)],
+        g == p_idx(g_m(mm).num_generators, n) <==> i == g_m(mm).num_generators + n + 1,
+{
+    let nk = g_m(mm).num_generators;
+    let am = a_col_machine(mm, n);
+    let blk_m = Seq::new(nk, |i2: int| seq![Symbol::Gen(i2 as nat)]);
+    let blk_b = Seq::new(n, |jj: int| seq![Symbol::Gen(b_idx(nk, n, (jj + 1) as nat))]);
+    let blk_d: Seq<Word> = seq![ seq![Symbol::Gen(d_idx(nk, n))] ];
+    let blk_p: Seq<Word> = seq![ seq![Symbol::Gen(p_idx(nk, n))] ];
+    assert(am =~= ((blk_m + blk_b) + blk_d) + blk_p);
+    assert(blk_m.len() == nk && blk_b.len() == n);
+    if i < nk {
+        assert(((blk_m + blk_b) + blk_d)[i] == (blk_m + blk_b)[i]);
+        assert((blk_m + blk_b)[i] == blk_m[i]);
+        assert(am[i] == seq![Symbol::Gen(i as nat)]);
+        (i as nat)
+    } else if i < nk + n {
+        let j = i - nk;
+        assert(((blk_m + blk_b) + blk_d)[i] == (blk_m + blk_b)[i]);
+        assert((blk_m + blk_b)[i] == blk_b[j]);
+        assert(b_idx(nk, n, (j + 1) as nat) == nk + n + j);             // < nk+2n < p_idx
+        assert(am[i] == seq![Symbol::Gen((nk + n + j) as nat)]);
+        (nk + n + j) as nat
+    } else if i == nk + n {
+        assert(((blk_m + blk_b) + blk_d)[i] == blk_d[0]);
+        assert(d_idx(nk, n) == nk + 2 * n);                            // != p_idx = nk+2n+1
+        assert(am[i] == seq![Symbol::Gen(d_idx(nk, n))]);
+        d_idx(nk, n)
+    } else {
+        assert(i == nk + n + 1);
+        assert(am[i] == blk_p[0]);
+        assert(am[i] == seq![Symbol::Gen(p_idx(nk, n))]);
+        p_idx(nk, n)
+    }
+}
+
+/// `a_col_machine` is a length-`nk+n+2` single-generator relabel.
+proof fn lemma_a_col_machine_single_gen(mm: ModMachine, n: nat)
+    ensures
+        a_col_machine(mm, n).len() == g_m(mm).num_generators + n + 2,
+        forall|i: int| 0 <= i < a_col_machine(mm, n).len() ==>
+            exists|g: nat| #[trigger] a_col_machine(mm, n)[i] == seq![Symbol::Gen(g)],
+{
+    lemma_machine_col_len(mm, n);
+    assert forall|i: int| 0 <= i < a_col_machine(mm, n).len()
+        implies exists|g: nat| #[trigger] a_col_machine(mm, n)[i] == seq![Symbol::Gen(g)] by {
+        let g = lemma_a_col_machine_entry(mm, n, i);
+        assert(a_col_machine(mm, n)[i] == seq![Symbol::Gen(g)]);
+    }
+}
+
+/// **The relabel preserves the machine stable letter exactly**: `relabel_symbol(a_col_machine, s)` is
+/// the recog stable letter `Gen/Inv(p_idx)` IFF `s` is the machine stable letter `Gen/Inv(nk+n+1)`.
+/// Transfers `has_adjacent_opposite_at` between `recog_data` and `base_A_plus_data` at the same index.
+proof fn lemma_a_col_machine_relabel_sym(mm: ModMachine, n: nat, s: Symbol)
+    requires
+        symbol_valid(s, (g_m(mm).num_generators + n + 2) as nat),
+    ensures
+        ({ let nk = g_m(mm).num_generators;
+           &&& (relabel_symbol(a_col_machine(mm, n), s) == Symbol::Gen(p_idx(nk, n))
+                 <==> s == Symbol::Gen((nk + n + 1) as nat))
+           &&& (relabel_symbol(a_col_machine(mm, n), s) == Symbol::Inv(p_idx(nk, n))
+                 <==> s == Symbol::Inv((nk + n + 1) as nat)) }),
+{
+    let nk = g_m(mm).num_generators;
+    let am = a_col_machine(mm, n);
+    let i = generator_index(s);
+    lemma_machine_col_len(mm, n);
+    assert(0 <= i < nk + n + 2);
+    let g = lemma_a_col_machine_entry(mm, n, i as int);
+    assert(am[i as int] == seq![Symbol::Gen(g)]);
+    assert(am[i as int][0] == Symbol::Gen(g));
+    // g == p_idx  ⟺  i == nk+n+1.
+    match s {
+        Symbol::Gen(ii) => {
+            assert(ii == i);
+            assert(relabel_symbol(am, s) == am[i as int][0]);
+            assert(relabel_symbol(am, s) == Symbol::Gen(g));
+        },
+        Symbol::Inv(ii) => {
+            assert(ii == i);
+            assert(relabel_symbol(am, s) == inverse_symbol(am[i as int][0]));
+            assert(inverse_symbol(Symbol::Gen(g)) == Symbol::Inv(g));
+            assert(relabel_symbol(am, s) == Symbol::Inv(g));
+        },
+    }
+}
+
 /// **Brick D preservation:** `seg_inv` survives a pinch-out splice.  Given a `base_A_plus_data` pinch
 /// at `(i,j)`, with the replacement middle `phi_g` stable-free and `∈ ⟨ublock_db_gens⟩`, the spliced
 /// word `wshort = wm[0..i] + phi_g + wm[j+1..]` again satisfies `seg_inv`.  The only *new* maximal
@@ -3445,6 +3545,204 @@ pub proof fn lemma_seg_inv_pinch_out(mm: ModMachine, n: nat, m: nat, slice: Seq<
         }
     }
     assert(seg_inv(mm, n, wshort));
+}
+
+// ----------------------------------------------------------------------------
+// Brick E — the pinch-descent (mirror `lemma_map_a_pinch_descends`).
+// ----------------------------------------------------------------------------
+
+/// **Brick E — `lemma_cs5_pinch_descends`.**  A `recog_data` pinch of `emb(a_col_machine, wm)`
+/// descends (given `seg_inv(wm)`) to a `base_A_plus_data(h0_filter(betas))` pinch of `wm`.  Mirror of
+/// `lemma_map_a_pinch_descends`: the single-gen relabel `a_col_machine` carries stable↔stable; the
+/// recog pinch-middle membership reflects through `ρ` (C1, `lemma_cs5_middle_reflect`) to a
+/// `base_A_plus_base` membership in the recog column (`config`/`assoc_rhs` over `betas`), `seg_inv`
+/// lands it in `⟨ublock_db_gens⟩` (`lemma_seg_inv_middle`), and the H₀-restriction (C2 / C2-b) cuts the
+/// slice to `h0_filter(betas)` — the target a/b-column.
+pub proof fn lemma_cs5_pinch_descends(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, wm: Word)
+    requires
+        mod_machine_wf(mm),
+        mm_terminal(mm, 0, 0),
+        2 * n < m,
+        alphas.no_duplicates(),
+        !alphas.contains(0nat),
+        forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]),
+        word_valid(wm, (g_m(mm).num_generators + n + 2) as nat),
+        seg_inv(mm, n, wm),
+        has_pinch(recog_data(mm, n, m, alphas), apply_embedding(a_col_machine(mm, n), wm)),
+    ensures
+        has_pinch(base_A_plus_data(mm, n, m, h0_filter(mm, betas(alphas))), wm),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let ng1 = (nk + n + 1) as nat;           // base_A_plus_base gens = machine/target stable index
+    let bet = betas(alphas);
+    let hf = h0_filter(mm, bet);
+    let rd = recog_data(mm, n, m, alphas);
+    let am = a_col_machine(mm, n);
+    let pw = apply_embedding(am, wm);
+    let p_rec = p_idx(nk, n);                 // recog stable letter index
+    let bp = base_A_plus_base(mm, n);
+    let target = base_A_plus_data(mm, n, m, hf);
+
+    lemma_betas_index(alphas);
+    lemma_betas_numbers_word(n, m, alphas);
+    lemma_betas_no_duplicates(alphas);
+    assert(bet.len() == alphas.len() + 1);
+
+    lemma_machine_col_len(mm, n);
+    assert(am.len() == nk + n + 2);
+    lemma_h1_base_num_generators(mm, n);
+    assert(rd.base.num_generators == p_rec);
+    assert(rd.base == h1_base(mm, n));
+    lemma_base_A_plus_data_shape(mm, n, m, hf);
+    assert(target.base.num_generators == ng1);
+    assert(target.base == bp);
+
+    // single-gen relabel.
+    lemma_a_col_machine_single_gen(mm, n);
+    lemma_single_gen_relabel(am, wm);
+    assert(pw.len() == wm.len());
+    assert(forall|k: int| 0 <= k < wm.len() ==> #[trigger] pw[k] == relabel_symbol(am, wm[k]));
+
+    // find the recog pinch.
+    let ij = choose|i: int, j: int| has_pinch_at(rd, pw, i, j);
+    let i = ij.0;
+    let j = ij.1;
+    assert(has_pinch_at(rd, pw, i, j));
+    assert(has_adjacent_opposite_at(rd, pw, i, j));
+    assert(0 <= i < j < wm.len());
+
+    // per-symbol stable correspondence (machine stable ↔ recog stable).
+    assert forall|k: int| 0 <= k < wm.len() implies (
+        (pw[k] == Symbol::Gen(p_rec) <==> wm[k] == Symbol::Gen(ng1))
+        && (pw[k] == Symbol::Inv(p_rec) <==> wm[k] == Symbol::Inv(ng1))
+        && (is_stable(rd, pw[k]) <==> seg_stable(mm, n, wm[k]))
+    ) by {
+        assert(symbol_valid(wm[k], (nk + n + 2) as nat));
+        lemma_a_col_machine_relabel_sym(mm, n, wm[k]);
+        assert(pw[k] == relabel_symbol(am, wm[k]));
+    }
+
+    // has_adjacent_opposite_at(target, wm, i, j).
+    assert(has_adjacent_opposite_at(target, wm, i, j)) by {
+        lemma_seg_stable_iff(mm, n, m, hf, wm[i]);
+        lemma_seg_stable_iff(mm, n, m, hf, wm[j]);
+        assert(is_stable(rd, pw[i]) && is_stable(rd, pw[j]));
+        assert(is_stable(target, wm[i]) && is_stable(target, wm[j]));
+        assert(wm[i] != wm[j]) by {
+            if wm[i] == wm[j] {
+                assert(pw[i] == relabel_symbol(am, wm[i]));
+                assert(pw[j] == relabel_symbol(am, wm[j]));
+            }
+        }
+        assert forall|k: int| i < k < j implies !is_stable(target, #[trigger] wm[k]) by {
+            assert(!is_stable(rd, pw[k]));
+            lemma_seg_stable_iff(mm, n, m, hf, wm[k]);
+        }
+    }
+
+    // the middle word, valid over ng1 (interior avoids the machine stable letter).
+    let mid_w = wm.subrange(i + 1, j);
+    assert(word_valid(mid_w, ng1)) by {
+        assert forall|t: int| 0 <= t < mid_w.len() implies symbol_valid(#[trigger] mid_w[t], ng1) by {
+            assert(mid_w[t] == wm[i + 1 + t]);
+            assert(i < i + 1 + t < j);
+            assert(!is_stable(target, wm[i + 1 + t]));
+            assert(symbol_valid(wm[i + 1 + t], (nk + n + 2) as nat));
+            assert(generator_index(wm[i + 1 + t]) != ng1) by {
+                if generator_index(wm[i + 1 + t]) == ng1 {
+                    match wm[i + 1 + t] {
+                        Symbol::Gen(gg) => { assert(wm[i + 1 + t] == Symbol::Gen(ng1)); },
+                        Symbol::Inv(gg) => { assert(wm[i + 1 + t] == Symbol::Inv(ng1)); },
+                    }
+                }
+            }
+        }
+    }
+    lemma_single_gen_relabel_subrange(am, wm, i + 1, j);
+    assert(pw.subrange(i + 1, j) =~= apply_embedding(am, mid_w));
+
+    // recog / target columns.
+    let rd_a_col = Seq::new(rd.associations.len(), |k: int| rd.associations[k].0);
+    let rd_b_col = Seq::new(rd.associations.len(), |k: int| rd.associations[k].1);
+    let tgt_a_col = Seq::new(target.associations.len(), |k: int| target.associations[k].0);
+    let tgt_b_col = Seq::new(target.associations.len(), |k: int| target.associations[k].1);
+    assert(tgt_a_col =~= config_emb(hf)) by {
+        assert(target.associations.len() == hf.len());
+        assert forall|k: int| 0 <= k < hf.len() implies tgt_a_col[k] =~= config_emb(hf)[k] by {
+            assert(target.associations[k].0 == config_word(hf[k], 0));
+        }
+    }
+    assert(tgt_b_col =~= assoc_rhs_emb(mm, n, m, hf)) by {
+        assert(target.associations.len() == hf.len());
+        assert forall|k: int| 0 <= k < hf.len()
+            implies tgt_b_col[k] =~= assoc_rhs_emb(mm, n, m, hf)[k] by {
+            assert(target.associations[k].1 == assoc_rhs_machine(mm, n, m, hf[k]));
+        }
+    }
+
+    // betas-column validities over ng1 (C1 preconds).
+    assert forall|k: int| 0 <= k < config_emb(bet).len()
+        implies word_valid(#[trigger] config_emb(bet)[k], ng1) by {
+        assert(config_emb(bet)[k] == config_word(bet[k], 0));
+        lemma_config_word_valid(bet[k], 0);
+        lemma_word_valid_mono(config_word(bet[k], 0), 3, ng1);
+    }
+    assert forall|k: int| 0 <= k < assoc_rhs_emb(mm, n, m, bet).len()
+        implies word_valid(#[trigger] assoc_rhs_emb(mm, n, m, bet)[k], ng1) by {
+        assert(assoc_rhs_emb(mm, n, m, bet)[k] == assoc_rhs_machine(mm, n, m, bet[k]));
+        lemma_w_c_valid(nk, n, m, bet[k], ng1);
+        lemma_single_gen_valid((nk + n) as nat, ng1);
+        lemma_config_word_valid(bet[k], 0);
+        lemma_word_valid_mono(config_word(bet[k], 0), 3, ng1);
+        lemma_concat_word_valid(config_word(bet[k], 0), w_b(nk, n, m, bet[k]), ng1);
+        lemma_concat_word_valid(config_word(bet[k], 0) + w_b(nk, n, m, bet[k]),
+            seq![Symbol::Gen((nk + n) as nat)], ng1);
+        assert(assoc_rhs_machine(mm, n, m, bet[k])
+            =~= (config_word(bet[k], 0) + w_b(nk, n, m, bet[k])) + seq![Symbol::Gen((nk + n) as nat)]);
+    }
+
+    // seg_inv: middle ∈ ⟨ublock_db_gens⟩ (orientation-independent).
+    lemma_seg_inv_middle(mm, n, m, hf, wm, i, j);
+    assert(in_generated_subgroup(bp, ublock_db_gens(mm, n), mid_w));
+
+    // orientation + middle descent.
+    assert(has_pinch_at(target, wm, i, j)) by {
+        assert(is_stable(rd, pw[i]));
+        if pw[i] == Symbol::Gen(p_rec) {
+            // t·g·t⁻¹: recog middle ∈ ⟨rd b-col⟩ = ⟨compose(am, assoc_rhs_emb(betas))⟩.
+            assert(pw[j] == Symbol::Inv(p_rec));
+            assert(wm[i] == Symbol::Gen(ng1));
+            assert(wm[j] == Symbol::Inv(ng1));
+            assert(in_generated_subgroup(rd.base, rd_b_col, pw.subrange(i + 1, j)));
+            lemma_cs5_b_col_correspondence(mm, n, m, alphas);
+            assert(rd_b_col =~= compose_embeddings(am, assoc_rhs_emb(mm, n, m, bet)));
+            assert(in_generated_subgroup(h1_base(mm, n),
+                compose_embeddings(am, assoc_rhs_emb(mm, n, m, bet)), apply_embedding(am, mid_w)));
+            lemma_cs5_middle_reflect(mm, n, assoc_rhs_emb(mm, n, m, bet), mid_w);
+            assert(in_generated_subgroup(bp, assoc_rhs_emb(mm, n, m, bet), mid_w));
+            lemma_cs5_middle_h0_restrict_b(mm, n, m, bet, mid_w);
+            assert(in_generated_subgroup(bp, assoc_rhs_emb(mm, n, m, hf), mid_w));
+            assert(in_generated_subgroup(bp, tgt_b_col, mid_w));
+        } else {
+            // t⁻¹·g·t: recog middle ∈ ⟨rd a-col⟩ = ⟨compose(am, config_emb(betas))⟩.
+            assert(pw[i] == Symbol::Inv(p_rec));
+            assert(pw[j] == Symbol::Gen(p_rec));
+            assert(wm[i] == Symbol::Inv(ng1));
+            assert(wm[j] == Symbol::Gen(ng1));
+            assert(in_generated_subgroup(rd.base, rd_a_col, pw.subrange(i + 1, j)));
+            lemma_cs5_a_col_correspondence(mm, n, m, alphas);
+            assert(rd_a_col =~= compose_embeddings(am, config_emb(bet)));
+            assert(in_generated_subgroup(h1_base(mm, n),
+                compose_embeddings(am, config_emb(bet)), apply_embedding(am, mid_w)));
+            lemma_cs5_middle_reflect(mm, n, config_emb(bet), mid_w);
+            assert(in_generated_subgroup(bp, config_emb(bet), mid_w));
+            lemma_cs5_middle_h0_restrict(mm, n, bet, mid_w);
+            assert(in_generated_subgroup(bp, config_emb(hf), mid_w));
+            assert(in_generated_subgroup(bp, tgt_a_col, mid_w));
+        }
+    }
+    assert(has_pinch(target, wm)) by { assert(has_pinch_at(target, wm, i, j)); }
 }
 
 } // verus!

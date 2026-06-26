@@ -134,7 +134,7 @@ pub proof fn lemma_betas_index(alphas: Seq<nat>)
 }
 
 /// `betas` numbers words (each digit ok): `0 ∈ I` trivially, and the `alphas` carry the hypothesis.
-proof fn lemma_betas_numbers_word(n: nat, m: nat, alphas: Seq<nat>)
+pub proof fn lemma_betas_numbers_word(n: nat, m: nat, alphas: Seq<nat>)
     requires forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]),
     ensures forall|i: int| 0 <= i < betas(alphas).len() ==> numbers_word(n, m, #[trigger] betas(alphas)[i]),
 {
@@ -150,7 +150,7 @@ proof fn lemma_betas_numbers_word(n: nat, m: nat, alphas: Seq<nat>)
 }
 
 /// `betas` has no duplicates when `0 ∉ alphas` and `alphas` is distinct.
-proof fn lemma_betas_no_duplicates(alphas: Seq<nat>)
+pub proof fn lemma_betas_no_duplicates(alphas: Seq<nat>)
     requires !alphas.contains(0nat), alphas.no_duplicates(),
     ensures betas(alphas).no_duplicates(),
 {
