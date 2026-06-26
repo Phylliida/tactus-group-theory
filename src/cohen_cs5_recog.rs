@@ -43,8 +43,12 @@ use crate::machine_group::{ModMachine, g_m, g_subgens, g_m_associations, config_
     lemma_b_m_valid, lemma_b_m_upto_num_generators, lemma_vii_subset, lemma_single_hnn_base_faithful};
 use crate::tower_peel::lemma_vi;
 use crate::prop_v::{lemma_equiv_from_concat_inv_trivial, lemma_theorem1};
-use crate::machine_group::{k_commutes, lemma_k_commutes_implies_subgroup};
+use crate::machine_group::{k_commutes, lemma_k_commutes_implies_subgroup, inv_rev_factors,
+    lemma_concat_all_inverse};
 use crate::hnn::lemma_base_embeds_in_hnn;
+use crate::word::lemma_inverse_involution;
+use crate::normal_form_afp_textbook::lemma_equiv_inverse;
+use crate::word_numbering::lemma_w_c_gens_in_block;
 use crate::free_basis::{lemma_g_m_data_isomorphic, config_emb, w_to_canon, lemma_config_emb_eq_canw};
 use crate::machine_group::{CanonLetter, canw_eval, base_A, lemma_base_A_valid, lemma_canw_eval_valid,
     lemma_no_relator_equiv_implies_freely_equivalent};
@@ -3812,6 +3816,270 @@ pub proof fn lemma_config_in_ublock(mm: ModMachine, n: nat, beta: nat)
         assert(ub[i] == gs[i]);                                  // prefix: ub = gs + tail
     }
     lemma_in_subgroup_gens_superset(bp, gs, ub, config_word(beta, 0));
+}
+
+// ---- generic subgroup inverse-closure (mirror `lemma_in_T_inverse`) ----
+
+/// `is_generator_or_inverse` is closed under `inverse_word` (gen ↦ inverse, inverse ↦ gen).
+proof fn lemma_gen_or_inv_inverse(gens: Seq<Word>, x: Word)
+    requires
+        is_generator_or_inverse(gens, x),
+    ensures
+        is_generator_or_inverse(gens, inverse_word(x)),
+{
+    let j = choose|j: int| 0 <= j < gens.len() && (x == gens[j] || x == inverse_word(gens[j]));
+    assert(0 <= j < gens.len() && (x == gens[j] || x == inverse_word(gens[j])));
+    if x != gens[j] {
+        lemma_inverse_involution(gens[j]);     // inverse_word(inverse_word(gens[j])) =~= gens[j]
+    }
+    assert(inverse_word(x) == gens[j] || inverse_word(x) == inverse_word(gens[j]));    // witness j
+}
+
+/// `factors_from_generators` is preserved by `inv_rev_factors`.
+proof fn lemma_factors_inv_rev(gens: Seq<Word>, factors: Seq<Word>)
+    requires
+        factors_from_generators(gens, factors),
+    ensures
+        factors_from_generators(gens, inv_rev_factors(factors)),
+    decreases factors.len(),
+{
+    reveal_with_fuel(inv_rev_factors, 2);
+    if factors.len() != 0 {
+        let first = factors.first();
+        let rest = factors.drop_first();
+        assert(factors[0] == first);
+        assert(is_generator_or_inverse(gens, first));
+        assert forall|i: int| 0 <= i < rest.len()
+            implies is_generator_or_inverse(gens, #[trigger] rest[i]) by {
+            assert(rest[i] == factors[i + 1]);
+        }
+        lemma_factors_inv_rev(gens, rest);
+        lemma_gen_or_inv_inverse(gens, first);
+        let g = inv_rev_factors(factors);
+        let grest = inv_rev_factors(rest);
+        assert(g =~= grest + seq![inverse_word(first)]);
+        assert forall|k: int| 0 <= k < g.len()
+            implies is_generator_or_inverse(gens, #[trigger] g[k]) by {
+            if k < grest.len() { assert(g[k] == grest[k]); } else { assert(g[k] == inverse_word(first)); }
+        }
+    }
+}
+
+/// **Generated subgroups are closed under inverse.**
+pub proof fn lemma_inverse_in_subgroup(p: Presentation, gens: Seq<Word>, w: Word)
+    requires
+        presentation_valid(p),
+        in_generated_subgroup(p, gens, w),
+        word_valid(w, p.num_generators),
+        forall|i: int| 0 <= i < gens.len() ==> word_valid(#[trigger] gens[i], p.num_generators),
+    ensures
+        in_generated_subgroup(p, gens, inverse_word(w)),
+{
+    let factors = choose|f: Seq<Word>| #[trigger] factors_from_generators(gens, f)
+        && equiv_in_presentation(p, concat_all(f), w);
+    assert(factors_from_generators(gens, factors)
+        && equiv_in_presentation(p, concat_all(factors), w));
+    let g = inv_rev_factors(factors);
+    lemma_factors_inv_rev(gens, factors);
+    lemma_concat_all_inverse(factors);                          // concat_all(g) =~= inverse_word(concat_all(f))
+    lemma_factors_concat_valid(gens, factors, p.num_generators);
+    lemma_equiv_inverse(p, concat_all(factors), w);
+    assert(concat_all(g) =~= inverse_word(concat_all(factors)));
+    assert(in_generated_subgroup(p, gens, inverse_word(w)));   // witness g
+}
+
+// ---- `assoc_rhs ∈ ⟨ublock⟩` (config·w_b·d, each factor in the segment subgroup) ----
+
+/// A single `b`-block (or `d`) generator `[s]` (`nk ≤ gen-index < nk+n+1`) lies in `⟨ublock_db_gens⟩`.
+proof fn lemma_singleton_in_ublock(mm: ModMachine, n: nat, s: Symbol)
+    requires
+        g_m(mm).num_generators <= generator_index(s) < g_m(mm).num_generators + n + 1,
+    ensures
+        in_generated_subgroup(base_A_plus_base(mm, n), ublock_db_gens(mm, n), seq![s]),
+{
+    let nk = g_m(mm).num_generators;
+    let bp = base_A_plus_base(mm, n);
+    let ub = ublock_db_gens(mm, n);
+    let q = g_subgens(mm).len();
+    let gi = generator_index(s);
+    lemma_base_A_plus_base_valid(mm, n);
+    let tail: Seq<Word> = Seq::new((n + 1) as nat, |j: int| seq![Symbol::Gen((nk + j) as nat)]);
+    assert(ub =~= g_subgens(mm) + tail);
+    let tj = gi - nk;
+    assert(0 <= tj < n + 1);
+    assert(ub[q + tj] == tail[tj]);
+    assert(tail[tj] =~= seq![Symbol::Gen((nk + tj) as nat)]);
+    assert(nk + tj == gi);
+    let factors: Seq<Word> = seq![ seq![s] ];
+    assert(is_generator_or_inverse(ub, seq![s])) by {
+        match s {
+            Symbol::Gen(g2) => {
+                assert(g2 == gi);
+                assert(seq![s] =~= ub[q + tj]);                // generator, witness q+tj
+            },
+            Symbol::Inv(g2) => {
+                assert(g2 == gi);
+                lemma_inverse_word_singleton(Symbol::Gen(gi));  // inverse_word([Gen(gi)]) = [Inv(gi)]
+                assert(seq![s] =~= inverse_word(ub[q + tj]));   // inverse, witness q+tj
+            },
+        }
+    }
+    assert(factors_from_generators(ub, factors));
+    assert(concat_all(factors) =~= seq![s]) by { reveal_with_fuel(concat_all, 2); }
+    lemma_equiv_refl(bp, seq![s]);
+    assert(in_generated_subgroup(bp, ub, seq![s]));            // witness factors
+}
+
+/// A word whose letters are all `b`-block/`d` generators (`nk ≤ gen-index < nk+n+1`) lies in `⟨ublock⟩`.
+proof fn lemma_bblock_word_in_ublock(mm: ModMachine, n: nat, w: Word)
+    requires
+        forall|k: int| 0 <= k < w.len() ==>
+            g_m(mm).num_generators <= generator_index(#[trigger] w[k]) < g_m(mm).num_generators + n + 1,
+    ensures
+        in_generated_subgroup(base_A_plus_base(mm, n), ublock_db_gens(mm, n), w),
+    decreases w.len(),
+{
+    let bp = base_A_plus_base(mm, n);
+    let ub = ublock_db_gens(mm, n);
+    lemma_base_A_plus_base_valid(mm, n);
+    if w.len() == 0 {
+        assert(w =~= empty_word());
+        lemma_empty_in_subgroup(bp, ub);
+    } else {
+        let head: Word = seq![w[0]];
+        let rest = w.drop_first();
+        lemma_singleton_in_ublock(mm, n, w[0]);
+        assert forall|k: int| 0 <= k < rest.len() implies
+            g_m(mm).num_generators <= generator_index(#[trigger] rest[k]) < g_m(mm).num_generators + n + 1 by {
+            assert(rest[k] == w[k + 1]);
+        }
+        lemma_bblock_word_in_ublock(mm, n, rest);
+        lemma_product_in_subgroup(bp, ub, head, rest);
+        assert(head + rest =~= w);
+    }
+}
+
+/// **`assoc_rhs_machine(β) ∈ ⟨ublock⟩`** for `(β,0)∈H₀` (the b-orientation pinch-out middle): the
+/// product `config(β,0)·w_β(b)·d`, each factor in the segment subgroup (`config` via the H₀-bridge,
+/// `w_β(b)` a b-block word, `d` a tail generator).
+pub proof fn lemma_assoc_rhs_in_ublock(mm: ModMachine, n: nat, m: nat, beta: nat)
+    requires
+        mod_machine_wf(mm),
+        mm_in_H0(mm, beta, 0),
+        2 * n < m,
+        numbers_word(n, m, beta),
+    ensures
+        in_generated_subgroup(base_A_plus_base(mm, n), ublock_db_gens(mm, n),
+            assoc_rhs_machine(mm, n, m, beta)),
+{
+    let nk = g_m(mm).num_generators;
+    let bp = base_A_plus_base(mm, n);
+    let ub = ublock_db_gens(mm, n);
+    lemma_g_m_num_generators(mm);
+    let cfg = config_word(beta, 0);
+    let wb = w_b(nk, n, m, beta);
+    let dgen: Word = seq![Symbol::Gen((nk + n) as nat)];
+    assert(assoc_rhs_machine(mm, n, m, beta) =~= (cfg + wb) + dgen);
+    // config ∈ ⟨ublock⟩.
+    lemma_config_in_ublock(mm, n, beta);
+    // w_b ∈ ⟨ublock⟩ (b-block letters).
+    lemma_w_c_gens_in_block(nk, n, m, beta);
+    assert forall|k: int| 0 <= k < wb.len()
+        implies nk <= generator_index(#[trigger] wb[k]) < nk + n + 1 by {
+        assert(nk <= generator_index(wb[k]) < nk + n);         // from w_c_gens_in_block (c_base=nk)
+    }
+    lemma_bblock_word_in_ublock(mm, n, wb);
+    // d ∈ ⟨ublock⟩.
+    lemma_singleton_in_ublock(mm, n, Symbol::Gen((nk + n) as nat));
+    // products.
+    lemma_product_in_subgroup(bp, ub, cfg, wb);
+    lemma_product_in_subgroup(bp, ub, cfg + wb, dgen);
+}
+
+/// **Closure**: `apply_embedding(col, u) ∈ ⟨ublock⟩` when every column entry is.  (Subgroup
+/// transitivity `lemma_in_subgroup_gens_in_core` + inverse-closure.)
+pub proof fn lemma_emb_col_in_ublock(mm: ModMachine, n: nat, col: Seq<Word>, u: Word)
+    requires
+        word_valid(u, col.len() as nat),
+        forall|k: int| 0 <= k < col.len() ==>
+            in_generated_subgroup(base_A_plus_base(mm, n), ublock_db_gens(mm, n), #[trigger] col[k]),
+        forall|k: int| 0 <= k < col.len()
+            ==> word_valid(#[trigger] col[k], (g_m(mm).num_generators + n + 1) as nat),
+    ensures
+        in_generated_subgroup(base_A_plus_base(mm, n), ublock_db_gens(mm, n), apply_embedding(col, u)),
+{
+    let nk = g_m(mm).num_generators;
+    let bp = base_A_plus_base(mm, n);
+    let ub = ublock_db_gens(mm, n);
+    let ng1 = (nk + n + 1) as nat;
+    lemma_base_A_plus_base_valid(mm, n);
+    lemma_g_m_num_generators(mm);
+    // ublock generators valid over ng1 (needed for inverse-closure).
+    assert forall|i: int| 0 <= i < ub.len() implies word_valid(#[trigger] ub[i], ng1) by {
+        lemma_ublock_gen_valid(mm, n, i);
+    }
+    lemma_apply_embedding_in_subgroup(bp, col, u);             // emb(col,u) ∈ ⟨col⟩
+    assert forall|j: int| 0 <= j < col.len() implies
+        in_generated_subgroup(bp, ub, #[trigger] col[j])
+        && in_generated_subgroup(bp, ub, inverse_word(col[j])) by {
+        lemma_inverse_in_subgroup(bp, ub, col[j]);
+    }
+    lemma_in_subgroup_gens_in_core(bp, col, ub, apply_embedding(col, u));
+}
+
+/// `ublock_db_gens` entries are valid over `base_A_plus_base`'s `nk+n+1` generators.
+proof fn lemma_ublock_gen_valid(mm: ModMachine, n: nat, i: int)
+    requires
+        0 <= i < ublock_db_gens(mm, n).len(),
+    ensures
+        word_valid(ublock_db_gens(mm, n)[i], (g_m(mm).num_generators + n + 1) as nat),
+{
+    let nk = g_m(mm).num_generators;
+    let q = g_subgens(mm).len();
+    let ng1 = (nk + n + 1) as nat;
+    lemma_g_m_num_generators(mm);
+    lemma_g_m_associations_valid(mm);
+    let ub = ublock_db_gens(mm, n);
+    let tail: Seq<Word> = Seq::new((n + 1) as nat, |j: int| seq![Symbol::Gen((nk + j) as nat)]);
+    assert(ub =~= g_subgens(mm) + tail);
+    if i < q {
+        assert(ub[i] == g_subgens(mm)[i]);
+        assert(g_subgens(mm)[i] == g_m_associations(mm)[i].1);
+        assert(word_valid(g_subgens(mm)[i], (3 + mm.quads.len()) as nat));
+        lemma_word_valid_mono(g_subgens(mm)[i], (3 + mm.quads.len()) as nat, ng1);
+    } else {
+        let tj = i - q;
+        assert(ub[i] == tail[tj]);
+        assert(tail[tj] =~= seq![Symbol::Gen((nk + tj) as nat)]);
+        assert(nk + tj < ng1);
+    }
+}
+
+/// Every `h0_filter(slice)` element satisfies `(·,0)∈H₀` (it keeps only the H₀ entries).
+pub proof fn lemma_h0_filter_in_H0(mm: ModMachine, slice: Seq<nat>, k: int)
+    requires
+        0 <= k < h0_filter(mm, slice).len(),
+    ensures
+        mm_in_H0(mm, h0_filter(mm, slice)[k], 0),
+    decreases slice.len(),
+{
+    let hf = h0_filter(mm, slice);
+    if slice.len() != 0 {
+        let rest = slice.drop_first();
+        if mm_in_H0(mm, slice[0], 0) {
+            assert(hf =~= seq![slice[0]] + h0_filter(mm, rest));
+            if k == 0 {
+                assert(hf[0] == slice[0]);
+            } else {
+                assert(hf[k] == h0_filter(mm, rest)[k - 1]);
+                lemma_h0_filter_in_H0(mm, rest, k - 1);
+            }
+        } else {
+            assert(hf =~= h0_filter(mm, rest));
+            assert(hf[k] == h0_filter(mm, rest)[k]);
+            lemma_h0_filter_in_H0(mm, rest, k);
+        }
+    }
 }
 
 } // verus!
