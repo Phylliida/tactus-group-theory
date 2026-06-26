@@ -619,3 +619,44 @@ is now a machine-checked **faithful embedding both ways** — **GAP-1 item-2 COM
 (the limit-commutation glue — the one companion-flagged new-math: per-slice `emb_M` instances commute
 with the direct-limit `equiv_in_g_limit`), then GAP-1 §3.4-routing assembly, then **GAP-2**
 (register→modular reduction, untouched).
+
+### 12.2 — `embedding`-item-3 (limit-commutation), MACHINE-INDEPENDENT CORE "3a" DONE (2026-06-26)
+
+**✅✅ `lemma_limit_commutation` VERIFIED — `src/miller_collapse_limit.rs` 17/0.** AUTHORIZED live with
+Danielle (port 8051, the §6.1-decision channel — she had reserved item-3 as "her call"): **build the
+machine-independent core, route (i) (monotone relator family)**; she confirmed monotonicity is the
+textbook requirement (Miller §4.1 direct limit is *directed*). Additive, reversible, 0 errors, no
+verifier escape hatches. The headline:
+
+```
+lemma_limit_commutation(fam, n, w):                                  // miller_collapse_limit.rs
+    requires decls_family_valid(fam), dbar_family_monotone(fam), word_valid(w, n)
+    ensures  equiv_in_g_limit(fam, n, w, ε)
+             <==> equiv_in_pred_presentation(p_infty(fam), apply_embedding(emb_n, w), ε)
+```
+where `p_infty(fam) = ⟨a,t | ⋃_M D̄_M⟩` (`dbar_union_pred = λr. ∃M. dbar(M,fam(M)).contains(r)`),
+`emb_n = miller_collapse_emb(n,0,1)`. This is the long-flagged "sole new-math risk" of GAP-1,
+discharged. **The split that made it tractable:**
+- **3a (DONE, machine-FREE):** the above iff, connecting the L0.5 direct limit to the fixed-`{a,t}`
+  union *predicate* presentation. Proof structure:
+  - **§A witness-preservation** (`lemma_emb_slice_independent`): a pure-`c` word's collapse image is
+    slice-independent — `apply_embedding(emb_M, w) = apply_embedding(emb_n, w)` for `M ≥ n` (the c-block
+    is insulated from `a/b/t`; `emb_M[i]=uᵢ` indep of `M` for `i<M`). This is the formal content of the
+    "shares the same witness `M`" insulation noted at `cohen_layer05.rs:714–716`.
+  - **§B generic forward bridge** (`lemma_fin_equiv_to_pred`): a finite `Presentation` whose relators
+    all satisfy a predicate embeds into the corresponding `PredPresentation` — the MIRROR of
+    `pred_to_finite.rs` (which goes pred→finite), via a direct index-free derivation-step map.
+  - **§C FORWARD** (`lemma_limit_to_pred`, no monotonicity): pick the witness slice, item-2 *preserving*
+    → ≡ in `K_M`, §A rewrites to `emb_n(w)`, §B lifts the finite `K_M`-derivation to `P_∞`.
+  - **§D BACKWARD** (`lemma_pred_to_limit`, route (i)): per-step + per-derivation slice-monotonicity +
+    a structural **compactness extraction** (`lemma_extract_slice`) of a *single* slice `M* = max(n,
+    relator witnesses)`; the EXISTING `lemma_pred_equiv_lifts_to_finite` (pred_to_finite.rs, reused
+    verbatim) lands it in finite `K_{M*}`; item-2 *injective* pulls back to `G^(M*)`, witnessing the limit.
+- **3b (REMAINING, machine-GATED):** the relator-set match (§3.4) — identify the predicate
+  `λr. ∃M. r ∈ D̄_M(fam)` with Cohen's `is_S_canonical(mm,…)` + reconcile `p_infty`'s 2-gen `{a,t}`
+  layout with `c_pred`'s gen layout. Needs GAP-2's modular machine `mm`. NOT started.
+
+**NEXT = item-3b** (relator-set match, after/with GAP-2), then GAP-1 §3.4-routing assembly, then **GAP-2**
+(register→modular reduction, untouched). The `decls_family_valid` + `dbar_family_monotone` hypotheses of
+`lemma_limit_commutation` are to be discharged for the concrete `ceer_decls_fam` when wiring the chain
+(monotonicity = the CEER family is cumulative across slices; both are properties of that one family).
