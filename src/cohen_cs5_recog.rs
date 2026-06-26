@@ -72,6 +72,8 @@ use crate::f_free::is_free_family;
 use crate::free_basis::lemma_config_emb_free;
 use crate::higman_operations::lemma_free_group_valid;
 use crate::phi_l_forward::lemma_intersection_property;
+use crate::phi_l_forward::{relabel_symbol, lemma_single_gen_relabel, lemma_single_gen_relabel_subrange};
+use crate::f_free::lemma_apply_embedding_agree_prefix;
 use crate::britton_via_tower::{is_stable, has_adjacent_opposite_at};
 
 verus! {
@@ -2955,6 +2957,209 @@ pub proof fn lemma_seg_inv_middle(mm: ModMachine, n: nat, m: nat, slice: Seq<nat
     // instantiate seg_inv at (i+1, j).
     assert(in_generated_subgroup(base_A_plus_base(mm, n), ublock_db_gens(mm, n),
         wm.subrange(i + 1, j)));
+}
+
+// ----------------------------------------------------------------------------
+// Brick D — the BASE CASE: `relabel(w)` satisfies `seg_inv`.  `relabel_col` is a single-gen
+// relabeling whose non-`p` entries are exactly the `ublock_db_gens` generators, so every
+// stable-free run of `relabel(w)` is a literal product of `ublock_db_gens` generators.
+// ----------------------------------------------------------------------------
+
+/// The `relabel_col` block decomposition `((r_u + r_d) + r_b) + r_p` (mirror `lemma_a_factor_entry`).
+proof fn lemma_relabel_col_blocks(mm: ModMachine, n: nat) -> (r: (Seq<Word>, Seq<Word>, Seq<Word>, Seq<Word>))
+    ensures
+        ({ let nk = g_m(mm).num_generators; let q = g_subgens(mm).len();
+           &&& r.0 == Seq::<Word>::new(q as nat, |i: int| g_subgens(mm)[i])
+           &&& r.1 == seq![ seq![Symbol::Gen((nk + n) as nat)] ]
+           &&& r.2 == Seq::<Word>::new(n, |j: int| seq![Symbol::Gen((nk + j) as nat)])
+           &&& r.3 == seq![ seq![Symbol::Gen((nk + n + 1) as nat)] ]
+           &&& relabel_col(mm, n) =~= ((r.0 + r.1) + r.2) + r.3 }),
+{
+    let nk = g_m(mm).num_generators;
+    let q = g_subgens(mm).len();
+    let r_u: Seq<Word> = Seq::new(q as nat, |i: int| g_subgens(mm)[i]);
+    let r_d: Seq<Word> = seq![ seq![Symbol::Gen((nk + n) as nat)] ];
+    let r_b: Seq<Word> = Seq::new(n, |j: int| seq![Symbol::Gen((nk + j) as nat)]);
+    let r_p: Seq<Word> = seq![ seq![Symbol::Gen((nk + n + 1) as nat)] ];
+    assert(relabel_col(mm, n) =~= ((r_u + r_d) + r_b) + r_p);
+    (r_u, r_d, r_b, r_p)
+}
+
+/// Every `relabel_col` entry is a single generator (`lemma_single_gen_relabel` precondition).
+proof fn lemma_relabel_col_single_gen(mm: ModMachine, n: nat)
+    ensures
+        forall|i: int| 0 <= i < relabel_col(mm, n).len() ==>
+            exists|g: nat| #[trigger] relabel_col(mm, n)[i] == seq![Symbol::Gen(g)],
+{
+    let nk = g_m(mm).num_generators;
+    let q = g_subgens(mm).len();
+    lemma_machine_col_len(mm, n);
+    lemma_g_m_num_generators(mm);
+    lemma_g_m_associations_valid(mm);
+    let blk = lemma_relabel_col_blocks(mm, n);
+    let rc = relabel_col(mm, n);
+    assert forall|i: int| 0 <= i < rc.len()
+        implies exists|g: nat| #[trigger] rc[i] == seq![Symbol::Gen(g)] by {
+        if i < q {
+            assert(rc[i] == g_subgens(mm)[i]) by {
+                assert(((blk.0 + blk.1) + blk.2)[i] == (blk.0 + blk.1)[i]);
+                assert((blk.0 + blk.1)[i] == blk.0[i]);
+            }
+            let u = g_subgens(mm)[i];
+            assert(u == g_m_associations(mm)[i].1);
+            assert(word_valid(u, (3 + mm.quads.len()) as nat));
+            assert(u.len() == 1);
+            let gi = generator_index(u[0]);
+            assert(symbol_valid(u[0], (3 + mm.quads.len()) as nat));
+            assert(u[0] == Symbol::Gen(gi)) by { assert(symbol_valid(u[0], nk)); }
+            assert(u =~= seq![Symbol::Gen(gi)]);
+        } else if i == q {
+            assert(rc[i] =~= seq![Symbol::Gen((nk + n) as nat)]) by {
+                assert(((blk.0 + blk.1) + blk.2)[i] == (blk.0 + blk.1)[i]);
+                assert((blk.0 + blk.1)[i] == blk.1[i - q]);
+            }
+        } else if i < q + 1 + n {
+            let j = i - q - 1;
+            assert(rc[i] =~= seq![Symbol::Gen((nk + j) as nat)]) by {
+                assert(((blk.0 + blk.1) + blk.2)[i] == blk.2[j]);
+            }
+        } else {
+            assert(rc[i] =~= seq![Symbol::Gen((nk + n + 1) as nat)]);
+        }
+    }
+}
+
+/// A non-`p` `relabel_col` entry (`i < q+n+1`) is a single gen with index `< nk+n+1` (so NOT the
+/// stable letter `Gen(nk+n+1)`) AND appears in `ublock_db_gens`.
+proof fn lemma_relabel_col_nonp(mm: ModMachine, n: nat, i: int)
+    requires
+        0 <= i < g_subgens(mm).len() + n + 1,
+    ensures
+        ({ let nk = g_m(mm).num_generators;
+           exists|g: nat| relabel_col(mm, n)[i] == seq![Symbol::Gen(g)] && g < nk + n + 1 }),
+        exists|k: int| 0 <= k < ublock_db_gens(mm, n).len()
+            && relabel_col(mm, n)[i] == #[trigger] ublock_db_gens(mm, n)[k],
+{
+    let nk = g_m(mm).num_generators;
+    let q = g_subgens(mm).len();
+    lemma_machine_col_len(mm, n);
+    lemma_g_m_num_generators(mm);
+    lemma_g_m_associations_valid(mm);
+    let blk = lemma_relabel_col_blocks(mm, n);
+    let rc = relabel_col(mm, n);
+    let ub = ublock_db_gens(mm, n);
+    // ub = g_subgens + Seq::new(n+1, |j| [Gen(nk+j)]).
+    assert(ub.len() == q + n + 1);
+    let ub_tail: Seq<Word> = Seq::new((n + 1) as nat, |j: int| seq![Symbol::Gen((nk + j) as nat)]);
+    assert(ub =~= g_subgens(mm) + ub_tail);
+    if i < q {
+        assert(rc[i] == g_subgens(mm)[i]) by {
+            assert(((blk.0 + blk.1) + blk.2)[i] == (blk.0 + blk.1)[i]);
+            assert((blk.0 + blk.1)[i] == blk.0[i]);
+        }
+        let u = g_subgens(mm)[i];
+        assert(u == g_m_associations(mm)[i].1);
+        assert(word_valid(u, (3 + mm.quads.len()) as nat));
+        assert(u.len() == 1);
+        let gi = generator_index(u[0]);
+        assert(symbol_valid(u[0], (3 + mm.quads.len()) as nat));
+        assert(gi < 3 + mm.quads.len());
+        assert(gi < nk);                                         // < nk < nk+n+1
+        assert(u[0] == Symbol::Gen(gi)) by { assert(symbol_valid(u[0], nk)); }
+        assert(u =~= seq![Symbol::Gen(gi)]);
+        assert(ub[i] == g_subgens(mm)[i]);                       // k = i (prefix)
+    } else if i == q {
+        // d: rc[q] = [Gen(nk+n)]; ub_tail[n] = [Gen(nk+n)] ⟹ ub[q+n].
+        assert(rc[i] =~= seq![Symbol::Gen((nk + n) as nat)]) by {
+            assert(((blk.0 + blk.1) + blk.2)[i] == (blk.0 + blk.1)[i]);
+            assert((blk.0 + blk.1)[i] == blk.1[i - q]);
+        }
+        assert(ub[(q + n) as int] == ub_tail[n as int]);
+        assert(ub_tail[n as int] =~= seq![Symbol::Gen((nk + n) as nat)]);   // k = q+n
+    } else {
+        // b: i = q+1+j, j ∈ [0,n); rc[i] = [Gen(nk+j)]; ub_tail[j] = [Gen(nk+j)] ⟹ ub[q+j].
+        let j = i - q - 1;
+        assert(0 <= j < n);
+        assert(rc[i] =~= seq![Symbol::Gen((nk + j) as nat)]) by {
+            assert(((blk.0 + blk.1) + blk.2)[i] == blk.2[j]);
+        }
+        assert(ub[(q as int) + j] == ub_tail[j]);
+        assert(ub_tail[j] =~= seq![Symbol::Gen((nk + j) as nat)]);          // k = q+j
+    }
+}
+
+/// **Brick D base case:** `relabel(w)` satisfies `seg_inv` — every stable-free run is a literal
+/// product of `ublock_db_gens` generators (the non-`p` `relabel_col` images).
+pub proof fn lemma_seg_inv_relabel(mm: ModMachine, n: nat, w: Word)
+    requires
+        word_valid(w, psi_assoc(mm, n).len()),
+    ensures
+        seg_inv(mm, n, relabel(mm, n, w)),
+{
+    let nk = g_m(mm).num_generators;
+    let q = g_subgens(mm).len();
+    let rc = relabel_col(mm, n);
+    let wm = relabel(mm, n, w);
+    let bp = base_A_plus_base(mm, n);
+    let ub = ublock_db_gens(mm, n);
+    lemma_machine_col_len(mm, n);
+    lemma_g_m_num_generators(mm);
+    assert(rc.len() == q + n + 2);
+    assert(word_valid(w, rc.len()));
+    lemma_relabel_col_single_gen(mm, n);
+    lemma_single_gen_relabel(rc, w);                            // wm length-preserving relabel
+    assert(wm.len() == w.len());
+
+    assert forall|a: int, b: int|
+        (0 <= a <= b <= wm.len()
+            && (a == 0 || seg_stable(mm, n, wm[a - 1]))
+            && (b == wm.len() || seg_stable(mm, n, wm[b]))
+            && (forall|k: int| a <= k < b ==> !seg_stable(mm, n, wm[k])))
+        implies #[trigger] in_generated_subgroup(bp, ub, wm.subrange(a, b)) by {
+        // wm.subrange(a,b) = emb(rc, w.subrange(a,b)).
+        lemma_single_gen_relabel_subrange(rc, w, a, b);
+        let ws = w.subrange(a, b);
+        assert(wm.subrange(a, b) =~= apply_embedding(rc, ws));
+        // ws valid over q+n+1 (the run avoids psi-p = index q+n+1).
+        assert(word_valid(ws, (q + n + 1) as nat)) by {
+            assert forall|t: int| 0 <= t < ws.len()
+                implies symbol_valid(#[trigger] ws[t], (q + n + 1) as nat) by {
+                assert(ws[t] == w[a + t]);
+                assert(a <= a + t < b);
+                assert(!seg_stable(mm, n, wm[a + t]));
+                assert(wm[a + t] == relabel_symbol(rc, w[a + t]));
+                let idx = generator_index(w[a + t]);
+                assert(symbol_valid(w[a + t], rc.len()));      // idx < q+n+2
+                // if idx == q+n+1 (psi-p) then wm[a+t] = p^± ⟹ seg_stable, contradiction.
+                if idx == q + n + 1 {
+                    assert(rc[idx as int] =~= seq![Symbol::Gen((nk + n + 1) as nat)]);
+                    match w[a + t] {
+                        Symbol::Gen(gg) => {
+                            assert(relabel_symbol(rc, w[a + t]) == Symbol::Gen((nk + n + 1) as nat));
+                        },
+                        Symbol::Inv(gg) => {
+                            assert(relabel_symbol(rc, w[a + t]) == Symbol::Inv((nk + n + 1) as nat));
+                        },
+                    }
+                }
+            }
+        }
+        // emb(rc, ws) = emb(rc_prefix, ws) (agree on the non-p prefix).
+        let rc_prefix = rc.subrange(0, (q + n + 1) as int);
+        assert(forall|ii: int| 0 <= ii < q + n + 1 ==> rc[ii] == rc_prefix[ii]);
+        lemma_apply_embedding_agree_prefix(rc, rc_prefix, ws, (q + n + 1) as nat);
+        assert(apply_embedding(rc, ws) =~= apply_embedding(rc_prefix, ws));
+        // ∈ ⟨rc_prefix⟩.
+        lemma_apply_embedding_in_subgroup(bp, rc_prefix, ws);
+        // rc_prefix ⊆ ublock_db_gens (each entry appears).
+        assert forall|ii: int| 0 <= ii < rc_prefix.len()
+            implies exists|k: int| 0 <= k < ub.len() && (#[trigger] rc_prefix[ii]) == ub[k] by {
+            assert(rc_prefix[ii] == rc[ii]);                   // ii < q+n+1
+            lemma_relabel_col_nonp(mm, n, ii);
+        }
+        lemma_in_subgroup_gens_superset(bp, rc_prefix, ub, apply_embedding(rc_prefix, ws));
+        assert(apply_embedding(rc_prefix, ws) =~= wm.subrange(a, b));
+    }
 }
 
 } // verus!
