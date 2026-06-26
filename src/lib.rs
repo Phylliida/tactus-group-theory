@@ -516,3 +516,7 @@ pub mod miller_collapse_assoc;
 // GAP-1 §9.2-item-(2) — the `apply_embedding` evaluator for `miller_collapse_emb` (pure-syntax index
 // access + symbol-power images). Plumbing under the well-definedness brick.
 pub mod miller_collapse_eval;
+// GAP-1 §9.2-item-(2) WELL-DEFINEDNESS brick — the HNN association relators of the Miller slice push
+// through emb_M to freely-trivial words (so D̄_M = pushforward(decls), no association relators). The
+// substituted image(a_col) is the t-conjugate of image(b_col); deconjugation + inverse-cancel.
+pub mod miller_collapse_reln;
