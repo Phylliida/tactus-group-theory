@@ -86,16 +86,24 @@ presentation, i.e. collapse the direct-limit `C` to the finite Higman group `H�
 proves this faithfully in group-theory: `cohen_cs7::lemma_C_faithful_printable` /
 `cohen_bridge::lemma_C_faithful_printable_canonical`. But a feasibility scan (2026-06-26) shows this
 is **not** a quick wiring step:
-- `lemma_C_faithful_printable` is **not** in the `cohen_layer05` export cone — it lives in the
-  Higman-tower + predicate-presentation cone (`h3_pres`, `c_pred`, `equiv_in_pred_presentation`,
-  `s_realizes`, `ModMachine`, `cohen_cs6/cs7/bridge`, `higman_completeness`, …). Wiring it needs a
-  **second, larger export-surface extension** (with its own possible exec-layer snags).
+- ~~`lemma_C_faithful_printable` is **not** in the `cohen_layer05` export cone~~ — **the
+  export-surface extension is now DONE (2026-06-26).** `src/ceer_lib.rs` was widened from the
+  48-module `cohen_layer05` cone to the **87-module union** that also covers the
+  `cohen_cs7`/`cohen_bridge` cone (the Higman-tower + predicate-presentation modules: `cohen_cs4*`,
+  `cohen_cs5*`, `cohen_cs6`, `cohen_cs7`, `cohen_h2`, `cohen_h3`, `cohen_retraction`, `pred_*`,
+  `phi_l_*`, `f_free_*`, `r_prime*`, `pa_data`, …). All 39 added modules are pure ghost (no exec
+  fn / `usize::MAX` / external_body), so the feared exec-layer snags did **not** materialise —
+  `runtime`/`todd_coxeter_rt` stay excluded. `lemma_C_faithful_printable` /
+  `lemma_C_faithful_printable_canonical` are now importable from the computability crate. This is
+  *availability only*; nothing downstream USES it yet — that is the gated collapse below.
 - The mathematical bridge is the **§3.3 machine reduction**: tie the Miller direct-limit `C` (relator
   set `S = D̄`) to Cohen's `C = ⟨c;S⟩` with `is_S = {w_α(c) : (α,0)∈H₀(M)}`, matching the CEER
   `decls_fam` to the machine set `s_realizes`. The AGENDA + `machine-bridge-and-infinite-gen-plan.md`
   flag this as **co-design-gated (a foundational decision, "NOT taken solo")** — the sequential
   successor to Layer 0.5, not a mechanical finish. Do not start it without Danielle's design go.
 
-Also outstanding (unrelated): `tactus-computability-theory/src/formula.rs::lemma_encode_ge_cost_inner`
-fails "postcondition not satisfied" deterministically (toolchain drift, was stale-cache-masked;
-computability gate 208/1). A deep recursive-arithmetic proof, not part of Layer 0.5.
+~~Also outstanding (unrelated): `…formula.rs::lemma_encode_ge_cost_inner` fails…~~ **RESOLVED
+(2026-06-26).** A fresh full-crate run of `tactus-computability-theory` is now **250 verified,
+0 errors** — `lemma_encode_ge_cost_inner` passes (it also passes module-isolated, `formula` 37/0).
+The earlier 208/1 was a transient toolchain-drift state that has since stabilised; no source change
+was needed. The computability crate is fully green.
