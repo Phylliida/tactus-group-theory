@@ -660,3 +660,14 @@ discharged. **The split that made it tractable:**
 (register→modular reduction, untouched). The `decls_family_valid` + `dbar_family_monotone` hypotheses of
 `lemma_limit_commutation` are to be discharged for the concrete `ceer_decls_fam` when wiring the chain
 (monotonicity = the CEER family is cumulative across slices; both are properties of that one family).
+
+**✅ FULL-CRATE REGRESSION GREEN (2026-06-26, next session, whole-crate `./check.sh`): `2731 verified,
+20 errors`, no panic.** Exactly `2714 (item-2) + 17 (item-3a) = 2731`; the new module contributes 17
+verified / 0 errors. The 20 errors are the **stable, pre-item-3 baseline** (verified identical to
+`/tmp/baseline_check.log`, 04:55, pre-item-2): **12** `tactus_auto`-rejected exec lowerings
+(`todd_coxeter_rt.rs`, `runtime.rs` — `IntegerTypeBound(UnsignedMax)`/`DeadEnd`, the known lean-backend
+exec-layer deferrals) + **8** `lake env lean (os error 2)` spawn failures (all `runtime::*` exec + the
+`ii_subset::lemma_exact_div` / `machine_group::lemma_div_mod_id` div-mod lemmas). **None touch the
+mathematical proof chain** — all are exec/runtime infrastructure. Item-3a is regression-clean; no new
+errors anywhere across the 104 modules. (The 8 lake-spawn errors are env/transient per the standing note
+and unchanged by this work — not introduced here.)
