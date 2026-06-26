@@ -411,11 +411,42 @@ Proof route (generalizes E2.E `lemma_in_TM_config_implies_H0` from a single conf
 This is the genuine multi-session work (E2.E-scale + a reconstruction). Build bottom-up; each rung
 verifies & commits.
 
-### 7.2 — Then 3d (with the invariant) + step 4 (DONE) + CS-5d.
-3d mirrors `lemma_map_a_forward` PLUS the §7 invariant (extra conjunct in the `decreases stable_count`
-induction; the per-step C2 call uses the invariant-supplied `∈⟨U,d,b⟩`). Step 4 von-Dyck
+#### 3c-C2 — ✅ **COMPLETE (session 27, `cohen_cs5_recog` 56/0).** `lemma_cs5_middle_h0_restrict`.
+Built bottom-up exactly per the 4-step route, every rung verified & committed:
+- **Step 1 — projection application** (`lemma_cs5_project_to_gsubgens`, →48/0). A machine word in
+  `⟨g_subgens,d,b⟩` over `base_A_plus_base` lands in `⟨g_subgens⟩` over `g_m`, via the `d,b`-killing
+  `π` + two **new presentation-agnostic** transfer lemmas: `lemma_hom_maps_subgroup` (a valid hom maps
+  `⟨gens⟩`-membership to `⟨φ(gens)⟩`-membership) and `lemma_in_subgroup_gens_in_core` (drop generators
+  that already lie in `⟨core⟩` — here the `ε`-images of `d,b`). `ublock_db_gens` = the `⟨g_subgens,d,b⟩`
+  generating set (uniform free tail `[Gen(nk+j)]_{j=0..n}`).
+- **Step 2 — vii→vi→in_TM** (`lemma_cs5_cfg_in_TM`, →51/0). `lemma_g_m_base_faithful_2word` (a NEW
+  two-word `k`-layer base-faithfulness, mirror of `lemma_quad_base_faithful`, via
+  `lemma_single_hnn_base_faithful` on the difference) lands the `⟨g_subgens⟩`-membership in `b_m`; then
+  the Layer-1 `lemma_vii_subset` + `lemma_vi` (diagonal `g_subgens=hnn_a_gens`) give `in_TM(cfg_rep)`.
+- **Step 3 — product coordinate-survival** (`lemma_cs5_canon_coords_h0`, →52/0). `canw_eval(cs)∈T(M)`
+  ⟹ every `cw_reduce(cs)` coordinate is `H₀` — the single-config E2.E (`lemma_in_TM_config_implies_H0`)
+  generalised to a product by applying the coordinate-survival core `lemma_tfree_coord_restrict` at each
+  surviving reduced coordinate (against the `H₀`-canon from `lemma_in_TM_to_canon`). First-try verify.
+- **Step 4 — reconstruct + assemble** (→56/0). `h0_filter` (`slice∩H₀`, a recursive filter) +
+  `lemma_h0_filter_contains`; reconstruct `cw_reduce(cs)` as a `config_emb(h0_filter)` product over
+  `free_group(3)` (`lemma_canw_in_config_subgroup` + `lemma_free_cw_reduce_eval`) and lift it once to
+  `base_A_plus_base` via `lemma_free_subgroup_to_pres` (free reduction sound in any presentation,
+  `freely_equivalent`), then `respects_equiv` back to `mid_w`.
+
+All fully verified, no `assume`/`admit`/`external_body`. Purely additive — nothing else in the crate
+touched, so the gate is undisturbed. The companion-model + textbook cross-check confirmed: `[x,y]=1`
+only affects intra-`β`-block structure (handled by `cw_reduce`), so the free-family coordinate argument
+is safe.
+
+### 7.2 — Then 3d (with the invariant) + step 4 (DONE) + CS-5d.   ← **NEXT**
+3d mirrors `lemma_map_a_forward` (`phi_l_pinch.rs:773`) PLUS the §7 invariant (extra conjunct in the
+`decreases stable_count` induction; the per-step **3c-C2 call now exists** and consumes the
+invariant-supplied `∈⟨g_subgens,d,b⟩` precondition — `lemma_cs5_middle_h0_restrict`). Step 4 von-Dyck
 (`lemma_cs5_vondyck_relator`, DONE) already wants the H₀-slice — it composes unchanged. CS-5d
 (tower lift via `lemma_h3_pred_upto_base_faithful` at k=2n) unchanged.
 
-**Status (session 26):** finding documented; baseline `cohen_cs5_recog` GREEN at 38/0. NEXT = build
-3c-C2 (`lemma_cs5_middle_h0_restrict`) bottom-up, then 3d with the invariant.
+**Status (session 27):** 3c-C1 (`lemma_cs5_middle_reflect`) + 3c-C2 (`lemma_cs5_middle_h0_restrict`)
+both COMPLETE; `cohen_cs5_recog` GREEN at 56/0. NEXT = build **3d** (the `lemma_map_a_forward`-analog
+peel over `base_A_plus_data`, threading the §7 `⟨g_subgens,d,b,p⟩`-subgroup invariant; base case = step
+2 `lemma_cs5_base_case_faithful`, step case = 3b descent + 3c-C1/C2 at the pinch middle + pinch-out +
+recurse) → assemble `(★k)` forward → glue backward → CS-5d tower lift.

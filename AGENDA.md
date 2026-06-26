@@ -341,6 +341,21 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > (α,0)∈H₀`, via `lemma_vii_subset`+`lemma_theorem1`) at the pinch middle, in place of CS-4's
 > config-family membership (`docs/cohen-cs5-blueprint.md` §4) → **CS-5d** (tower lift, mirror CS-4e).
 >
+> **✅ CS-5c 3c-C2 COMPLETE 2026-06-25 (session 27) — the H₀-restriction intersection crux
+> (`cohen_cs5_recog` 56/0).** Built the corrected R1 route (blueprint §7.1) bottom-up, 4 rungs each
+> verified & committed: **(1)** `lemma_cs5_project_to_gsubgens` — the `d,b`-killing `π` application
+> (`⟨g_subgens,d,b⟩`-over-`base_A_plus_base` machine word → `⟨g_subgens⟩` over `g_m`) via two NEW
+> presentation-agnostic transfer lemmas (`lemma_hom_maps_subgroup`, `lemma_in_subgroup_gens_in_core`);
+> **(2)** `lemma_cs5_cfg_in_TM` — `lemma_g_m_base_faithful_2word` (NEW two-word k-layer base-faithfulness)
+> lands it in `b_m`, then Layer-1 vii→vi → `in_TM`; **(3)** `lemma_cs5_canon_coords_h0` — product
+> coordinate-survival (E2.E single→product via `lemma_tfree_coord_restrict` per surviving coord);
+> **(4)** `lemma_cs5_middle_h0_restrict` — `h0_filter` reconstruction over `free_group(3)` +
+> `freely_equivalent` lift to `base_A_plus_base`. Fully verified, NO assume/admit/external_body, purely
+> additive (gate undisturbed). Companion-model + textbook cross-checked (`[x,y]=1` only affects intra-β
+> structure, safe). **NEXT = 3d** = the `lemma_map_a_forward`-analog peel over `base_A_plus_data`
+> threading the §7 `⟨g_subgens,d,b,p⟩`-invariant (base case = step-2 `lemma_cs5_base_case_faithful`; step
+> case = 3b descent + 3c-C1/C2 at the pinch middle + pinch-out + recurse) → `(★k)` fwd → CS-5d tower lift.
+>
 > **✅ FORK-A STARTED 2026-06-23 (session 14) — elementary foundation arc DONE, ports VERBATIM.**
 > The completeness route is **Fork-A** (predicate presentation; the textbook route per
 > `docs/cohen-faithfulness-primary-source.md` §1/§10). Go taken on the standing "follow the textbook"
