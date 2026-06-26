@@ -498,3 +498,50 @@ set. The §4.2 design sub-questions stand, now anchored:
 
 **Net:** GAP-2 source is now READ (not just located). The construction is pinned to the paper. The
 build itself remains the separate, later, textbook-gated reduction — *not* started this session.
+
+---
+
+## 11. GAP-1 §9.2-item-(1) BUILT — the Miller collapse images `uⱼ(a,t)` (2026-06-26)
+
+*This session re-audited the §9.4 reframing and found that one piece of the §9.2 build is genuinely
+**routing-neutral** and therefore in the same "safe additive brick" category as the §10 GAP-3
+soundness build — and built it. Companion cross-checked (the "Containment Protocol": existing
+representation, zero logic beyond hygiene, hard stop before item-2). No faithfulness, no equiv, no
+codomain commitment.*
+
+- **New module `src/miller_collapse.rs` (5 verified, 0 errors), definitions-only:**
+  - `b_sub(a,t) = t a t⁻¹`, `binv_sub(a,t) = t a⁻¹ t⁻¹` — the collapsed `b`/`b⁻¹` (from the col-0
+    association `t⁻¹bt=a`).
+  - `miller_collapse_word(j,a_idx,t_idx)` = Miller's `uⱼ = t·b⁻ⁱ·a·bⁱ·t⁻¹·a⁻ⁱ·b⁻¹·aⁱ` with `i=j+1`
+    and `b↦tat⁻¹` substituted **mechanically** (no algebraic reduction — avoids the "Literal Fallacy";
+    every `b` symbol → the 3-letter word `tat⁻¹`). This is the textbook `cⱼ↦uⱼ(a,t)` image.
+  - `miller_collapse_emb(M,a_idx,t_idx)` = the full per-slice substitution as a `Seq<Word>` of length
+    `M+3` (= `hnn_presentation(miller_data(M)).num_generators`): `Gen(j)↦uⱼ`, `a=Gen(M)↦a`,
+    `b=Gen(M+1)↦tat⁻¹`, `t=Gen(M+2)↦t`. This is the literal object `apply_embedding`/item-2 consume.
+  - Hygiene lemmas (pure syntax): `lemma_miller_collapse_word_valid`, `lemma_miller_collapse_emb_len`
+    (`=M+3`), `lemma_miller_collapse_emb_valid`, plus local `lemma_word_power_valid`/`lemma_bt_words_valid`.
+- **Index facts pinned off the code** (`cohen_layer05.rs:60`): c-block `cⱼ=Gen(j)` (j<M), `a=Gen(M)`,
+  `b=Gen(M+1)`, stable letter `t=Gen(M+2)` (`hnn.rs:29`). The repo's `cⱼ=Gen(j)` is Miller's
+  `c_{j+1}` — `acol_elt` uses exponent **`j+1`** — so the Miller exponent is `i=j+1` (NOT `j`; that
+  off-by-one was the Type-Constraint Trap the companion flagged).
+- **Why this is routing-neutral (the §9.4-reserved decision is NOT pre-committed):** everything is
+  **parametrized over `(a_idx,t_idx)`**. The "wrap in place" packaging instantiates `a_idx=M,t_idx=M+2`
+  (collapsed object inside `G^(M)`); the "fresh `{a,t}` Presentation" packaging instantiates
+  `a_idx=0,t_idx=1`. Both feed the **same** parametrized words — so the definition survives either
+  choice unchanged. (Test for "doesn't cross the gate": would Danielle's representational choice force
+  a rewrite of this brick? No.) ✓
+
+### What this leaves for Danielle (the gate is now exactly here)
+- **§9.2-item-(2)** (instantiate `embedding_injective`/`embedding_preserving` for `miller_collapse_emb`)
+  **genuinely crosses §9.4's reserved choice**: it must name the codomain `k: Presentation` in
+  `embedding_injective(g,k,emb)` — i.e. *pick* fresh-`{a,t}`-presentation vs wrap-in-place — and it is
+  the multi-session **effort-go**. Not takeable solo.
+- Defining the **fresh collapsed presentation** `⟨a,t | D̄_M⟩` / the relator set `D̄_M` is **also**
+  not neutral — you only build `D̄_M` under the "former" packaging, so it pre-commits §9.4. (Confirmed:
+  item-(1) was the *last* routing-neutral brick; item-(2), the codomain, and `D̄_M` all need the confirm.)
+- **§9.2-item-(3)** (limit-commutation glue) and **GAP-2** unchanged — both gated.
+
+**Net:** GAP-1's textbook object `uⱼ(a,t)` is now machine-defined and well-formed (5/0), reused-machinery
+ready for item-2. The lane is back at the genuine wall — Danielle's §6.1 representational confirm
+(fresh-presentation vs wrap) **+ effort-go** for item-2/3, and §6.2 + effort for GAP-2. Item-1 was the
+boundary; there is no further routing-neutral solo brick.

@@ -502,3 +502,10 @@ pub mod cohen_layer05;
 // cp-relator is empty in fp. Machine-independent; the Layer-2 application (cp=c_pred, fp=h3_pres,
 // relator hypothesis via lemma_III) is a separate brick. docs/final-gate-axiom-removal-plan.md sec 5.
 pub mod pred_to_finite;
+
+// miller_collapse: GAP-1 (final gate) §9.2-item-(1) — Miller §4.1 substitute-and-collapse images
+// `uⱼ(a,t)` (the c-generators' collapse words) as routing-neutral DEFINITIONS, parametrized over
+// where a,t live so neither §9.4 packaging choice is pre-committed. Definitions + word-validity
+// hygiene only; the two faithfulness directions (item-2) and limit-commutation glue (item-3) are
+// the effort-gated build and are NOT here. docs/final-gate-axiom-removal-plan.md §3/§8.5/§9.2.
+pub mod miller_collapse;
