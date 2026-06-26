@@ -69,9 +69,15 @@ lemma_C_faithful_printable_canonical(mm, n, m, w):     // mm: ModMachine  (exact
 ```
 - `h3_pres(mm,n,m)` is a **finite `Presentation`** (uses plain `equiv`, not `equiv_pred`) — Cohen's
   set (I). So it can serve *directly* as the witness `p` of the final theorem. ✓
-- `c_pred(mm,n,m,is_S)` (`cohen-section1-assembly-plan.md` §3) = Cohen's `⟨c;S⟩` as a
-  `PredPresentation`: `num_generators = h2_num_gens`, relators `= is_S(w) ∨ (Gen(g)≡ε for every
-  non-c generator g)`. **Fixed finite c-block** at indices `[c_base, c_base+n)`.
+- `c_pred(mm,n,m,is_S)` (`cohen_retraction.rs:238`, NOT `cohen-section1-assembly-plan.md` §3) =
+  `PredPresentation { num_generators = h2_num_gens(g_m(mm).num_generators, n), relators = |w| is_S(w) }`.
+  **⚠ CORRECTED by the §8 audit:** the relators are **`is_S` ONLY** — there is *no* `Gen(g)≡ε`
+  non-c-killing disjunction (that lives in the *retraction homomorphism* `c_retraction`'s images,
+  `cohen_retraction.rs:246`, not in `c_pred`'s relators). So `c_pred` is **`⟨c;S⟩ ∗ F(non-c gens)`**:
+  the non-c generators are *present-but-free*. On a **pure-c word** this presents exactly Cohen's
+  `⟨c;S⟩` (free factors are invisible to a pure-c word problem); reaching the literal fixed-`n`-block
+  `⟨c;S⟩` requires Tietze-removing the free non-c gens — a *deferred final-packaging step* (the code
+  comment flags it). **Fixed c-block** at indices `[c_base, c_base+n)` *inside* the larger gen set.
 - `is_S_canonical(mm,n,m)` (`cohen_bridge.rs:49`)
   `= { w : ∃α. numbers_word(n,m,α) ∧ mm_in_H0(mm,α,0) ∧ w = w_c(c_base, n, m, α) }`.
 - **Soundness direction also available**: `lemma_III` (`higman_consequences.rs`):
@@ -244,3 +250,67 @@ Given GAP 1 + GAP 2:
   dragon (`∼` only c.e.). Follow Miller; carry `C₀`'s relators opaquely.
 
 *Do not start GAP 1/2 implementation without Danielle's design go on §6.1–6.2.*
+
+---
+
+## 8. Runway audit (2026-06-26, unsupervised session — read-only, no code)
+
+*A fresh read-only pass that verifies every endpoint signature, the axiom, and the dependency chain
+in §1–§5 **against the actual `tactus-*` source** (the verus MCP indexes the old Z3 crate, so these
+were checked directly with Read/Grep on the tactus port). Purpose: guarantee the runway Danielle is
+asked to commit effort to is grounded in reality, not drift. **No code written; no decision taken.**
+One correction + one hidden sub-task found; the rest confirmed accurate.*
+
+### 8.1 Confirmed accurate (line-grounded)
+| Claim | Verified at | Status |
+|---|---|---|
+| `axiom_ceer_fp_embedding`, `external_body`, `requires ceer_wf(e)` | `ceer_benign.rs:67` (decl; doc said :66 = attr line) | ✓ |
+| Axiom used in **exactly one** place | `ceer_benign.rs:84` (`lemma_ceer_embeds_in_fp_group_main`) | ✓ |
+| Chain → `lemma_higman_embedding:72` → `theorem_zfc_equiv_in_fp_group:107` | `higman.rs` | ✓ (single axiom dep) |
+| L0.5 endpoint `lemma_ceer_native_embeds_in_c_iff` signature | `ceer_layer05_bridge.rs:955` | ✓ exact |
+| `equiv_in_g_limit := ∃M≥n. equiv_in_presentation(hnn_presentation(miller_data(M,fam(M))),…)` | `cohen_layer05.rs:735` | ✓ exact |
+| `miller_data(M,·).base.num_generators == M+2` (growing c-block `Gen(0..M)` + a,b) | `cohen_layer05.rs:633` | ✓ |
+| L2 endpoint `lemma_C_faithful_printable_canonical` signature | `cohen_bridge.rs:125` | ✓ exact |
+| `is_S_canonical` definition | `cohen_bridge.rs:49` | ✓ exact |
+
+### 8.2 ⚠ CORRECTION — `c_pred`'s relators (§1.2 fixed inline)
+The doc claimed `c_pred` relators `= is_S(w) ∨ (Gen(g)≡ε for non-c g)`. **The actual code
+(`cohen_retraction.rs:241`) is `relators: |w| is_S(w)` — `is_S` only.** The non-c-killing `↦ε`
+lives in the *retraction homomorphism* `c_retraction` (`:246`), not in `c_pred`. So
+**`c_pred ≅ ⟨c;S⟩ ∗ F(non-c gens)`** with the non-c generators *present-but-free*.
+
+### 8.3 Hidden sub-task this surfaces (belongs in GAP 3, §5)
+Because `c_pred` carries free non-c generators, the final theorem's chain lands in
+`⟨c;S⟩ ∗ F(non-c)`, not literally Cohen's `⟨c;S⟩`. **Two ways to close it** (companion-confirmed):
+- **(cheap, sufficient)** a lemma `equiv_in_pred_presentation(c_pred, w, ε) ⟺ w ≡_{⟨c;S⟩} ε` **for
+  pure-c `w`** — true by free-product invisibility (a factor element is trivial in `A∗B` iff trivial
+  in `A`). The final `emb` maps CEER gens to pure-c words, so this is all the theorem needs.
+- **(full hygiene)** Tietze-remove the free non-c gens (the deferred final-packaging step the code
+  comment names). Not required for the *truth* of the iff; only for a literally-`⟨c;S⟩` artifact.
+
+### 8.4 GAP-1 framing SHARPENED (the central question, §3)
+`equiv_in_g_limit` keeps the c-block **growing** (`Gen(0..M)`, one gen per CEER generator) — so
+**L0.5's `C` is, formally, still infinitely generated** (a growing-generator direct limit of Miller
+slices), *not* Miller's genuinely finitely-generated `G`. GAP 1 is therefore **not "spec packaging"**
+(as "identify the two C's" reads): it is the **∞ → finitely-generated collapse that L0.5 deliberately
+deferred** (the "Tietze tax" the `cohen_layer05.rs:704–717` note explicitly chose to skip). The
+original CEER generators must become **words** over a fixed finite alphabet (Miller Thm 4.1:
+`gₖ ↦ cₖ a⁻ᵏbaᵏ`-style conjugates — exactly the banked `conj_family`/`conj_family_b` free families).
+- **Cohen's `n` (c-generator count)** = the f.g. count of the *collapsed* `G`, **not** the CEER
+  generator count (infinite — impossible). The companion argues `n = 2` (`{a,t}`/`{a,b}`); the exact
+  value is a GAP-1/GAP-2 **design detail coupled to the word-numbering digit structure**
+  (`numbers_word` uses digits `1≤d≤2n`, `is_S_canonical`/`w_c`) — **confirm against the actual
+  instantiation, do not assert.**
+- This *reinforces* the §6.1 gate: R1 (substitute-and-collapse) is precisely paying the deferred
+  Tietze tax; it is real Miller-Thm-4.1 content, the hardest part — treating GAP 1 as packaging would
+  ignore it. Still **surfaced, not taken.**
+
+### 8.5 Tooling note
+Neither textbook PDF is readable in this env: `pdftoppm`/`pdftotext` (poppler) absent and no python
+PDF lib (`fitz`/`pdfplumber`) installed — so the Miller §4.1 / Cohen §9.6 *primary-source* read that
+GAP 1's resolution wants (`MESSAGES_FROM_USER.md` 2026-06-22) **cannot be done here**; it needs an
+env with poppler, or the build session. The §8.4 sharpening rests on the code + companion logic-check,
+not a fresh primary-source read — flagged so a later session closes that gap before the §6.1 go.
+
+*Net: the runway is sound and now corrected. The blocker is unchanged — Danielle's design go on
+§6.1 (GAP-1 routing) + §6.2 (GAP-2 encoding). Nothing further is safe to build solo.*
