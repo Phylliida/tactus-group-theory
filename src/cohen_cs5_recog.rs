@@ -43,7 +43,10 @@ use crate::machine_group::{ModMachine, g_m, g_subgens, g_m_associations, config_
     lemma_b_m_valid, lemma_b_m_upto_num_generators, lemma_vii_subset, lemma_single_hnn_base_faithful};
 use crate::tower_peel::lemma_vi;
 use crate::prop_v::lemma_equiv_from_concat_inv_trivial;
-use crate::free_basis::lemma_g_m_data_isomorphic;
+use crate::free_basis::{lemma_g_m_data_isomorphic, config_emb, w_to_canon, lemma_config_emb_eq_canw};
+use crate::machine_group::{CanonLetter, canw_eval, base_A, lemma_base_A_valid, lemma_canw_eval_valid};
+use crate::config_reduce::{coord_in, cw_reduce, lemma_in_TM_to_canon, lemma_tfree_coord_restrict,
+    lemma_cw_reduce_eval};
 use crate::presentation::{lemma_equiv_refl, lemma_equiv_transitive};
 use crate::presentation_lemmas::{lemma_equiv_concat_left, lemma_word_inverse_right};
 use crate::layout::{h1_num_gens, h2_num_gens, c_base, b_base, d_idx, p_idx, b_idx, c_idx};
@@ -1944,6 +1947,41 @@ pub proof fn lemma_cs5_cfg_in_TM(mm: ModMachine, cfg_rep: Word)
     assert(in_generated_subgroup(bm, hnn_a_gens(gdata), cfg_rep));
     lemma_vii_subset(mm, cfg_rep);                          // ∈ ⟨T(M), rᵢ, lⱼ⟩
     lemma_vi(mm, cfg_rep);                                  // ∈ T(M)
+}
+
+// ============================================================================
+// Step 3c-C2 (step 3) — the product coordinate-survival.  A CanonLetter list `cs` whose
+// evaluation lies in `T(M)` has every surviving (post-`cw_reduce`) coordinate in `H₀`.
+// Generalizes `lemma_in_TM_config_implies_H0` from a single config to a product, by applying the
+// E2.E coordinate-survival core (`lemma_tfree_coord_restrict`) at each reduced coordinate.
+// ============================================================================
+
+/// **CS-5c step 3.** `canw_eval(cs) ∈ T(M)` ⟹ every coordinate of `cw_reduce(cs)` is an `H₀` config.
+pub proof fn lemma_cs5_canon_coords_h0(mm: ModMachine, cs: Seq<CanonLetter>)
+    requires
+        in_TM(mm, canw_eval(cs)),
+    ensures
+        forall|j: int| 0 <= j < cw_reduce(cs).len() ==>
+            mm_in_H0(mm, (#[trigger] cw_reduce(cs)[j]).r as nat, cw_reduce(cs)[j].s as nat),
+{
+    let g = canw_eval(cs);
+    let red = cw_reduce(cs);
+    lemma_base_A_valid();
+    let p_canon = lemma_in_TM_to_canon(mm, g);              // canw(p_canon) ≡_A g, coords ∈ H₀
+    lemma_canw_eval_valid(p_canon);
+    lemma_equiv_symmetric(base_A(), canw_eval(p_canon), g);
+    assert(equiv_in_presentation(base_A(), canw_eval(cs), canw_eval(p_canon)));
+    assert forall|j: int| 0 <= j < red.len() implies
+        mm_in_H0(mm, (#[trigger] red[j]).r as nat, red[j].s as nat) by {
+        assert(coord_in(red, red[j].r, red[j].s));          // red[j] is its own witness
+        lemma_tfree_coord_restrict(cs, p_canon, red[j].r, red[j].s);
+        let k = choose|k: int| 0 <= k < p_canon.len()
+            && p_canon[k].r == red[j].r && p_canon[k].s == red[j].s;
+        assert(0 <= k < p_canon.len() && p_canon[k].r == red[j].r && p_canon[k].s == red[j].s);
+        assert(mm_in_H0(mm, p_canon[k].r as nat, p_canon[k].s as nat)
+            && p_canon[k].r >= 0 && p_canon[k].s >= 0);     // from lemma_in_TM_to_canon
+        assert(p_canon[k].r as nat == red[j].r as nat && p_canon[k].s as nat == red[j].s as nat);
+    }
 }
 
 } // verus!
