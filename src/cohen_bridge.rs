@@ -25,16 +25,19 @@
 // Additive (new module + one lib.rs line); reversible; no regression.
 
 use vstd::prelude::*;
-use crate::word::{Word, empty_word};
+use crate::word::{Word, empty_word, word_valid};
 use crate::presentation::equiv_in_presentation;
 use crate::pred_presentation::equiv_in_pred_presentation;
-use crate::machine_group::{ModMachine, mod_machine_wf, mm_terminal, mm_in_H0, g_m};
-use crate::layout::c_base;
+use crate::machine_group::{ModMachine, mod_machine_wf, mm_terminal, mm_in_H0, g_m,
+    lemma_g_m_num_generators, lemma_word_valid_mono};
+use crate::layout::{c_base, h2_num_gens, h3_num_gens};
 use crate::word_numbering::{numbers_word, w_c};
-use crate::h3::h3_pres;
-use crate::cohen_h2::{s_relators_valid, s_realizes, is_c_word, c_symbol};
+use crate::h3::{h3_pres, lemma_h3_pres_valid, lemma_h3_num_generators};
+use crate::cohen_h2::{s_relators_valid, s_realizes, is_c_word, c_symbol, lemma_c_word_valid};
 use crate::cohen_retraction::{c_pred, lemma_w_c_in_block};
 use crate::cohen_cs7::lemma_C_faithful_printable;
+use crate::higman_consequences::lemma_III;
+use crate::pred_to_finite::lemma_pred_equiv_lifts_to_finite;
 
 verus! {
 
@@ -135,6 +138,55 @@ pub proof fn lemma_C_faithful_printable_canonical(mm: ModMachine, n: nat, m: nat
     lemma_is_S_canonical_relators_valid(mm, n, m);
     lemma_is_S_canonical_realizes(mm, n, m);
     lemma_C_faithful_printable(mm, n, m, is_S_canonical(mm, n, m), w);
+}
+
+// ============================================================================
+// The concrete SOUNDNESS headline (GAP-3) — the companion of faithfulness
+// ============================================================================
+
+/// **§3.3a — concrete Higman-embedding SOUNDNESS for the printable group.**  The companion of
+/// `lemma_C_faithful_printable_canonical`: a word `w` trivial in `C = ⟨c;S⟩` (the CONCRETE relator
+/// set `S = { w_α(c) : (α,0)∈H₀(M) }`) is trivial in the printable finite `h3_pres`.  Instantiates
+/// the generic soundness transport `lemma_pred_equiv_lifts_to_finite` (`pred_to_finite.rs`) at
+/// `cp = c_pred`, `fp = h3_pres`, discharging its relator hypothesis with Layer-2 soundness
+/// `lemma_III` (`(α,0)∈H₀ ⟹ w_α(c) ≡ 1 in h3_pres`) + the c-word validity bound.  Together with
+/// `lemma_C_faithful_printable_canonical` this is the full
+/// `equiv_in_pred_presentation(c_pred,w,ε) ⟺ equiv_in_presentation(h3_pres,w,ε)` over the machine
+/// bridge — GAP 3 of the final gate (`docs/final-gate-axiom-removal-plan.md` §5).
+pub proof fn lemma_C_sound_printable_canonical(mm: ModMachine, n: nat, m: nat, w: Word)
+    requires
+        mod_machine_wf(mm),
+        2 * n < m,
+        equiv_in_pred_presentation(c_pred(mm, n, m, is_S_canonical(mm, n, m)), w, empty_word()),
+    ensures
+        equiv_in_presentation(h3_pres(mm, n, m), w, empty_word()),
+{
+    let nk = g_m(mm).num_generators;
+    let cp = c_pred(mm, n, m, is_S_canonical(mm, n, m));
+    let fp = h3_pres(mm, n, m);
+    // gen-count inclusion: cp = h2_num_gens(nk,n) = nk+2n+2 ≤ nk+4n+3 = h3_num_gens(nk,n) = fp
+    lemma_g_m_num_generators(mm);          // nk == 4 + |quads|
+    lemma_h3_num_generators(mm, n, m);     // fp.num_generators == h3_num_gens(nk, n)
+    assert(cp.num_generators == h2_num_gens(nk, n));
+    assert(fp.num_generators == h3_num_gens(nk, n));
+    assert(cp.num_generators <= fp.num_generators);
+    // fp valid
+    lemma_h3_pres_valid(mm, n, m);
+    // relator hypothesis: every S-relator is trivial in h3_pres (lemma_III) and a valid h3-word
+    assert forall|r: Word| #[trigger] (cp.relators)(r) implies
+        equiv_in_presentation(fp, r, empty_word()) && word_valid(r, fp.num_generators) by {
+        // (cp.relators)(r) = is_S_canonical(mm,n,m)(r)
+        assert(is_S_canonical(mm, n, m)(r));
+        let alpha = choose|alpha: nat|
+            #![trigger w_c(c_base(nk), n, m, alpha)]
+            numbers_word(n, m, alpha) && mm_in_H0(mm, alpha, 0)
+            && r == w_c(c_base(nk), n, m, alpha);
+        lemma_III(mm, n, m, alpha);             // equiv(fp, w_c(c_base(nk),n,m,alpha), ε) = equiv(fp,r,ε)
+        lemma_w_c_is_c_word(nk, n, m, alpha);   // is_c_word(nk,n,r)
+        lemma_c_word_valid(nk, n, r);           // word_valid(r, h2_num_gens(nk,n))
+        lemma_word_valid_mono(r, h2_num_gens(nk, n), fp.num_generators);  // h2 ≤ h3
+    }
+    lemma_pred_equiv_lifts_to_finite(cp, fp, w, empty_word());
 }
 
 } // verus!
