@@ -671,3 +671,46 @@ exec-layer deferrals) + **8** `lake env lean (os error 2)` spawn failures (all `
 mathematical proof chain** — all are exec/runtime infrastructure. Item-3a is regression-clean; no new
 errors anywhere across the 104 modules. (The 8 lake-spawn errors are env/transient per the standing note
 and unchanged by this work — not introduced here.)
+
+---
+
+## 13. GAP-2 INTERFACE SKELETON — BUILT (2026-06-26, next session, authorized + closed by Danielle)
+
+*After item-3a closed, consulted Danielle (port 8051, the §6.1-decision channel). She gave an explicit
+**effort-go to OPEN GAP-2 as an Interface-Definition session only** (type-level plumbing, NOT the
+reduction impl), fixed the **design = parametric-over-`enc`** (companion's Option B — keep GAP-1
+word-numbering ⊥ GAP-2 machine), and asked for a skeleton check-in. Built it, checked in, she
+confirmed the natural stopping point ("session closed, the skeleton is green, stand down").*
+
+**⚠ ARCHITECTURAL FINDING — GAP-2 lives in `tactus-computability-theory`, NOT here.** The dep runs
+`computability-theory → group-theory` (one-way; `Cargo.toml` path dep `verus_group_theory`). Since
+`ceer_to_modmachine` needs BOTH `CEER` (computability) and `ModMachine` (group-theory), it can only live
+in the computability crate. (`ceer_to_modmachine` is morally a compiler CEER→ModMachine; it belongs in
+the layer that understands the *source*.) The §4.2 sketch's home was therefore the sibling crate all along.
+
+**`tactus-computability-theory/src/modular_reduction.rs` (commit `c466aae`, crate `250 → 251 verified,
+0 errors`).** The three skeleton points, all green:
+- **(1) Parametric seam** — `pub type Enc = spec_fn(nat,nat) -> nat`, the abstract `(a,b) ↦ word-number`
+  map held as a parameter so refining the word-numbering never forces a machine rewrite (and vice versa).
+- **(2) Register→modular state map, TYPED** — `rm_modulus(rm)`, `config_encode(rm,c) -> (nat,nat)`,
+  `ceer_to_modmachine(e) -> ModMachine`. Bodies are honest **DEFERRED stubs** (each doc-flagged
+  `DEFERRED (GAP-2 impl)`; they pin the *type* only — e.g. `ceer_to_modmachine` returns the trivial
+  terminal `ModMachine{m:2,n:1,quads:empty}`, explicitly NOT the AC-correct build). The m-ary residue
+  encoding — §4.2's "where reinvention is most dangerous" — was deliberately NOT attempted; stopped at
+  the type so the contract can "set" before the fragile encoding work begins.
+- **(3) H₀ reduction TARGET, delineated** — `mm_realizes_declared(mm, enc, e) := mm_terminal(mm,0,0) ∧
+  ∀a,b. mm_in_H0(mm, enc(a,b), 0) ⟺ declared_equiv(e,a,b)`. This is exactly the **§3.4 second conjunct**.
+  Plus `lemma_realizes_iff` (verified: unfolds the target at one pair = the downstream consumer contract).
+- The two **AC-Thm-2 correctness obligations** (`lemma_ceer_modmachine_wf`, `lemma_modmachine_realizes`)
+  are written as **documented obligations at the file foot, NOT proof fns** — proving them needs the real
+  encoding bodies (the deferred co-design), so coding them now would fail or need an escape hatch (banned).
+
+**Reused (no shadow types):** `RegisterMachine`/`Configuration`/`step`/`run`/`halts` (`machine.rs`,
+Minsky Inc/DecJump/Halt), `CEER`/`declared_pair`/`declared_equiv`/`stage_declares` (`ceer.rs`),
+`ModMachine`/`mm_in_H0`/`mm_terminal` (group-theory export), `is_S_canonical` (`cohen_bridge.rs`).
+
+**NEXT (deferred, co-design):** discharge `lemma_modmachine_realizes` — the AC-Thm-2 m-ary simulation
+(`config_encode` correct, per-instruction quad emission, `H₀`-reaches-origin ⟺ enumerator-halts). Then
+GAP-1 item-3b wires `is_S_canonical(ceer_to_modmachine(e),n,m)` to `ceer_decls_fam(e)`'s union-predicate
+and discharges `lemma_limit_commutation`'s `decls_family_valid`/`dbar_family_monotone` for that concrete
+`mm`. Escape valve (Danielle): if the encoding leaks/walls → pivot to the `dbar_family_monotone` bricks.
