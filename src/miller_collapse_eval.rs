@@ -2,7 +2,8 @@ use vstd::prelude::*;
 use crate::symbol::*;
 use crate::word::*;
 use crate::benign::{apply_embedding, apply_embedding_symbol, lemma_apply_embedding_concat};
-use crate::machine_group::{symbol_power, word_power, lemma_symbol_power_one, lemma_symbol_power_merge};
+use crate::machine_group::{symbol_power, word_power, lemma_symbol_power_one, lemma_symbol_power_merge,
+    lemma_word_power_symbol};
 use crate::miller_collapse::{b_sub, binv_sub, miller_collapse_word, miller_collapse_emb};
 
 verus! {
@@ -53,6 +54,29 @@ pub proof fn lemma_apply_embedding_symbol_power(emb: Seq<Word>, s: Symbol, n: na
         // apply_embedding(emb, sⁿ) = img + word_power(img, k) = word_power(img, n)
         assert(word_power(img, n) =~= img + word_power(img, k));
     }
+}
+
+/// `word_power([s], i) = sⁱ` — a singleton's word-power is the symbol-power.
+pub proof fn lemma_word_power_singleton(s: Symbol, i: nat)
+    ensures
+        word_power(seq![s], i) =~= symbol_power(s, i),
+{
+    lemma_symbol_power_one(s);
+    assert(seq![s] =~= symbol_power(s, 1));
+    lemma_word_power_symbol(s, 1, i);   // word_power(symbol_power(s,1), i) =~= symbol_power(s, 1*i)
+    assert((1 * i) as nat == i);
+}
+
+/// `apply_embedding(emb, Gen(k)ⁱ) = (emb[k])ⁱ` and the `Inv(k)` analog — embedding a generator-power.
+pub proof fn lemma_emb_gen_power(emb: Seq<Word>, k: nat, i: nat)
+    ensures
+        apply_embedding(emb, symbol_power(Symbol::Gen(k), i)) =~= word_power(emb[k as int], i),
+        apply_embedding(emb, symbol_power(Symbol::Inv(k), i)) =~= word_power(inverse_word(emb[k as int]), i),
+{
+    lemma_apply_embedding_symbol_power(emb, Symbol::Gen(k), i);
+    assert(apply_embedding_symbol(emb, Symbol::Gen(k)) == emb[k as int]);
+    lemma_apply_embedding_symbol_power(emb, Symbol::Inv(k), i);
+    assert(apply_embedding_symbol(emb, Symbol::Inv(k)) == inverse_word(emb[k as int]));
 }
 
 // --- miller_collapse_emb index access (off the Seq::new + seq! structure) ---
