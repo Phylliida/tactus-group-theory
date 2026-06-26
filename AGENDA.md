@@ -408,10 +408,20 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > `lemma_p_relator_is_family_ii` (`hnn_relator(h2_data,0) = p⁻¹·t·p·(td)⁻¹ = family_II_relator(0)`,
 > since `config_word(0,0)=t` and `w_b(0)=ε`) + the existing generic lift `lemma_pred_equiv_from_finite`.
 > **LAYER 2 COMPLETE** — the Higman embedding `C ↪ H₃` is faithful for the actual printable f.p. group.
-> **NEXT** = the machine bridge §3.3 (instantiate `is_S` concretely so `w_α(c)∈S ⟺ (α,0)∈H₀(M)`,
-> discharging `s_relators_valid`/`s_realizes`) + Layer 0.5 (CEER → f.g. `C`, still co-design-BLOCKED on
-> the infinite-gen representation). The soundness ⟸ (`lemma_III`) + this faithfulness ⟹ give the
-> machine-iff `w_α(c)=1 in H₃ ⟺ (α,0)∈H₀` once the bridge lands `is_S`.
+>
+> **✅ §3.3a DONE + DESIGN PASS 2026-06-25 (session 32) — `docs/machine-bridge-and-infinite-gen-plan.md`.**
+> `cohen_bridge.rs` 4/0 (commit 61297d2): canonical `is_S = { w_α(c) : (α,0)∈H₀(M) }` discharges
+> `s_relators_valid`/`s_realizes` ⟹ **`lemma_C_faithful_printable_canonical`** — the printable f.p.
+> `h3_pres` faithfully contains `C=⟨c;S⟩` for the concrete machine set `H₀(M)`. **The general explicit
+> Higman embedding theorem, ZFC-independent.** The design pass mapped the rest: the headline machine-iff
+> `w_α(c)=1 in H₃ ⟺ (α,0)∈H₀` is NOT closed by §3.3a — its ⟹ (`w_α(c)=1 in C ⟹ (α,0)∈H₀`) is C's word
+> problem deciding the c.e. set = **Layer-0.5 content**; the two arcs are sequential (Layer 0.5 → §3.3).
+> Layer 0.5's "∞-gen blocker" is softer than thought: a bespoke ∞-gen CEER rep + its forward direction
+> already exist (`ceer_group.rs`), both F∞↪F₂ cruxes are banked. **NEXT = the foundational decision
+> (plan §C, co-design-GATED, NOT taken solo): representation (extend `ceer_group.rs` vs general
+> `InfPredPresentation`) + the compactness question (does Miller §4.1 HNN faithfulness localize to
+> finite slices, reusing the proven AFP/Britton stack?) + whether the CEER group's freeness is a
+> legit `F∞↪F₂` shortcut or a dragon. De-risk via the cheap non-committing probe (plan §D) first.**
 >
 > **✅ CS-5c 3d IN PROGRESS 2026-06-25 (session 29) — `cohen_cs5_recog` 83→102/0, gate GREEN, additive
 > (+19 lemmas, 6 commits, all verified first/second try, no assume/admit/external_body).** Blueprint
@@ -848,9 +858,28 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       orbit of `wα(c)`'s digits.** See `docs/brick5-c4-plan.md` §7–§8.
 
 ### 3.3 — The ZFC bridge + instantiation
-- [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse).
+
+> **✅ DESIGN PASS 2026-06-25 (session 32) — `docs/machine-bridge-and-infinite-gen-plan.md`.** The
+> dependency structure of the last two arcs is now mapped. Headline: the genuine critical path is
+> **Layer 0.5 first**, then §3.3-proper (Layer 0.5 produces the real `C`'s relator set `S`; §3.3 then
+> ties `S` to a machine). §3.3a (the only unblocked part) was BUILT; the rest waits on Layer 0.5 +
+> the foundational representation decision (§3.3 plan doc §C, surfaced for Danielle — NOT taken solo).
+
+- [x] **§3.3a — canonical `is_S` + discharge the abstract Layer-2 hypotheses — DONE**
+      (`cohen_bridge.rs` 4/0, commit 61297d2). Instantiates `is_S = { w_α(c) : (α,0)∈H₀(M) }` (Cohen's
+      word-numbering, book p.279, the bridge's ⟸); `s_relators_valid` via `lemma_w_c_is_c_word`
+      (wrapper over `lemma_w_c_in_block`), `s_realizes` immediate (witness β=α). Headline
+      **`lemma_C_faithful_printable_canonical`**: the printable f.p. `h3_pres` faithfully contains
+      `C=⟨c;S⟩` for the concrete machine set `H₀(M)` — Higman's embedding theorem made fully explicit,
+      ZFC-independent, NO abstract hypotheses. Additive, reversible. *Does NOT close the headline
+      machine-iff `w_α(c)=1 in H₃ ⟺ (α,0)∈H₀` — the ⟹ (`w_α(c)=1 in C ⟹ (α,0)∈H₀`) is C's word
+      problem deciding the c.e. set = Layer-0.5 content (`ncl(S)` collapses more than `S`); plan §A.3.*
+- [ ] **ZFC-provable-equiv is a CEER** — verified in `tactus-computability-theory` (reuse). The
+      bespoke ∞-gen CEER group + its forward direction already exist (`ceer_group.rs`,
+      `lemma_ceer_equiv_implies_group_equiv`); see plan §B.3.
 - [ ] **reduce the ZFC enumerator → a classic modular machine `M`** so that `H₀(M)` encodes the
       declared (ZFC-equivalent) pairs; this is the `wα(c)∈S ⟺ (α,0)∈H₀(M)` bridge's machine side.
+      **Presupposes Layer 0.5's `S`** (plan §A.3) — sequence Layer 0.5 first.
 - [ ] **instantiate** Layers 1+2 on that `M` and the CEER group ⟹ a concrete `H₃` with
       `[machine instance] = f` and `f(σ)=f(τ) ⟺ ZFC⊢σ↔τ`.
 
