@@ -465,3 +465,9 @@ pub mod cohen_cs5_recog;
 // two-step descent — Britton down the H₃ tower (CS-4/CS-5 isos) ∘ the c-retraction (CS-2).
 // docs/cohen-section1-assembly-plan.md §3.
 pub mod cohen_cs6;
+
+// cohen_cs7: Layer 2 — Cohen §1 assembly, brick CS-7 (the second half of CS-6). Transport the C↪H₃
+// faithfulness from the predicate base to the PRINTABLE finite h3_pres: lemma_C_faithful_printable
+// (pure-c w trivial in finite h3_pres ⟹ trivial in c_pred), via the easy finite→predicate relator
+// inclusion (lemma_pred_equiv_from_finite) ∘ lemma_C_faithful. docs/cohen-section1-assembly-plan.md §5.
+pub mod cohen_cs7;
