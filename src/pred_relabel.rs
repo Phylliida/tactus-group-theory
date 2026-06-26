@@ -172,14 +172,15 @@ pub proof fn lemma_pred_hom_iso_equiv(h: PredHomomorphismData, hinv: PredHomomor
 // Validity of the two relabel homomorphisms (from the relator correspondence)
 // ----------------------------------------------------------------------------
 
-/// `ρ` is a valid homomorphism, given the FORWARD relator correspondence.
+/// `ρ` is a valid homomorphism, given the FORWARD relator correspondence (every p1-relator's image
+/// is trivial in p2 — true whether the image is a p2-relator or just `ε`).
 pub proof fn lemma_relabel_hom_valid(p1: PredPresentation, p2: PredPresentation, off: nat)
     requires
         pred_presentation_valid(p1),
         pred_presentation_valid(p2),
         off + p1.num_generators <= p2.num_generators,
         forall|r: Word| #![trigger (p1.relators)(r)]
-            (p1.relators)(r) ==> (p2.relators)(apply_hom_pred(relabel_hom(p1, p2, off), r)),
+            (p1.relators)(r) ==> equiv_in_pred_presentation(p2, apply_hom_pred(relabel_hom(p1, p2, off), r), empty_word()),
     ensures
         is_valid_pred_homomorphism(relabel_hom(p1, p2, off)),
 {
@@ -193,12 +194,12 @@ pub proof fn lemma_relabel_hom_valid(p1: PredPresentation, p2: PredPresentation,
     assert forall|r: Word| #![trigger (h.source.relators)(r)] (h.source.relators)(r)
         implies equiv_in_pred_presentation(h.target, apply_hom_pred(h, r), empty_word()) by {
         assert((p1.relators)(r));
-        assert((p2.relators)(apply_hom_pred(h, r)));
-        lemma_pred_relator_is_identity(p2, apply_hom_pred(h, r));
+        // FWD hypothesis gives equiv(p2, ρ(r), ε) directly; h.target == p2, apply_hom_pred(h,r) == ρ(r).
     }
 }
 
-/// `ρ⁻¹` is a valid homomorphism, given the BACKWARD relator correspondence.
+/// `ρ⁻¹` is a valid homomorphism, given the BACKWARD relator correspondence: every p2-relator `s` is
+/// the relabel-image `ρ(r)` of some p1-word `r` that is trivial in p1 (a p1-relator, or `ε`).
 pub proof fn lemma_relabel_hom_inv_valid(p1: PredPresentation, p2: PredPresentation, off: nat)
     requires
         pred_presentation_valid(p1),
@@ -206,8 +207,8 @@ pub proof fn lemma_relabel_hom_inv_valid(p1: PredPresentation, p2: PredPresentat
         off + p1.num_generators <= p2.num_generators,
         p1.num_generators >= 1,
         forall|s: Word| #![trigger (p2.relators)(s)]
-            (p2.relators)(s) ==> exists|r: Word|
-                word_valid(r, p1.num_generators) && (p1.relators)(r)
+            (p2.relators)(s) ==> exists|r: Word| #![trigger apply_hom_pred(relabel_hom(p1, p2, off), r)]
+                word_valid(r, p1.num_generators) && equiv_in_pred_presentation(p1, r, empty_word())
                 && s =~= apply_hom_pred(relabel_hom(p1, p2, off), r),
     ensures
         is_valid_pred_homomorphism(relabel_hom_inv(p1, p2, off)),
@@ -227,13 +228,12 @@ pub proof fn lemma_relabel_hom_inv_valid(p1: PredPresentation, p2: PredPresentat
     assert forall|s: Word| #![trigger (hinv.source.relators)(s)] (hinv.source.relators)(s)
         implies equiv_in_pred_presentation(hinv.target, apply_hom_pred(hinv, s), empty_word()) by {
         assert((p2.relators)(s));
-        let r = choose|r: Word|
-            word_valid(r, p1.num_generators) && (p1.relators)(r)
+        let r = choose|r: Word| #![trigger apply_hom_pred(relabel_hom(p1, p2, off), r)]
+            word_valid(r, p1.num_generators) && equiv_in_pred_presentation(p1, r, empty_word())
             && s =~= apply_hom_pred(relabel_hom(p1, p2, off), r);
-        // ρ⁻¹(s) = ρ⁻¹(ρ(r)) = r, and r ≡ ε in p1.
+        // ρ⁻¹(s) = ρ⁻¹(ρ(r)) = r, and r ≡ ε in p1 (given directly).
         lemma_relabel_roundtrip(p1, p2, off, r);
         assert(apply_hom_pred(hinv, s) =~= r);
-        lemma_pred_relator_is_identity(p1, r);
     }
 }
 
@@ -242,7 +242,8 @@ pub proof fn lemma_relabel_hom_inv_valid(p1: PredPresentation, p2: PredPresentat
 // ----------------------------------------------------------------------------
 
 /// **B3 — relabel-iso.**  If the block-shift relabeling `ρ : Gen(i) ↦ Gen(off+i)` matches p1's and
-/// p2's relator sets BOTH WAYS, then the word problem transports: `v ≡ ε in p1 ⟺ ρ(v) ≡ ε in p2`.
+/// p2's relator sets BOTH WAYS (every p1-relator's image is trivial in p2; every p2-relator is the
+/// image of a p1-trivial word), then the word problem transports: `v ≡ ε in p1 ⟺ ρ(v) ≡ ε in p2`.
 pub proof fn lemma_equiv_by_relabel(p1: PredPresentation, p2: PredPresentation, off: nat, v: Word)
     requires
         pred_presentation_valid(p1),
@@ -251,10 +252,10 @@ pub proof fn lemma_equiv_by_relabel(p1: PredPresentation, p2: PredPresentation, 
         p1.num_generators >= 1,
         word_valid(v, p1.num_generators),
         forall|r: Word| #![trigger (p1.relators)(r)]
-            (p1.relators)(r) ==> (p2.relators)(apply_hom_pred(relabel_hom(p1, p2, off), r)),
+            (p1.relators)(r) ==> equiv_in_pred_presentation(p2, apply_hom_pred(relabel_hom(p1, p2, off), r), empty_word()),
         forall|s: Word| #![trigger (p2.relators)(s)]
-            (p2.relators)(s) ==> exists|r: Word|
-                word_valid(r, p1.num_generators) && (p1.relators)(r)
+            (p2.relators)(s) ==> exists|r: Word| #![trigger apply_hom_pred(relabel_hom(p1, p2, off), r)]
+                word_valid(r, p1.num_generators) && equiv_in_pred_presentation(p1, r, empty_word())
                 && s =~= apply_hom_pred(relabel_hom(p1, p2, off), r),
     ensures
         equiv_in_pred_presentation(p1, v, empty_word())
