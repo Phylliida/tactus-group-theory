@@ -520,3 +520,7 @@ pub mod miller_collapse_eval;
 // through emb_M to freely-trivial words (so D̄_M = pushforward(decls), no association relators). The
 // substituted image(a_col) is the t-conjugate of image(b_col); deconjugation + inverse-cancel.
 pub mod miller_collapse_reln;
+// GAP-1 §9.2-item-(2) — embedding_preserving: emb_M : G^(M) → K_M=⟨a,t|D̄_M⟩ is a well-defined
+// homomorphism (D̄_M = pushforward(decls); associations discharge to ε). Fresh packaging a=Gen(0),
+// t=Gen(1). Assembled via lemma_hom_preserves_equiv + lemma_apply_hom_eq_embedding.
+pub mod miller_collapse_preserve;
