@@ -538,7 +538,67 @@ one-line corollary, but it REUSES the a-side C2 + config coordinate survival.
 analog, threading INV; per-orientation C1+C2 / C1+C2-b) → F (the `decreases stable_count` induction +
 compactness wiring + (★k)-forward glue + CS-5d tower lift).
 
-## 7.4 — BUILD STATUS + handoff (session 28, `cohen_cs5_recog` 83/0, gate GREEN, all additive).
+## 7.5 — BUILD STATUS (session 29, `cohen_cs5_recog` 102/0, gate GREEN, all additive).
+
+**DONE session 29 (each verified & committed, no `assume`/`admit`/`external_body`; +19 over the
+session-28 83/0 baseline):**
+- **Brick D-preservation COMPLETE** — `lemma_seg_inv_pinch_out` (the 3-way splice, verified first try).
+  Helpers `lemma_wshort_at` (3-region indexing) + `lemma_seg_inv_run_in_ub` (seg_inv instantiation
+  wrapper). The exhaustive case split (b≤i / a≥i+|φ| / merged) was companion-confirmed; configs 1/3 map
+  to maximal `wm` runs (right/left boundary = the pinch stable `wm[i]`/`wm[j]`), config 2 = `wm[a..i] ·
+  φ · wm[j+1..b+δ]` product. **Brick D COMPLETE.**
+- **Brick E COMPLETE** — `lemma_cs5_pinch_descends` (mirror `lemma_map_a_pinch_descends`, first try).
+  New `a_col_machine`-relabel helpers `lemma_a_col_machine_{entry,single_gen,relabel_sym}` (stable↔stable
+  at index `nk+n+1`↔`p_idx`). Both p-orientations wired: C1 (`lemma_cs5_middle_reflect`) + seg_inv_middle
+  + C2/C2-b. Exposed `lemma_betas_{numbers_word,no_duplicates}` as pub.
+- **Brick F groundwork — the `phi_g ∈ ⟨ublock⟩` membership theory (the genuinely-NEW math):**
+  - `lemma_subgroup_base_to_hnn` (generic base→HNN subgroup lift via `lemma_base_embeds_in_hnn`).
+  - **`lemma_config_in_ublock`** — `(β,0)∈H₀ ⟹ config(β,0)∈⟨ublock⟩` (the conceptual HEART: `lemma_theorem1`
+    → k_commutes → `lemma_k_commutes_implies_subgroup` over `b_m` → lift to `g_m` → `gm_to_bp` → g_subgens
+    prefix of ublock). **This is exactly why the H₀-filter keeps `seg_inv` alive across the splice.**
+  - `lemma_inverse_in_subgroup` (generic, via `inv_rev_factors`+`lemma_gen_or_inv_inverse`/`_factors_inv_rev`),
+    `lemma_singleton_in_ublock` + `lemma_bblock_word_in_ublock` (b-block/d letters), **`lemma_assoc_rhs_in_ublock`**
+    (`config·w_b·d` for H₀ β), `lemma_emb_col_in_ublock` (subgroup-transitivity closure for `emb(opp_col,u)`),
+    `lemma_ublock_gen_valid`, `lemma_h0_filter_in_H0` (filter keeps only H₀ entries).
+- **Brick F — the CS-5 pinch-out LYNCHPIN COMPLETE** — `lemma_cs5_pinch_out` (mirror `lemma_pd_pinch_out`,
+  first try after import fixes). Bundles E→pinch-out→D-preservation: a `base_A_plus_data(slice)` pinch over
+  an all-H₀ `slice` reduces to a strictly stable-count-smaller `wshort` that STILL satisfies `seg_inv`.
+  The conjugation factorization (`lemma_stable_conj_factorization{,_rev}`) gives the stable-free middle
+  `phi_g = ψ(opp_col, u)`, `phi_g ∈ ⟨ublock⟩` via the toolkit (opp_col = config/assoc_rhs over H₀ slice),
+  spliced by `lemma_pinch_assemble` (made pub) + `lemma_seg_inv_pinch_out`. Signature is **slice-parametrized**
+  (requires `∀k. mm_in_H0(slice[k],0)` + `numbers_word`), so `lemma_cs5_recognition_forward` will instantiate
+  `slice = h0_filter(betas(alphas))` discharging via `lemma_h0_filter_in_H0`/`_in_slice`.
+
+**REMAINING for Brick F (all dependencies above are built & verified; bottom-up, each verifies/commits):**
+
+1. **`lemma_a_col_machine_relator_trivial`** (the a-side von-Dyck over the FINITE `h2_II`, NEW helper):
+   `a_col_machine` sends each `hnn_presentation(base_A_plus_data(slice))` relator → ε in `h2_II`. Two
+   relator classes (NB `base_A_plus_base.relators = g_m.relators` is NON-empty, unlike `pa_data`'s free
+   base — so BOTH classes need handling, this is the one divergence from `lemma_a_words_relator_trivial`):
+   (a) base `g_m`/K_M relators: `a_col_machine` fixes machine words (`lemma_a_col_machine_fixes_machine_word`)
+   and a K_M relator is an `h1_base`/`h2_II` relator ⟹ ≡ε (mirror `lemma_cs5_vondyck_KM_relator` but a-side
+   over `h2_II`, not b-side over `h2_pred`); (b) HNN p-conjugation relators: `a_col_machine` sends to
+   `family_II_relator(slice[jj])` (via 3b `lemma_a_col_machine_assoc_rhs`) ⟹ ∈ `h2_II` ⟹ ≡ε (reuse
+   `lemma_family_II_relator_in_h2_II`/`_head_in_h2_II` from `phi_l_pinch::lemma_a_words_relator_trivial`).
+2. **`lemma_cs5_recognition_forward`** (~130 lines, mirror `lemma_map_a_forward` `phi_l_pinch.rs:773`,
+   `decreases stable_count(base_A_plus_data(h0_filter(betas)), wm)`): base case (sc 0) = `wm` a base word
+   ⟹ `emb(a_col_machine,wm)` an `h1_base` word ⟹ `lemma_h1_faithful_in_h2_II` ⟹ `lemma_cs5_base_case_faithful`
+   (DONE, 1080) ⟹ base-embeds. Step = `britton_lemma_full(recog,pw)` → **E** `lemma_cs5_pinch_descends`
+   (gives target pinch) → **pinch-out** `lemma_cs5_pinch_out` (DONE — gives wshort + seg_inv(wshort) +
+   stable-count drop, all in ONE call now) → relator-trivial (#1) ⟹ `emb(a_col_machine,wm) ≡_{h2_II}
+   emb(a_col_machine,wshort)` via `lemma_emb_respects_source_equiv` → recurse. Discharge `slice=h0_filter(betas)`
+   all-H₀ via `lemma_h0_filter_in_H0`; numbers_word via `_in_slice`+betas.
+3. **Compactness wiring + (★k) forward**: `lemma_cs5_recog_compactness` (already 18/0 in `cohen_cs5.rs`)
+   gives the finite slice `alphas` from `emb(k_a_col,w)≡_{h2_pred}ε`; relabel bridges
+   `lemma_emb_{a,b}_col_via_relabel` ⟹ `emb(a_col_machine, relabel(w))`; recognition_forward ⟹
+   `relabel(w)≡_{base_A_plus_data(h0_filter(betas))}ε`; then the b-direction via the von-Dyck
+   `lemma_cs5_vondyck_relator` (DONE) ⟹ `(★k) emb(k_a_col,w)≡_{h2_pred}ε ⟹ emb(k_b_col,w)≡ε`.
+4. **(★k) glue + CS-5d**: glue forward with backward `lemma_cs5_backward` (DONE) ⟹ `(★k)`; CS-5d tower
+   lift (reuse CS-4e `lemma_h3_pred_upto_base_faithful` at k=2n) ⟹ `hnn_pred_associations_isomorphic(h3_pred_data)`.
+
+---
+
+## 7.4 — BUILD STATUS + handoff (session 28, `cohen_cs5_recog` 83/0, gate GREEN, all additive). [SUPERSEDED by §7.5]
 
 **DONE this session (each verified & committed, no `assume`/`admit`/`external_body`):**
 - **Brick A** — `assoc_rhs_emb` + `lemma_cs5_{a,b}_col_correspondence` (recog a-col =
