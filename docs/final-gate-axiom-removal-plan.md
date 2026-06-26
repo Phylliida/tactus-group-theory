@@ -344,3 +344,89 @@ unsupervised pass. Pointer recorded so that session starts from the primary sour
 
 *Net: the runway is sound and now corrected. The blocker is unchanged — Danielle's design go on
 §6.1 (GAP-1 routing) + §6.2 (GAP-2 encoding). Nothing further is safe to build solo.*
+
+---
+
+## 9. GAP-1 infrastructure audit (2026-06-26, second unsupervised session — read-only, no code)
+
+*Picks up where §8 left off. §8.5 established that the GAP-1 **direction** is textbook-forced to
+**R1 = routing (a)** (Miller's literal `cᵢ ↦ uᵢ(a,t)` substitute-and-collapse) and that the genuine
+residue is the §6.1 sub-fork **(a) collapse vs (b) wrap + the effort**. This session **audits the
+existing infrastructure** that routing (a) would consume, to convert §6.1 from an open architectural
+design into a **bounded, infrastructure-backed effort-go**. Baseline re-confirmed green:
+`tactus-computability-theory ./check.sh` = **250 verified, 0 errors** (exit 0). The relevant
+group-theory module `tietze` independently re-verified: `./check.sh --verify-module tietze` =
+**10 verified, 0 errors**. No code written; no decision taken. Companion-model cross-checked.*
+
+### 9.1 The headline: the "Tietze tax" routing (a) dreaded is **mostly pre-paid**
+The §3/§8 framing treated R1's "Tietze tax" (the `cᵢ↦uᵢ(a,t)` substitution hom + the b/cᵢ
+elimination + proving the c-word problems coincide) as a *large deferred cost*. **The audit finds the
+toolkit it needs already exists and is verified:**
+
+| What R1 needs | Already banked | Where | State |
+|---|---|---|---|
+| **T1** add-generator preserves equivalence | `lemma_add_generator_preserves` | `tietze.rs:472` | ✓ verified |
+| **T3** add/remove a *derivable* relator (fwd+rev) | `lemma_add_derivable_relator_forward/reverse` | `tietze.rs:94,108` | ✓ verified |
+| **T4** remove a derivable relator (fwd) | `lemma_remove_relator_forward` | `tietze.rs:266` | ✓ verified |
+| add-generator constructor (`Gen(n)·defn⁻¹`) | `add_generator_to_presentation` | `tietze.rs:32` | ✓ |
+| **substitution hom** `cᵢ↦uᵢ(a,t)` (apply per word) | `apply_embedding` | `benign.rs:86` | ✓ verified, heavily used |
+| **both** faithfulness directions of an embedding | `embedding_injective` (K-eq→G-eq) **and** `embedding_preserving` (G-eq→K-eq) | `benign.rs:110,122` | ✓ abstract spec, instantiated all over `cohen_cs4*` |
+| free-family facts for the `a/b` columns | `conj_family`/`conj_family_b` free | `conj_free_core.rs`/`conj_free_b.rs` | ✓ banked (per memory + §8.5) |
+
+The whole Tietze module (`tietze.rs`, 544 lines, 10 proof fns) is part of the group-theory crate
+(`lib.rs:191`) and verifies. The substitution machinery `apply_embedding` is not a prototype — it is
+the workhorse of the entire Cohen faithfulness layer (`cohen_cs4.rs`, `cohen_cs4e.rs`,
+`cohen_cs4d_recog.rs` all consume it with both `embedding_injective`/`embedding_preserving`). So R1's
+two obligations — *carry the substitution* and *prove it's faithful both ways* — land on machinery
+that is already exercised at scale, not on a green-field "general Tietze library."
+
+### 9.2 What is genuinely new for routing (a) (the actual residual effort)
+With the toolkit pre-paid, the remaining R1 build narrows to three concrete pieces:
+1. **Define the substitution `emb_M : cᵢ ↦ uᵢ(a,t)` per slice** as a concrete `Seq<Word>` over the
+   slice generators (`miller_data(M)` = `Gen(0..M)`+`a,b,t`), uniformly in `M`. The words `uᵢ` are
+   Miller's `t b⁻ⁱabⁱ t⁻¹ a⁻ⁱb⁻¹aⁱ` with `b↦tat⁻¹` substituted (Miller §4.1, recorded §8.5).
+2. **Instantiate `embedding_injective` + `embedding_preserving` for `emb_M`** per slice — i.e. the
+   c-word problem of `G^(M)` matches that of the collapsed `⟨a,t | D̄_M⟩`. This is where the banked
+   `conj_family` free-column facts get re-used (exactly as the §D compactness probe already did for
+   the *base* faithfulness, `cohen_layer05_probe.rs:350`); the per-slice relators are **finite**
+   (`miller_data(M)` has finitely many), so the `Presentation`-level `tietze.rs` T1/T3/T4 apply
+   *directly* — no `PredPresentation` Tietze port needed for the collapse itself.
+3. **The limit-commutation glue** — the one piece with no pre-built analog. The substitution must
+   **commute with the direct-limit witness `M`**: `equiv_in_g_limit(fam, n, w, ε)` (a `c`-word `w`
+   trivial in *some* slice `G^(M)`) ⟺ `w` (re-expressed via `emb_M`) trivial in the fixed-c-block
+   Cohen object. Because a pure-`c` word `w` and its substituted image share the same witness `M`
+   (the c-block is insulated from `a/b/t`, the same insulation `cohen_layer05.rs:714–716` already
+   exploits), this should be a *witness-preserving* lemma, not a new fixed-point construction —
+   **but it is the genuine new content and the companion flagged it as the sole real risk** (does the
+   substitution "commute correctly with the direct limit"? — yes iff defined uniformly across slices,
+   which (1) ensures).
+
+### 9.3 Companion cross-check (independent read, this session)
+Posed the (a)-vs-(b) + effort question to the companion model. It **independently confirmed**:
+(i) under "follow the textbook, do not reinvent", **routing (a) is the faithful choice; (b) is exactly
+the kind of dragon-shortcut that caused the 13k-line regression** (it preserves the iso but bypasses
+Miller's *construction*, leaving the formal group not-the-one-Miller-built and making Layer-2
+reconciliation harder); (ii) the real open question is **effort, not direction** — whether the
+substitution reuses local hom machinery vs. a heavy general-Tietze library (the audit answers: reuse,
+§9.1); (iii) **the one caveat is §9.2-item-3** — ensure the substitution commutes with the direct
+limit; if defined uniformly across slices, the heavy infrastructure is avoidable.
+
+### 9.4 Net reframing of §6.1 (decision-data, **NOT** the decision)
+§6.1 was logged as "the single most important **undesigned** decision." After §8.5 + this audit it is
+**no longer undesigned** in *direction* (textbook ⇒ routing (a) = R1; (b) is the dragon) **nor in
+infrastructure** (T1/T3/T4 + `apply_embedding` + both faithfulness specs + the free-column facts are
+all banked and verified). What remains genuinely open for Danielle collapses to:
+- **An EFFORT-go** on the bounded §9.2 build (1)+(2)+(3) — *not* an architecture design. Pieces (1),(2)
+  are instantiation of exercised machinery; (3) is one witness-preserving limit-commutation lemma
+  (the only new-math, companion-flagged) risk.
+- **One narrow representational confirm** still belongs to her (it is the residue §8.5 named): whether
+  to land the collapsed object as a *new fixed-`{a,t}` `Presentation`* re-run over the slices
+  (cleanest, matches Cohen's `n=2` input literally) or to *wrap* `equiv_in_g_limit` in place. The
+  audit's recommendation (**surfaced, pending confirm — not taken**): the **former** (build the
+  collapsed slice presentation + `emb_M`, instantiate the two faithfulness specs, glue with §9.2-3),
+  because it is Miller's literal object and reuses the §D probe's exact pattern; the "wrap-in-place"
+  is the (b)-flavored shortcut the standing rule disfavors.
+
+**Still gated:** the §9.2 build is co-design-gated per the standing rule — this audit only *de-risks
+and bounds* it; it does not start it. GAP-2 (§4/§6.2) is untouched and remains the separate, later,
+textbook-gated reduction. *Do not start the §9.2 build without Danielle's effort-go.*
