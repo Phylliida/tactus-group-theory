@@ -228,6 +228,11 @@ pub mod prop_v;
 #[cfg(verus_keep_ghost)]
 pub mod word_numbering;
 
+// word_numbering_decode: GAP-1 item-3b brick B1 — the decode bridge (w_c is surjective onto c-block
+// words; decode_word is an explicit section). Machine-free; consumed by B2's enc.
+#[cfg(verus_keep_ghost)]
+pub mod word_numbering_decode;
+
 // layout: Layer 2 / Brick 2 foundation — the global generator-index table for the Higman tower
 // H₁ ⊆ H₂ ⊆ H₃ (K_M, c, b, d, p, a-block, k blocks). Pure arithmetic; reused across bricks 2–5.
 #[cfg(verus_keep_ghost)]
