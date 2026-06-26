@@ -42,7 +42,9 @@ use crate::machine_group::{ModMachine, g_m, g_subgens, g_m_associations, config_
     b_m, b_m_upto, mm_terminal, hnn_a_gens, in_TM, in_TMstable,
     lemma_b_m_valid, lemma_b_m_upto_num_generators, lemma_vii_subset, lemma_single_hnn_base_faithful};
 use crate::tower_peel::lemma_vi;
-use crate::prop_v::lemma_equiv_from_concat_inv_trivial;
+use crate::prop_v::{lemma_equiv_from_concat_inv_trivial, lemma_theorem1};
+use crate::machine_group::{k_commutes, lemma_k_commutes_implies_subgroup};
+use crate::hnn::lemma_base_embeds_in_hnn;
 use crate::free_basis::{lemma_g_m_data_isomorphic, config_emb, w_to_canon, lemma_config_emb_eq_canw};
 use crate::machine_group::{CanonLetter, canw_eval, base_A, lemma_base_A_valid, lemma_canw_eval_valid,
     lemma_no_relator_equiv_implies_freely_equivalent};
@@ -3743,6 +3745,73 @@ pub proof fn lemma_cs5_pinch_descends(mm: ModMachine, n: nat, m: nat, alphas: Se
         }
     }
     assert(has_pinch(target, wm)) by { assert(has_pinch_at(target, wm, i, j)); }
+}
+
+// ----------------------------------------------------------------------------
+// Brick F groundwork — `phi_g ∈ ⟨ublock⟩` (the pinch-out replacement middle stays in the segment
+// subgroup).  Core: `config(β,0) ∈ ⟨g_subgens⟩` REQUIRES `(β,0)∈H₀` (k_commutes), so the H₀-filtered
+// slice is exactly what keeps `seg_inv` alive across the splice.
+// ----------------------------------------------------------------------------
+
+/// Generic: a subgroup membership over an HNN base lifts to the HNN presentation (the base-derivation
+/// is an HNN-derivation — more relators).
+pub proof fn lemma_subgroup_base_to_hnn(data: HNNData, gens: Seq<Word>, w: Word)
+    requires
+        in_generated_subgroup(data.base, gens, w),
+    ensures
+        in_generated_subgroup(hnn_presentation(data), gens, w),
+{
+    let factors = choose|f: Seq<Word>| #[trigger] factors_from_generators(gens, f)
+        && equiv_in_presentation(data.base, concat_all(f), w);
+    assert(factors_from_generators(gens, factors)
+        && equiv_in_presentation(data.base, concat_all(factors), w));
+    lemma_base_embeds_in_hnn(data, concat_all(factors), w);
+    assert(in_generated_subgroup(hnn_presentation(data), gens, w));    // same factors witness
+}
+
+/// **The H₀-restricted config landing.** For `(β,0)∈H₀`, `config(β,0) ∈ ⟨ublock_db_gens⟩` over
+/// `base_A_plus_base`.  Chain: `lemma_theorem1` (H₀ ⟹ k_commutes) → `lemma_k_commutes_implies_subgroup`
+/// (∈ ⟨g_subgens⟩ over `b_m`) → base→HNN lift (over `g_m`) → `gm_to_bp` (over `base_A_plus_base`) →
+/// `g_subgens` is a prefix of `ublock_db_gens` (superset).
+pub proof fn lemma_config_in_ublock(mm: ModMachine, n: nat, beta: nat)
+    requires
+        mod_machine_wf(mm),
+        mm_in_H0(mm, beta, 0),
+    ensures
+        in_generated_subgroup(base_A_plus_base(mm, n), ublock_db_gens(mm, n), config_word(beta, 0)),
+{
+    let nk = g_m(mm).num_generators;
+    let bp = base_A_plus_base(mm, n);
+    let gs = g_subgens(mm);
+    let ub = ublock_db_gens(mm, n);
+    lemma_g_m_num_generators(mm);
+    // H₀ ⟹ k_commutes ⟹ config ∈ ⟨g_subgens⟩ over b_m.
+    lemma_theorem1(mm, beta, 0);
+    assert(k_commutes(mm, config_word(beta, 0)));
+    lemma_k_commutes_implies_subgroup(mm, beta, 0);
+    let gdata = HNNData { base: b_m(mm), associations: g_m_associations(mm) };
+    assert(hnn_presentation(gdata) == g_m(mm));
+    assert(in_generated_subgroup(gdata.base, gs, config_word(beta, 0)));
+    // lift b_m → g_m.
+    lemma_subgroup_base_to_hnn(gdata, gs, config_word(beta, 0));
+    assert(in_generated_subgroup(g_m(mm), gs, config_word(beta, 0)));
+    // transfer g_m → base_A_plus_base (validities).
+    lemma_config_word_valid(beta, 0);
+    lemma_word_valid_mono(config_word(beta, 0), 3, nk);
+    lemma_g_m_associations_valid(mm);
+    assert forall|i: int| 0 <= i < gs.len() implies word_valid(#[trigger] gs[i], nk) by {
+        assert(gs[i] == g_m_associations(mm)[i].1);
+        assert(word_valid(gs[i], (3 + mm.quads.len()) as nat));
+        lemma_word_valid_mono(gs[i], (3 + mm.quads.len()) as nat, nk);
+    }
+    lemma_machine_subgroup_gm_to_bp(mm, n, gs, config_word(beta, 0));
+    assert(in_generated_subgroup(bp, gs, config_word(beta, 0)));
+    // ⟨g_subgens⟩ ⊆ ⟨ublock⟩ (g_subgens is a prefix of ublock).
+    assert forall|i: int| 0 <= i < gs.len()
+        implies exists|k: int| 0 <= k < ub.len() && (#[trigger] gs[i]) == ub[k] by {
+        assert(ub[i] == gs[i]);                                  // prefix: ub = gs + tail
+    }
+    lemma_in_subgroup_gens_superset(bp, gs, ub, config_word(beta, 0));
 }
 
 } // verus!
