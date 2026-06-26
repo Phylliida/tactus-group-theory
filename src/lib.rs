@@ -496,3 +496,9 @@ pub mod cohen_layer05_probe;
 // families in L=C₀⋆F₂ — via the retraction ρ killing C₀ (columns ↦ banked conj_family/conj_family_b,
 // free in F₂) + Layer-1's lemma_pullback_free. Uses Miller's i≥1 (nonempty-spacer) convention.
 pub mod cohen_layer05;
+
+// pred_to_finite: GAP-3 (final gate) generic SOUNDNESS transport. A PredPresentation-equivalence
+// lifts to a finite Presentation-equivalence when cp.num_generators <= fp.num_generators and every
+// cp-relator is empty in fp. Machine-independent; the Layer-2 application (cp=c_pred, fp=h3_pres,
+// relator hypothesis via lemma_III) is a separate brick. docs/final-gate-axiom-removal-plan.md sec 5.
+pub mod pred_to_finite;
