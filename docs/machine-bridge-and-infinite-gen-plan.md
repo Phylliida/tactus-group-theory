@@ -223,28 +223,40 @@ finite* substrate and machine-checked end-to-end for a fixed word:
 needed** (decision-1/2 in §C closed). The **only** remaining new math is the A-column free-family
 fact (B-column = banked).
 
-### The Layer-0.5 build that the probe unlocks (pending Danielle's go)
+### The Layer-0.5 build that the probe unlocks — ✅ IN-CRATE MATH DONE (session 34, `cohen_layer05.rs`)
 
-The probe leaves a clean, de-risked ladder. NONE of it is a direction risk anymore; it is the
-effort commitment §C flags as still gated.
+> **Danielle gave the go (session 34).** The in-crate mathematical content of Layer 0.5 is now
+> **built and verified** (`cohen_layer05.rs` 31/0, gate 2645/20 = additive, no regression, no
+> assume/admit/external_body). Steps 1, 3 and the in-crate half of 4 are DONE; what remains is
+> *pipeline wiring only* (the cross-crate CEER instantiation of step 2 + connecting to Layer-2's `S`).
 
-1. **A-column freeness — the one new crux.** `is_free_family(C₀⋆F₂, {b, cᵢa⁻ⁱbaⁱ})`. A free-product
-   normal-form argument (companion-confirmed clean): each `cᵢa⁻ⁱbaⁱ` is reduced alternating between
-   `C₀` (the `cᵢ`) and `F₂` (the `a⁻ⁱbaⁱ`, whose central-`b` survival is the banked `conj_free_core`
-   content); the F₂-blocks act as spacers so the `C₀`-syllables can never collapse. Likely the bulk
-   of the work. (B-column `{a, b⁻ⁱabⁱ}` = `conj_free_b`, banked.) **Indexing note:** Miller uses i≥1
-   for the c-terms (always a nonempty `aⁱ` spacer) with `b` a *separate* basis generator; the probe's
-   0-indexed `a_basis_elt(n,0)=c₀·b` has an empty spacer (still free — `c₀` itself separates `b` from
-   `c₀b` — but the build should prefer Miller's i≥1 convention to keep every c-term spacer nonempty
-   and dodge the edge case).
-2. **Carry the bespoke `C₀`.** Wire `ceer_group.rs`'s `CeerWord`/`ceer_group_equiv` (∞-alphabet,
-   forward direction DONE) into the finite-slice `decls` view (a finite slice of declared pairs is a
-   finite `Presentation`), so `c0_slice` instantiates to a genuine CEER slice.
-3. **The `∀w ∃N` compactness assembly** (CS-4b-style): a finite derivation of `w=1 in G` uses
-   finitely many relators ⟹ lives in `G^(N)` ⟹ Part C ⟹ `w=1 in C₀`. Reuse the
-   `lemma_cs4b_compactness` pattern (`lemma_finite_step_from_pred` + relator-arm + induction core).
-4. **Assemble `C = G = ⟨a,t | D̄⟩`** (2-generated, recursively presented) + faithfulness `C₀ ↪ C`;
-   this `C` is Layer-2's input. Then §3.3-proper ties `S = D̄` to the machine.
-
-**Do not start step 1 without Danielle's go** — the standing co-design gate is now narrowed to the
-*effort* commitment (the direction + scope are settled and machine-validated).
+1. **A-column freeness — the one new crux — ✅ DONE** (`lemma_acol_free`; B-column `lemma_bcol_free`).
+   **The argument is the kill-`C₀` RETRACTION, not a free-product normal-form induction** (the
+   companion-confirmed slicker route): `ρ : C₀⋆F₂ → F₂` (every `cᵢ ↦ ε`, `a↦a`, `b↦b`) maps the
+   A-column EXACTLY onto `conj_family(n+1)={a⁻ⁱbaⁱ}` and the B-column onto `conj_family_b(n+1)`, both
+   banked free in F₂. Reuses Layer-1's `lemma_pullback_free` engine. **Indexing resolved:** used
+   Miller's `i≥1` (exponent `j+1`) convention — required, since the 0-indexed `c₀·b` collides with the
+   separate `b` generator under ρ (the retraction needs ρ injective on the column).
+2. **Carry the bespoke `C₀` — PENDING (cross-crate).** Instantiate the abstract `decls_fam(N)` with
+   the CEER group's stage-`N` declared pairs (`tactus-computability-theory/src/ceer_group.rs`,
+   ∞-alphabet, forward DONE). **This lives in the COMPUTABILITY crate** (it depends on group-theory
+   via `--import`, not vice-versa), consuming `lemma_c0_embeds_in_c_iff`. Needs a `CeerWord → Word`
+   alphabet translation + `decls_family_valid` for the CEER family. No new group theory.
+3. **The `∀w∃N` (direct-limit) assembly — ✅ DONE**, in the cleaner **shared-witness** form. Rather
+   than building the infinite `G` as a single object (would force the Tietze-to-2-gen reduction =
+   "Tietze tax", and break Layer-2's c-block view — companion-confirmed), `C` and `C₀` are the
+   **direct limits** `equiv_in_g_limit` / `equiv_in_c0_limit` of their finite slices.
+   `lemma_miller_faithfulness` (the per-slice descent: finite-Britton base-embed `L↪G` with the iso
+   precondition discharged by the proven column freeness, then free-product injectivity `C₀↪L`) +
+   the forward inclusions `lemma_left_embeds_in_fp`/`lemma_base_embeds_in_hnn` give the full
+   **embedding iff** `lemma_c0_embeds_in_c_iff`: for a c-word `w`, `w=1 in C ⟺ w=1 in C₀`.
+   **No nesting / no re-encoding needed** — c-words are insulated from the `a/b/t` indices (and `t` is
+   forced to the top index by the substrate's HNN convention regardless), so the two limits share the
+   same witness slice `M`. (Note: this diverges from the companion's "re-encode for nested slices"
+   advice, which didn't account for c-word insulation; the divergence was deliberate and the result
+   verified.) The CS-4b `lemma_compactness_core` (relator-step induction) is the *fallback* if a true
+   infinite-`G` object is ever wanted; it was NOT needed for the embedding statement.
+4. **Assemble `C` + faithfulness `C₀ ↪ C` — in-crate half DONE** (`lemma_c0_embeds_in_c_iff` IS the
+   faithful embedding, direct-limit form). What remains: (a) step 2's CEER instantiation, and (b)
+   §3.3-proper tying the limit's relator set `S = D̄` to the machine for Layer 2. Both are wiring,
+   downstream of this.
