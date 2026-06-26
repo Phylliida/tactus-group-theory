@@ -24,9 +24,13 @@ use crate::symbol::*;
 use crate::presentation::{Presentation, presentation_valid, equiv_in_presentation};
 use crate::presentation_lemmas::lemma_relator_is_identity;
 use crate::benign::{apply_embedding, apply_embedding_symbol, in_generated_subgroup,
-    lemma_apply_embedding_concat, lemma_apply_embedding_inverse, lemma_apply_embedding_valid};
+    lemma_apply_embedding_concat, lemma_apply_embedding_inverse, lemma_apply_embedding_valid,
+    concat_all, factors_from_generators, is_generator_or_inverse};
 use crate::homomorphism::{HomomorphismData, apply_hom, apply_hom_symbol, is_valid_homomorphism,
-    lemma_hom_preserves_equiv};
+    lemma_hom_preserves_equiv, lemma_hom_respects_inverse};
+use crate::phi_l_forward::lemma_apply_embedding_concat_all;
+use crate::machine_group::lemma_product_in_subgroup;
+use crate::r_prime::lemma_empty_in_subgroup;
 use crate::free_basis::{comp_images, lemma_apply_hom_embedding_compose};
 use crate::h3_ii::{compose_embeddings, lemma_apply_embedding_compose};
 use crate::normal_form_afp_textbook::lemma_subgroup_to_k_word;
@@ -1580,6 +1584,230 @@ pub proof fn lemma_db_projection_valid(mm: ModMachine, n: nat)
         lemma_db_proj_fixes_machine_word(mm, n, gr[i]);    // apply_hom(π, gr[i]) = gr[i]
         lemma_relator_is_identity(g_m(mm), i);             // gr[i] ≡_{g_m} ε
     }
+}
+
+// ============================================================================
+// Step 3c-C2 (step 1) — general subgroup-transfer machinery (presentation-agnostic).
+// `lemma_hom_maps_subgroup`: a valid hom maps `⟨gens⟩`-membership to `⟨φ(gens)⟩`-membership.
+// `lemma_in_subgroup_gens_in_core`: if every generator (and its inverse) already lies in
+// `⟨core⟩`, then `⟨gens⟩ ⊆ ⟨core⟩` — used to drop the `ε`-images of `d,b` after projecting.
+// ============================================================================
+
+/// `apply_hom` distributes over `concat_all` (via the `apply_embedding` bridge).
+proof fn lemma_apply_hom_distributes_concat_all(h: HomomorphismData, factors: Seq<Word>)
+    ensures
+        apply_hom(h, concat_all(factors))
+            =~= concat_all(Seq::new(factors.len(), |k: int| apply_hom(h, factors[k]))),
+{
+    let imgs = h.generator_images;
+    lemma_apply_hom_eq_emb(h, concat_all(factors));
+    lemma_apply_embedding_concat_all(imgs, factors);
+    let me = Seq::new(factors.len(), |k: int| apply_embedding(imgs, factors[k]));
+    let mh = Seq::new(factors.len(), |k: int| apply_hom(h, factors[k]));
+    assert(me =~= mh) by {
+        assert forall|k: int| 0 <= k < factors.len() implies me[k] =~= mh[k] by {
+            lemma_apply_hom_eq_emb(h, factors[k]);
+        }
+    }
+}
+
+/// **General: a valid homomorphism maps subgroup membership to subgroup membership.**
+/// `w ∈ ⟨gens⟩` over `h.source` ⟹ `φ(w) ∈ ⟨φ(gens)⟩` over `h.target`.
+pub proof fn lemma_hom_maps_subgroup(h: HomomorphismData, gens: Seq<Word>, w: Word)
+    requires
+        is_valid_homomorphism(h),
+        in_generated_subgroup(h.source, gens, w),
+    ensures
+        in_generated_subgroup(h.target,
+            Seq::new(gens.len(), |i: int| apply_hom(h, gens[i])),
+            apply_hom(h, w)),
+{
+    let img_gens = Seq::new(gens.len(), |i: int| apply_hom(h, gens[i]));
+    let factors = choose|f: Seq<Word>| #[trigger] factors_from_generators(gens, f)
+        && equiv_in_presentation(h.source, concat_all(f), w);
+    assert(factors_from_generators(gens, factors)
+        && equiv_in_presentation(h.source, concat_all(factors), w));
+    let img_factors = Seq::new(factors.len(), |k: int| apply_hom(h, factors[k]));
+    // 1. each φ-image factor is a generator-or-inverse of `img_gens`.
+    assert(factors_from_generators(img_gens, img_factors)) by {
+        assert forall|k: int| 0 <= k < img_factors.len()
+            implies is_generator_or_inverse(img_gens, #[trigger] img_factors[k]) by {
+            assert(is_generator_or_inverse(gens, factors[k]));
+            let j = choose|j: int| 0 <= j < gens.len()
+                && (factors[k] == gens[j] || factors[k] == inverse_word(gens[j]));
+            assert(0 <= j < gens.len()
+                && (factors[k] == gens[j] || factors[k] == inverse_word(gens[j])));
+            assert(img_factors[k] == apply_hom(h, factors[k]));
+            assert(img_gens[j] == apply_hom(h, gens[j]));
+            if factors[k] == gens[j] {
+            } else {
+                lemma_hom_respects_inverse(h, gens[j]);
+            }
+        }
+    }
+    // 2. concat_all(img_factors) = φ(concat_all(factors)).
+    lemma_apply_hom_distributes_concat_all(h, factors);
+    // 3. φ preserves equiv.
+    lemma_hom_preserves_equiv(h, concat_all(factors), w);
+    assert(factors_from_generators(img_gens, img_factors)
+        && equiv_in_presentation(h.target, concat_all(img_factors), apply_hom(h, w)));
+}
+
+/// Closure: a `concat_all` of `⟨core⟩`-members lies in `⟨core⟩`.
+proof fn lemma_concat_all_in_subgroup(p: Presentation, core: Seq<Word>, factors: Seq<Word>)
+    requires
+        presentation_valid(p),
+        forall|j: int| 0 <= j < factors.len()
+            ==> in_generated_subgroup(p, core, #[trigger] factors[j]),
+    ensures
+        in_generated_subgroup(p, core, concat_all(factors)),
+    decreases factors.len(),
+{
+    if factors.len() == 0 {
+        assert(concat_all(factors) =~= empty_word()) by { reveal_with_fuel(concat_all, 1); }
+        lemma_empty_in_subgroup(p, core);
+    } else {
+        let rest = factors.drop_first();
+        assert forall|j: int| 0 <= j < rest.len()
+            implies in_generated_subgroup(p, core, #[trigger] rest[j]) by {
+            assert(rest[j] == factors[j + 1]);
+        }
+        lemma_concat_all_in_subgroup(p, core, rest);
+        assert(in_generated_subgroup(p, core, factors[0]));
+        assert(concat_all(factors) =~= factors.first() + concat_all(rest)) by {
+            reveal_with_fuel(concat_all, 1);
+        }
+        lemma_product_in_subgroup(p, core, factors.first(), concat_all(rest));
+    }
+}
+
+/// **General: drop redundant generators.** If every `gens[j]` and its inverse already lie in
+/// `⟨core⟩`, then `w ∈ ⟨gens⟩ ⟹ w ∈ ⟨core⟩`.
+pub proof fn lemma_in_subgroup_gens_in_core(p: Presentation, gens: Seq<Word>, core: Seq<Word>, w: Word)
+    requires
+        presentation_valid(p),
+        in_generated_subgroup(p, gens, w),
+        forall|j: int| 0 <= j < gens.len() ==>
+            in_generated_subgroup(p, core, #[trigger] gens[j])
+            && in_generated_subgroup(p, core, inverse_word(gens[j])),
+    ensures
+        in_generated_subgroup(p, core, w),
+{
+    let factors = choose|f: Seq<Word>| #[trigger] factors_from_generators(gens, f)
+        && equiv_in_presentation(p, concat_all(f), w);
+    assert(factors_from_generators(gens, factors)
+        && equiv_in_presentation(p, concat_all(factors), w));
+    assert forall|k: int| 0 <= k < factors.len()
+        implies in_generated_subgroup(p, core, #[trigger] factors[k]) by {
+        assert(is_generator_or_inverse(gens, factors[k]));
+        let j = choose|j: int| 0 <= j < gens.len()
+            && (factors[k] == gens[j] || factors[k] == inverse_word(gens[j]));
+        assert(0 <= j < gens.len()
+            && (factors[k] == gens[j] || factors[k] == inverse_word(gens[j])));
+    }
+    lemma_concat_all_in_subgroup(p, core, factors);
+    lemma_in_subgroup_respects_equiv(p, core, concat_all(factors), w);
+}
+
+// ============================================================================
+// Step 3c-C2 (step 1, specialized) — the `⟨g_subgens, d, b⟩` generating set + the projection
+// application. `π` kills the free `d,b`-block (uniform tail `[Gen(nk+j)]_{j=0..n}` = b-block then
+// d) and fixes the machine gens, so a machine word in `⟨g_subgens, d, b⟩` over `base_A_plus_base`
+// lands in `⟨g_subgens⟩` over `g_m`.
+// ============================================================================
+
+/// The base subgroup `⟨g_subgens, d, b⟩` of `base_A_plus_base` (the 3d `⟨U,d,b,p⟩`-invariant's
+/// base part, no `p`). Tail entry `j` is the free gen `[Gen(nk+j)]` (b-block `j<n`, d at `j=n`).
+pub open spec fn ublock_db_gens(mm: ModMachine, n: nat) -> Seq<Word> {
+    let nk = g_m(mm).num_generators;
+    g_subgens(mm) + Seq::new((n + 1) as nat, |j: int| seq![Symbol::Gen((nk + j) as nat)])
+}
+
+/// `π` kills a free-block single gen `[Gen(idx)]`, `nk ≤ idx < nk+n+1` ⟹ `apply_hom(π,·) = ε`.
+proof fn lemma_db_proj_kills_high(mm: ModMachine, n: nat, idx: nat)
+    requires
+        g_m(mm).num_generators <= idx,
+        idx < g_m(mm).num_generators + n + 1,
+    ensures
+        apply_hom(db_projection(mm, n), seq![Symbol::Gen(idx)]) =~= empty_word(),
+{
+    let pi = db_projection(mm, n);
+    let w: Word = seq![Symbol::Gen(idx)];
+    assert(w.len() == 1 && w.first() == Symbol::Gen(idx) && w.drop_first() =~= empty_word());
+    reveal_with_fuel(apply_hom, 2);
+    assert(apply_hom(pi, w.drop_first()) =~= empty_word());
+    assert(apply_hom_symbol(pi, w.first()) == pi.generator_images[idx as int]);
+    assert(pi.generator_images[idx as int] =~= empty_word());      // idx ≥ nk branch of db_projection
+    lemma_concat_empty_right(pi.generator_images[idx as int]);
+}
+
+/// A generator and its inverse both lie in the subgroup they generate.
+proof fn lemma_gen_and_inv_in_subgroup(p: Presentation, gens: Seq<Word>, j: int)
+    requires
+        0 <= j < gens.len(),
+    ensures
+        in_generated_subgroup(p, gens, gens[j]),
+        in_generated_subgroup(p, gens, inverse_word(gens[j])),
+{
+    let g: Word = seq![Symbol::Gen(j as nat)];
+    let gi: Word = seq![Symbol::Inv(j as nat)];
+    assert(word_valid(g, gens.len() as nat) && word_valid(gi, gens.len() as nat));
+    lemma_apply_embedding_in_subgroup(p, gens, g);
+    lemma_emb_single_gen(gens, j as nat);
+    lemma_apply_embedding_in_subgroup(p, gens, gi);
+    lemma_emb_single_inv_gen(gens, j as nat);
+}
+
+/// **CS-5c step 1 (projection application).** A machine word `cfg_rep` (valid over `nk`) lying in
+/// `⟨g_subgens, d, b⟩` over `base_A_plus_base` lies in `⟨g_subgens⟩` over `g_m`.
+pub proof fn lemma_cs5_project_to_gsubgens(mm: ModMachine, n: nat, cfg_rep: Word)
+    requires
+        word_valid(cfg_rep, g_m(mm).num_generators),
+        in_generated_subgroup(base_A_plus_base(mm, n), ublock_db_gens(mm, n), cfg_rep),
+    ensures
+        in_generated_subgroup(g_m(mm), g_subgens(mm), cfg_rep),
+{
+    let nk = g_m(mm).num_generators;
+    let pi = db_projection(mm, n);
+    let ub = ublock_db_gens(mm, n);
+    let gs = g_subgens(mm);
+    lemma_db_projection_valid(mm, n);
+    lemma_g_m_valid(mm);
+    lemma_g_m_num_generators(mm);
+    lemma_g_m_associations_valid(mm);
+
+    // 1. transfer membership through π; π fixes the machine word cfg_rep.
+    lemma_hom_maps_subgroup(pi, ub, cfg_rep);
+    let img_gens = Seq::new(ub.len(), |i: int| apply_hom(pi, ub[i]));
+    lemma_db_proj_fixes_machine_word(mm, n, cfg_rep);
+    assert(in_generated_subgroup(g_m(mm), img_gens, cfg_rep));     // π.target == g_m, π(cfg_rep)=cfg_rep
+
+    // 2. every img_gens[j] (and inverse) lies in ⟨gs⟩ — g_subgens entries are fixed, d/b → ε.
+    assert(gs.len() == g_m_associations(mm).len());
+    assert forall|j: int| 0 <= j < img_gens.len()
+        implies in_generated_subgroup(g_m(mm), gs, #[trigger] img_gens[j])
+            && in_generated_subgroup(g_m(mm), gs, inverse_word(img_gens[j])) by {
+        assert(img_gens[j] == apply_hom(pi, ub[j]));
+        if j < gs.len() {
+            assert(ub[j] == gs[j]);                                // prefix index of `gs + tail`
+            assert(gs[j] == g_m_associations(mm)[j].1);
+            lemma_word_valid_mono(gs[j], (3 + mm.quads.len()) as nat, nk);
+            lemma_db_proj_fixes_machine_word(mm, n, gs[j]);        // π fixes gs[j]
+            assert(img_gens[j] =~= gs[j]);
+            lemma_gen_and_inv_in_subgroup(g_m(mm), gs, j);
+        } else {
+            let k = j - gs.len();
+            assert(0 <= k < n + 1);
+            assert(ub[j] =~= seq![Symbol::Gen((nk + k) as nat)]);  // tail index
+            lemma_db_proj_kills_high(mm, n, (nk + k) as nat);
+            assert(img_gens[j] =~= empty_word());
+            lemma_empty_in_subgroup(g_m(mm), gs);
+            assert(inverse_word(img_gens[j]) =~= empty_word());
+            lemma_empty_in_subgroup(g_m(mm), gs);
+        }
+    }
+    // 3. drop the ε-images, landing in ⟨gs⟩.
+    lemma_in_subgroup_gens_in_core(g_m(mm), img_gens, gs, cfg_rep);
 }
 
 } // verus!
