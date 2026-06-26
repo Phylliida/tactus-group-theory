@@ -70,6 +70,8 @@ use crate::f_free_a1::{betas, lemma_betas_index};
 use crate::machine_group::lemma_config_word_zero;
 use crate::f_free::is_free_family;
 use crate::free_basis::lemma_config_emb_free;
+use crate::higman_operations::lemma_free_group_valid;
+use crate::phi_l_forward::lemma_intersection_property;
 
 verus! {
 
@@ -2614,6 +2616,279 @@ pub proof fn lemma_comp_pi_assoc_is_config(mm: ModMachine, n: nat, m: nat, slice
         lemma_db_proj_assoc_rhs(mm, n, m, slice[i]);
         assert(ce[i] == config_word(slice[i], 0));
     }
+}
+
+// ----------------------------------------------------------------------------
+// The `h0_filter` position selector — `h0_sel[k] = [Gen(p_k)]` with `slice[p_k] = h0_filter(slice)[k]`.
+// One selector serves BOTH columns: `compose(config_emb(slice), h0_sel) = config_emb(h0_filter)` and
+// `compose(assoc_rhs_emb(slice), h0_sel) = assoc_rhs_emb(h0_filter)`.
+// ----------------------------------------------------------------------------
+
+/// A `slice`-position holding `val` (well-defined whenever `slice.contains(val)`).
+spec fn slice_pos(slice: Seq<nat>, val: nat) -> int {
+    choose|p: int| 0 <= p < slice.len() && slice[p] == val
+}
+
+/// The selector picking, for each `h0_filter(slice)` entry, a `slice`-position holding it.
+spec fn h0_sel(mm: ModMachine, slice: Seq<nat>) -> Seq<Word> {
+    Seq::new(h0_filter(mm, slice).len(),
+        |k: int| seq![Symbol::Gen(slice_pos(slice, h0_filter(mm, slice)[k]) as nat)])
+}
+
+/// `slice.contains(val) ⟹ slice_pos` is a valid position holding `val`.
+proof fn lemma_slice_pos_valid(slice: Seq<nat>, val: nat)
+    requires
+        slice.contains(val),
+    ensures
+        0 <= slice_pos(slice, val) < slice.len(),
+        slice[slice_pos(slice, val)] == val,
+{
+    assert(exists|p: int| 0 <= p < slice.len() && slice[p] == val) by { assert(slice.contains(val)); }
+}
+
+/// Every `h0_filter(slice)` entry lies in `slice` (it keeps a subset).
+proof fn lemma_h0_filter_in_slice(mm: ModMachine, slice: Seq<nat>, k: int)
+    requires
+        0 <= k < h0_filter(mm, slice).len(),
+    ensures
+        slice.contains(h0_filter(mm, slice)[k]),
+    decreases slice.len(),
+{
+    let hf = h0_filter(mm, slice);
+    if slice.len() == 0 {
+        assert(hf.len() == 0);
+    } else {
+        let rest = slice.drop_first();
+        if mm_in_H0(mm, slice[0], 0) {
+            assert(hf =~= seq![slice[0]] + h0_filter(mm, rest));
+            if k == 0 {
+                assert(hf[0] == slice[0]);
+                assert(slice[0] == slice[0]);
+            } else {
+                assert(hf[k] == h0_filter(mm, rest)[k - 1]);
+                lemma_h0_filter_in_slice(mm, rest, k - 1);
+                let i = choose|i: int| 0 <= i < rest.len() && rest[i] == hf[k];
+                assert(0 <= i < rest.len() && rest[i] == hf[k]);
+                assert(rest[i] == slice[i + 1]);
+            }
+        } else {
+            assert(hf =~= h0_filter(mm, rest));
+            lemma_h0_filter_in_slice(mm, rest, k);
+            let i = choose|i: int| 0 <= i < rest.len() && rest[i] == hf[k];
+            assert(0 <= i < rest.len() && rest[i] == hf[k]);
+            assert(rest[i] == slice[i + 1]);
+        }
+    }
+}
+
+/// `h0_sel[k]` is valid over `slice.len()` (its single generator index is a `slice`-position).
+proof fn lemma_h0_sel_valid(mm: ModMachine, slice: Seq<nat>, k: int)
+    requires
+        0 <= k < h0_filter(mm, slice).len(),
+    ensures
+        word_valid(h0_sel(mm, slice)[k], slice.len()),
+        slice[slice_pos(slice, h0_filter(mm, slice)[k]) as int] == h0_filter(mm, slice)[k],
+        0 <= slice_pos(slice, h0_filter(mm, slice)[k]) < slice.len(),
+{
+    let hf = h0_filter(mm, slice);
+    lemma_h0_filter_in_slice(mm, slice, k);
+    lemma_slice_pos_valid(slice, hf[k]);
+    let p = slice_pos(slice, hf[k]);
+    assert(h0_sel(mm, slice)[k] =~= seq![Symbol::Gen(p as nat)]);
+}
+
+/// **`compose_embeddings(config_emb(slice), h0_sel) = config_emb(h0_filter(slice))`.**
+proof fn lemma_compose_config_h0_sel(mm: ModMachine, n: nat, slice: Seq<nat>)
+    ensures
+        compose_embeddings(config_emb(slice), h0_sel(mm, slice)) =~= config_emb(h0_filter(mm, slice)),
+{
+    let hf = h0_filter(mm, slice);
+    let sel = h0_sel(mm, slice);
+    let ce = config_emb(slice);
+    let comp = compose_embeddings(ce, sel);
+    assert(comp.len() == sel.len() == hf.len());
+    assert(config_emb(hf).len() == hf.len());
+    assert forall|k: int| 0 <= k < hf.len() implies comp[k] =~= config_emb(hf)[k] by {
+        lemma_h0_sel_valid(mm, slice, k);
+        let p = slice_pos(slice, hf[k]);
+        assert(comp[k] == apply_embedding(ce, sel[k]));
+        assert(sel[k] =~= seq![Symbol::Gen(p as nat)]);
+        lemma_emb_single_gen(ce, p as nat);                  // = ce[p] = config(slice[p],0)
+        assert(ce[p] == config_word(slice[p], 0));
+        assert(slice[p] == hf[k]);
+        assert(config_emb(hf)[k] == config_word(hf[k], 0));
+    }
+}
+
+/// **`compose_embeddings(assoc_rhs_emb(slice), h0_sel) = assoc_rhs_emb(h0_filter(slice))`.**
+proof fn lemma_compose_assoc_h0_sel(mm: ModMachine, n: nat, m: nat, slice: Seq<nat>)
+    ensures
+        compose_embeddings(assoc_rhs_emb(mm, n, m, slice), h0_sel(mm, slice))
+            =~= assoc_rhs_emb(mm, n, m, h0_filter(mm, slice)),
+{
+    let hf = h0_filter(mm, slice);
+    let sel = h0_sel(mm, slice);
+    let ae = assoc_rhs_emb(mm, n, m, slice);
+    let comp = compose_embeddings(ae, sel);
+    assert(comp.len() == sel.len() == hf.len());
+    assert(assoc_rhs_emb(mm, n, m, hf).len() == hf.len());
+    assert forall|k: int| 0 <= k < hf.len() implies comp[k] =~= assoc_rhs_emb(mm, n, m, hf)[k] by {
+        lemma_h0_sel_valid(mm, slice, k);
+        let p = slice_pos(slice, hf[k]);
+        assert(comp[k] == apply_embedding(ae, sel[k]));
+        assert(sel[k] =~= seq![Symbol::Gen(p as nat)]);
+        lemma_emb_single_gen(ae, p as nat);                  // = ae[p] = assoc_rhs_machine(slice[p])
+        assert(ae[p] == assoc_rhs_machine(mm, n, m, slice[p]));
+        assert(slice[p] == hf[k]);
+        assert(assoc_rhs_emb(mm, n, m, hf)[k] == assoc_rhs_machine(mm, n, m, hf[k]));
+    }
+}
+
+/// **CS-5c 3d Brick C — THE B-SIDE H₀-restriction (`C2-b`).** A base word `mid_w` of
+/// `base_A_plus_base` lying in BOTH `⟨ublock_db_gens⟩` (the 3d invariant, no `p`) and
+/// `⟨assoc_rhs_emb(slice)⟩` lies in `⟨assoc_rhs_emb(h0_filter(slice))⟩`. The b-orientation analog of
+/// `lemma_cs5_middle_h0_restrict` — reduces to the a-side via `π` + config freeness + intersection.
+pub proof fn lemma_cs5_middle_h0_restrict_b(mm: ModMachine, n: nat, m: nat, slice: Seq<nat>,
+    mid_w: Word)
+    requires
+        mod_machine_wf(mm),
+        mm_terminal(mm, 0, 0),
+        2 * n < m,
+        slice.no_duplicates(),
+        forall|i: int| 0 <= i < slice.len() ==> numbers_word(n, m, #[trigger] slice[i]),
+        in_generated_subgroup(base_A_plus_base(mm, n), ublock_db_gens(mm, n), mid_w),
+        in_generated_subgroup(base_A_plus_base(mm, n), assoc_rhs_emb(mm, n, m, slice), mid_w),
+    ensures
+        in_generated_subgroup(base_A_plus_base(mm, n),
+            assoc_rhs_emb(mm, n, m, h0_filter(mm, slice)), mid_w),
+{
+    let nk = g_m(mm).num_generators;
+    let bp = base_A_plus_base(mm, n);
+    let ng1 = (nk + n + 1) as nat;
+    let pi = db_projection(mm, n);
+    let ae = assoc_rhs_emb(mm, n, m, slice);
+    let ce = config_emb(slice);
+    lemma_g_m_num_generators(mm);
+    lemma_g_m_valid(mm);
+    lemma_base_A_plus_base_valid(mm, n);
+    lemma_db_projection_valid(mm, n);
+    assert(bp.num_generators == ng1);
+
+    // assoc_rhs_emb / config_emb validities.
+    assert(ae.len() == slice.len());
+    assert forall|i: int| 0 <= i < ae.len() implies word_valid(#[trigger] ae[i], ng1) by {
+        assert(ae[i] == assoc_rhs_machine(mm, n, m, slice[i]));
+        lemma_w_c_valid(nk, n, m, slice[i], ng1);
+        lemma_single_gen_valid((nk + n) as nat, ng1);
+        lemma_config_word_valid(slice[i], 0);
+        lemma_word_valid_mono(config_word(slice[i], 0), 3, ng1);
+        lemma_concat_word_valid(config_word(slice[i], 0), w_b(nk, n, m, slice[i]), ng1);
+        lemma_concat_word_valid(config_word(slice[i], 0) + w_b(nk, n, m, slice[i]),
+            seq![Symbol::Gen((nk + n) as nat)], ng1);
+        assert(assoc_rhs_machine(mm, n, m, slice[i])
+            =~= (config_word(slice[i], 0) + w_b(nk, n, m, slice[i])) + seq![Symbol::Gen((nk + n) as nat)]);
+    }
+    assert(ce.len() == slice.len());
+    assert forall|i: int| 0 <= i < ce.len() implies word_valid(#[trigger] ce[i], nk) by {
+        assert(ce[i] == config_word(slice[i], 0));
+        lemma_config_word_valid(slice[i], 0);
+        lemma_word_valid_mono(config_word(slice[i], 0), 3, nk);
+    }
+
+    // ---- 1. coord word u over assoc_rhs_emb(slice); A = emb(ae, u) ≡_bp mid_w ----
+    lemma_subgroup_to_k_word(bp, ae, mid_w);
+    let u = choose|u: Word| word_valid(u, ae.len())
+        && equiv_in_presentation(bp, apply_embedding(ae, u), mid_w);
+    assert(word_valid(u, ae.len()) && equiv_in_presentation(bp, apply_embedding(ae, u), mid_w));
+    let av = apply_embedding(ae, u);
+    assert(word_valid(u, slice.len()));
+    lemma_apply_embedding_valid(ae, u, ng1);                 // av valid over bp
+
+    // ---- 2. A ∈ ⟨ublock_db_gens⟩ over bp ----
+    lemma_equiv_symmetric(bp, av, mid_w);
+    lemma_in_subgroup_respects_equiv(bp, ublock_db_gens(mm, n), mid_w, av);
+
+    // ---- 3. cw = π(A) = emb(config_emb(slice), u) ----
+    lemma_apply_hom_embedding_compose(pi, ae, u);
+    lemma_comp_pi_assoc_is_config(mm, n, m, slice);
+    let cw = apply_embedding(ce, u);
+    assert(apply_hom(pi, av) =~= cw);
+    lemma_apply_embedding_valid(ce, u, nk);                  // cw valid over nk
+
+    // ---- 4. cw ∈ ⟨g_subgens⟩ over g_m ----
+    lemma_pi_image_in_gsubgens(mm, n, av);
+    assert(in_generated_subgroup(g_m(mm), g_subgens(mm), cw));
+
+    // ---- 5. lift cw to bp, a-side C2 ⟹ cw ∈ ⟨config_emb(h0_filter)⟩ over bp ----
+    assert forall|i: int| 0 <= i < g_subgens(mm).len()
+        implies word_valid(#[trigger] g_subgens(mm)[i], nk) by {
+        lemma_g_m_associations_valid(mm);
+        assert(g_subgens(mm)[i] == g_m_associations(mm)[i].1);
+        lemma_word_valid_mono(g_subgens(mm)[i], (3 + mm.quads.len()) as nat, nk);
+    }
+    lemma_machine_subgroup_gm_to_bp(mm, n, g_subgens(mm), cw);
+    // g_subgens ⊆ ublock_db_gens (prefix).
+    assert forall|i: int| 0 <= i < g_subgens(mm).len()
+        implies exists|kk: int| 0 <= kk < ublock_db_gens(mm, n).len()
+            && (#[trigger] g_subgens(mm)[i]) == ublock_db_gens(mm, n)[kk] by {
+        assert(ublock_db_gens(mm, n)[i] == g_subgens(mm)[i]);   // prefix
+    }
+    lemma_in_subgroup_gens_superset(bp, g_subgens(mm), ublock_db_gens(mm, n), cw);
+    lemma_apply_embedding_in_subgroup(bp, ce, u);            // cw ∈ ⟨config_emb(slice)⟩ over bp
+    lemma_cs5_middle_h0_restrict(mm, n, slice, cw);
+    let hf = h0_filter(mm, slice);
+    assert(in_generated_subgroup(bp, config_emb(hf), cw));
+
+    // ---- 6. descend cw ∈ ⟨config_emb(hf)⟩ to g_m (π fixes cw and config_emb(hf)) ----
+    lemma_hom_maps_subgroup(pi, config_emb(hf), cw);
+    let dimg = Seq::new(config_emb(hf).len(), |i: int| apply_hom(pi, config_emb(hf)[i]));
+    assert(dimg =~= config_emb(hf)) by {
+        assert forall|i: int| 0 <= i < config_emb(hf).len() implies dimg[i] =~= config_emb(hf)[i] by {
+            assert(config_emb(hf)[i] == config_word(hf[i], 0));
+            lemma_db_proj_fixes_config(mm, n, hf[i]);
+        }
+    }
+    lemma_db_proj_fixes_machine_word(mm, n, cw);             // π(cw) = cw
+    assert(in_generated_subgroup(g_m(mm), config_emb(hf), cw));
+
+    // ---- 7. intersection over g_m: config free + config_emb(hf) = compose(config_emb(slice), h0_sel) ----
+    lemma_config_emb_is_free_family_gm(mm, slice);
+    lemma_compose_config_h0_sel(mm, n, slice);
+    assert(in_generated_subgroup(g_m(mm), compose_embeddings(ce, h0_sel(mm, slice)), cw));
+    assert forall|k: int| 0 <= k < h0_sel(mm, slice).len()
+        implies word_valid(#[trigger] h0_sel(mm, slice)[k], slice.len()) by {
+        lemma_h0_sel_valid(mm, slice, k);
+    }
+    lemma_intersection_property(g_m(mm), ce, h0_sel(mm, slice), u);
+    assert(in_generated_subgroup(free_group(slice.len()), h0_sel(mm, slice), u));
+
+    // ---- 8. carry u back through assoc_rhs_emb (emb-as-hom) ----
+    let eh = HomomorphismData { source: free_group(slice.len()), target: bp, generator_images: ae };
+    lemma_free_group_valid(slice.len());
+    assert(is_valid_homomorphism(eh)) by {
+        reveal(presentation_valid);
+        assert(eh.source.relators.len() == 0);
+        assert forall|i: int| 0 <= i < eh.generator_images.len()
+            implies word_valid(#[trigger] eh.generator_images[i], eh.target.num_generators) by {
+            assert(eh.generator_images[i] == ae[i]);
+        }
+    }
+    lemma_hom_maps_subgroup(eh, h0_sel(mm, slice), u);
+    let aimg = Seq::new(h0_sel(mm, slice).len(), |i: int| apply_hom(eh, h0_sel(mm, slice)[i]));
+    assert(apply_hom(eh, u) =~= av) by { lemma_apply_hom_eq_emb(eh, u); }
+    lemma_compose_assoc_h0_sel(mm, n, m, slice);
+    assert(aimg =~= assoc_rhs_emb(mm, n, m, hf)) by {
+        assert forall|i: int| 0 <= i < h0_sel(mm, slice).len()
+            implies aimg[i] =~= assoc_rhs_emb(mm, n, m, hf)[i] by {
+            lemma_apply_hom_eq_emb(eh, h0_sel(mm, slice)[i]);
+            assert(apply_hom(eh, h0_sel(mm, slice)[i]) == apply_embedding(ae, h0_sel(mm, slice)[i]));
+            assert(compose_embeddings(ae, h0_sel(mm, slice))[i] == apply_embedding(ae, h0_sel(mm, slice)[i]));
+        }
+    }
+    assert(in_generated_subgroup(bp, assoc_rhs_emb(mm, n, m, hf), av));
+
+    // ---- 9. mid_w ≡_bp A ⟹ mid_w ∈ ⟨assoc_rhs_emb(hf)⟩ ----
+    lemma_in_subgroup_respects_equiv(bp, assoc_rhs_emb(mm, n, m, hf), av, mid_w);
 }
 
 } // verus!
