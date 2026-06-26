@@ -3162,4 +3162,289 @@ pub proof fn lemma_seg_inv_relabel(mm: ModMachine, n: nat, w: Word)
     }
 }
 
+// ----------------------------------------------------------------------------
+// Brick D — D-PRESERVATION: `seg_inv` survives a pinch-out splice.
+// ----------------------------------------------------------------------------
+
+/// Three-region indexing of the spliced word `wshort = wm[0..i] + phi_g + wm[j+1..]`:
+/// positions `< i` come from `wm`, positions `[i, i+|phi_g|)` from `phi_g`, positions `>= i+|phi_g|`
+/// from the suffix `wm[j+1..]` (shifted).
+proof fn lemma_wshort_at(wm: Word, phi_g: Word, i: int, j: int, k: int)
+    requires
+        0 <= i,
+        i < j,
+        j < wm.len(),
+        0 <= k < i + phi_g.len() + (wm.len() - j - 1),
+    ensures
+        ({
+            let pre = wm.subrange(0, i);
+            let suf = wm.subrange(j + 1, wm.len() as int);
+            let wshort = (pre + phi_g) + suf;
+            let lp = phi_g.len() as int;
+            &&& wshort.len() == i + lp + (wm.len() - j - 1)
+            &&& (0 <= k < i ==> wshort[k] == wm[k])
+            &&& (i <= k < i + lp ==> wshort[k] == phi_g[k - i])
+            &&& (i + lp <= k ==> wshort[k] == wm[k - i - lp + j + 1])
+        }),
+{
+    let pre = wm.subrange(0, i);
+    let suf = wm.subrange(j + 1, wm.len() as int);
+    let pf = pre + phi_g;
+    let wshort = pf + suf;
+    let lp = phi_g.len() as int;
+    assert(pre.len() == i);
+    assert(suf.len() == wm.len() - j - 1);
+    assert(pf.len() == i + lp);
+    assert(wshort.len() == i + lp + (wm.len() - j - 1));
+    if 0 <= k < i {
+        assert(wshort[k] == pf[k]);          // k < pf.len()
+        assert(pf[k] == pre[k]);             // k < pre.len()
+        assert(pre[k] == wm[k]);             // subrange(0,i)
+    } else if i <= k < i + lp {
+        assert(wshort[k] == pf[k]);          // k < pf.len() = i+lp
+        assert(pf[k] == phi_g[k - i]);       // k >= pre.len() = i
+    } else {
+        assert(wshort[k] == suf[k - (i + lp)]);                       // k >= pf.len()
+        assert(suf[k - (i + lp)] == wm[(j + 1) + (k - (i + lp))]);    // subrange(j+1, _)
+        assert((j + 1) + (k - (i + lp)) == k - i - lp + j + 1);
+    }
+}
+
+/// `seg_inv(wm)` instantiated at one maximal stable-free run `[a,b)`: directly gives `wm[a..b] ∈
+/// ⟨ublock_db_gens⟩`.  (A thin wrapper so each call site only has to discharge the run conditions.)
+proof fn lemma_seg_inv_run_in_ub(mm: ModMachine, n: nat, wm: Word, a: int, b: int)
+    requires
+        seg_inv(mm, n, wm),
+        0 <= a <= b <= wm.len(),
+        a == 0 || seg_stable(mm, n, wm[a - 1]),
+        b == wm.len() || seg_stable(mm, n, wm[b]),
+        forall|kk: int| a <= kk < b ==> !seg_stable(mm, n, wm[kk]),
+    ensures
+        in_generated_subgroup(base_A_plus_base(mm, n), ublock_db_gens(mm, n), wm.subrange(a, b)),
+{
+    assert(in_generated_subgroup(base_A_plus_base(mm, n), ublock_db_gens(mm, n), wm.subrange(a, b)));
+}
+
+/// **Brick D preservation:** `seg_inv` survives a pinch-out splice.  Given a `base_A_plus_data` pinch
+/// at `(i,j)`, with the replacement middle `phi_g` stable-free and `∈ ⟨ublock_db_gens⟩`, the spliced
+/// word `wshort = wm[0..i] + phi_g + wm[j+1..]` again satisfies `seg_inv`.  The only *new* maximal
+/// stable-free run is the merged `wm[s..i] · phi_g · wm[j+1..e]` (the pre/suf runs are bounded by the
+/// removed `p`-letters at `i,j`, hence maximal runs of `wm` ⟹ in `⟨ublock⟩` by IH; `phi_g` is in by
+/// hypothesis; product ∈ subgroup).  All other runs of `wshort` are runs of `wm`.  (Companion-confirmed
+/// case split; blueprint §7.3.)
+pub proof fn lemma_seg_inv_pinch_out(mm: ModMachine, n: nat, m: nat, slice: Seq<nat>,
+    wm: Word, phi_g: Word, i: int, j: int)
+    requires
+        seg_inv(mm, n, wm),
+        has_adjacent_opposite_at(base_A_plus_data(mm, n, m, slice), wm, i, j),
+        forall|t: int| 0 <= t < phi_g.len() ==> !seg_stable(mm, n, phi_g[t]),
+        in_generated_subgroup(base_A_plus_base(mm, n), ublock_db_gens(mm, n), phi_g),
+    ensures
+        seg_inv(mm, n, wm.subrange(0, i) + phi_g + wm.subrange(j + 1, wm.len() as int)),
+{
+    let bp = base_A_plus_base(mm, n);
+    let ub = ublock_db_gens(mm, n);
+    let data = base_A_plus_data(mm, n, m, slice);
+    let pre = wm.subrange(0, i);
+    let suf = wm.subrange(j + 1, wm.len() as int);
+    let wshort = pre + phi_g + suf;                  // = (pre + phi_g) + suf
+    let big_m = wm.len() as int;
+    let lp = phi_g.len() as int;
+    let cap_w = i + lp + (big_m - j - 1);
+    let dd = j + 1 - i - lp;                          // suffix shift: region-3 wshort[k] = wm[k+dd]
+    lemma_base_A_plus_base_valid(mm, n);
+    // bounds + pinch stability of wm[i], wm[j].
+    assert(0 <= i < j < big_m);
+    lemma_seg_stable_iff(mm, n, m, slice, wm[i]);
+    lemma_seg_stable_iff(mm, n, m, slice, wm[j]);
+    assert(seg_stable(mm, n, wm[i]));
+    assert(seg_stable(mm, n, wm[j]));
+    assert(pre.len() == i);
+    assert(suf.len() == big_m - j - 1);
+    assert(wshort.len() == cap_w);
+
+    assert forall|a: int, b: int|
+        (0 <= a <= b <= wshort.len()
+            && (a == 0 || seg_stable(mm, n, wshort[a - 1]))
+            && (b == wshort.len() || seg_stable(mm, n, wshort[b]))
+            && (forall|k: int| a <= k < b ==> !seg_stable(mm, n, wshort[k])))
+        implies #[trigger] in_generated_subgroup(bp, ub, wshort.subrange(a, b)) by {
+        // ---- exclusion: a,b ∉ (i, i+lp) (the phi-region is stable-free, so a maximal run can't
+        //      have a boundary strictly inside it). ----
+        if i < a < i + lp {
+            lemma_wshort_at(wm, phi_g, i, j, a - 1);
+            assert(wshort[a - 1] == phi_g[a - 1 - i]);
+            assert(!seg_stable(mm, n, phi_g[a - 1 - i]));    // 0 <= a-1-i < lp
+            assert(a != 0);
+            assert(false);
+        }
+        if i < b < i + lp {
+            lemma_wshort_at(wm, phi_g, i, j, b);
+            assert(wshort[b] == phi_g[b - i]);
+            assert(!seg_stable(mm, n, phi_g[b - i]));
+            assert(b < cap_w);                                // b < i+lp <= cap_w
+            assert(false);
+        }
+        // now a <= i || a >= i+lp, and b <= i || b >= i+lp.
+
+        if b <= i {
+            // ======== Config 1: run inside the prefix → a maximal run of wm. ========
+            // wshort[a..b] == wm[a..b].
+            assert(wshort.subrange(a, b) =~= wm.subrange(a, b)) by {
+                assert forall|r: int| 0 <= r < b - a
+                    implies wshort.subrange(a, b)[r] == wm.subrange(a, b)[r] by {
+                    lemma_wshort_at(wm, phi_g, i, j, a + r);   // a+r < b <= i ⟹ region 1
+                    assert(wshort.subrange(a, b)[r] == wshort[a + r]);
+                    assert(wm.subrange(a, b)[r] == wm[a + r]);
+                }
+            }
+            // wm run conditions for [a,b).
+            assert(a == 0 || seg_stable(mm, n, wm[a - 1])) by {
+                if a != 0 {
+                    lemma_wshort_at(wm, phi_g, i, j, a - 1);    // a-1 < i ⟹ region 1
+                    assert(wshort[a - 1] == wm[a - 1]);
+                }
+            }
+            assert(b == big_m || seg_stable(mm, n, wm[b])) by {
+                if b < i {
+                    lemma_wshort_at(wm, phi_g, i, j, b);        // region 1
+                    assert(wshort[b] == wm[b]);
+                    assert(b < cap_w);
+                } // else b == i: seg_stable(wm[i]) already in scope.
+            }
+            assert forall|kk: int| a <= kk < b implies !seg_stable(mm, n, wm[kk]) by {
+                lemma_wshort_at(wm, phi_g, i, j, kk);           // kk < b <= i ⟹ region 1
+                assert(wshort[kk] == wm[kk]);
+            }
+            lemma_seg_inv_run_in_ub(mm, n, wm, a, b);
+        } else if a >= i + lp {
+            // ======== Config 3: run inside the suffix → a maximal run of wm (shifted by dd). ========
+            assert(wshort.subrange(a, b) =~= wm.subrange(a + dd, b + dd)) by {
+                assert forall|r: int| 0 <= r < b - a
+                    implies wshort.subrange(a, b)[r] == wm.subrange(a + dd, b + dd)[r] by {
+                    lemma_wshort_at(wm, phi_g, i, j, a + r);    // a+r >= i+lp ⟹ region 3
+                    assert(wshort.subrange(a, b)[r] == wshort[a + r]);
+                    assert(wshort[a + r] == wm[(a + r) - i - lp + j + 1]);
+                    assert((a + r) - i - lp + j + 1 == (a + dd) + r);
+                    assert(wm.subrange(a + dd, b + dd)[r] == wm[(a + dd) + r]);
+                }
+            }
+            // wm run conditions for [a+dd, b+dd).  a+dd >= j+1 >= 1.
+            assert(a + dd >= j + 1);
+            assert(b + dd <= big_m);
+            assert((a + dd) == 0 || seg_stable(mm, n, wm[(a + dd) - 1])) by {
+                if a == i + lp {
+                    assert((a + dd) - 1 == j);                   // seg_stable(wm[j])
+                } else {
+                    assert(a > i + lp && a != 0);
+                    lemma_wshort_at(wm, phi_g, i, j, a - 1);     // a-1 >= i+lp ⟹ region 3
+                    assert(wshort[a - 1] == wm[(a - 1) - i - lp + j + 1]);
+                    assert((a - 1) - i - lp + j + 1 == (a + dd) - 1);
+                }
+            }
+            assert((b + dd) == big_m || seg_stable(mm, n, wm[b + dd])) by {
+                if b < cap_w {
+                    lemma_wshort_at(wm, phi_g, i, j, b);         // b >= a >= i+lp ⟹ region 3
+                    assert(wshort[b] == wm[b - i - lp + j + 1]);
+                    assert(b - i - lp + j + 1 == b + dd);
+                }
+            }
+            assert forall|kk: int| (a + dd) <= kk < (b + dd) implies !seg_stable(mm, n, wm[kk]) by {
+                let k0 = kk - dd;                                 // k0 in [a,b), region 3
+                assert(a <= k0 < b);
+                lemma_wshort_at(wm, phi_g, i, j, k0);
+                assert(wshort[k0] == wm[k0 - i - lp + j + 1]);
+                assert(k0 - i - lp + j + 1 == kk);
+            }
+            lemma_seg_inv_run_in_ub(mm, n, wm, a + dd, b + dd);
+        } else {
+            // ======== Config 2: the MERGED run = wm[a..i] · phi_g · wm[j+1..b+dd]. ========
+            assert(a <= i && b >= i + lp);
+            let bd = b + dd;                                      // = b - i - lp + j + 1
+            let cap_p = wm.subrange(a, i);                        // pre piece
+            let cap_y = wm.subrange(j + 1, bd);                   // suf piece
+            assert(j + 1 <= bd <= big_m);
+            // splice equality: wshort[a..b] == (cap_p + phi_g) + cap_y.
+            assert(wshort.subrange(a, b) =~= (cap_p + phi_g) + cap_y) by {
+                let tgt = (cap_p + phi_g) + cap_y;
+                assert(cap_p.len() == i - a);
+                assert(cap_y.len() == bd - (j + 1));
+                assert(tgt.len() == b - a);
+                assert forall|r: int| 0 <= r < b - a
+                    implies wshort.subrange(a, b)[r] == tgt[r] by {
+                    lemma_wshort_at(wm, phi_g, i, j, a + r);
+                    assert(wshort.subrange(a, b)[r] == wshort[a + r]);
+                    if r < i - a {
+                        assert(a + r < i);                       // region 1
+                        assert(tgt[r] == (cap_p + phi_g)[r]);
+                        assert((cap_p + phi_g)[r] == cap_p[r]);
+                        assert(cap_p[r] == wm[a + r]);
+                    } else if r < (i - a) + lp {
+                        assert(i <= a + r < i + lp);             // region 2
+                        assert(tgt[r] == (cap_p + phi_g)[r]);
+                        assert((cap_p + phi_g)[r] == phi_g[r - (i - a)]);
+                        assert(r - (i - a) == a + r - i);
+                    } else {
+                        assert(a + r >= i + lp);                 // region 3
+                        assert(tgt[r] == cap_y[r - ((i - a) + lp)]);
+                        assert(cap_y[r - ((i - a) + lp)] == wm[(j + 1) + (r - ((i - a) + lp))]);
+                        assert((j + 1) + (r - ((i - a) + lp)) == (a + r) - i - lp + j + 1);
+                    }
+                }
+            }
+            // cap_p ∈ ⟨ub⟩: maximal run of wm (right end = stable wm[i]), or empty when a == i.
+            if a < i {
+                assert(a == 0 || seg_stable(mm, n, wm[a - 1])) by {
+                    if a != 0 {
+                        lemma_wshort_at(wm, phi_g, i, j, a - 1);  // a-1 < i ⟹ region 1
+                        assert(wshort[a - 1] == wm[a - 1]);
+                    }
+                }
+                assert forall|kk: int| a <= kk < i implies !seg_stable(mm, n, wm[kk]) by {
+                    lemma_wshort_at(wm, phi_g, i, j, kk);          // kk < i ⟹ region 1
+                    assert(wshort[kk] == wm[kk]);
+                    assert(a <= kk < b);                           // i <= b
+                }
+                lemma_seg_inv_run_in_ub(mm, n, wm, a, i);
+            } else {
+                assert(a == i);
+                assert(cap_p =~= empty_word());
+                lemma_empty_in_subgroup(bp, ub);
+            }
+            assert(in_generated_subgroup(bp, ub, cap_p));
+            // cap_y ∈ ⟨ub⟩: maximal run of wm (left end = stable wm[j]), or empty when b == i+lp.
+            if b > i + lp {
+                assert(j + 1 < bd);
+                assert((bd) == big_m || seg_stable(mm, n, wm[bd])) by {
+                    if b < cap_w {
+                        lemma_wshort_at(wm, phi_g, i, j, b);       // b >= i+lp ⟹ region 3
+                        assert(wshort[b] == wm[b - i - lp + j + 1]);
+                        assert(b - i - lp + j + 1 == bd);
+                    }
+                }
+                assert forall|kk: int| (j + 1) <= kk < bd implies !seg_stable(mm, n, wm[kk]) by {
+                    let k0 = kk - dd;                              // k0 in [i+lp, b), region 3
+                    assert(i + lp <= k0 < b);
+                    lemma_wshort_at(wm, phi_g, i, j, k0);
+                    assert(wshort[k0] == wm[k0 - i - lp + j + 1]);
+                    assert(k0 - i - lp + j + 1 == kk);
+                    assert(a <= k0 < b);                           // a <= i <= i+lp <= k0
+                }
+                lemma_seg_inv_run_in_ub(mm, n, wm, j + 1, bd);
+            } else {
+                assert(b == i + lp);
+                assert(bd == j + 1);
+                assert(cap_y =~= empty_word());
+                lemma_empty_in_subgroup(bp, ub);
+            }
+            assert(in_generated_subgroup(bp, ub, cap_y));
+            // product: (cap_p + phi_g) + cap_y ∈ ⟨ub⟩.
+            lemma_product_in_subgroup(bp, ub, cap_p, phi_g);
+            lemma_product_in_subgroup(bp, ub, cap_p + phi_g, cap_y);
+            assert(in_generated_subgroup(bp, ub, wshort.subrange(a, b)));
+        }
+    }
+    assert(seg_inv(mm, n, wshort));
+}
+
 } // verus!
