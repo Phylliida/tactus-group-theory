@@ -371,6 +371,24 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > proof) → Brick E (`lemma_cs5_pinch_descends`, ~250 lines, per-orientation C1+C2 / C1+C2-b) → Brick F
 > (induction + (★k) glue + CS-5d). Full per-brick plan in blueprint §7.4.**
 >
+> **✅✅ CS-5 COMPLETE 2026-06-25 (session 30) — `cohen_cs5_recog` 102→114/0, gate GREEN, all additive
+> (no assume/admit/external_body). `lemma_cs5_iso` = `hnn_pred_associations_isomorphic(h3_pred_data)`
+> VERIFIED — the k von-Dyck iso `A₊≅A₋` over the predicate Higman tower, the LAST open piece of CS-5.**
+> All four §7.5 REMAINING items landed (blueprint §7.6 is the live record): **(1)**
+> `lemma_a_col_machine_relator_trivial` (a-side von-Dyck over finite `h2_II`; both the K_M base-relator
+> class via `lemma_h2_II_contains_gm`+`lemma_a_col_machine_fixes_machine_word` AND the HNN p-relator
+> class via new `lemma_a_col_machine_on_hnn_relator`→`family_II_relator`); **(2)**
+> `lemma_cs5_recognition_forward` (the `p`-peel injectivity, mirror `lemma_map_a_forward`: base case via
+> `lemma_cs5_base_case_faithful`+new `lemma_a_col_machine_base_word_valid`; step via `britton_lemma_full`
+> →`lemma_cs5_pinch_descends`→`lemma_cs5_pinch_out`→#1→recurse — landed FIRST TRY); **(3)**
+> `lemma_cs5_kforward` (the `(★k)` FORWARD: compactness→`normalize_alphas`→a-relabel→recognition_forward
+> →b-von-Dyck `lemma_cs5_vondyck_relator`→b-relabel); **(4)** `lemma_cs5_iso` via `lemma_cs5d_level_iff`
+> (base-faithfulness `lemma_h3_pred_upto_base_faithful` at `k=2n`, powered by `lemma_cs4e_iso_upto`,
+> sandwiching `(★k)`=kforward+`lemma_cs5_backward`; mirror CS-4e). **NEXT = CS-6** (Cohen §1 final
+> assembly): Britton descent over `h3_pred_data` (BOTH a-level + k-level isos now give
+> `hnn_pred_associations_isomorphic`) ∘ CS-2 retraction `lemma_h2_pred_descends_to_c` ⟹ `C ↪ H₃`
+> faithfulness, transported to printable `h3_pres` via soundness `lemma_III`.
+>
 > **✅ CS-5c 3d IN PROGRESS 2026-06-25 (session 29) — `cohen_cs5_recog` 83→102/0, gate GREEN, additive
 > (+19 lemmas, 6 commits, all verified first/second try, no assume/admit/external_body).** Blueprint
 > §7.5 is the live record. **Brick D COMPLETE** = `lemma_seg_inv_pinch_out` (the trickiest proof — the
