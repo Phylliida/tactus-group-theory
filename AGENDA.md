@@ -371,6 +371,26 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > proof) → Brick E (`lemma_cs5_pinch_descends`, ~250 lines, per-orientation C1+C2 / C1+C2-b) → Brick F
 > (induction + (★k) glue + CS-5d). Full per-brick plan in blueprint §7.4.**
 >
+> **✅ CS-5c 3d IN PROGRESS 2026-06-25 (session 29) — `cohen_cs5_recog` 83→102/0, gate GREEN, additive
+> (+19 lemmas, 6 commits, all verified first/second try, no assume/admit/external_body).** Blueprint
+> §7.5 is the live record. **Brick D COMPLETE** = `lemma_seg_inv_pinch_out` (the trickiest proof — the
+> 3-way splice; companion-confirmed exhaustive case split, configs 1/3 map to maximal `wm` runs bounded
+> by the pinch stables, config 2 = the merged `wm[a..i]·φ·wm[j+1..b+δ]` product). **Brick E COMPLETE**
+> = `lemma_cs5_pinch_descends` (mirror `lemma_map_a_pinch_descends`; new `a_col_machine`-relabel helpers
+> carry stable↔stable at `nk+n+1`↔`p_idx`; both p-orientations via C1+seg_inv_middle+C2/C2-b). **Brick F
+> groundwork COMPLETE** = the **`phi_g ∈ ⟨ublock⟩` membership theory** (the genuinely-NEW math), centred on
+> **`lemma_config_in_ublock`** (`(β,0)∈H₀ ⟹ config(β,0)∈⟨ublock⟩` via theorem1→k_commutes→subgroup over
+> b_m→lift to g_m→gm_to_bp — exactly why the H₀-filter keeps `seg_inv` alive) + `lemma_assoc_rhs_in_ublock`
+> + generic `lemma_{subgroup_base_to_hnn,inverse_in_subgroup,emb_col_in_ublock,h0_filter_in_H0}`. **Brick
+> F LYNCHPIN COMPLETE** = **`lemma_cs5_pinch_out`** (mirror `lemma_pd_pinch_out`; bundles E→pinch-out→
+> D-preservation into ONE slice-parametrized call: a `base_A_plus_data(slice)` pinch over an all-H₀ slice
+> reduces to a smaller `wshort` that STILL satisfies `seg_inv`; made `lemma_pinch_assemble` pub). **NEXT
+> (all deps built+verified; blueprint §7.5 REMAINING 1–4): (1)** `lemma_a_col_machine_relator_trivial`
+> (a-side von-Dyck over finite `h2_II` — the one divergence from `lemma_a_words_relator_trivial`: the
+> non-free `base_A_plus_base` adds a K_M-relator class) **→ (2)** `lemma_cs5_recognition_forward`
+> (mirror `lemma_map_a_forward`, consumes the pinch-out) **→ (3)** compactness + (★k) forward **→ (4)**
+> glue + CS-5d tower lift ⟹ `hnn_pred_associations_isomorphic(h3_pred_data)`.**
+>
 > **✅ FORK-A STARTED 2026-06-23 (session 14) — elementary foundation arc DONE, ports VERBATIM.**
 > The completeness route is **Fork-A** (predicate presentation; the textbook route per
 > `docs/cohen-faithfulness-primary-source.md` §1/§10). Go taken on the standing "follow the textbook"
