@@ -477,3 +477,10 @@ pub mod cohen_cs7;
 // s_relators_valid + s_realizes, yielding the CONCRETE faithfulness lemma_C_faithful_printable_canonical
 // (C↪H₃ explicit for the machine set H₀(M)). docs/machine-bridge-and-infinite-gen-plan.md §A.
 pub mod cohen_bridge;
+
+// cohen_layer05_probe: the Layer-0.5 compactness probe (design doc §D). NON-COMMITTING. Shows the
+// Miller Thm 4.1 HNN faithfulness over the infinitely-generated L=C₀⋆F₂ LOCALIZES to a legal finite
+// HNNData per fixed word — reducing to finite Britton (lemma_single_hnn_base_faithful) + free-product
+// injectivity + two free-family facts. 0 errors ⟹ option (i)+compactness is real, no ∞-gen port
+// needed. docs/machine-bridge-and-infinite-gen-plan.md §B.3/§D.
+pub mod cohen_layer05_probe;
