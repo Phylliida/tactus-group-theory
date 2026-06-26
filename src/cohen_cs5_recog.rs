@@ -69,7 +69,10 @@ use crate::layout::{h1_num_gens, h2_num_gens, c_base, b_base, d_idx, p_idx, b_id
 use crate::h1::{h1_base, comm_relators, comm_relator, lemma_h1_base_valid, lemma_h1_base_num_generators};
 use crate::h3::{psi_assoc, psi_ublock, psi_bcblock, lemma_single_gen_valid};
 use crate::word_numbering::{w_b, w_c, w_bc, bc_letter, numbers_word, alphabet_letter, lemma_w_c_valid};
-use crate::h3_ii::{family_II_rhs, family_II_lhs};
+use crate::h3_ii::{family_II_rhs, family_II_lhs, family_II_relator, family_II, h2_II};
+use crate::phi_l_iso::lemma_family_II_relator_in_h2_II;
+use crate::phi_l_lift::lemma_family_II_relator_head_in_h2_II;
+use crate::cohen_cs4b::lemma_h2_II_contains_gm;
 use crate::hnn::{HNNData, hnn_data_valid, hnn_relator, hnn_relators, hnn_presentation,
     stable_letter, stable_letter_inv};
 use crate::pred_presentation::{equiv_in_pred_presentation, pred_presentation_valid};
@@ -4248,6 +4251,185 @@ pub proof fn lemma_cs5_pinch_out(mm: ModMachine, n: nat, m: nat, slice: Seq<nat>
         lemma_seg_inv_pinch_out(mm, n, m, slice, wm, psi_g, i, j);
     }
     wshort
+}
+
+// ============================================================================
+// Step 4 (item #1) — `a_col_machine` sends every `hnn_presentation(base_A_plus_data(slice))`
+// relator to `ε` in the FINITE `h2_II`.  Mirror of `lemma_a_words_relator_trivial`
+// (`phi_l_pinch.rs:742`), but `base_A_plus_base.relators == g_m.relators` is NON-empty, so both
+// relator classes need handling (the one divergence from the free-base `pa_data`).
+// ============================================================================
+
+/// A member of `betas(alphas) = [0]++alphas` is `0` or a member of `alphas`.
+proof fn lemma_betas_member(alphas: Seq<nat>, b: nat)
+    requires
+        betas(alphas).contains(b),
+    ensures
+        b == 0 || alphas.contains(b),
+{
+    let bs = betas(alphas);
+    lemma_betas_index(alphas);
+    let i = choose|i: int| 0 <= i < bs.len() && bs[i] == b;
+    assert(0 <= i < bs.len() && bs[i] == b);
+    if i == 0 {
+        assert(b == 0);
+    } else {
+        assert(bs[i] == alphas[i - 1]);
+        assert(alphas.contains(b)) by { assert(alphas[i - 1] == b); }
+    }
+}
+
+/// **a-side `hnn_relator` descent**: `emb(a_col_machine, hnn_relator(base_A_plus_data(slice), jj))
+/// =~= family_II_relator(slice[jj])`.  Mirror of `lemma_a_words_on_hnn_relator` over the
+/// machine-scheme HNN: `a_col_machine` fixes the config (a-column, a machine word), relabels the
+/// machine-scheme rhs `assoc_rhs_machine` onto the h2 `family_II_rhs` (`lemma_a_col_machine_assoc_rhs`),
+/// and maps the machine stable letter (index `nk+n+1`) to `Gen(p_idx)`.
+pub proof fn lemma_a_col_machine_on_hnn_relator(mm: ModMachine, n: nat, m: nat, slice: Seq<nat>, jj: int)
+    requires
+        2 * n < m,
+        0 <= jj < slice.len(),
+        numbers_word(n, m, slice[jj]),
+    ensures
+        apply_embedding(a_col_machine(mm, n), hnn_relator(base_A_plus_data(mm, n, m, slice), jj))
+            =~= family_II_relator(mm, n, m, slice[jj]),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);                       // nk = 4 + |quads| ≥ 4
+    lemma_machine_col_len(mm, n);                        // a_col_machine.len() == nk+n+2
+    let am = a_col_machine(mm, n);
+    let data = base_A_plus_data(mm, n, m, slice);
+    let beta = slice[jj];
+    let cfg = config_word(beta, 0);
+    let rhs = assoc_rhs_machine(mm, n, m, beta);
+    let p = p_idx(nk, n);
+    let st = (nk + n + 1) as nat;                        // machine stable-letter index
+
+    lemma_base_A_plus_data_shape(mm, n, m, slice);       // data.base.num_generators == nk+n+1
+    assert(data.base.num_generators == st);
+    assert(stable_letter(data) == Symbol::Gen(st));
+    assert(stable_letter_inv(data) == Symbol::Inv(st));
+    assert(data.associations == base_A_plus_assoc(mm, n, m, slice));
+    assert(data.associations[jj] == (config_word(beta, 0), assoc_rhs_machine(mm, n, m, beta)));
+
+    // am[st] = [Gen(p)] (the p-slot, index nk+n+1).
+    let g = lemma_a_col_machine_entry(mm, n, st as int);
+    assert(g == p_idx(nk, n));                            // st == nk+n+1 ⟹ g == p_idx
+    assert(am[st as int] == seq![Symbol::Gen(p)]);
+
+    // hnn_relator(data, jj) = ((av + cfg) + cv) + inverse(rhs), av=[Inv(st)], cv=[Gen(st)].
+    let av: Word = Seq::new(1, |_q: int| stable_letter_inv(data));
+    let cv: Word = Seq::new(1, |_q: int| stable_letter(data));
+    assert(av =~= seq![Symbol::Inv(st)]);
+    assert(cv =~= seq![Symbol::Gen(st)]);
+    let hr = hnn_relator(data, jj);
+    assert(hr == ((av + cfg) + cv) + inverse_word(rhs));
+
+    // distribute apply_embedding over the three outer concats.
+    lemma_apply_embedding_concat(am, (av + cfg) + cv, inverse_word(rhs));
+    lemma_apply_embedding_concat(am, av + cfg, cv);
+    lemma_apply_embedding_concat(am, av, cfg);
+
+    // ae(av) = inverse_word(am[st]) = [Inv(p)].
+    reveal_with_fuel(apply_embedding, 2);
+    lemma_concat_empty_right(inverse_word(am[st as int]));
+    assert(apply_embedding(am, av) =~= inverse_word(am[st as int]));
+    reveal_with_fuel(inverse_word, 2);
+    assert(inverse_word(am[st as int]) =~= seq![Symbol::Inv(p)]);
+    // ae(cfg) =~= cfg (config is a machine word over 3 ≤ nk).
+    lemma_config_word_valid(beta, 0);
+    lemma_word_valid_mono(cfg, 3, nk);
+    lemma_a_col_machine_fixes_machine_word(mm, n, cfg);
+    // ae(cv) = am[st] = [Gen(p)].
+    lemma_concat_empty_right(am[st as int]);
+    assert(apply_embedding(am, cv) =~= am[st as int]);
+    // ae(inverse(rhs)) = inverse(ae(rhs)) = inverse(family_II_rhs(β)).
+    lemma_apply_embedding_inverse(am, rhs);
+    lemma_a_col_machine_assoc_rhs(mm, n, m, beta);
+    assert(apply_embedding(am, inverse_word(rhs)) =~= inverse_word(family_II_rhs(mm, n, m, beta)));
+
+    // assemble.
+    assert(apply_embedding(am, hr)
+        =~= ((seq![Symbol::Inv(p)] + cfg) + seq![Symbol::Gen(p)])
+            + inverse_word(family_II_rhs(mm, n, m, beta)));
+    assert(family_II_lhs(mm, n, beta) =~= (seq![Symbol::Inv(p)] + cfg) + seq![Symbol::Gen(p)]);
+    assert(family_II_relator(mm, n, m, beta)
+        == family_II_lhs(mm, n, beta) + inverse_word(family_II_rhs(mm, n, m, beta)));
+}
+
+/// **Item #1 — the a-side von-Dyck over the finite `h2_II`.**  `a_col_machine` sends each relator of
+/// `src = hnn_presentation(base_A_plus_data(slice))` to `ε` in `h2_II(alphas)`.  Two classes
+/// (`src.relators = g_m.relators + hnn_relators(data)`):
+///  (a) base K_M relators `g_m.relators[jj]`: `a_col_machine` fixes machine words and a K_M relator is
+///      an `h2_II` relator (K_M clause) ⟹ `≡ ε`;
+///  (b) HNN p-conjugation relators `hnn_relator(data, jj')`: map to `family_II_relator(slice[jj'])`,
+///      which is an `h2_II` relator whenever `slice[jj'] = 0` (head) or `∈ alphas`.
+/// This is the relator-preservation precondition of `lemma_emb_respects_source_equiv` in the step
+/// case of `lemma_cs5_recognition_forward` (instantiated `slice = h0_filter(betas(alphas))`).
+pub proof fn lemma_a_col_machine_relator_trivial(
+    mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, slice: Seq<nat>, jj: int)
+    requires
+        2 * n < m,
+        forall|k: int| 0 <= k < slice.len() ==> numbers_word(n, m, #[trigger] slice[k]),
+        forall|k: int| 0 <= k < slice.len() ==> (slice[k] == 0 || alphas.contains(#[trigger] slice[k])),
+        0 <= jj < hnn_presentation(base_A_plus_data(mm, n, m, slice)).relators.len(),
+    ensures
+        equiv_in_presentation(h2_II(mm, n, m, alphas),
+            apply_embedding(a_col_machine(mm, n),
+                hnn_presentation(base_A_plus_data(mm, n, m, slice)).relators[jj]),
+            empty_word()),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    lemma_g_m_valid(mm);
+    let data = base_A_plus_data(mm, n, m, slice);
+    let src = hnn_presentation(data);
+    let am = a_col_machine(mm, n);
+    let h2ii = h2_II(mm, n, m, alphas);
+    let glen = g_m(mm).relators.len() as int;
+
+    // src.relators = base.relators + hnn_relators = g_m.relators + hnn_relators(data).
+    assert(src.relators == data.base.relators + hnn_relators(data));
+    assert(data.base.relators == g_m(mm).relators);
+    assert(src.relators =~= g_m(mm).relators + hnn_relators(data));
+    lemma_base_A_plus_data_shape(mm, n, m, slice);       // hnn_relators(data).len() == slice.len()
+
+    let r = src.relators[jj];
+    if jj < glen {
+        // --- (a) K_M relator class ---
+        assert(r == (g_m(mm).relators + hnn_relators(data))[jj]);
+        assert(r == g_m(mm).relators[jj]);
+        assert(g_m(mm).relators.contains(r)) by { assert(g_m(mm).relators[jj] == r); }
+        reveal(presentation_valid);
+        assert(word_valid(r, nk));                        // g_m valid ⟹ relator valid over nk
+        lemma_a_col_machine_fixes_machine_word(mm, n, r); // emb(am, r) = r
+        assert(apply_embedding(am, r) =~= r);
+        // r is an h2_II relator (K_M clause) ⟹ ≡ ε.
+        lemma_h2_II_contains_gm(mm, n, m, alphas, r);
+        let idx = choose|i: int| 0 <= i < h2ii.relators.len() && h2ii.relators[i] == r;
+        assert(0 <= idx < h2ii.relators.len() && h2ii.relators[idx] == r);
+        lemma_relator_is_identity(h2ii, idx);
+    } else {
+        // --- (b) HNN p-conjugation relator class ---
+        let j2 = jj - glen;
+        assert(0 <= j2 < hnn_relators(data).len());
+        assert(r == (g_m(mm).relators + hnn_relators(data))[jj]);
+        assert(r == hnn_relators(data)[j2]);
+        assert(hnn_relators(data)[j2] == hnn_relator(data, j2));
+        let beta = slice[j2];
+        assert(numbers_word(n, m, beta));
+        lemma_a_col_machine_on_hnn_relator(mm, n, m, slice, j2);
+        assert(apply_embedding(am, r) =~= family_II_relator(mm, n, m, beta));
+        // family_II_relator(β) ≡_{h2_II} ε (β is 0 → head, or ∈ alphas → in_h2_II).
+        if beta == 0 {
+            lemma_family_II_relator_head_in_h2_II(mm, n, m, alphas);
+        } else {
+            assert(slice[j2] == 0 || alphas.contains(slice[j2]));
+            assert(alphas.contains(beta));
+            let k = choose|k: int| 0 <= k < alphas.len() && alphas[k] == beta;
+            assert(0 <= k < alphas.len() && alphas[k] == beta);
+            lemma_family_II_relator_in_h2_II(mm, n, m, alphas, k);
+        }
+    }
 }
 
 } // verus!
