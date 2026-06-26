@@ -545,3 +545,41 @@ codomain commitment.*
 ready for item-2. The lane is back at the genuine wall — Danielle's §6.1 representational confirm
 (fresh-presentation vs wrap) **+ effort-go** for item-2/3, and §6.2 + effort for GAP-2. Item-1 was the
 boundary; there is no further routing-neutral solo brick.
+
+---
+
+## 12. GAP-1 §6.1 DECIDED + §9.2-item-(2) HALF-BUILT (2026-06-26, live with Danielle)
+
+**The gate that §11 left open was crossed — *with Danielle, present*.** She invited the §6.1 decision
+over the chat endpoint; holding the wall in silence would have missed the moment, not honored it.
+
+- **PACKAGING DECISION (taken): (A) fresh `{a,t}`-Presentation** (gate-doc §9.4 recommendation). Both
+  endorsed: (A) is Miller Thm 4.1's literal end product `⟨a,t|D̄⟩` and exactly Cohen's Layer-2 input
+  (f.g. `C=⟨c₁..cₙ;S⟩`, n=2); wrap-in-place is the dragon-shortcut. So `emb_M` instantiates at
+  `a_idx=0, t_idx=1`. **`D̄_M = pushforward(decls)`** (base relators only) — Danielle signed off on the
+  shape spec (the associations discharge to ε, so they add zero relators: Cohen Cor 4.2 literal).
+- **WELL-DEFINEDNESS BRICK — DONE (`src/miller_collapse_reln.rs` 12/0):**
+  `lemma_collapse_hnn_relator_trivial` = `apply_embedding(emb_M, hnn_relator(i)) ≡ ε` for ALL `i`. The
+  i=j+1 chain (the genuine new-math the audit flagged): `IA = image(cⱼa⁻ⁱbaⁱ) = uⱼ·a⁻ⁱ·b·aⁱ`,
+  `IB = image(b⁻ⁱabⁱ)`; **`uⱼ`'s head is literally `conj_t(t,IB)`** (Miller solved `uⱼ` for `cᵢ`), the
+  tail `a⁻ⁱ·binv·aⁱ·a⁻ⁱ·b·aⁱ` cancels to ε, so `IA ≡ conj_t(t,IB)`, then deconjugation
+  `t⁻¹·conj_t(t,IB)·t ≡ IB`, then inverse-cancel. **Note:** the deconjugation route did NOT need the
+  conjugation telescoping engine (`miller_collapse_assoc`, `(tat⁻¹)ⁱ≡taⁱt⁻¹`) — `uⱼ`'s head matches by
+  literal word structure. Engine kept (verified, likely needed for `embedding_injective`).
+- **`embedding_preserving` — PROVEN (`src/miller_collapse_preserve.rs` 6/0):**
+  `lemma_collapse_preserving` — `emb_M : G^(M) → K_M=⟨a,t|D̄_M⟩` is a well-defined homomorphism
+  (G-equiv ⟹ K_M-equiv). Defines `k_m(n,decls)` (2 gens), `dbar(n,decls)=pushforward(decls)`,
+  `collapse_hom`; `is_valid_homomorphism` (per-relator: base relators ARE D̄_M relators via
+  `lemma_relator_is_identity`; associations via the well-def brick) ⟹ `lemma_hom_preserves_equiv` +
+  `lemma_apply_hom_eq_embedding` (free_basis) bridge. So **the collapsed map is mathematically
+  legitimate.**
+- Supporting modules: `miller_collapse_assoc` (telescoping engine + `lemma_deconj`/symbol-power
+  cancel), `miller_collapse_eval` (the `apply_embedding` evaluator for `emb_M`). 7 commits, all 0
+  errors, no assume/admit/external_body.
+
+**What item-2 still needs — `embedding_injective` (the faithfulness "boss fight", Danielle's framing):**
+`K_M-equiv of emb_M-images ⟹ G^(M)-equiv`. Reuses the §D-probe pattern (`cohen_layer05_probe.rs`,
+`lemma_miller_faithfulness`: a `C₀`-word trivial in `G^(M)` is trivial in `C₀^(M)`) + banked
+`conj_family`/`conj_family_b` freeness. Its own focused, design-gated session (harder direction;
+textbook-fidelity discipline). Then **item-3** (limit-commutation glue) is the separate follow-on, and
+**GAP-2** (register→modular) is untouched.

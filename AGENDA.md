@@ -881,6 +881,20 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 
 ### 3.3 — The ZFC bridge + instantiation
 
+> **✅ GAP-1 §6.1 DECIDED + item-(2) `embedding_preserving` PROVEN 2026-06-26 (live with Danielle).**
+> `docs/final-gate-axiom-removal-plan.md` §12. The §6.1 packaging gate was crossed *with Danielle present*:
+> **(A) fresh `{a,t}`-Presentation** (`emb_M` at a=Gen(0),t=Gen(1)), **D̄_M = pushforward(decls)**. Built
+> + committed (7 commits, all 0 errors, no assume/admit/external_body): **(1) WELL-DEF BRICK**
+> (`miller_collapse_reln` 12/0) `lemma_collapse_hnn_relator_trivial` — every HNN association relator pushes
+> through `emb_M` to ε (so associations add zero relators; `uⱼ`'s head IS `conj_t(t,IB)`, tail cancels,
+> deconjugation closes it). **(2) `embedding_preserving` PROVEN** (`miller_collapse_preserve` 6/0)
+> `lemma_collapse_preserving` — `emb_M : G^(M) → K_M=⟨a,t|D̄_M⟩` is a well-defined homomorphism, via
+> `is_valid_homomorphism` + `lemma_hom_preserves_equiv` + the `apply_hom`/`apply_embedding` bridge.
+> Plus engine modules `miller_collapse_assoc` (telescoping `(tat⁻¹)ⁱ≡taⁱt⁻¹` + deconj) and
+> `miller_collapse_eval` (the `emb_M` evaluator). **NEXT = `embedding_injective`** (faithfulness "boss
+> fight", reuses §D-probe + `conj_family` freeness — own design-gated session), then item-3 (limit
+> commutation), then GAP-2.
+>
 > **✅ GAP-3 SOUNDNESS BUILT + GAP-2 SOURCE READ 2026-06-26 (this session — BROKE the read-only-hold
 > cycle with verified, reversible, critical-path code).** `docs/final-gate-axiom-removal-plan.md` §10.
 > Two new bricks, gate 2645→2650/20 (+5 verified, baseline 20 errors unchanged, new modules 0 errors,
