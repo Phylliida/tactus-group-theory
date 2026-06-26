@@ -153,4 +153,75 @@ pub proof fn lemma_binv_sub_power(p: Presentation, a_idx: nat, t_idx: nat, i: na
     lemma_conj_power(p, t_idx, Symbol::Inv(a_idx), i);
 }
 
+// ---------------------------------------------------------------------------
+// Generic free-cancellation helpers for the association brick.
+// ---------------------------------------------------------------------------
+
+/// `inverse_word(sⁿ) = (s⁻¹)ⁿ`  (a constant symbol-power).  (Public copy of the `conj_free_core`
+/// private analog — kept local to avoid invalidating that module's cache.)
+pub proof fn lemma_inverse_symbol_power(s: Symbol, n: nat)
+    ensures
+        inverse_word(symbol_power(s, n)) =~= symbol_power(inverse_symbol(s), n),
+    decreases n,
+{
+    if n == 0 {
+        assert(symbol_power(s, 0) =~= empty_word());
+        assert(symbol_power(inverse_symbol(s), 0) =~= empty_word());
+    } else {
+        let k = (n - 1) as nat;
+        lemma_symbol_power_merge(s, k, 1);
+        lemma_symbol_power_one(s);
+        assert(symbol_power(s, n) =~= symbol_power(s, k) + seq![s]);
+        lemma_inverse_concat(symbol_power(s, k), seq![s]);
+        lemma_inverse_symbol_power(s, k);                 // IH
+        lemma_inverse_singleton(s);
+        assert(seq![s] =~= Seq::new(1, |_i: int| s));
+        assert(inverse_word(seq![s]) =~= seq![inverse_symbol(s)]);
+        lemma_symbol_power_one(inverse_symbol(s));
+        lemma_symbol_power_merge(inverse_symbol(s), 1, k);
+        assert(seq![inverse_symbol(s)] + symbol_power(inverse_symbol(s), k)
+            =~= symbol_power(inverse_symbol(s), n));
+    }
+}
+
+/// `sⁿ · (s⁻¹)ⁿ ≡ ε`  (a symbol-power cancels its inverse-symbol-power).
+pub proof fn lemma_symbol_power_inverse_cancel(p: Presentation, s: Symbol, n: nat)
+    ensures
+        equiv_in_presentation(p, symbol_power(s, n) + symbol_power(inverse_symbol(s), n), empty_word()),
+{
+    lemma_inverse_symbol_power(s, n);   // inverse_word(sⁿ) =~= (s⁻¹)ⁿ
+    lemma_word_inverse_right(p, symbol_power(s, n));   // sⁿ · inverse_word(sⁿ) ≡ ε
+    assert(symbol_power(s, n) + symbol_power(inverse_symbol(s), n)
+        =~= concat(symbol_power(s, n), inverse_word(symbol_power(s, n))));
+}
+
+/// **Deconjugation.**  `t⁻¹ · (t·w·t⁻¹) · t ≡ w`  (the inverse of `conj_t`).
+pub proof fn lemma_deconj(p: Presentation, t_idx: nat, w: Word)
+    ensures
+        equiv_in_presentation(p,
+            seq![Symbol::Inv(t_idx)] + conj_t(t_idx, w) + seq![Symbol::Gen(t_idx)], w),
+{
+    let it = seq![Symbol::Inv(t_idx)];
+    let gt = seq![Symbol::Gen(t_idx)];
+    let c = it + gt;   // t⁻¹ · t
+
+    // c ≡ ε
+    lemma_inv_gen_singleton(t_idx);     // inverse_word(gt) =~= it
+    lemma_word_inverse_left(p, gt);     // concat(inverse_word(gt), gt) ≡ ε, i.e. c ≡ ε
+
+    // it + conj_t(t,w) + gt =~= (c + w) + c
+    assert(it + conj_t(t_idx, w) + gt =~= (c + w) + c);
+
+    // c + w ≡ ε + w =~= w
+    lemma_equiv_concat_left(p, c, empty_word(), w);
+    assert(empty_word() + w =~= w);
+    // (c + w) + c ≡ w + c
+    lemma_equiv_concat_left(p, c + w, w, c);
+    // w + c ≡ w + ε =~= w
+    lemma_equiv_concat_right(p, w, c, empty_word());
+    assert(w + empty_word() =~= w);
+    // chain (c+w)+c ≡ w+c ≡ w
+    lemma_equiv_transitive(p, (c + w) + c, w + c, w);
+}
+
 } // verus!
