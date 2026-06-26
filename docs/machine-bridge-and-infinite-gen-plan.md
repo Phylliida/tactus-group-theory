@@ -229,9 +229,14 @@ The probe leaves a clean, de-risked ladder. NONE of it is a direction risk anymo
 effort commitment §C flags as still gated.
 
 1. **A-column freeness — the one new crux.** `is_free_family(C₀⋆F₂, {b, cᵢa⁻ⁱbaⁱ})`. A free-product
-   normal-form argument: each `cᵢa⁻ⁱbaⁱ` is reduced alternating between `C₀` (the `cᵢ`) and `F₂`
-   (the `a⁻ⁱbaⁱ`, whose central-`b` survival is the banked `conj_free_core` content). Likely the
-   bulk of the work. (B-column `{a, b⁻ⁱabⁱ}` = `conj_free_b`, banked.)
+   normal-form argument (companion-confirmed clean): each `cᵢa⁻ⁱbaⁱ` is reduced alternating between
+   `C₀` (the `cᵢ`) and `F₂` (the `a⁻ⁱbaⁱ`, whose central-`b` survival is the banked `conj_free_core`
+   content); the F₂-blocks act as spacers so the `C₀`-syllables can never collapse. Likely the bulk
+   of the work. (B-column `{a, b⁻ⁱabⁱ}` = `conj_free_b`, banked.) **Indexing note:** Miller uses i≥1
+   for the c-terms (always a nonempty `aⁱ` spacer) with `b` a *separate* basis generator; the probe's
+   0-indexed `a_basis_elt(n,0)=c₀·b` has an empty spacer (still free — `c₀` itself separates `b` from
+   `c₀b` — but the build should prefer Miller's i≥1 convention to keep every c-term spacer nonempty
+   and dodge the edge case).
 2. **Carry the bespoke `C₀`.** Wire `ceer_group.rs`'s `CeerWord`/`ceer_group_equiv` (∞-alphabet,
    forward direction DONE) into the finite-slice `decls` view (a finite slice of declared pairs is a
    finite `Presentation`), so `c0_slice` instantiates to a genuine CEER slice.
