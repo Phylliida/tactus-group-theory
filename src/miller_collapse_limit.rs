@@ -62,12 +62,174 @@ pub open spec fn p_le(fam: spec_fn(nat) -> Seq<Word>, m: nat) -> PredPresentatio
     PredPresentation { num_generators: 2, relators: |r: Word| dbar(m, fam(m)).contains(r) }
 }
 
-/// The collapsed relator family is directed: a relator visible at level `m1` stays visible at any
-/// `m2 ≥ m1`.  (Miller §4.1: the direct limit is directed — confirmed textbook, route (i).)
+/// The collapsed relator family is directed: a NON-TRIVIAL relator visible at level `m1` stays
+/// visible at any `m2 ≥ m1`.  (Miller §4.1: the direct limit is directed — confirmed textbook,
+/// route (i).)  The `r != empty_word()` guard is essential: the trivial (empty) relator is an
+/// administrative padding artifact of the per-slice family (`ceer_decls_fam` pads non-fitting
+/// stages with `empty_word()`), and it is NOT slice-monotone (it can appear at one slice and vanish
+/// at a larger one).  Since the empty relator is the identity — inserting/deleting it is a no-op —
+/// directedness need only hold for the genuine group relators; the backward extraction strips the
+/// empty no-op steps first (see `strip_empty_steps`).
 pub open spec fn dbar_family_monotone(fam: spec_fn(nat) -> Seq<Word>) -> bool {
     forall|m1: nat, m2: nat, r: Word|
         #![trigger dbar(m1, fam(m1)).contains(r), dbar(m2, fam(m2)).contains(r)]
-        m1 <= m2 && dbar(m1, fam(m1)).contains(r) ==> dbar(m2, fam(m2)).contains(r)
+        r != empty_word() && m1 <= m2 && dbar(m1, fam(m1)).contains(r) ==> dbar(m2, fam(m2)).contains(r)
+}
+
+// ===========================================================================
+// Empty-relator (no-op) step handling, for the backward extraction.
+//
+// A `PredDerivationStep` that inserts/deletes the EMPTY relator is a no-op (it leaves the word
+// unchanged) — but it is only a *valid* step at a slice where the empty word is a relator, and the
+// empty relator is not slice-monotone.  So before re-reading a `P_∞` derivation at a single finite
+// slice we drop the empty-relator steps; the surviving steps cite only genuine relators, which ARE
+// monotone (`dbar_family_monotone`).  This keeps the abstract monotonicity hypothesis honest while
+// making it satisfiable by the concrete CEER family.
+// ===========================================================================
+
+/// A derivation step that does NOT cite the trivial (empty) relator.
+pub open spec fn step_nonempty(step: PredDerivationStep) -> bool {
+    match step {
+        PredDerivationStep::RelatorInsert { relator, .. } => relator != empty_word(),
+        PredDerivationStep::RelatorDelete { relator, .. } => relator != empty_word(),
+        _ => true,
+    }
+}
+
+/// Every step avoids the trivial (empty) relator.
+pub open spec fn derivation_nonempty(steps: Seq<PredDerivationStep>) -> bool {
+    forall|i: int| 0 <= i < steps.len() ==> step_nonempty(#[trigger] steps[i])
+}
+
+/// Drop every empty-relator step (each is a no-op).
+pub open spec fn strip_empty_steps(steps: Seq<PredDerivationStep>) -> Seq<PredDerivationStep>
+    decreases steps.len(),
+{
+    if steps.len() == 0 {
+        Seq::<PredDerivationStep>::empty()
+    } else if step_nonempty(steps.first()) {
+        seq![steps.first()] + strip_empty_steps(steps.drop_first())
+    } else {
+        strip_empty_steps(steps.drop_first())
+    }
+}
+
+/// An empty-relator step is a no-op: when it succeeds, it produces the input word unchanged.
+proof fn lemma_empty_step_noop(p: PredPresentation, w: Word, h: PredDerivationStep, w1: Word)
+    requires
+        !step_nonempty(h),
+        apply_step_pred(p, w, h) == Some(w1),
+    ensures
+        w1 == w,
+{
+    match h {
+        PredDerivationStep::FreeReduce { .. } => { assert(false); }
+        PredDerivationStep::FreeExpand { .. } => { assert(false); }
+        PredDerivationStep::RelatorInsert { position, relator, inverted } => {
+            assert(relator == empty_word());
+            let r = get_relator_pred(relator, inverted);
+            // get_relator_pred(empty, _) == empty (inverse_word(empty) == empty)
+            assert(r == empty_word());
+            // success ⟹ 0 <= position <= w.len() and w1 = w[0..position] + r + w[position..]
+            assert(w1 == w.subrange(0, position) + r + w.subrange(position, w.len() as int));
+            assert(0 <= position <= w.len());
+            assert(w1 =~= w);
+        }
+        PredDerivationStep::RelatorDelete { position, relator, inverted } => {
+            assert(relator == empty_word());
+            let r = get_relator_pred(relator, inverted);
+            assert(r == empty_word());
+            lemma_inverse_word_len(relator);
+            assert(r.len() == 0);
+            // success ⟹ w1 = w[0..position] + w[position+0..]
+            assert(w1 == w.subrange(0, position) + w.subrange(position + 0, w.len() as int));
+            assert(0 <= position <= w.len());
+            assert(w1 =~= w);
+        }
+    }
+}
+
+/// Unfold `pred_derivation_produces` over a cons `[h] ++ rest`.
+proof fn lemma_produces_cons(
+    p: PredPresentation, h: PredDerivationStep, rest: Seq<PredDerivationStep>,
+    start: Word, w1: Word, end: Word,
+)
+    requires
+        apply_step_pred(p, start, h) == Some(w1),
+        pred_derivation_produces(p, rest, w1) == Some(end),
+    ensures
+        pred_derivation_produces(p, seq![h] + rest, start) == Some(end),
+{
+    let s = seq![h] + rest;
+    assert(s.len() == rest.len() + 1);
+    assert(s.first() == h);
+    assert(s.drop_first() =~= rest);
+    assert(pred_derivation_produces(p, s, start) == (match apply_step_pred(p, start, s.first()) {
+        Some(next) => pred_derivation_produces(p, s.drop_first(), next),
+        None => None::<Word>,
+    }));
+}
+
+/// Stripping empty (no-op) steps preserves the produced word.
+proof fn lemma_strip_preserves_produces(
+    p: PredPresentation, steps: Seq<PredDerivationStep>, start: Word, end: Word,
+)
+    requires
+        pred_derivation_produces(p, steps, start) == Some(end),
+    ensures
+        pred_derivation_produces(p, strip_empty_steps(steps), start) == Some(end),
+    decreases steps.len(),
+{
+    if steps.len() == 0 {
+    } else {
+        let h = steps.first();
+        let tail = steps.drop_first();
+        assert(pred_derivation_produces(p, steps, start) == (match apply_step_pred(p, start, h) {
+            Some(next) => pred_derivation_produces(p, tail, next),
+            None => None::<Word>,
+        }));
+        let res = apply_step_pred(p, start, h);
+        assert(res is Some);
+        let w1 = res.unwrap();
+        assert(pred_derivation_produces(p, tail, w1) == Some(end));
+        if step_nonempty(h) {
+            lemma_strip_preserves_produces(p, tail, w1, end);
+            assert(strip_empty_steps(steps) == seq![h] + strip_empty_steps(tail));
+            lemma_produces_cons(p, h, strip_empty_steps(tail), start, w1, end);
+        } else {
+            lemma_empty_step_noop(p, start, h, w1);
+            assert(w1 == start);
+            assert(pred_derivation_produces(p, tail, start) == Some(end));
+            lemma_strip_preserves_produces(p, tail, start, end);
+            assert(strip_empty_steps(steps) == strip_empty_steps(tail));
+        }
+    }
+}
+
+/// The stripped derivation has no empty-relator steps.
+proof fn lemma_strip_yields_nonempty(steps: Seq<PredDerivationStep>)
+    ensures
+        derivation_nonempty(strip_empty_steps(steps)),
+    decreases steps.len(),
+{
+    if steps.len() == 0 {
+        assert(strip_empty_steps(steps) == Seq::<PredDerivationStep>::empty());
+    } else {
+        lemma_strip_yields_nonempty(steps.drop_first());
+        if step_nonempty(steps.first()) {
+            let stripped = strip_empty_steps(steps);
+            let tail_stripped = strip_empty_steps(steps.drop_first());
+            assert(stripped == seq![steps.first()] + tail_stripped);
+            assert forall|i: int| 0 <= i < stripped.len() implies
+                step_nonempty(#[trigger] stripped[i]) by {
+                if i == 0 {
+                    assert(stripped[0] == steps.first());
+                } else {
+                    assert(stripped[i] == tail_stripped[i - 1]);
+                }
+            }
+        }
+    }
 }
 
 // ===========================================================================
@@ -360,6 +522,7 @@ proof fn lemma_step_slice_monotone(
 )
     requires
         dbar_family_monotone(fam),
+        step_nonempty(step),
         m1 <= m2,
         apply_step_pred(p_le(fam, m1), w, step) == Some(w2),
     ensures
@@ -369,10 +532,12 @@ proof fn lemma_step_slice_monotone(
         PredDerivationStep::FreeReduce { position } => { }
         PredDerivationStep::FreeExpand { position, symbol } => { }
         PredDerivationStep::RelatorInsert { position, relator, inverted } => {
+            assert(relator != empty_word());              // from step_nonempty
             assert(dbar(m1, fam(m1)).contains(relator));   // from success
-            assert(dbar(m2, fam(m2)).contains(relator));   // fires monotonicity
+            assert(dbar(m2, fam(m2)).contains(relator));   // fires (non-empty) monotonicity
         }
         PredDerivationStep::RelatorDelete { position, relator, inverted } => {
+            assert(relator != empty_word());              // from step_nonempty
             assert(dbar(m1, fam(m1)).contains(relator));
             assert(dbar(m2, fam(m2)).contains(relator));
         }
@@ -385,6 +550,7 @@ proof fn lemma_produces_slice_monotone(
 )
     requires
         dbar_family_monotone(fam),
+        derivation_nonempty(steps),
         m1 <= m2,
         pred_derivation_produces(p_le(fam, m1), steps, start) == Some(end),
     ensures
@@ -395,6 +561,12 @@ proof fn lemma_produces_slice_monotone(
     } else {
         let h = steps.first();
         let tail = steps.drop_first();
+        assert(step_nonempty(h)) by { assert(steps[0] == h); }   // derivation_nonempty at index 0
+        assert(derivation_nonempty(tail)) by {
+            assert forall|i: int| 0 <= i < tail.len() implies step_nonempty(#[trigger] tail[i]) by {
+                assert(tail[i] == steps[i + 1]);
+            }
+        }
         assert(pred_derivation_produces(p_le(fam, m1), steps, start) == (match apply_step_pred(p_le(fam, m1), start, h) {
             Some(next) => pred_derivation_produces(p_le(fam, m1), tail, next),
             None => None::<Word>,
@@ -420,6 +592,7 @@ proof fn lemma_first_step_slice(
 )
     requires
         dbar_family_monotone(fam),
+        step_nonempty(step),
         apply_step_pred(p_infty(fam), w, step) == Some(w2),
     ensures
         exists|m0: nat| #![trigger apply_step_pred(p_le(fam, m0), w, step)]
@@ -433,14 +606,16 @@ proof fn lemma_first_step_slice(
             assert(n <= n && apply_step_pred(p_le(fam, n), w, step) == Some(w2));
         }
         PredDerivationStep::RelatorInsert { position, relator, inverted } => {
+            assert(relator != empty_word());                // from step_nonempty
             assert(dbar_union_pred(fam, relator));
             let big_m0 = choose|big_m0: nat| (#[trigger] dbar(big_m0, fam(big_m0))).contains(relator);
             assert(dbar(big_m0, fam(big_m0)).contains(relator));
             let m0: nat = if big_m0 >= n { big_m0 } else { n };
-            assert(dbar(m0, fam(m0)).contains(relator));    // fires monotonicity (big_m0 <= m0)
+            assert(dbar(m0, fam(m0)).contains(relator));    // fires (non-empty) monotonicity (big_m0 <= m0)
             assert(n <= m0 && apply_step_pred(p_le(fam, m0), w, step) == Some(w2));
         }
         PredDerivationStep::RelatorDelete { position, relator, inverted } => {
+            assert(relator != empty_word());                // from step_nonempty
             assert(dbar_union_pred(fam, relator));
             let big_m0 = choose|big_m0: nat| (#[trigger] dbar(big_m0, fam(big_m0))).contains(relator);
             assert(dbar(big_m0, fam(big_m0)).contains(relator));
@@ -458,6 +633,7 @@ proof fn lemma_extract_slice(
 )
     requires
         dbar_family_monotone(fam),
+        derivation_nonempty(steps),
         pred_derivation_produces(p_infty(fam), steps, start) == Some(end),
     ensures
         exists|m: nat| #![trigger pred_derivation_produces(p_le(fam, m), steps, start)]
@@ -469,6 +645,12 @@ proof fn lemma_extract_slice(
     } else {
         let h = steps.first();
         let tail = steps.drop_first();
+        assert(step_nonempty(h)) by { assert(steps[0] == h); }   // derivation_nonempty at index 0
+        assert(derivation_nonempty(tail)) by {
+            assert forall|i: int| 0 <= i < tail.len() implies step_nonempty(#[trigger] tail[i]) by {
+                assert(tail[i] == steps[i + 1]);
+            }
+        }
         assert(pred_derivation_produces(p_infty(fam), steps, start) == (match apply_step_pred(p_infty(fam), start, h) {
             Some(next) => pred_derivation_produces(p_infty(fam), tail, next),
             None => None::<Word>,
@@ -515,14 +697,21 @@ pub proof fn lemma_pred_to_limit(fam: spec_fn(nat) -> Seq<Word>, n: nat, w: Word
     let emb_n = miller_collapse_emb(n, 0, 1);
     let v = apply_embedding(emb_n, w);
 
-    // 1. extract a single slice mf ≥ n in which the (collapsed) derivation lives
+    // 1. extract a single slice mf ≥ n in which the (collapsed) derivation lives.
+    //    First STRIP the empty-relator (no-op) steps: the trivial relator is not slice-monotone,
+    //    so the surviving (genuine) relators are exactly what `dbar_family_monotone` covers.
     let d = choose|d: PredDerivation| pred_derivation_valid(p_infty(fam), d, v, empty_word());
     assert(pred_derivation_produces(p_infty(fam), d.steps, v) == Some(empty_word()));
-    lemma_extract_slice(fam, n, d.steps, v, empty_word());
-    let mf = choose|mf: nat| #![trigger pred_derivation_produces(p_le(fam, mf), d.steps, v)]
-        n <= mf && pred_derivation_produces(p_le(fam, mf), d.steps, v) == Some(empty_word());
-    assert(n <= mf && pred_derivation_produces(p_le(fam, mf), d.steps, v) == Some(empty_word()));
-    let pd = PredDerivation { steps: d.steps };
+    let stripped = strip_empty_steps(d.steps);
+    lemma_strip_preserves_produces(p_infty(fam), d.steps, v, empty_word());
+    lemma_strip_yields_nonempty(d.steps);
+    assert(pred_derivation_produces(p_infty(fam), stripped, v) == Some(empty_word()));
+    assert(derivation_nonempty(stripped));
+    lemma_extract_slice(fam, n, stripped, v, empty_word());
+    let mf = choose|mf: nat| #![trigger pred_derivation_produces(p_le(fam, mf), stripped, v)]
+        n <= mf && pred_derivation_produces(p_le(fam, mf), stripped, v) == Some(empty_word());
+    assert(n <= mf && pred_derivation_produces(p_le(fam, mf), stripped, v) == Some(empty_word()));
+    let pd = PredDerivation { steps: stripped };
     assert(pred_derivation_valid(p_le(fam, mf), pd, v, empty_word()));
     assert(equiv_in_pred_presentation(p_le(fam, mf), v, empty_word()));
 
