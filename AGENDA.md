@@ -895,6 +895,21 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > fight", reuses §D-probe + `conj_family` freeness — own design-gated session), then item-3 (limit
 > commutation), then GAP-2.
 >
+> **✅✅ GAP-1 ITEM-2 COMPLETE 2026-06-26 (unsupervised) — `embedding_injective` PROVEN
+> (`miller_collapse_inject.rs` 22/0, crate 2714/20, +22 additive, no regression, no
+> assume/admit/external_body).** `lemma_collapse_injective` = `embedding_injective(G^(M), K_M, emb_M)`.
+> **Route correction:** the "boss fight" was Miller Thm 4.1's **Tietze collapse `G^(M)≅⟨a,t|D̄⟩`** —
+> proven by the **mutually-inverse-homomorphisms / retraction** technique (`cohen-faithfulness-primary-source.md`
+> §54), which needs **NO freeness**. The §D-probe/`conj_family` hint had conflated this with the
+> *separate* `C₀↪G` HNN-faithfulness (Layer 0.5). Retraction `ψ : K_M→G^(M)` (a↦Gen(n), t↦Gen(n+2));
+> `ψ∘emb_M = emb(n,n,n+2)` (the routing-neutral "wrap-in-place" emb) ≡ id in `G^(M)` via the new
+> ≡-identity-on-generators master lemma (G1); ψ well-defined since `D̄_M=emb_M(decls)` pushes back to
+> `decls≡ε`. Key content: the c-crux `lemma_mcw_recovers_c` (`uⱼ(a,t)↦cⱼ` reversed) + R0 (`b↦tat⁻¹`).
+> Full detail in `docs/final-gate-axiom-removal-plan.md` §12.1. **With `embedding_preserving`
+> (`lemma_collapse_preserving`) this makes `emb_M : G^(M)→K_M=⟨a,t|D̄_M⟩` a machine-checked faithful
+> embedding both ways. NEXT = item-3** (limit-commutation glue, the sole companion-flagged new-math),
+> then GAP-1 §3.4 assembly, then GAP-2 (register→modular).
+>
 > **✅ GAP-3 SOUNDNESS BUILT + GAP-2 SOURCE READ 2026-06-26 (this session — BROKE the read-only-hold
 > cycle with verified, reversible, critical-path code).** `docs/final-gate-axiom-removal-plan.md` §10.
 > Two new bricks, gate 2645→2650/20 (+5 verified, baseline 20 errors unchanged, new modules 0 errors,

@@ -583,3 +583,39 @@ over the chat endpoint; holding the wall in silence would have missed the moment
 `conj_family`/`conj_family_b` freeness. Its own focused, design-gated session (harder direction;
 textbook-fidelity discipline). Then **item-3** (limit-commutation glue) is the separate follow-on, and
 **GAP-2** (register→modular) is untouched.
+
+### 12.1 — `embedding_injective` DONE (2026-06-26, unsupervised) — `miller_collapse_inject.rs` 22/0
+
+**✅✅ `lemma_collapse_injective` VERIFIED — GAP-1 ITEM-2 IS COMPLETE.** Crate 2714/20 (+22, no
+regression, additive, no assume/admit/external_body). **Route correction (companion + textbook
+confirmed):** the §12 hint above ("reuses §D-probe + `conj_family` freeness") **conflated the two
+distinct Miller-4.1 faithfulness facts** (`higman-embedding-blueprint.md` p.108–109): **(1) the Tietze
+collapse `G^(M) ≅ ⟨a,t|D̄⟩`** — which IS `emb_M` injective — needs **NO freeness**; **(2)** the separate
+`C₀ ↪ L ↪ G` HNN-faithfulness (free-product + Britton) — which IS the §D-probe / `conj_family` / Layer
+0.5, a *different* statement. So `embedding_injective` was the **Tietze iso**, proven by the
+**mutually-inverse-homomorphisms / retraction** technique (`cohen-faithfulness-primary-source.md` §54,
+the blessed "two mutually-inverse homs ⟹ iso, no Britton-peel" pattern).
+
+**The proof** (`src/miller_collapse_inject.rs`), structured in three layers:
+- **§A generic tools:** `lemma_apply_embedding_word_power` (emb distributes over `word_power`) +
+  **`lemma_emb_id_on_gens_preserves` (G1)** — the master lemma: an embedding ≡-identity on every
+  generator is ≡-identity on every word (structural induction). Reused for the composite AND the
+  `b ↦ tat⁻¹` substitution.
+- **§B per-generator facts** (the content of the Tietze elimination, in `G^(M)`): `lemma_reconj`
+  (`t·(t⁻¹wt)·t⁻¹≡w`, mirror of `lemma_deconj`); **R0** `lemma_collapse_b_recovers` (`b_sub≡Gen(n+1)`
+  from the base association via `lemma_hnn_conjugation`); **Rj** `lemma_acol_as_conj`
+  (`acolⱼ≡t·bcolⱼ·t⁻¹`); the `b`-substitution embedding `β` + `lemma_beta_id` + `lemma_col_img_b_eq_bcol`;
+  and **THE c-crux `lemma_mcw_recovers_c`** (`mcw(j,n,n+2)≡Gen(j)` — the `cⱼ↦uⱼ(a,t)` elimination
+  reversed: `lemma_ia_conj` ∘ `col_img_b≡bcol` ∘ Rj ∘ `lemma_ia_form` ∘ suffix-cancellation).
+- **§C assembly:** `lemma_wrap_is_identity` (the routing-neutral "wrap-in-place" `emb(n,n,n+2)=ψ∘emb_M`
+  ≡ id, via G1 + §B); the **relabel** `lemma_section_compose` (`compose_embeddings(section_imgs,emb_M)
+  = emb(n,n,n+2)`, key sub-lemma `lemma_relabel_mcw`); the retraction `ψ=section_hom` (a↦Gen(n),
+  t↦Gen(n+2)); `lemma_collapse_section_id` (`ψ(emb_M(w))≡w`); `lemma_section_hom_valid` (ψ well-defined:
+  its only relators `D̄_M=emb_M(decls)` push back to `decls≡ε` in `G^(M)`); and **★
+  `lemma_collapse_injective`** = `embedding_injective(G^(M), K_M, emb_M)`.
+
+**Net:** with `lemma_collapse_preserving` (`embedding_preserving`, done prior), `emb_M : G^(M) → K_M=⟨a,t|D̄_M⟩`
+is now a machine-checked **faithful embedding both ways** — **GAP-1 item-2 COMPLETE**. **NEXT = item-3**
+(the limit-commutation glue — the one companion-flagged new-math: per-slice `emb_M` instances commute
+with the direct-limit `equiv_in_g_limit`), then GAP-1 §3.4-routing assembly, then **GAP-2**
+(register→modular reduction, untouched).
