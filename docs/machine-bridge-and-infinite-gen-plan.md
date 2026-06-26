@@ -34,6 +34,20 @@ the located source material. It supersedes nothing; it is the missing map for th
   do NOT start the multi-week port unilaterally** (unsupervised session; this is the decision
   Danielle has gated for many sessions). Surface it + the cheap de-risking probe (§5).
 
+- **✅ THE §D PROBE RAN — POSITIVE (2026-06-25, session 33, `cohen_layer05_probe.rs` 10/0, commit
+  1bea208, gate 2614/20 = additive no-regression).** The single decisive unknown (does Miller's HNN
+  faithfulness localize to finite slices?) is now **machine-checked YES**. For a fixed word over a
+  finite slice, the whole `C₀ ↪ L ↪ G` obligation reduces to a *legal finite `HNNData`* that plugs
+  straight into the proven stack: free-product injectivity (`lemma_free_product_injective_left`) +
+  finite Britton base-embed (`lemma_single_hnn_base_faithful`), with the HNN iso precondition reduced
+  **generically** to two `is_free_family` facts on the columns (`lemma_iso_from_free_columns`).
+  **Consequence: NO infinite-generator presentation type is on the critical path** (option (i)+
+  compactness is real; (ii) is dead). The infinity survives only in (a) the done `ceer_group.rs`
+  forward direction and (b) the meta-level `∀w ∃N` quantifier (needs no ∞-gen type). The **sole**
+  genuinely-new math left for Layer 0.5 is the A-column basis `{b, cᵢa⁻ⁱbaⁱ}` being a free family
+  in the free *product* `C₀⋆F₂` (the B-column `{a, b⁻ⁱabⁱ}` = pure-F₂ = banked `conj_family_b`).
+  Decision-1/3 below collapse accordingly; only the *go-ahead to build* remains gated. See §D.
+
 ---
 
 ## A. §3.3 — the machine bridge
@@ -151,31 +165,81 @@ checked against Miller §4.1 + the recursive-presentation requirement — NOT a 
 
 ## C. The genuine decision for Danielle (surfaced, not taken)
 
-This session built §3.3a (designed, forced, additive) and stopped at the foundational fork, which is
-co-design-gated and which an unsupervised session must not take unilaterally:
+Session 32 built §3.3a and stopped at the foundational fork. **Session 33 ran the §D probe, which
+answers decisions 2 and 3 empirically** (machine-checked + companion-confirmed) and collapses 1.
+The fork is now nearly resolved; only the *go-ahead to spend the build effort* remains gated.
 
 1. **Representation** for Layer 0.5: extend bespoke `ceer_group.rs` (i) vs. general
-   `InfPredPresentation` (ii). Recommendation: (i)+compactness, (ii) only if compactness fails.
-2. **The compactness question** (§B.3): does the Miller HNN faithfulness localize to finite slices
-   (reusing the proven AFP/Britton stack), or does it force a third ∞-gen port? Decisive for scope.
-3. **The free-group simplification** (§B.4): is the CEER group's freeness a legitimate shortcut to
-   `F∞↪F₂` (conj-families, DONE), or a dragon? Check against Miller + recursive-presentation.
+   `InfPredPresentation` (ii). **→ RESOLVED by the probe: (i)+compactness.** The probe shows the
+   only place the AFP/Britton stack is invoked (the HNN faithfulness) localizes to finite slices
+   reusing the *existing finite* `Presentation`/`free_product`/`HNNData`/Britton — so (ii)'s ∞-gen
+   AFP port is NOT needed. The bespoke `ceer_group.rs` carries `C₀`; finite slices carry the rest.
+2. **The compactness question** (§B.3): does Miller's HNN faithfulness localize to finite slices?
+   **→ ANSWERED YES** (`cohen_layer05_probe.rs` 10/0; §D below). Decisive-for-scope unknown closed.
+3. **The free-group simplification** (§B.4): legitimate `F∞↪F₂` shortcut or dragon? **→ DRAGON
+   (confirmed).** `∼` is only c.e., so the basis `ℕ/∼` is not computable; using it would smuggle in
+   deciding `C₀`'s word problem, collapsing the point of the construction. Follow Miller: carry
+   `C₀`'s relators opaquely (as `decls`/the bespoke predicate). NOT a reason to skip Layer 0.5.
 4. **Sequencing**: confirm Layer 0.5 → §3.3-proper → §3.4 (print). §3.3a + soundness already give
-   the *general* explicit Higman theorem today; ZFC needs Layer 0.5 first.
+   the *general* explicit Higman theorem today; ZFC needs Layer 0.5 first. *(unchanged)*
+
+**What is STILL gated (the only open decision):** the go-ahead to build Layer 0.5 itself — i.e. to
+spend the effort on (a) the A-column free-product basis freeness `{b, cᵢa⁻ⁱbaⁱ}` free in `C₀⋆F₂`
+(the one genuinely-new crux; B-column banked), (b) wiring the bespoke `ceer_group.rs` `C₀` through
+the finite-slice machinery the probe validated, and (c) the `∀w ∃N` compactness assembly
+(CS-4b-style). This is no longer a *direction* risk (the direction is settled + de-risked) but an
+*effort* commitment, so it still wants Danielle's explicit go.
 
 ---
 
-## D. Recommended next step (cheap, non-committing — mirrors the §4 Fork-A probe)
+## D. The de-risking probe — ✅ DONE, POSITIVE (session 33)
 
-Before committing the multi-week Layer-0.5 build, run ONE de-risking probe that answers the
-compactness question (§B.3) without porting anything heavy:
+> Ran the cheap non-committing probe (analog of session-12's `pred_presentation.rs` that de-risked
+> Fork-A's foundational layer). **Result: POSITIVE.** Committed `cohen_layer05_probe.rs` (10/0,
+> additive, gate 2614/20, no assume/admit/external_body, commit 1bea208).
 
-- **Probe:** state `L = C₀ ⋆ F₂` for the bespoke CEER group (option (i)) using the EXISTING finite
-  `free_product` over a finite slice of c's, and check whether the embedding's faithfulness obligation
-  for a *single fixed word* reduces (by compactness) to a finite sub-presentation already covered by
-  the proven AFP machinery. Outcome positive ⟹ (i)+compactness route is real and the port is small;
-  outcome negative ⟹ option (ii)'s ∞-gen AFP port is on the critical path (re-scope with Danielle).
+**What the probe is (as run).** A finite slice of Miller's construction, stated with the *existing
+finite* substrate and machine-checked end-to-end for a fixed word:
+- `c0_slice(n, decls)` = `C₀^(N)` as a finite `Presentation` (N c-generators + opaque relators
+  `decls` — recursively presented, NOT free; the §B.4 trap is avoided).
+- `l_slice(n, decls) = free_product(c0_slice, free_group(2))` = `L^(N) = C₀^(N) ⋆ F₂`
+  (a = Gen(n), b = Gen(n+1)).
+- `miller_data(n, decls)` = the finite-association `HNNData` for `G^(N)` with associations
+  `{(b,a)} ∪ {(cᵢa⁻ⁱbaⁱ, b⁻ⁱabⁱ) : i<N}`; `lemma_miller_data_valid` proves it is a legal
+  `hnn_data_valid` datum.
 
-This is the analog of session-12's `pred_presentation.rs` probe that de-risked Fork-A's foundational
-layer (8/0 first try) without committing the tower port. **Do not proceed past the probe without
-Danielle's go** (the standing co-design gate on the foundational representation decision).
+**What it proves.**
+- **Part A — generic reusable nugget** (`lemma_iso_from_free_columns`,
+  `lemma_hnn_base_faithful_from_free_columns`): two free association columns ⟹ `hnn_associations_isomorphic`
+  ⟹ `lemma_single_hnn_base_faithful` applies. Column-agnostic; this is what the real build consumes.
+- **Part C — the headline** (`lemma_miller_slice_faithfulness_reduces`): for a fixed `C₀`-word `w`
+  trivial in `G^(N)`, faithfulness descends to `w` trivial in `C₀^(N)`, **given only** that the two
+  columns are free families in `L^(N)`. The free-product step (`lemma_free_product_injective_left`)
+  and the finite-Britton step (Part A) are *fully discharged*.
+
+**What it settles.** The whole per-word faithfulness obligation = `[free-product injectivity: HAVE]`
++ `[finite Britton base-embed: HAVE]` + `[two free-family facts]`. So Miller's HNN faithfulness
+**localizes to finite slices** — option (i)+compactness is real, **no ∞-gen presentation port
+needed** (decision-1/2 in §C closed). The **only** remaining new math is the A-column free-family
+fact (B-column = banked).
+
+### The Layer-0.5 build that the probe unlocks (pending Danielle's go)
+
+The probe leaves a clean, de-risked ladder. NONE of it is a direction risk anymore; it is the
+effort commitment §C flags as still gated.
+
+1. **A-column freeness — the one new crux.** `is_free_family(C₀⋆F₂, {b, cᵢa⁻ⁱbaⁱ})`. A free-product
+   normal-form argument: each `cᵢa⁻ⁱbaⁱ` is reduced alternating between `C₀` (the `cᵢ`) and `F₂`
+   (the `a⁻ⁱbaⁱ`, whose central-`b` survival is the banked `conj_free_core` content). Likely the
+   bulk of the work. (B-column `{a, b⁻ⁱabⁱ}` = `conj_free_b`, banked.)
+2. **Carry the bespoke `C₀`.** Wire `ceer_group.rs`'s `CeerWord`/`ceer_group_equiv` (∞-alphabet,
+   forward direction DONE) into the finite-slice `decls` view (a finite slice of declared pairs is a
+   finite `Presentation`), so `c0_slice` instantiates to a genuine CEER slice.
+3. **The `∀w ∃N` compactness assembly** (CS-4b-style): a finite derivation of `w=1 in G` uses
+   finitely many relators ⟹ lives in `G^(N)` ⟹ Part C ⟹ `w=1 in C₀`. Reuse the
+   `lemma_cs4b_compactness` pattern (`lemma_finite_step_from_pred` + relator-arm + induction core).
+4. **Assemble `C = G = ⟨a,t | D̄⟩`** (2-generated, recursively presented) + faithfulness `C₀ ↪ C`;
+   this `C` is Layer-2's input. Then §3.3-proper ties `S = D̄` to the machine.
+
+**Do not start step 1 without Danielle's go** — the standing co-design gate is now narrowed to the
+*effort* commitment (the direction + scope are settled and machine-validated).

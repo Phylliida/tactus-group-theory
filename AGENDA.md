@@ -553,9 +553,15 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       `apply_embedding` image list `swap_emb=[[b],[a]]`. Transfer: `emb(conj_family_b,w)=
       swap_emb(emb(conj_family,w))` (`compose_embeddings`) ⟹ swap is an iso (`lemma_swap_preserves_triv`
       via `lemma_emb_respects_source_equiv`, free relators vacuous + `lemma_swap_involution`) ⟹ reduce to
-      the A-crux `lemma_conj_family_free`. Also representation-independent (pure `F₂`). **NEXT = the
-      infinite-gen representation decision** (still ⚠ BLOCKED, co-design w/ Danielle; then `A`/`B` bases
-      over the c's, `L=C⋆F₂`, the `t`-HNN `G`, 2-generation, `C↪G`).
+      the A-crux `lemma_conj_family_free`. Also representation-independent (pure `F₂`).
+      **✅ COMPACTNESS PROBE DONE — POSITIVE (session 33, `cohen_layer05_probe.rs` 10/0):** the
+      "infinite-gen representation decision" is largely RESOLVED — the §D probe machine-checks that
+      Miller's HNN faithfulness localizes to finite slices, so **no ∞-gen presentation type is
+      needed** (use the existing finite `free_product`/`HNNData`/Britton + a `∀w ∃N` compactness
+      quantifier; carry `C₀` via the bespoke `ceer_group.rs`). **NEXT (gated on Danielle's effort-go,
+      direction settled):** A-column `{b,cᵢa⁻ⁱbaⁱ}` free in `C₀⋆F₂` (the one new crux; B-column =
+      banked `conj_free_b`) → wire `C₀` slices → compactness assembly → `C=G=⟨a,t|D̄⟩` + `C₀↪C`.
+      See `docs/machine-bridge-and-infinite-gen-plan.md` §C/§D.
 - [ ] **word-numbering bridge** — `wα(c)`, with `wα(c)∈S ⟺ (α,0)∈H₀(M)` (ties the relator set `S`
       to the machine, built from the reduction in §3.3).
 - [x] **H₁ = K_M ∗ (C × ⟨b_j⟩) ∗ ⟨d⟩** — literal finite `h1_base` built (`h1.rs`), and
@@ -864,6 +870,17 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > **Layer 0.5 first**, then §3.3-proper (Layer 0.5 produces the real `C`'s relator set `S`; §3.3 then
 > ties `S` to a machine). §3.3a (the only unblocked part) was BUILT; the rest waits on Layer 0.5 +
 > the foundational representation decision (§3.3 plan doc §C, surfaced for Danielle — NOT taken solo).
+>
+> **✅ §D COMPACTNESS PROBE RAN — POSITIVE 2026-06-25 (session 33, `cohen_layer05_probe.rs` 10/0,
+> commit 1bea208, gate 2614/20 additive).** The single decisive unknown is machine-checked YES:
+> Miller's HNN faithfulness `C₀ ↪ L ↪ G` over the ∞-gen `L=C₀⋆F₂` **localizes to finite slices** —
+> per fixed word it is a legal *finite* `HNNData` reducing to `lemma_free_product_injective_left`
+> (HAVE) + `lemma_single_hnn_base_faithful` (HAVE) + two `is_free_family` facts on the columns
+> (generic `lemma_iso_from_free_columns`). **NO infinite-generator presentation port is on the
+> critical path** (plan §C decisions 1/2 closed; §B.4 free-group shortcut confirmed a dragon). The
+> SOLE remaining new math = A-column `{b,cᵢa⁻ⁱbaⁱ}` free in `C₀⋆F₂` (B-column banked). The Layer-0.5
+> build is now a de-risked 4-step ladder (plan §D), gated only on Danielle's *effort* go — NOT a
+> direction decision anymore.
 
 - [x] **§3.3a — canonical `is_S` + discharge the abstract Layer-2 hypotheses — DONE**
       (`cohen_bridge.rs` 4/0, commit 61297d2). Instantiates `is_S = { w_α(c) : (α,0)∈H₀(M) }` (Cohen's
