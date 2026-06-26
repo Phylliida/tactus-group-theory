@@ -23,6 +23,8 @@ use crate::word::{Word, empty_word, word_valid, inverse_word, lemma_inverse_sing
 use crate::pred_presentation::*;
 use crate::pred_presentation_lemmas::lemma_pred_relator_is_identity;
 use crate::pred_homomorphism::*;
+use crate::word_numbering_decode::{c_alphabet_word, in_c_block};
+use crate::word::concat;
 
 verus! {
 
@@ -131,6 +133,64 @@ pub proof fn lemma_relabel_roundtrip(p1: PredPresentation, p2: PredPresentation,
         lemma_relabel_sym_roundtrip(p1, p2, off, s);                          // ρ⁻¹(hsym(h,s)) = [s]
         // ρ⁻¹(ρ(v)) = concat([s], rest) = v.
         assert(v =~= crate::word::concat(Seq::new(1, |_i: int| s), rest));
+    }
+}
+
+// ----------------------------------------------------------------------------
+// The relabel image lands in the block `[off, off+p1.num_generators)`
+// ----------------------------------------------------------------------------
+
+/// `ρ(w)` is a word over the c-block alphabet based at `off`: every letter `Gen(i)/Inv(i)` (i < N1)
+/// maps to `Gen(off+i)/Inv(off+i)`, whose generator index lies in `[off, off+N1)`.  Bridges B3's
+/// shift to B1's `c_alphabet_word` so the decode section applies to `ρ`-images.
+pub proof fn lemma_relabel_image_c_alphabet(p1: PredPresentation, p2: PredPresentation, off: nat, w: Word)
+    requires
+        word_valid(w, p1.num_generators),
+        off + p1.num_generators <= p2.num_generators,
+    ensures
+        c_alphabet_word(off, p1.num_generators, apply_hom_pred(relabel_hom(p1, p2, off), w)),
+    decreases w.len()
+{
+    let h = relabel_hom(p1, p2, off);
+    let img = apply_hom_pred(h, w);
+    if w.len() == 0 {
+        assert(img =~= empty_word());
+    } else {
+        let s = w.first();
+        let rest = w.drop_first();
+        assert(symbol_valid(s, p1.num_generators)) by { assert(s == w[0]); }
+        assert(word_valid(rest, p1.num_generators)) by {
+            assert forall|k: int| 0 <= k < rest.len() implies symbol_valid(#[trigger] rest[k], p1.num_generators) by {
+                assert(rest[k] == w[k + 1]);
+            }
+        }
+        lemma_relabel_image_c_alphabet(p1, p2, off, rest);           // IH on the tail
+        let head = apply_hom_symbol_pred(h, s);
+        let tail = apply_hom_pred(h, rest);
+        assert(img =~= concat(head, tail));
+        // `head` is a single c-block letter.
+        assert(head.len() == 1 && in_c_block(off, p1.num_generators, head[0])) by {
+            match s {
+                Symbol::Gen(i) => {
+                    assert(head =~= h.generator_images[i as int]);
+                    assert(h.generator_images[i as int] =~= Seq::new(1, |_j: int| Symbol::Gen((off + i) as nat)));
+                },
+                Symbol::Inv(i) => {
+                    assert(head =~= inverse_word(h.generator_images[i as int]));
+                    assert(h.generator_images[i as int] =~= Seq::new(1, |_j: int| Symbol::Gen((off + i) as nat)));
+                    lemma_inverse_singleton(Symbol::Gen((off + i) as nat));
+                },
+            }
+        }
+        // concat of two c-alphabet words is a c-alphabet word.
+        assert forall|k: int| 0 <= k < concat(head, tail).len()
+            implies in_c_block(off, p1.num_generators, #[trigger] concat(head, tail)[k]) by {
+            if k < head.len() {
+                assert(concat(head, tail)[k] == head[0]);
+            } else {
+                assert(concat(head, tail)[k] == tail[k - head.len()]);
+            }
+        }
     }
 }
 
