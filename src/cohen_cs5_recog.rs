@@ -44,9 +44,13 @@ use crate::machine_group::{ModMachine, g_m, g_subgens, g_m_associations, config_
 use crate::tower_peel::lemma_vi;
 use crate::prop_v::lemma_equiv_from_concat_inv_trivial;
 use crate::free_basis::{lemma_g_m_data_isomorphic, config_emb, w_to_canon, lemma_config_emb_eq_canw};
-use crate::machine_group::{CanonLetter, canw_eval, base_A, lemma_base_A_valid, lemma_canw_eval_valid};
+use crate::machine_group::{CanonLetter, canw_eval, base_A, lemma_base_A_valid, lemma_canw_eval_valid,
+    lemma_no_relator_equiv_implies_freely_equivalent};
 use crate::config_reduce::{coord_in, cw_reduce, lemma_in_TM_to_canon, lemma_tfree_coord_restrict,
-    lemma_cw_reduce_eval};
+    lemma_cw_reduce_eval, lemma_cw_reduce_coords};
+use crate::r_prime::{lemma_membership_to_canon, lemma_canw_in_config_subgroup, lemma_free_cw_reduce_eval};
+use crate::presentation_lemmas::lemma_freely_equivalent_implies_equiv;
+use crate::higman_operations::free_group;
 use crate::presentation::{lemma_equiv_refl, lemma_equiv_transitive};
 use crate::presentation_lemmas::{lemma_equiv_concat_left, lemma_word_inverse_right};
 use crate::layout::{h1_num_gens, h2_num_gens, c_base, b_base, d_idx, p_idx, b_idx, c_idx};
@@ -1982,6 +1986,177 @@ pub proof fn lemma_cs5_canon_coords_h0(mm: ModMachine, cs: Seq<CanonLetter>)
             && p_canon[k].r >= 0 && p_canon[k].s >= 0);     // from lemma_in_TM_to_canon
         assert(p_canon[k].r as nat == red[j].r as nat && p_canon[k].s as nat == red[j].s as nat);
     }
+}
+
+// ============================================================================
+// Step 3c-C2 (step 4) — reconstruction + assembly of `lemma_cs5_middle_h0_restrict`.
+// `h0_filter` keeps the `slice` indices whose config is `H₀`; the reconstruction rebuilds the
+// reduced canon as a `config_emb(h0_filter)` product over `free_group(3)` and lifts it (free
+// reduction is sound in any presentation) to `base_A_plus_base`.
+// ============================================================================
+
+/// The `H₀`-restriction of a `slice`: the indices `β ∈ slice` with `(β,0) ∈ H₀`.
+pub open spec fn h0_filter(mm: ModMachine, slice: Seq<nat>) -> Seq<nat>
+    decreases slice.len(),
+{
+    if slice.len() == 0 {
+        Seq::<nat>::empty()
+    } else if mm_in_H0(mm, slice[0], 0) {
+        seq![slice[0]] + h0_filter(mm, slice.drop_first())
+    } else {
+        h0_filter(mm, slice.drop_first())
+    }
+}
+
+/// `β ∈ slice ∧ (β,0)∈H₀ ⟹ β ∈ h0_filter(slice)`.
+proof fn lemma_h0_filter_contains(mm: ModMachine, slice: Seq<nat>, b: nat)
+    requires
+        slice.contains(b),
+        mm_in_H0(mm, b, 0),
+    ensures
+        exists|k: int| 0 <= k < h0_filter(mm, slice).len() && h0_filter(mm, slice)[k] == b,
+    decreases slice.len(),
+{
+    let hf = h0_filter(mm, slice);
+    if slice.len() == 0 {
+        assert(!slice.contains(b));
+    } else if slice[0] == b {
+        assert(mm_in_H0(mm, slice[0], 0));
+        assert(hf =~= seq![slice[0]] + h0_filter(mm, slice.drop_first()));
+        assert(hf[0] == b);                                // k = 0
+    } else {
+        let rest = slice.drop_first();
+        assert(rest.contains(b)) by {
+            let i = choose|i: int| 0 <= i < slice.len() && slice[i] == b;
+            assert(0 <= i < slice.len() && slice[i] == b);
+            assert(i != 0);
+            assert(rest[i - 1] == slice[i]);
+        }
+        lemma_h0_filter_contains(mm, rest, b);
+        let kr = choose|kr: int| 0 <= kr < h0_filter(mm, rest).len() && h0_filter(mm, rest)[kr] == b;
+        assert(0 <= kr < h0_filter(mm, rest).len() && h0_filter(mm, rest)[kr] == b);
+        if mm_in_H0(mm, slice[0], 0) {
+            assert(hf =~= seq![slice[0]] + h0_filter(mm, rest));
+            assert(hf[kr + 1] == h0_filter(mm, rest)[kr]);    // shifted witness
+        } else {
+            assert(hf =~= h0_filter(mm, rest));
+            assert(hf[kr] == h0_filter(mm, rest)[kr]);
+        }
+    }
+}
+
+/// **Membership lift** `free_group(k) → p`: free reduction is sound in any presentation, so a
+/// `⟨gens⟩`-membership over a free group transfers to any presentation (over which `gens`/`w` are valid).
+proof fn lemma_free_subgroup_to_pres(p: Presentation, k: nat, gens: Seq<Word>, w: Word)
+    requires
+        presentation_valid(p),
+        in_generated_subgroup(free_group(k), gens, w),
+        forall|i: int| 0 <= i < gens.len() ==> word_valid(#[trigger] gens[i], p.num_generators),
+        word_valid(w, p.num_generators),
+    ensures
+        in_generated_subgroup(p, gens, w),
+{
+    let factors = choose|f: Seq<Word>| #[trigger] factors_from_generators(gens, f)
+        && equiv_in_presentation(free_group(k), concat_all(f), w);
+    assert(factors_from_generators(gens, factors)
+        && equiv_in_presentation(free_group(k), concat_all(factors), w));
+    lemma_factors_concat_valid(gens, factors, p.num_generators);
+    assert(free_group(k).relators.len() == 0);
+    lemma_no_relator_equiv_implies_freely_equivalent(free_group(k), concat_all(factors), w);
+    lemma_freely_equivalent_implies_equiv(p, concat_all(factors), w);
+    assert(in_generated_subgroup(p, gens, w));             // witness `factors`
+}
+
+/// **CS-5c 3c-C2 — THE H₀-restriction intersection lemma.** A base word `mid_w` of
+/// `base_A_plus_base` that lies in BOTH `⟨g_subgens, d, b⟩` (the 3d `⟨U,d,b,p⟩`-invariant, no `p`)
+/// and `⟨config(β,0) : β ∈ slice⟩` actually lies in `⟨config(β,0) : β ∈ slice ∧ (β,0)∈H₀⟩`.
+/// (E2.E generalised from a single config to a product — `docs/cohen-cs5-blueprint.md` §7.1.)
+pub proof fn lemma_cs5_middle_h0_restrict(mm: ModMachine, n: nat, slice: Seq<nat>, mid_w: Word)
+    requires
+        mod_machine_wf(mm),
+        mm_terminal(mm, 0, 0),
+        in_generated_subgroup(base_A_plus_base(mm, n), ublock_db_gens(mm, n), mid_w),
+        in_generated_subgroup(base_A_plus_base(mm, n), config_emb(slice), mid_w),
+    ensures
+        in_generated_subgroup(base_A_plus_base(mm, n), config_emb(h0_filter(mm, slice)), mid_w),
+{
+    let nk = g_m(mm).num_generators;
+    let bp = base_A_plus_base(mm, n);
+    let ng1 = (nk + n + 1) as nat;
+    lemma_g_m_num_generators(mm);
+    lemma_g_m_valid(mm);
+    lemma_base_A_plus_base_valid(mm, n);
+    assert(bp.num_generators == ng1);
+
+    // ---- the config representative cfg_rep = canw_eval(cs), ≡_bp mid_w ----
+    let cfactors = choose|f: Seq<Word>| #[trigger] factors_from_generators(config_emb(slice), f)
+        && equiv_in_presentation(bp, concat_all(f), mid_w);
+    assert(factors_from_generators(config_emb(slice), cfactors)
+        && equiv_in_presentation(bp, concat_all(cfactors), mid_w));
+    let cfg_rep = concat_all(cfactors);
+    let cs = lemma_membership_to_canon(slice, cfactors);
+    assert(cfg_rep =~= canw_eval(cs));
+
+    // cfg_rep valid over {t,x,y}=3.
+    assert forall|i: int| 0 <= i < config_emb(slice).len()
+        implies word_valid(#[trigger] config_emb(slice)[i], 3) by {
+        assert(config_emb(slice)[i] == config_word(slice[i], 0));
+        lemma_config_word_valid(slice[i], 0);
+    }
+    lemma_factors_concat_valid(config_emb(slice), cfactors, 3);
+    lemma_word_valid_mono(cfg_rep, 3, nk);
+
+    // ---- step 1: cfg_rep ∈ ⟨g_subgens⟩ over g_m ----
+    lemma_equiv_symmetric(bp, cfg_rep, mid_w);
+    lemma_in_subgroup_respects_equiv(bp, ublock_db_gens(mm, n), mid_w, cfg_rep);
+    lemma_cs5_project_to_gsubgens(mm, n, cfg_rep);
+
+    // ---- step 2: in_TM(cfg_rep) ----
+    lemma_cs5_cfg_in_TM(mm, cfg_rep);
+
+    // ---- step 3: every cw_reduce(cs) coordinate is H₀ ----
+    assert(in_TM(mm, canw_eval(cs)));                      // cfg_rep =~= canw_eval(cs)
+    lemma_cs5_canon_coords_h0(mm, cs);
+
+    // ---- step 4: reconstruct over free_group(3) (coords ∈ h0_filter), lift to bp ----
+    let hf = h0_filter(mm, slice);
+    let red = cw_reduce(cs);
+    lemma_cw_reduce_coords(cs);
+    assert forall|i: int| 0 <= i < red.len() implies {
+        &&& (#[trigger] red[i]).s == 0
+        &&& (exists|kk: int| 0 <= kk < hf.len() && hf[kk] as int == red[i].r)
+    } by {
+        assert(coord_in(cs, red[i].r, red[i].s));
+        let j = choose|j: int| 0 <= j < cs.len() && cs[j].r == red[i].r && cs[j].s == red[i].s;
+        assert(0 <= j < cs.len() && cs[j].r == red[i].r && cs[j].s == red[i].s);
+        assert(cs[j].s == 0);                              // from lemma_membership_to_canon
+        let m = choose|m: int| 0 <= m < slice.len() && slice[m] as int == cs[j].r;
+        assert(0 <= m < slice.len() && slice[m] as int == cs[j].r);
+        assert(red[i].s == 0 && red[i].r == slice[m] as int);
+        assert(mm_in_H0(mm, red[i].r as nat, red[i].s as nat));   // step 3
+        assert(red[i].r as nat == slice[m]);
+        assert(mm_in_H0(mm, slice[m], 0));
+        assert(slice.contains(slice[m]));
+        lemma_h0_filter_contains(mm, slice, slice[m]);
+        let kk0 = choose|kk: int| 0 <= kk < hf.len() && hf[kk] == slice[m];
+        assert(0 <= kk0 < hf.len() && hf[kk0] == slice[m] && hf[kk0] as int == red[i].r);
+    }
+    lemma_canw_in_config_subgroup(hf, 0, red);             // ∈ ⟨config_emb(hf)⟩ over free_group(3)
+
+    assert forall|i: int| 0 <= i < cs.len() implies (#[trigger] cs[i]).s == 0 by {}
+    lemma_free_cw_reduce_eval(0, cs);                      // canw(red) ≡ canw(cs) over free_group(3)
+    lemma_in_subgroup_respects_equiv(free_group(3), config_emb(hf), canw_eval(red), cfg_rep);
+
+    // ---- lift free_group(3) → bp, then respects_equiv to mid_w ----
+    assert forall|i: int| 0 <= i < config_emb(hf).len()
+        implies word_valid(#[trigger] config_emb(hf)[i], ng1) by {
+        assert(config_emb(hf)[i] == config_word(hf[i], 0));
+        lemma_config_word_valid(hf[i], 0);
+        lemma_word_valid_mono(config_word(hf[i], 0), 3, ng1);
+    }
+    lemma_word_valid_mono(cfg_rep, 3, ng1);
+    lemma_free_subgroup_to_pres(bp, 3, config_emb(hf), cfg_rep);
+    lemma_in_subgroup_respects_equiv(bp, config_emb(hf), cfg_rep, mid_w);
 }
 
 } // verus!
