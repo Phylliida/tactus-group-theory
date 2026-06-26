@@ -389,6 +389,30 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > `hnn_pred_associations_isomorphic`) ∘ CS-2 retraction `lemma_h2_pred_descends_to_c` ⟹ `C ↪ H₃`
 > faithfulness, transported to printable `h3_pres` via soundness `lemma_III`.
 >
+> **✅✅✅ CS-6 + CS-7 COMPLETE 2026-06-25 (session 31) — LAYER 2 `C ↪ H₃` FAITHFULNESS MACHINE-CHECKED
+> FOR THE PRINTABLE GROUP. `lemma_C_faithful_printable` VERIFIED (gate 2600/20, all additive, no
+> assume/admit/external_body).** The Cohen §1 final assembly. Two new modules, both first/second try:
+> **CS-6 (`cohen_cs6.rs` 2/0)** = `lemma_C_faithful`: a pure-c word trivial in the PREDICATE `h3_pred`
+> is trivial in `C = ⟨c;S⟩` (`c_pred`), via the **two-step descent** (plan §3) — step 1
+> `lemma_h3_pred_descends_to_h2` (Britton down the H₃ tower: `britton_lemma_unconditional` peels the top
+> `k` consuming `lemma_cs5_iso`, then `lemma_h3_pred_upto_base_faithful` peels the WHOLE a-tower in one
+> shot consuming `lemma_cs4e_iso_upto` — the per-level induction lives inside that base-faithfulness
+> lemma) ∘ step 2 `lemma_h2_pred_descends_to_c` (the CS-2 c-retraction, no isos). **CS-7
+> (`cohen_cs7.rs` 8/0)** = `lemma_C_faithful_printable`: transports faithfulness from the predicate base
+> to the **printable finite `h3_pres`** (Cohen's set (I)). The chain `equiv(h3_pres,w) ⟹
+> equiv_pred(h3_pred,w) ⟹ equiv_pred(c_pred,w)` uses the **EASY** finite→predicate direction (finite
+> `h3_pres` has FEWER relators — only the β=0 p-relation, vs the full family (II) + S in the predicate)
+> — so it needs NEITHER `lemma_II` NOR S-soundness (those are the *other* "groups-are-equal" direction).
+> Structural induction `lemma_h3_upto_rel_incl` (finite `hnn_relator` ≡ predicate `hnn_relator_pred`
+> once gen-counts agree, `lemma_hnn_relator_match`) + the ONE content lemma
+> `lemma_p_relator_is_family_ii` (`hnn_relator(h2_data,0) = p⁻¹·t·p·(td)⁻¹ = family_II_relator(0)`,
+> since `config_word(0,0)=t` and `w_b(0)=ε`) + the existing generic lift `lemma_pred_equiv_from_finite`.
+> **LAYER 2 COMPLETE** — the Higman embedding `C ↪ H₃` is faithful for the actual printable f.p. group.
+> **NEXT** = the machine bridge §3.3 (instantiate `is_S` concretely so `w_α(c)∈S ⟺ (α,0)∈H₀(M)`,
+> discharging `s_relators_valid`/`s_realizes`) + Layer 0.5 (CEER → f.g. `C`, still co-design-BLOCKED on
+> the infinite-gen representation). The soundness ⟸ (`lemma_III`) + this faithfulness ⟹ give the
+> machine-iff `w_α(c)=1 in H₃ ⟺ (α,0)∈H₀` once the bridge lands `is_S`.
+>
 > **✅ CS-5c 3d IN PROGRESS 2026-06-25 (session 29) — `cohen_cs5_recog` 83→102/0, gate GREEN, additive
 > (+19 lemmas, 6 commits, all verified first/second try, no assume/admit/external_body).** Blueprint
 > §7.5 is the live record. **Brick D COMPLETE** = `lemma_seg_inv_pinch_out` (the trickiest proof — the

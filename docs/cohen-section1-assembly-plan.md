@@ -171,9 +171,21 @@ to (residue facts, free basis `lemma_basis_elt_free`, `lemma_theorem1`) is alrea
   equivalence lift + the bc-von-Dyck atom `lemma_cs5_bc_config_trivial`). **NEXT:** the von-Dyck
   RECOGNITION (`emb(a_col,w)≡ε ⟹ w≡_{A₊_pres}ε`) — adapt CS-4 `lemma_map_a_forward` with property
   (vii) (`config∈⟨U⟩ ⟺ H₀`) at the pinch middle — then CS-5d tower lift (mirror CS-4e).
-- **CS-6 — assembly.** Britton descent (step 1) ∘ retraction (step 2) ⟹ `lemma_C_faithful`.
-  Transport to the printable finite `h3_pres` via soundness (`lemma_III`: the predicate H₃ and the
-  finite `h3_pres` are the same group — all predicate relators are consequences of finite set (I)).
+- **CS-6 — assembly. ✅ DONE (`cohen_cs6.rs` 2/0, session 31).** `lemma_C_faithful`: pure-c `w`
+  trivial in the predicate `h3_pred` ⟹ trivial in `C = c_pred`. Britton descent (step 1,
+  `lemma_h3_pred_descends_to_h2`: `britton_lemma_unconditional` at the top `k` via `lemma_cs5_iso`,
+  then `lemma_h3_pred_upto_base_faithful` over the whole a-tower via `lemma_cs4e_iso_upto`) ∘ the
+  c-retraction (step 2, `lemma_h2_pred_descends_to_c`).
+- **CS-7 — transport to the printable `h3_pres`. ✅ DONE (`cohen_cs7.rs` 8/0, session 31).**
+  `lemma_C_faithful_printable`: pure-c `w` trivial in the finite printable `h3_pres` ⟹ trivial in `C`.
+  The chain `equiv(h3_pres,w) ⟹ equiv_pred(h3_pred,w) ⟹ equiv_pred(c_pred,w)`. The first arrow is the
+  **easy** finite→predicate direction (finite `h3_pres` has only the β=0 p-relation, ⊆ the predicate's
+  full family (II) + S), proven by relator-inclusion induction up the structurally-aligned tower
+  (`lemma_h3_upto_rel_incl`; `hnn_relator ≡ hnn_relator_pred` once gen-counts match) + the one content
+  lemma `lemma_p_relator_is_family_ii` (`hnn_relator(h2_data,0) = family_II_relator(0)`) + the generic
+  `lemma_pred_equiv_from_finite`. **NB:** this needs NEITHER `lemma_II` NOR S-soundness — those are the
+  *other* "groups-are-equal" direction (`ncl(predicate) ⊆ ncl(finite)`), not needed for faithfulness.
+  **LAYER 2 COMPLETE.**
 
 CS-1/CS-2/CS-3 are FA-4-style "definitions + validity + retraction" bricks (port cleanly, high
 confidence). CS-4/CS-5 are the genuine multi-session work. No verifier bypasses (standing rule).
