@@ -513,3 +513,6 @@ pub mod miller_collapse;
 // Miller's `uⱼ` discharge the HNN associations as free tautologies after the cⱼ↦uⱼ, b↦tat⁻¹
 // substitution. Presentation-generic; no codomain commitment. docs/final-gate-axiom-removal-plan.md §9.2.
 pub mod miller_collapse_assoc;
+// GAP-1 §9.2-item-(2) — the `apply_embedding` evaluator for `miller_collapse_emb` (pure-syntax index
+// access + symbol-power images). Plumbing under the well-definedness brick.
+pub mod miller_collapse_eval;
