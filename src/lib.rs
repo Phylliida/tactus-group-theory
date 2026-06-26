@@ -528,3 +528,8 @@ pub mod miller_collapse_preserve;
 // INJECTIVE (Miller Thm 4.1 Tietze collapse = iso) via the mutually-inverse-homomorphisms retraction
 // ψ : a↦Gen(n), t↦Gen(n+2); ψ∘emb_M = wrap-in-place emb(n,n,n+2) ≡ id in G^(M). No freeness needed.
 pub mod miller_collapse_inject;
+// GAP-1 §9.2-item-(3) — the LIMIT-COMMUTATION glue (machine-independent core "3a"): the direct limit
+// equiv_in_g_limit ⟺ a fixed-{a,t} predicate presentation P_∞ over ⋃_M D̄_M, via item-2's per-slice
+// faithful collapse + a forward finite→pred bridge + a backward compactness extraction (route (i),
+// monotone family).  The machine-gated relator-set match (3b, §3.4) stays separate.
+pub mod miller_collapse_limit;
