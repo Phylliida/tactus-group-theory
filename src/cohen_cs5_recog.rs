@@ -68,6 +68,8 @@ use crate::h3_ii::{recog_data, family_II_assoc};
 use crate::h2::{p_assoc, td_word};
 use crate::f_free_a1::{betas, lemma_betas_index};
 use crate::machine_group::lemma_config_word_zero;
+use crate::f_free::is_free_family;
+use crate::free_basis::lemma_config_emb_free;
 
 verus! {
 
@@ -2410,6 +2412,185 @@ pub proof fn lemma_db_proj_assoc_rhs(mm: ModMachine, n: nat, m: nat, beta: nat)
     assert(concat(cfg, empty_word()) =~= apply_hom(pi, cfg + wb));
     assert(concat(apply_hom(pi, cfg + wb), empty_word()) =~= apply_hom(pi, cfg + wb)) by {
         lemma_concat_empty_right(apply_hom(pi, cfg + wb));
+    }
+}
+
+/// The inclusion `ι : g_m → base_A_plus_base` (machine gen `i ↦ [Gen(i)]`); `base_A_plus_base` has
+/// the same relators as `g_m`, so `ι` is valid and a machine word is fixed by it.
+pub open spec fn gm_incl_bp(mm: ModMachine, n: nat) -> HomomorphismData {
+    let nk = g_m(mm).num_generators;
+    HomomorphismData {
+        source: g_m(mm),
+        target: base_A_plus_base(mm, n),
+        generator_images: Seq::new(nk, |g: int| seq![Symbol::Gen(g as nat)]),
+    }
+}
+
+/// `ι` fixes a machine word (valid over `nk`): `apply_hom(ι, r) = r`.
+proof fn lemma_incl_fixes_machine_word(mm: ModMachine, n: nat, r: Word)
+    requires
+        word_valid(r, g_m(mm).num_generators),
+    ensures
+        apply_hom(gm_incl_bp(mm, n), r) =~= r,
+{
+    let nk = g_m(mm).num_generators;
+    let io = gm_incl_bp(mm, n);
+    lemma_apply_hom_eq_emb(io, r);
+    assert forall|i: int| 0 <= i < nk
+        implies #[trigger] io.generator_images[i] =~= seq![Symbol::Gen(i as nat)] by {}
+    lemma_emb_identity_prefix(io.generator_images, r, nk);
+}
+
+/// **`ι` is a valid homomorphism `g_m → base_A_plus_base`.** Same relators as `g_m`; `ι` fixes each
+/// machine relator, which is a `base_A_plus_base` relator ⟹ `≡ ε`.
+pub proof fn lemma_gm_incl_bp_valid(mm: ModMachine, n: nat)
+    ensures
+        is_valid_homomorphism(gm_incl_bp(mm, n)),
+{
+    let nk = g_m(mm).num_generators;
+    let io = gm_incl_bp(mm, n);
+    lemma_g_m_valid(mm);
+    lemma_base_A_plus_base_valid(mm, n);
+    assert(io.source.num_generators == nk);
+    assert(io.generator_images.len() == nk);
+    assert(io.target.num_generators == nk + n + 1);
+    assert forall|i: int| 0 <= i < io.generator_images.len()
+        implies word_valid(#[trigger] io.generator_images[i], (nk + n + 1) as nat) by {
+        assert(io.generator_images[i] =~= seq![Symbol::Gen(i as nat)]);
+    }
+    let gr = g_m(mm).relators;
+    assert(io.source.relators == gr);
+    assert(base_A_plus_base(mm, n).relators == gr);
+    assert forall|i: int| 0 <= i < io.source.relators.len()
+        implies equiv_in_presentation(io.target, apply_hom(io, #[trigger] io.source.relators[i]),
+            empty_word()) by {
+        assert(io.source.relators[i] == gr[i]);
+        reveal(presentation_valid);
+        assert(word_valid(gr[i], nk));
+        lemma_incl_fixes_machine_word(mm, n, gr[i]);           // apply_hom(ι, gr[i]) = gr[i]
+        lemma_relator_is_identity(base_A_plus_base(mm, n), i); // gr[i] ≡_bp ε
+    }
+}
+
+/// **Membership lift `g_m → base_A_plus_base`** for machine words: a machine word `w` in
+/// `⟨gens⟩` over `g_m` (machine `gens`) lies in `⟨gens⟩` over `base_A_plus_base` (via `ι`).
+pub proof fn lemma_machine_subgroup_gm_to_bp(mm: ModMachine, n: nat, gens: Seq<Word>, w: Word)
+    requires
+        word_valid(w, g_m(mm).num_generators),
+        forall|i: int| 0 <= i < gens.len() ==> word_valid(#[trigger] gens[i], g_m(mm).num_generators),
+        in_generated_subgroup(g_m(mm), gens, w),
+    ensures
+        in_generated_subgroup(base_A_plus_base(mm, n), gens, w),
+{
+    let io = gm_incl_bp(mm, n);
+    lemma_gm_incl_bp_valid(mm, n);
+    lemma_hom_maps_subgroup(io, gens, w);
+    let img_gens = Seq::new(gens.len(), |i: int| apply_hom(io, gens[i]));
+    // ι fixes each machine gen and w.
+    assert(img_gens =~= gens) by {
+        assert forall|i: int| 0 <= i < gens.len() implies img_gens[i] =~= gens[i] by {
+            assert(img_gens[i] == apply_hom(io, gens[i]));
+            lemma_incl_fixes_machine_word(mm, n, gens[i]);
+        }
+    }
+    lemma_incl_fixes_machine_word(mm, n, w);                   // apply_hom(ι, w) = w
+}
+
+/// **Generic subgroup generator-superset** (local copy of `r_prime_b`'s): `⟨gens1⟩ ⊆ ⟨gens2⟩`
+/// when every `gens1[i]` appears in `gens2`.
+pub proof fn lemma_in_subgroup_gens_superset(p: Presentation, gens1: Seq<Word>, gens2: Seq<Word>,
+    w: Word)
+    requires
+        in_generated_subgroup(p, gens1, w),
+        forall|i: int| 0 <= i < gens1.len()
+            ==> exists|k: int| 0 <= k < gens2.len() && (#[trigger] gens1[i]) == gens2[k],
+    ensures
+        in_generated_subgroup(p, gens2, w),
+{
+    let factors = choose|f: Seq<Word>| #[trigger] factors_from_generators(gens1, f)
+        && equiv_in_presentation(p, concat_all(f), w);
+    assert(factors_from_generators(gens1, factors)
+        && equiv_in_presentation(p, concat_all(factors), w));
+    assert(factors_from_generators(gens2, factors)) by {
+        assert forall|k: int| 0 <= k < factors.len()
+            implies is_generator_or_inverse(gens2, #[trigger] factors[k]) by {
+            assert(is_generator_or_inverse(gens1, factors[k]));
+            let j = choose|j: int| 0 <= j < gens1.len()
+                && (factors[k] == gens1[j] || factors[k] == inverse_word(gens1[j]));
+            assert(0 <= j < gens1.len()
+                && (factors[k] == gens1[j] || factors[k] == inverse_word(gens1[j])));
+            let kk = choose|kk: int| 0 <= kk < gens2.len() && gens1[j] == gens2[kk];
+            assert(gens1[j] == gens2[kk]);
+        }
+    }
+}
+
+/// **`π`-image lands in `⟨g_subgens⟩`.** If `A ∈ ⟨ublock_db_gens⟩` over `base_A_plus_base` then
+/// `π(A) ∈ ⟨g_subgens⟩` over `g_m` (the `d,b`-images of `π` are `ε`). Generalizes the projection
+/// half of `lemma_cs5_project_to_gsubgens` to an arbitrary `⟨ublock_db_gens⟩`-element `A`.
+pub proof fn lemma_pi_image_in_gsubgens(mm: ModMachine, n: nat, av: Word)
+    requires
+        in_generated_subgroup(base_A_plus_base(mm, n), ublock_db_gens(mm, n), av),
+    ensures
+        in_generated_subgroup(g_m(mm), g_subgens(mm), apply_hom(db_projection(mm, n), av)),
+{
+    let nk = g_m(mm).num_generators;
+    let pi = db_projection(mm, n);
+    let ub = ublock_db_gens(mm, n);
+    let gs = g_subgens(mm);
+    lemma_db_projection_valid(mm, n);
+    lemma_g_m_valid(mm);
+    lemma_g_m_num_generators(mm);
+    lemma_g_m_associations_valid(mm);
+    lemma_hom_maps_subgroup(pi, ub, av);
+    let img_gens = Seq::new(ub.len(), |i: int| apply_hom(pi, ub[i]));
+    assert(gs.len() == g_m_associations(mm).len());
+    assert forall|j: int| 0 <= j < img_gens.len()
+        implies in_generated_subgroup(g_m(mm), gs, #[trigger] img_gens[j])
+            && in_generated_subgroup(g_m(mm), gs, inverse_word(img_gens[j])) by {
+        assert(img_gens[j] == apply_hom(pi, ub[j]));
+        if j < gs.len() {
+            assert(ub[j] == gs[j]);
+            assert(gs[j] == g_m_associations(mm)[j].1);
+            lemma_word_valid_mono(gs[j], (3 + mm.quads.len()) as nat, nk);
+            lemma_db_proj_fixes_machine_word(mm, n, gs[j]);
+            assert(img_gens[j] =~= gs[j]);
+            lemma_gen_and_inv_in_subgroup(g_m(mm), gs, j);
+        } else {
+            let k = j - gs.len();
+            assert(0 <= k < n + 1);
+            assert(ub[j] =~= seq![Symbol::Gen((nk + k) as nat)]);
+            lemma_db_proj_kills_high(mm, n, (nk + k) as nat);
+            assert(img_gens[j] =~= empty_word());
+            lemma_empty_in_subgroup(g_m(mm), gs);
+            assert(inverse_word(img_gens[j]) =~= empty_word());
+        }
+    }
+    lemma_in_subgroup_gens_in_core(g_m(mm), img_gens, gs, apply_hom(pi, av));
+}
+
+/// **`config_emb(slice)` is a free family over `g_m`** (for `no_duplicates` slice). The freeness
+/// implication is `lemma_config_emb_free`; the validity is `config(β,0)` over `3 ≤ nk`.
+pub proof fn lemma_config_emb_is_free_family_gm(mm: ModMachine, slice: Seq<nat>)
+    requires
+        mod_machine_wf(mm),
+        slice.no_duplicates(),
+    ensures
+        is_free_family(g_m(mm), config_emb(slice)),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let ce = config_emb(slice);
+    assert forall|i: int| 0 <= i < ce.len() implies word_valid(#[trigger] ce[i], nk) by {
+        assert(ce[i] == config_word(slice[i], 0));
+        lemma_config_word_valid(slice[i], 0);
+        lemma_word_valid_mono(config_word(slice[i], 0), 3, nk);
+    }
+    assert forall|w: Word| (#[trigger] word_valid(w, ce.len())
+        && equiv_in_presentation(g_m(mm), apply_embedding(ce, w), empty_word()))
+        implies equiv_in_presentation(free_group(ce.len()), w, empty_word()) by {
+        assert(ce.len() == slice.len());
+        lemma_config_emb_free(mm, slice, w);
     }
 }
 
