@@ -46,7 +46,10 @@ use crate::free_product::shift_relators;
 use crate::conj_free::{conj_family, conj_word};
 use crate::conj_free_core::lemma_conj_family_free;
 use crate::conj_free_b::{conj_family_b, conj_word_b, lemma_conj_family_b_free};
-use crate::cohen_layer05_probe::{c0_slice, l_slice};
+use crate::cohen_layer05_probe::{c0_slice, l_slice, assoc_col0, assoc_col1,
+    lemma_hnn_base_faithful_from_free_columns};
+use crate::hnn::{HNNData, hnn_data_valid, hnn_presentation};
+use crate::normal_form_free_product::lemma_free_product_injective_left;
 
 verus! {
 
@@ -602,6 +605,95 @@ pub proof fn lemma_bcol_free(n: nat, decls: Seq<Word>)
         assert(b_col(n).len() == n + 1);
         assert(word_valid(w, conj_family_b((n + 1) as nat).len()));
     }
+}
+
+// ===========================================================================
+// 7. The Miller finite slice `G^(N)` and its per-word faithfulness — now UNCONDITIONAL.
+//   The probe's `lemma_miller_slice_faithfulness_reduces` took the two free-family facts as
+//   hypotheses; here they are discharged internally (lemma_acol_free / lemma_bcol_free), so the
+//   reduction `w=1 in G^(N) ⟹ w=1 in C₀^(N)` holds with no remaining freeness assumptions.
+// ===========================================================================
+
+/// `G^(N)` = HNN(L^(N), t | t⁻¹·a_col[i]·t = b_col[i]) — the Miller finite slice (i≥1 convention).
+pub open spec fn miller_data(n: nat, decls: Seq<Word>) -> HNNData {
+    HNNData {
+        base: l_slice(n, decls),
+        associations: Seq::new((n + 1) as nat, |i: int| (a_col(n)[i], b_col(n)[i])),
+    }
+}
+
+/// `G^(N)` is a legal finite `HNNData`.
+pub proof fn lemma_miller_data_valid(n: nat, decls: Seq<Word>)
+    requires
+        forall|j: int| 0 <= j < decls.len() ==> word_valid(#[trigger] decls[j], n),
+    ensures
+        hnn_data_valid(miller_data(n, decls)),
+        miller_data(n, decls).base.num_generators == n + 2,
+        miller_data(n, decls).associations.len() == n + 1,
+{
+    let data = miller_data(n, decls);
+    lemma_l_slice_valid(n, decls);
+    lemma_acol_valid(n);
+    lemma_bcol_valid(n);
+    assert(data.associations.len() == n + 1);
+    assert forall|i: int| 0 <= i < data.associations.len() implies
+        word_valid(data.associations[i].0, data.base.num_generators)
+        && word_valid(data.associations[i].1, data.base.num_generators) by {
+        assert(data.associations[i].0 == a_col(n)[i]);
+        assert(data.associations[i].1 == b_col(n)[i]);
+    }
+}
+
+/// The generic association columns of `G^(N)` ARE the A/B columns.
+proof fn lemma_miller_assoc_cols(n: nat, decls: Seq<Word>)
+    ensures
+        assoc_col0(miller_data(n, decls)) =~= a_col(n),
+        assoc_col1(miller_data(n, decls)) =~= b_col(n),
+{
+    let data = miller_data(n, decls);
+    assert(data.associations.len() == n + 1);
+    assert(a_col(n).len() == n + 1);
+    assert(b_col(n).len() == n + 1);
+    assert(assoc_col0(data) =~= a_col(n));
+    assert(assoc_col1(data) =~= b_col(n));
+}
+
+/// **THE LAYER-0.5 PER-WORD FAITHFULNESS.** A `C₀`-word `w` trivial in the Miller finite slice
+/// `G^(N)` is trivial in `C₀^(N)` — unconditionally. (Finite Britton base-embed `L↪G` with its iso
+/// precondition discharged by the now-proven column freeness, then free-product injectivity `C₀↪L`.)
+pub proof fn lemma_miller_faithfulness(n: nat, decls: Seq<Word>, w: Word)
+    requires
+        forall|j: int| 0 <= j < decls.len() ==> word_valid(#[trigger] decls[j], n),
+        word_valid(w, n),
+        equiv_in_presentation(hnn_presentation(miller_data(n, decls)), w, empty_word()),
+    ensures
+        equiv_in_presentation(c0_slice(n, decls), w, empty_word()),
+{
+    let data = miller_data(n, decls);
+    lemma_miller_data_valid(n, decls);
+    lemma_miller_assoc_cols(n, decls);
+    lemma_l_slice_valid(n, decls);
+    assert(data.base == l_slice(n, decls));
+
+    // Discharge the two free-family facts (UNCONDITIONAL — proved in §6), bridged to the
+    // generic association-column form Part A consumes.
+    lemma_acol_free(n, decls);
+    lemma_bcol_free(n, decls);
+    assert(is_free_family(data.base, assoc_col0(data)));
+    assert(is_free_family(data.base, assoc_col1(data)));
+
+    lemma_word_valid_mono(w, n, (n + 2) as nat);
+    assert(word_valid(w, data.base.num_generators));
+
+    // Step 1 — finite Britton base-embed: w = 1 in G^(N) ⟹ w = 1 in L^(N).
+    lemma_hnn_base_faithful_from_free_columns(data, w);
+    assert(equiv_in_presentation(l_slice(n, decls), w, empty_word()));
+
+    // Step 2 — free-product faithfulness: w (a C₀-word) = 1 in L^(N) ⟹ w = 1 in C₀^(N).
+    reveal(presentation_valid);
+    assert(presentation_valid(c0_slice(n, decls)));
+    lemma_free_group_valid(2);
+    lemma_free_product_injective_left(c0_slice(n, decls), free_group(2), w);
 }
 
 } // verus!
