@@ -714,3 +714,65 @@ Minsky Inc/DecJump/Halt), `CEER`/`declared_pair`/`declared_equiv`/`stage_declare
 GAP-1 item-3b wires `is_S_canonical(ceer_to_modmachine(e),n,m)` to `ceer_decls_fam(e)`'s union-predicate
 and discharges `lemma_limit_commutation`'s `decls_family_valid`/`dbar_family_monotone` for that concrete
 `mm`. Escape valve (Danielle): if the encoding leaks/walls → pivot to the `dbar_family_monotone` bricks.
+
+---
+
+## 14. GAP-2 = ROUTE C (deferred); GAP-1 item-3a INSTANTIATED for the concrete CEER family (2026-06-26)
+
+*Next unsupervised session after §13. Re-read the AC paper (§10.2) + the `ModMachine`/`RegisterMachine`/
+`CEER` substrate before any code (the durable "follow the textbook, don't reinvent — 13k lines were
+wasted that way" rule). Two co-design exchanges with Danielle (port 8051), both decisive.*
+
+### 14.1 The GAP-2 scope decision — Route C
+**Finding (confirmed with her):** `lemma_modmachine_realizes` is not an encoding tweak — it is a proof
+of **Turing-completeness for modular machines**. `mm_in_H0(mm, enc(a,b), 0)` must hold iff the CEER
+enumerator halts on *some* stage `s` declaring `(a,b)`; a *deterministic* `mm` started at `enc(a,b)` must
+therefore itself dovetail-search the enumerator over all stages. The paper's faithful route is
+**register → TM → modular** (TM→modular = 2 quads/quintuple, clean; register→TM deferred to ref [18],
+NOT in repo; no TM formalism in repo). Direct register→modular is the "dragon" (no source).
+**Danielle's verdict: do NOT build GAP-2-proper.** Leave `ceer_to_modmachine`/`lemma_modmachine_realizes`
+as the documented obligation (the §13 skeleton, unchanged), and complete the **machine-independent family
+theory** for item-3a, making any machine-needing lemma CONDITIONAL on a realizes-hypothesis (`requires …
+ensures …` — a sound conditional theorem, NOT `assume`/`admit`/`external_body`).
+
+### 14.2 The empty-relator monotonicity fix (group-theory, VERIFIED 22/0, committed)
+The item-3a engine `lemma_limit_commutation` (§12.2) needs `decls_family_valid` + `dbar_family_monotone`
+of the family. For the concrete `ceer_decls_fam(e)`, `decls_family_valid` was already proven
+(`ceer_layer05::lemma_ceer_decls_family_valid`), but **literal `dbar_family_monotone(ceer_decls_fam(e))`
+is FALSE for some `e`** (confirmed counterexample): the family pads non-fitting stages with `empty_word()`
+(`ceer_relator_at` returns `[]` when the declared pair doesn't fit the M-gen slice), so the trivial relator
+can appear at slice `m1` and vanish at `m2 > m1`. Counterexample: enumerator `0→(2,0),1→(0,0),2→(1,1)` has
+`empty ∈ dbar(2,fam(2))` (stage-0 pair (2,0) doesn't fit `<2`) but `empty ∉ dbar(3,fam(3))` (all three
+fit, all non-empty; `apply_embedding` doesn't reduce). The genuine collapsed relators `u_a·u_b⁻¹` ARE
+slice-monotone. And it bites: `apply_step_pred` lets a `p_infty`-derivation legitimately cite the empty
+relator as a no-op insert, and the backward extraction (`lemma_first_step_slice`) needs it re-citable at
+the max slice — which fails in the pathological case.
+
+**Fix (A)+(B), Danielle-approved, contained to `miller_collapse_limit.rs`** (`dbar_family_monotone` is
+used ONLY there; `lemma_limit_commutation` not yet wired, so small blast radius):
+- **(A)** weaken `dbar_family_monotone` to quantify only over `r != empty_word()` (directedness is about
+  the genuine group relators; the empty relator is the identity — administrative padding).
+- **(B)** strip the empty (no-op) relator steps from the backward derivation before slice extraction:
+  `strip_empty_steps` + `lemma_empty_step_noop` (empty insert/delete leaves the word unchanged) +
+  `lemma_strip_preserves_produces` + `lemma_strip_yields_nonempty`; `step_nonempty`/`derivation_nonempty`
+  preconditions threaded through `lemma_first_step_slice` / `lemma_step_slice_monotone` /
+  `lemma_produces_slice_monotone` / `lemma_extract_slice`. Verified 22/0, no escape hatches.
+
+### 14.3 Item-3a instantiated for the concrete CEER family (computability crate)
+`ceer_layer05.rs` (new lemmas): `lemma_ceer_relator_at_stable` (a non-empty contributed relator is the
+same at every larger slice) → `lemma_ceer_dbar_mono_at` → **`lemma_ceer_dbar_family_monotone(e)`** (the
+weakened directedness, now TRUE via `lemma_emb_slice_independent` on the non-empty collapse images) →
+**`lemma_ceer_limit_commutation(e,n,w)`** = `lemma_limit_commutation` instantiated at `ceer_decls_fam(e)`
+(both hypotheses discharged): `equiv_in_g_limit(ceer_decls_fam(e),n,w,ε) ⟺ equiv_in_pred_presentation(
+p_infty(ceer_decls_fam(e)), emb_n(w), ε)`. Required adding the `miller_collapse*` + `pred_to_finite` cone
+to the export root `src/ceer_lib.rs` and rebuilding `export/`. *(Group-theory side 22/0 confirmed;
+computability side pending the export rebuild + module verify this session.)*
+
+### 14.4 NEXT — item-3b (part 2): the machine-gated relator-set match (NOT this session)
+Identify `p_infty(ceer_decls_fam(e)).relators` (= `⋃_M D̄_M`, the collapsed relators `{u_a·u_b⁻¹}` over the
+**{a,t} 2-generator alphabet** — `miller_collapse_word` is over `Gen(0)`/`Gen(1)` only) with
+`is_S_canonical(mm,n,m)` (the c-block words `w_α(c)` over the **Higman tower generators**). These are
+genuinely different word spaces, so this is the GAP-1 §3.4 reconciliation flagged as "the load-bearing
+undesigned decision" (§8.4 / the GATE DESIGN MAP) — it requires GAP-2's concrete `mm` and a co-designed
+bridge (Miller collapse ∘ word-numbering). With it, `lemma_ceer_limit_commutation` + the §10 GAP-3 span +
+Layer-2 faithfulness assemble to delete `axiom_ceer_fp_embedding`.
