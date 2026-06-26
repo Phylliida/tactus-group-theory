@@ -910,6 +910,21 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > embedding both ways. NEXT = item-3** (limit-commutation glue, the sole companion-flagged new-math),
 > then GAP-1 §3.4 assembly, then GAP-2 (register→modular).
 >
+> **✅✅ GAP-1 ITEM-3 MACHINE-INDEPENDENT CORE ("3a") COMPLETE 2026-06-26 (unsupervised, AUTHORIZED
+> live with Danielle on port 8051 — she had reserved item-3 as "her call") — `lemma_limit_commutation`
+> PROVEN (`miller_collapse_limit.rs` 17/0, additive, no verifier escape hatches).** The sole
+> companion-flagged "new-math risk" of GAP-1, discharged. `equiv_in_g_limit(fam,n,w,ε) ⟺
+> equiv_in_pred_presentation(P_∞(fam), emb_n(w), ε)` where `P_∞ = ⟨a,t | ⋃_M D̄_M⟩`. **Route (i)**
+> (Danielle-confirmed textbook: Miller §4.1 direct limit is *directed* ⟹ hypothesize
+> `dbar_family_monotone`). Structure (full detail gate-doc §12.2): §A witness-preservation
+> (`lemma_emb_slice_independent`, the c-block insulation made formal), §B generic forward bridge
+> (`lemma_fin_equiv_to_pred`, mirror of `pred_to_finite`), §C FORWARD (`lemma_limit_to_pred`, no mono),
+> §D BACKWARD (`lemma_pred_to_limit`, compactness extraction `lemma_extract_slice` + reuse of EXISTING
+> `lemma_pred_equiv_lifts_to_finite` + item-2 injective). **NEXT = item-3b** (the machine-gated
+> relator-set match §3.4: identify `⋃_M D̄_M` with `is_S_canonical(mm,…)` + gen-layout reconcile — needs
+> GAP-2's `mm`), then §3.4 assembly, then GAP-2. The `decls_family_valid`+`dbar_family_monotone`
+> hypotheses get discharged for the concrete `ceer_decls_fam` at chain-wiring time.
+>
 > **✅ GAP-3 SOUNDNESS BUILT + GAP-2 SOURCE READ 2026-06-26 (this session — BROKE the read-only-hold
 > cycle with verified, reversible, critical-path code).** `docs/final-gate-axiom-removal-plan.md` §10.
 > Two new bricks, gate 2645→2650/20 (+5 verified, baseline 20 errors unchanged, new modules 0 errors,
