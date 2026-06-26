@@ -28,6 +28,15 @@ proves ZFC-provable-equiv ⟺ word problem of *some* f.p. group — but via `axi
 the actual Aanderaa–Cohen + Higman construction so the group is concrete and printable, removing
 that axiom.
 
+> **STATUS 2026-06-26 — the explicit chain is COMPLETE modulo ONE deferred machine reduction.**
+> `lemma_ceer_word_problem_in_h3` (`tactus-computability-theory/src/ceer_fp_conditional.rs`) proves
+> `ceer_group_equiv(e,w,ε) ⟺ equiv_in_presentation(h3_pres(mm,2,m), ρ(collapse(ceer_to_word(w))), ε)`
+> — the explicit `(p=h3_pres, emb)` chain — conditional only on `ceer_realizes` (GAP-2: the modular
+> machine `mm` realizes the CEER set as `H₀`, the Route-C-deferred register→modular reduction). GAP-1
+> (incl. item-3b: B1/B2/B3 + assembly) and GAP-3 are ALL machine-checked. See
+> `docs/final-gate-axiom-removal-plan.md` §15. NEXT (and last) = discharge `ceer_realizes` (GAP-2),
+> then the axiom drops.
+
 ---
 
 ## 1. Architecture — the pipeline
