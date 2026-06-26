@@ -178,10 +178,10 @@ i.e. `H₀(mm)` realizes the c.e. set `{α : w_α(c) is a CEER relator cₐc_b�
 ### 4.1 Source + substrate
 - Modular machine + `H₀` already exist and are the classic Aanderaa–Cohen object
   (`machine_group.rs:145–195`, matches `docs/aanderaa-cohen-construction.md` §1).
-- *Source note*: the Aanderaa paper PDF in this dir is **not text-extractable** (scanned; poppler
-  absent) — read it with the Read tool's visual/PDF mode in the build session, don't burn time on
-  `pdftotext`. The modular-machine def is already transcribed into `aanderaa-cohen-construction.md`;
-  the un-transcribed part is the *reduction* (register/Turing machine → modular machine).
+- *Source note (CORRECTED — see §8.6):* the Aanderaa paper PDF **IS text-extractable** via
+  `pip install pymupdf` (16/16 text pages; `pdftotext`/`pdftoppm` fail but `pymupdf` works). The
+  modular-machine def is already in `aanderaa-cohen-construction.md`; the un-transcribed *reduction*
+  (Turing → modular machine) is **Theorem 2, PDF page idx 7** (proof pp.7–9).
 - The CEER enumerator is a **`RegisterMachine`** (`ceer.rs:13`, `CEER{enumerator}`), with
   `declared_pair(e,s)` = `(reg[1],reg[2])` when `e.enumerator` halts on input `s`.
 - **The reduction is: register machine → modular machine.** This is standard (Aanderaa–Cohen prove
@@ -305,12 +305,42 @@ original CEER generators must become **words** over a fixed finite alphabet (Mil
   Tietze tax; it is real Miller-Thm-4.1 content, the hardest part — treating GAP 1 as packaging would
   ignore it. Still **surfaced, not taken.**
 
-### 8.5 Tooling note
-Neither textbook PDF is readable in this env: `pdftoppm`/`pdftotext` (poppler) absent and no python
-PDF lib (`fitz`/`pdfplumber`) installed — so the Miller §4.1 / Cohen §9.6 *primary-source* read that
-GAP 1's resolution wants (`MESSAGES_FROM_USER.md` 2026-06-22) **cannot be done here**; it needs an
-env with poppler, or the build session. The §8.4 sharpening rests on the code + companion logic-check,
-not a fresh primary-source read — flagged so a later session closes that gap before the §6.1 go.
+### 8.5 Miller §4.1 PRIMARY-SOURCE READ (poppler-free `pymupdf` works; gate-doc tooling claim corrected)
+`pdftotext`/`pdftoppm` are absent, but **`pip install pymupdf` succeeds in the venv** and extracts
+text fine. **`CGTMiller.pdf` IS extractable** (Thm 4.1 at page idx 55); the Cohen book is image-only
+(Layer 2 already done, not needed for GAP 1). So the GAP-1 primary-source read `MESSAGES_FROM_USER.md`
+(2026-06-22) demands **was done this session**. Miller's Theorem 4.1 (Higman–Neumann–Neumann),
+verbatim construction for `C = ⟨c₁,c₂,… | D⟩`:
+- `L = C ⋆ F`, `F = ⟨a,b|⟩`; `A = ⟨b, cᵢa⁻ⁱbaⁱ⟩` and `B = ⟨a, b⁻ⁱabⁱ⟩` free (the banked
+  `conj_family`/`conj_family_b`); `G = ⟨a,b,cᵢ,t | D, t⁻¹bt=a, t⁻¹cᵢa⁻ⁱbaⁱt = b⁻ⁱabⁱ⟩`.
+- **The collapse (the decisive lines):** rewrite to `cᵢ =_G t b⁻ⁱabⁱ t⁻¹ a⁻ⁱb⁻¹aⁱ` ⟹ `G=⟨t,a,b⟩`;
+  since `b = tat⁻¹`, `G=⟨a,t⟩`; substitute `b↦tat⁻¹` to get `cᵢ =_G uᵢ(a,t)`; rewrite `D`'s
+  `cᵢ`-words via `uᵢ` into `D̄`; **"Applying Tietze transformations to eliminate the other symbols,
+  G ≅ ⟨a,t | D̄⟩."** (Cor 4.2: `G` has the *same number of relations* as `C` — so an r.e. `D` stays
+  r.e., exactly Cohen's Layer-2 input.)
+
+**GAP-1 consequence (decision-data, NOT the decision):** **R1 (substitute-and-collapse) IS Miller's
+literal proof** — `cᵢ ↦ uᵢ(a,t)`, Tietze-eliminate. So "follow the textbook" (the standing rule)
+*points at R1*. Two things this pins:
+- **Cohen's `n = 2` is forced, not optional.** Higman/Cohen's Layer 2 *requires a finitely-generated*
+  input (that is the theorem's premise); the infinite `cᵢ` cannot be the c-block. After Miller, the
+  f.g. input is `⟨a,t⟩` (n=2), `S = D̄`. The companion's "n=2" is textbook-confirmed.
+- **The real undesigned residue in §6.1 is the *reconciliation with L0.5's deliberate "no-Tietze"
+  choice*, not the routing.** `equiv_in_g_limit` keeps the c-block as `Gen(0..M)` (un-collapsed) on
+  purpose (`cohen_layer05.rs:704–717`, "keep Layer 2's c-block view"). R1 = Miller now has to *pay*
+  that deferred Tietze tax — i.e. build the `cᵢ↦uᵢ(a,t)` substitution hom + prove the c-word problems
+  coincide. **Whether to (a) undo L0.5's choice and collapse, or (b) wrap the growing limit so Cohen's
+  c-block IS taken to be the (already-present) `a,b`-image with `cᵢ` re-expressed as words — and the
+  *effort* — is the genuine call for Danielle.** Surfaced, not taken.
+
+### 8.6 GAP-2 source located + gate-doc claim corrected (pointer only; NOT read deeply)
+The gate doc §4.1 says the Aanderaa paper is "not text-extractable (scanned)". **Wrong — it extracts
+cleanly via `pymupdf` (16/16 text pages).** The Turing-machine → modular-machine reduction GAP 2
+needs is **Theorem 2, page idx 7** (`"Let T be a Turing machine…"`), with the quadruple-simulation
+proof on pp.7–9 (`H₀(Td)`, blank tape). *Deliberately not read deeply this session* — GAP 2 is
+sequenced *after* Layer 0.5/GAP 1 (`machine-bridge-and-infinite-gen-plan.md`) and the reduction is
+"where reinvention is most dangerous" (§4.2), so it deserves a focused, gated session, not a rushed
+unsupervised pass. Pointer recorded so that session starts from the primary source, not a re-derivation.
 
 *Net: the runway is sound and now corrected. The blocker is unchanged — Danielle's design go on
 §6.1 (GAP-1 routing) + §6.2 (GAP-2 encoding). Nothing further is safe to build solo.*
