@@ -484,3 +484,9 @@ pub mod cohen_bridge;
 // injectivity + two free-family facts. 0 errors ⟹ option (i)+compactness is real, no ∞-gen port
 // needed. docs/machine-bridge-and-infinite-gen-plan.md §B.3/§D.
 pub mod cohen_layer05_probe;
+
+// cohen_layer05: the Layer-0.5 build the probe unlocked. Discharges the two `is_free_family` facts the
+// probe took as hypotheses — the A/B association columns of the Miller Thm 4.1 finite slice are free
+// families in L=C₀⋆F₂ — via the retraction ρ killing C₀ (columns ↦ banked conj_family/conj_family_b,
+// free in F₂) + Layer-1's lemma_pullback_free. Uses Miller's i≥1 (nonempty-spacer) convention.
+pub mod cohen_layer05;
