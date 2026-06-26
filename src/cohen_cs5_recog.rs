@@ -79,6 +79,10 @@ use crate::h3_ii::{lemma_recog_data_valid, lemma_recog_presentation};
 use crate::f_free_a1::{lemma_recog_associations_isomorphic, lemma_h1_faithful_in_h2_II};
 use crate::machine_group::{lemma_stable_count_zero_no_stable, lemma_stable_count_pos_has_stable};
 use crate::britton_via_tower::has_stable_letter;
+use crate::cohen_cs5::{lemma_cs5_recog_compactness, lemma_cs5_backward};
+use crate::cohen_cs4c::{normalize_alphas, lemma_h2_II_normalize_equiv};
+use crate::pred_emb_respects::lemma_emb_respects_source_equiv_pred;
+use crate::cohen_h2::lemma_h2_pred_num_generators;
 use crate::hnn::{HNNData, hnn_data_valid, hnn_relator, hnn_relators, hnn_presentation,
     stable_letter, stable_letter_inv};
 use crate::pred_presentation::{equiv_in_pred_presentation, pred_presentation_valid};
@@ -4649,6 +4653,203 @@ pub proof fn lemma_cs5_recognition_forward(mm: ModMachine, n: nat, m: nat, alpha
         lemma_cs5_recognition_forward(mm, n, m, alphas, wshort);
         lemma_equiv_transitive(src, wm, wshort, empty_word());
     }
+}
+
+// ============================================================================
+// Items #3/#4 — compactness wiring, the (★k) forward, the (★k) iff, and CS-5d tower lift.
+// ============================================================================
+
+/// Each `relabel_col` image is valid over `nk+n+2` (every entry is a single gen `≤ nk+n+1`).
+proof fn lemma_relabel_col_img_valid(mm: ModMachine, n: nat, i: int)
+    requires
+        0 <= i < relabel_col(mm, n).len(),
+    ensures
+        word_valid(relabel_col(mm, n)[i], (g_m(mm).num_generators + n + 2) as nat),
+{
+    let nk = g_m(mm).num_generators;
+    let q = g_subgens(mm).len();
+    let rc = relabel_col(mm, n);
+    lemma_machine_col_len(mm, n);                          // rc.len() == q+n+2
+    if i < q + n + 1 {
+        lemma_relabel_col_nonp(mm, n, i);                 // rc[i] == [Gen(g)], g < nk+n+1
+        let g = choose|g: nat| rc[i] == seq![Symbol::Gen(g)] && g < nk + n + 1;
+        assert(rc[i] == seq![Symbol::Gen(g)] && g < nk + n + 1);
+        lemma_single_gen_valid(g, (nk + n + 2) as nat);
+    } else {
+        assert(i == q + n + 1);
+        let blk0: Seq<Word> = Seq::new(q, |i2: int| g_subgens(mm)[i2]);
+        let blk1: Seq<Word> = seq![ seq![Symbol::Gen((nk + n) as nat)] ];
+        let blk2: Seq<Word> = Seq::new(n, |j: int| seq![Symbol::Gen((nk + j) as nat)]);
+        let blk3: Seq<Word> = seq![ seq![Symbol::Gen((nk + n + 1) as nat)] ];
+        assert(rc == ((blk0 + blk1) + blk2) + blk3);
+        assert(rc[i] == blk3[0]);
+        assert(rc[i] == seq![Symbol::Gen((nk + n + 1) as nat)]);
+        lemma_single_gen_valid((nk + n + 1) as nat, (nk + n + 2) as nat);
+    }
+}
+
+/// A psi-scheme word `w` (valid over `psi_assoc.len()`) has `relabel(w)` valid over `nk+n+2`.
+proof fn lemma_relabel_word_valid(mm: ModMachine, n: nat, w: Word)
+    requires
+        word_valid(w, psi_assoc(mm, n).len()),
+    ensures
+        word_valid(relabel(mm, n, w), (g_m(mm).num_generators + n + 2) as nat),
+{
+    let nk = g_m(mm).num_generators;
+    let rc = relabel_col(mm, n);
+    lemma_machine_col_len(mm, n);                          // rc.len() == psi_assoc.len()
+    assert(word_valid(w, rc.len()));
+    assert forall|i: int| 0 <= i < rc.len()
+        implies word_valid(#[trigger] rc[i], (nk + n + 2) as nat) by {
+        lemma_relabel_col_img_valid(mm, n, i);
+    }
+    lemma_apply_embedding_valid(rc, w, (nk + n + 2) as nat);
+}
+
+/// Each `b_col_machine` image is valid over `h2_num_gens(nk,n)` (machine `<nk`, b-block
+/// `[Gen(b_idx<nk+2n), Gen(c_idx<nk+n)]`, `d=nk+2n`, `p=nk+2n+1`, all `< nk+2n+2`).
+proof fn lemma_b_col_machine_img_valid(mm: ModMachine, n: nat, i: int)
+    requires
+        0 <= i < g_m(mm).num_generators + n + 2,
+    ensures
+        word_valid(b_col_machine(mm, n)[i], h2_num_gens(g_m(mm).num_generators, n)),
+{
+    let nk = g_m(mm).num_generators;
+    let bm = b_col_machine(mm, n);
+    let h2ng = h2_num_gens(nk, n);                         // nk+2n+2
+    lemma_machine_col_len(mm, n);
+    let blk_m: Seq<Word> = Seq::new(nk, |i2: int| seq![Symbol::Gen(i2 as nat)]);
+    let blk_b: Seq<Word> = Seq::new(n, |jj: int| seq![Symbol::Gen(b_idx(nk, n, (jj + 1) as nat)),
+                                                       Symbol::Gen(c_idx(nk, (jj + 1) as nat))]);
+    let blk_d: Seq<Word> = seq![ seq![Symbol::Gen(d_idx(nk, n))] ];
+    let blk_p: Seq<Word> = seq![ seq![Symbol::Gen(p_idx(nk, n))] ];
+    assert(bm == ((blk_m + blk_b) + blk_d) + blk_p);
+    if i < nk {
+        assert(((blk_m + blk_b) + blk_d)[i] == (blk_m + blk_b)[i]);
+        assert((blk_m + blk_b)[i] == blk_m[i]);
+        assert(bm[i] == seq![Symbol::Gen(i as nat)]);
+        lemma_single_gen_valid(i as nat, h2ng);
+    } else if i < nk + n {
+        let j = i - nk;
+        lemma_b_col_machine_bblock(mm, n, j);
+        assert(bm[i] =~= seq![Symbol::Gen(b_idx(nk, n, (j + 1) as nat)),
+                              Symbol::Gen(c_idx(nk, (j + 1) as nat))]);
+        assert(b_idx(nk, n, (j + 1) as nat) == nk + n + j);
+        assert(c_idx(nk, (j + 1) as nat) == nk + j);
+        assert(word_valid(bm[i], h2ng)) by {
+            assert(bm[i].len() == 2);
+            assert(symbol_valid(bm[i][0], h2ng));
+            assert(symbol_valid(bm[i][1], h2ng));
+        }
+    } else if i == nk + n {
+        assert(((blk_m + blk_b) + blk_d)[i] == blk_d[0]);
+        assert(bm[i] == seq![Symbol::Gen(d_idx(nk, n))]);
+        assert(d_idx(nk, n) == nk + 2 * n);
+        lemma_single_gen_valid(d_idx(nk, n), h2ng);
+    } else {
+        assert(i == nk + n + 1);
+        assert(bm[i] == blk_p[0]);
+        assert(bm[i] == seq![Symbol::Gen(p_idx(nk, n))]);
+        assert(p_idx(nk, n) == nk + 2 * n + 1);
+        lemma_single_gen_valid(p_idx(nk, n), h2ng);
+    }
+}
+
+/// **(★k) FORWARD.**  `emb(k_a_col, w) ≡_{h2_pred} ε ⟹ emb(k_b_col, w) ≡_{h2_pred} ε`.  Compactness
+/// (CS-4b) reduces the a-triviality to a finite slice `h2_II(alphas)`; normalize (no-dup/∌0); the
+/// a-relabel bridge moves it to `a_col_machine` over `relabel(w)`; `lemma_cs5_recognition_forward`
+/// peels `p` to `base_A_plus_data(h0_filter(betas))`; then the b-von-Dyck `lemma_cs5_vondyck_relator`
+/// (over `b_col_machine`, c-killing) carries it to `h2_pred`; the b-relabel bridge returns `k_b_col`.
+pub proof fn lemma_cs5_kforward(
+    mm: ModMachine, n: nat, m: nat, is_S: spec_fn(Word) -> bool, w: Word,
+)
+    requires
+        mod_machine_wf(mm),
+        mm_terminal(mm, 0, 0),
+        2 * n < m,
+        s_relators_valid(is_S, g_m(mm).num_generators, n),
+        s_realizes(is_S, mm, n, m),
+        word_valid(w, psi_assoc(mm, n).len()),
+        equiv_in_pred_presentation(h2_pred(mm, n, m, is_S),
+            apply_embedding(k_a_col(mm, n), w), empty_word()),
+    ensures
+        equiv_in_pred_presentation(h2_pred(mm, n, m, is_S),
+            apply_embedding(k_b_col(mm, n), w), empty_word()),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let rw = relabel(mm, n, w);
+    let png = (nk + n + 2) as nat;
+
+    // 1. compactness ⟹ a finite slice alphas0 with emb(k_a_col, w) ≡_{h2_II(alphas0)} ε.
+    lemma_cs5_recog_compactness(mm, n, m, is_S, w);
+    let alphas0 = choose|alphas: Seq<nat>|
+        (forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]))
+        && equiv_in_presentation(h2_II(mm, n, m, alphas),
+            apply_embedding(k_a_col(mm, n), w), empty_word());
+    assert((forall|i: int| 0 <= i < alphas0.len() ==> numbers_word(n, m, alphas0[i]))
+        && equiv_in_presentation(h2_II(mm, n, m, alphas0),
+            apply_embedding(k_a_col(mm, n), w), empty_word()));
+
+    // 2. normalize (no-dup, ∌0, number-words) + lift triviality.
+    lemma_h2_II_normalize_equiv(mm, n, m, alphas0, apply_embedding(k_a_col(mm, n), w), empty_word());
+    let norm = normalize_alphas(alphas0);
+
+    // 3. a-relabel bridge: emb(a_col_machine, relabel(w)) ≡_{h2_II(norm)} ε.
+    lemma_emb_a_col_via_relabel(mm, n, w);
+    assert(equiv_in_presentation(h2_II(mm, n, m, norm),
+        apply_embedding(a_col_machine(mm, n), rw), empty_word()));
+
+    // 4. seg_inv + validity of relabel(w).
+    lemma_seg_inv_relabel(mm, n, w);
+    lemma_relabel_word_valid(mm, n, w);
+    assert(word_valid(rw, png));
+
+    // 5. recognition_forward: relabel(w) ≡_{base_A_plus_data(h0_filter(betas(norm)))} ε.
+    lemma_cs5_recognition_forward(mm, n, m, norm, rw);
+    let slice = h0_filter(mm, betas(norm));
+    let target = base_A_plus_data(mm, n, m, slice);
+    let src = hnn_presentation(target);
+    assert(equiv_in_presentation(src, rw, empty_word()));
+
+    // slice is all-H₀ + number-words (for the b-von-Dyck).
+    lemma_betas_index(norm);
+    lemma_betas_numbers_word(n, m, norm);
+    assert forall|k: int| 0 <= k < slice.len() implies numbers_word(n, m, slice[k]) by {
+        lemma_h0_filter_in_slice(mm, betas(norm), k);
+        let i = choose|i: int| 0 <= i < betas(norm).len() && betas(norm)[i] == slice[k];
+        assert(numbers_word(n, m, betas(norm)[i]));
+    }
+    assert forall|k: int| 0 <= k < slice.len() implies mm_in_H0(mm, slice[k], 0) by {
+        lemma_h0_filter_in_H0(mm, betas(norm), k);
+    }
+
+    // 6. b-von-Dyck: emb(b_col_machine, relabel(w)) ≡_{h2_pred} ε.
+    lemma_base_A_plus_data_valid(mm, n, m, slice);
+    lemma_hnn_presentation_valid(target);
+    lemma_machine_col_len(mm, n);
+    lemma_h2_pred_valid(mm, n, m, is_S);
+    lemma_h2_pred_num_generators(mm, n, m, is_S);
+    assert(h2_pred(mm, n, m, is_S).num_generators == h2_num_gens(nk, n));
+    assert(src.num_generators == png);
+    assert(b_col_machine(mm, n).len() == png);
+    assert forall|i: int| 0 <= i < b_col_machine(mm, n).len()
+        implies word_valid(#[trigger] b_col_machine(mm, n)[i],
+            h2_pred(mm, n, m, is_S).num_generators) by {
+        lemma_b_col_machine_img_valid(mm, n, i);
+    }
+    assert forall|jj: int| 0 <= jj < src.relators.len() implies
+        equiv_in_pred_presentation(h2_pred(mm, n, m, is_S),
+            apply_embedding(b_col_machine(mm, n), src.relators[jj]), empty_word()) by {
+        lemma_cs5_vondyck_relator(mm, n, m, is_S, slice, jj);
+    }
+    lemma_emb_respects_source_equiv_pred(src, h2_pred(mm, n, m, is_S), b_col_machine(mm, n),
+        rw, empty_word());
+    assert(equiv_in_pred_presentation(h2_pred(mm, n, m, is_S),
+        apply_embedding(b_col_machine(mm, n), rw), empty_word()));
+
+    // 7. b-relabel bridge: emb(k_b_col, w) = emb(b_col_machine, relabel(w)).
+    lemma_emb_b_col_via_relabel(mm, n, w);
 }
 
 } // verus!
