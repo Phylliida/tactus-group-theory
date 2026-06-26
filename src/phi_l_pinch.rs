@@ -478,7 +478,7 @@ pub proof fn lemma_map_a_pinch_descends(mm: ModMachine, n: nat, m: nat, alphas: 
 /// Assemble the pinch-out: given the pinched middle `mid = w[i..j+1]` reduces (in the HNN) to a
 /// stable-free base word `phi_g`, splice it back — `w ≡ pre·phi_g·suf` with strictly fewer stable
 /// letters (the two `t`'s at `i,j` are gone; `phi_g` and `g` are both stable-free).
-proof fn lemma_pinch_assemble(data: HNNData, w: Word, i: int, j: int, phi_g: Word) -> (wshort: Word)
+pub proof fn lemma_pinch_assemble(data: HNNData, w: Word, i: int, j: int, phi_g: Word) -> (wshort: Word)
     requires
         hnn_data_valid(data),
         word_valid(w, hnn_presentation(data).num_generators),

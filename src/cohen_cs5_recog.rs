@@ -49,6 +49,12 @@ use crate::hnn::lemma_base_embeds_in_hnn;
 use crate::word::lemma_inverse_involution;
 use crate::normal_form_afp_textbook::lemma_equiv_inverse;
 use crate::word_numbering::lemma_w_c_gens_in_block;
+use crate::machine_group::{hnn_b_gens, lemma_stable_conj_factorization,
+    lemma_stable_conj_factorization_rev};
+use crate::presentation_lemmas::lemma_equiv_concat_right;
+use crate::phi_l_pinch::lemma_pinch_assemble;
+use crate::britton_infra::lemma_hnn_presentation_valid;
+use crate::britton_via_tower::stable_count;
 use crate::free_basis::{lemma_g_m_data_isomorphic, config_emb, w_to_canon, lemma_config_emb_eq_canw};
 use crate::machine_group::{CanonLetter, canw_eval, base_A, lemma_base_A_valid, lemma_canw_eval_valid,
     lemma_no_relator_equiv_implies_freely_equivalent};
@@ -4080,6 +4086,168 @@ pub proof fn lemma_h0_filter_in_H0(mm: ModMachine, slice: Seq<nat>, k: int)
             lemma_h0_filter_in_H0(mm, rest, k);
         }
     }
+}
+
+// ----------------------------------------------------------------------------
+// Brick F — the CS-5 pinch-out (mirror `lemma_pd_pinch_out`, threading `seg_inv`).
+// ----------------------------------------------------------------------------
+
+/// **CS-5 pinch-out**: a `base_A_plus_data(slice)` pinch of `wm` (with `seg_inv(wm)`, over an
+/// all-H₀ slice) reduces to a strictly stable-count-smaller `wshort` that STILL satisfies `seg_inv`.
+/// Mirror of `lemma_pd_pinch_out` (the conjugation factorization gives a stable-free middle `phi_g`)
+/// PLUS: `phi_g ∈ ⟨ublock⟩` (the opposite column over an H₀ slice — `config`/`assoc_rhs` toolkit), so
+/// `lemma_seg_inv_pinch_out` keeps the segment invariant alive across the splice.
+pub proof fn lemma_cs5_pinch_out(mm: ModMachine, n: nat, m: nat, slice: Seq<nat>, wm: Word,
+    i: int, j: int) -> (wshort: Word)
+    requires
+        mod_machine_wf(mm),
+        2 * n < m,
+        forall|k: int| 0 <= k < slice.len() ==> mm_in_H0(mm, #[trigger] slice[k], 0),
+        forall|k: int| 0 <= k < slice.len() ==> numbers_word(n, m, slice[k]),
+        word_valid(wm, hnn_presentation(base_A_plus_data(mm, n, m, slice)).num_generators),
+        seg_inv(mm, n, wm),
+        has_pinch_at(base_A_plus_data(mm, n, m, slice), wm, i, j),
+    ensures
+        equiv_in_presentation(hnn_presentation(base_A_plus_data(mm, n, m, slice)), wm, wshort),
+        word_valid(wshort, hnn_presentation(base_A_plus_data(mm, n, m, slice)).num_generators),
+        stable_count(base_A_plus_data(mm, n, m, slice), wshort)
+            < stable_count(base_A_plus_data(mm, n, m, slice), wm),
+        seg_inv(mm, n, wshort),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let target = base_A_plus_data(mm, n, m, slice);
+    let hp = hnn_presentation(target);
+    let png = hp.num_generators;
+    let ng = target.base.num_generators;        // nk+n+1
+    let bp = base_A_plus_base(mm, n);
+    let ub = ublock_db_gens(mm, n);
+    let st = stable_letter(target);
+    let si = stable_letter_inv(target);
+    let g = wm.subrange(i + 1, j);
+    let ag = hnn_a_gens(target);
+    let bg = hnn_b_gens(target);
+    let kk = target.associations.len();
+
+    lemma_base_A_plus_data_valid(mm, n, m, slice);
+    lemma_base_A_plus_data_shape(mm, n, m, slice);
+    lemma_hnn_presentation_valid(target);
+    assert(target.base == bp);
+    assert(ng == nk + n + 1);
+    assert(png == ng + 1);
+    assert(st == Symbol::Gen(ng) && si == Symbol::Inv(ng));
+    assert(kk == slice.len());
+    assert(has_adjacent_opposite_at(target, wm, i, j));
+
+    // a/b-gens valid over ng; a-col = config_emb(slice), b-col = assoc_rhs_emb(slice).
+    assert forall|t: int| 0 <= t < ag.len() implies word_valid(#[trigger] ag[t], ng) by {
+        assert(ag[t] == target.associations[t].0);
+    }
+    assert forall|t: int| 0 <= t < bg.len() implies word_valid(#[trigger] bg[t], ng) by {
+        assert(bg[t] == target.associations[t].1);
+    }
+
+    // mid =~= [w[i]] + g + [w[j]].
+    assert(wm.subrange(i, j + 1) =~= (seq![wm[i]] + g) + seq![wm[j]]) by {
+        assert forall|t: int| 0 <= t < wm.subrange(i, j + 1).len()
+            implies ((seq![wm[i]] + g) + seq![wm[j]])[t] == wm.subrange(i, j + 1)[t] by {
+            assert(wm.subrange(i, j + 1)[t] == wm[i + t]);
+            if t != 0 && t < wm.subrange(i, j + 1).len() - 1 { assert(g[t - 1] == wm[i + t]); }
+        }
+    }
+
+    let wshort;
+    if wm[i] == si {
+        // t⁻¹·g·t: g ∈ ⟨ag⟩ (= config_emb), phi_g = ψ(bg, u) ∈ ⟨assoc_rhs⟩ ⊆ ⟨ublock⟩.
+        assert(wm[j] == st);
+        assert(in_generated_subgroup(target.base, ag, g));
+        lemma_subgroup_to_k_word(target.base, ag, g);
+        let u = choose|u: Word| word_valid(u, ag.len())
+            && equiv_in_presentation(target.base, apply_embedding(ag, u), g);
+        assert(word_valid(u, ag.len())
+            && equiv_in_presentation(target.base, apply_embedding(ag, u), g));
+        assert(ag.len() == kk);
+        let phi_g = apply_embedding(bg, u);
+        lemma_apply_embedding_valid(bg, u, ng);
+        lemma_apply_embedding_valid(ag, u, ng);
+        lemma_word_valid_mono(apply_embedding(ag, u), ng, png);
+        lemma_base_embeds_in_hnn(target, apply_embedding(ag, u), g);
+        lemma_equiv_symmetric(hp, apply_embedding(ag, u), g);
+        lemma_equiv_concat_right(hp, seq![si], g, apply_embedding(ag, u));
+        assert(concat(seq![si], g) == seq![si] + g);
+        assert(concat(seq![si], apply_embedding(ag, u)) == seq![si] + apply_embedding(ag, u));
+        lemma_equiv_concat_left(hp, seq![si] + g, seq![si] + apply_embedding(ag, u), seq![st]);
+        assert(concat(seq![si] + g, seq![st]) == (seq![si] + g) + seq![st]);
+        assert(concat(seq![si] + apply_embedding(ag, u), seq![st])
+            == (seq![si] + apply_embedding(ag, u)) + seq![st]);
+        lemma_stable_conj_factorization(target, u);
+        assert(seq![si] + apply_embedding(ag, u) + seq![st]
+            == (seq![si] + apply_embedding(ag, u)) + seq![st]);
+        lemma_equiv_transitive(hp, (seq![si] + g) + seq![st],
+            (seq![si] + apply_embedding(ag, u)) + seq![st], phi_g);
+        assert(wm.subrange(i, j + 1) == (seq![wm[i]] + g) + seq![wm[j]]);
+        assert((seq![wm[i]] + g) + seq![wm[j]] == (seq![si] + g) + seq![st]);
+        assert(equiv_in_presentation(hp, wm.subrange(i, j + 1), phi_g));
+        // phi_g ∈ ⟨ublock⟩ (each bg entry = assoc_rhs_machine(slice[k]), slice ⊆ H₀).
+        assert forall|c: int| 0 <= c < bg.len()
+            implies in_generated_subgroup(bp, ub, #[trigger] bg[c]) by {
+            assert(bg[c] == assoc_rhs_machine(mm, n, m, slice[c]));
+            lemma_assoc_rhs_in_ublock(mm, n, m, slice[c]);
+        }
+        lemma_emb_col_in_ublock(mm, n, bg, u);
+        assert(in_generated_subgroup(bp, ub, phi_g));
+        // phi_g stable-free.
+        assert forall|t: int| 0 <= t < phi_g.len() implies !seg_stable(mm, n, phi_g[t]) by {
+            assert(symbol_valid(phi_g[t], ng));
+        }
+        wshort = lemma_pinch_assemble(target, wm, i, j, phi_g);
+        lemma_seg_inv_pinch_out(mm, n, m, slice, wm, phi_g, i, j);
+    } else {
+        // t·g·t⁻¹: g ∈ ⟨bg⟩ (= assoc_rhs), psi_g = ψ(ag, u) ∈ ⟨config_emb⟩ ⊆ ⟨ublock⟩.
+        assert(wm[i] == st && wm[j] == si);
+        assert(in_generated_subgroup(target.base, bg, g));
+        lemma_subgroup_to_k_word(target.base, bg, g);
+        let u = choose|u: Word| word_valid(u, bg.len())
+            && equiv_in_presentation(target.base, apply_embedding(bg, u), g);
+        assert(word_valid(u, bg.len())
+            && equiv_in_presentation(target.base, apply_embedding(bg, u), g));
+        assert(bg.len() == kk);
+        let psi_g = apply_embedding(ag, u);
+        lemma_apply_embedding_valid(ag, u, ng);
+        lemma_apply_embedding_valid(bg, u, ng);
+        lemma_word_valid_mono(apply_embedding(bg, u), ng, png);
+        lemma_base_embeds_in_hnn(target, apply_embedding(bg, u), g);
+        lemma_equiv_symmetric(hp, apply_embedding(bg, u), g);
+        lemma_equiv_concat_right(hp, seq![st], g, apply_embedding(bg, u));
+        assert(concat(seq![st], g) == seq![st] + g);
+        assert(concat(seq![st], apply_embedding(bg, u)) == seq![st] + apply_embedding(bg, u));
+        lemma_equiv_concat_left(hp, seq![st] + g, seq![st] + apply_embedding(bg, u), seq![si]);
+        assert(concat(seq![st] + g, seq![si]) == (seq![st] + g) + seq![si]);
+        assert(concat(seq![st] + apply_embedding(bg, u), seq![si])
+            == (seq![st] + apply_embedding(bg, u)) + seq![si]);
+        lemma_stable_conj_factorization_rev(target, u);
+        assert(seq![st] + apply_embedding(bg, u) + seq![si]
+            == (seq![st] + apply_embedding(bg, u)) + seq![si]);
+        lemma_equiv_transitive(hp, (seq![st] + g) + seq![si],
+            (seq![st] + apply_embedding(bg, u)) + seq![si], psi_g);
+        assert(wm.subrange(i, j + 1) == (seq![wm[i]] + g) + seq![wm[j]]);
+        assert((seq![wm[i]] + g) + seq![wm[j]] == (seq![st] + g) + seq![si]);
+        assert(equiv_in_presentation(hp, wm.subrange(i, j + 1), psi_g));
+        // psi_g ∈ ⟨ublock⟩ (each ag entry = config(slice[k],0), slice ⊆ H₀).
+        assert forall|c: int| 0 <= c < ag.len()
+            implies in_generated_subgroup(bp, ub, #[trigger] ag[c]) by {
+            assert(ag[c] == config_word(slice[c], 0));
+            lemma_config_in_ublock(mm, n, slice[c]);
+        }
+        lemma_emb_col_in_ublock(mm, n, ag, u);
+        assert(in_generated_subgroup(bp, ub, psi_g));
+        assert forall|t: int| 0 <= t < psi_g.len() implies !seg_stable(mm, n, psi_g[t]) by {
+            assert(symbol_valid(psi_g[t], ng));
+        }
+        wshort = lemma_pinch_assemble(target, wm, i, j, psi_g);
+        lemma_seg_inv_pinch_out(mm, n, m, slice, wm, psi_g, i, j);
+    }
+    wshort
 }
 
 } // verus!
