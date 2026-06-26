@@ -38,7 +38,14 @@ use crate::presentation::lemma_equiv_symmetric;
 use crate::machine_group::{ModMachine, g_m, g_subgens, g_m_associations, config_word, mod_machine_wf,
     mm_in_H0, lemma_g_m_num_generators, lemma_g_m_associations_valid, lemma_g_m_valid,
     lemma_word_valid_mono, lemma_cancel_pair_equiv_empty, lemma_config_word_valid,
-    lemma_apply_embedding_in_subgroup, lemma_in_subgroup_respects_equiv};
+    lemma_apply_embedding_in_subgroup, lemma_in_subgroup_respects_equiv,
+    b_m, b_m_upto, mm_terminal, hnn_a_gens, in_TM, in_TMstable,
+    lemma_b_m_valid, lemma_b_m_upto_num_generators, lemma_vii_subset, lemma_single_hnn_base_faithful};
+use crate::tower_peel::lemma_vi;
+use crate::prop_v::lemma_equiv_from_concat_inv_trivial;
+use crate::free_basis::lemma_g_m_data_isomorphic;
+use crate::presentation::{lemma_equiv_refl, lemma_equiv_transitive};
+use crate::presentation_lemmas::{lemma_equiv_concat_left, lemma_word_inverse_right};
 use crate::layout::{h1_num_gens, h2_num_gens, c_base, b_base, d_idx, p_idx, b_idx, c_idx};
 use crate::h1::{h1_base, comm_relators, comm_relator, lemma_h1_base_valid, lemma_h1_base_num_generators};
 use crate::h3::{psi_assoc, psi_ublock, psi_bcblock, lemma_single_gen_valid};
@@ -1808,6 +1815,135 @@ pub proof fn lemma_cs5_project_to_gsubgens(mm: ModMachine, n: nat, cfg_rep: Word
     }
     // 3. drop the ε-images, landing in ⟨gs⟩.
     lemma_in_subgroup_gens_in_core(g_m(mm), img_gens, gs, cfg_rep);
+}
+
+// ============================================================================
+// Step 3c-C2 (step 2) — `cfg_rep ∈ ⟨g_subgens⟩ over g_m` ⟹ `in_TM(cfg_rep)`.
+// Base-faithfulness of the `g_m` HNN (`b_m`-words) lands the membership in `b_m`, then the
+// Layer-1 chain property (vii) (`lemma_vii_subset`) + property (vi) (`lemma_vi`).
+// ============================================================================
+
+/// Two-word base-faithfulness of `g_m = HNN(b_m, g_m_associations)`: `b_m`-words equiv over `g_m`
+/// are equiv over `b_m`. (Mirror of `lemma_quad_base_faithful` at the `k`-layer.)
+pub proof fn lemma_g_m_base_faithful_2word(mm: ModMachine, w1: Word, w2: Word)
+    requires
+        mod_machine_wf(mm),
+        word_valid(w1, b_m(mm).num_generators),
+        word_valid(w2, b_m(mm).num_generators),
+        equiv_in_presentation(g_m(mm), w1, w2),
+    ensures
+        equiv_in_presentation(b_m(mm), w1, w2),
+{
+    let data = HNNData { base: b_m(mm), associations: g_m_associations(mm) };
+    let hp = g_m(mm);
+    let p = b_m(mm);
+    let ng = p.num_generators;
+    lemma_b_m_valid(mm);
+    lemma_b_m_upto_num_generators(mm, mm.quads.len());
+    assert(p == b_m_upto(mm, mm.quads.len()));
+    assert(ng == (3 + mm.quads.len()) as nat);
+    lemma_g_m_associations_valid(mm);
+    assert(hnn_data_valid(data));
+    lemma_g_m_data_isomorphic(mm);
+    assert(hp == hnn_presentation(data));
+    let iw2 = inverse_word(w2);
+    lemma_inverse_word_valid(w2, ng);
+    lemma_concat_word_valid(w1, iw2, ng);
+    // (a) w1 ≡_hp w2 ⟹ w1·w2⁻¹ ≡_hp ε
+    lemma_equiv_concat_left(hp, w1, w2, iw2);
+    lemma_word_inverse_right(hp, w2);
+    lemma_equiv_transitive(hp, w1 + iw2, w2 + iw2, empty_word());
+    // single-layer base-faithful: w1·w2⁻¹ ≡_{b_m} ε
+    lemma_single_hnn_base_faithful(data, w1 + iw2);
+    // (b) w1·w2⁻¹ ≡_p ε ⟹ w1 ≡_p w2
+    lemma_equiv_from_concat_inv_trivial(p, w1, w2);
+}
+
+/// A `concat_all` of generator-or-inverse factors is valid over `ng` when every generator is.
+proof fn lemma_factors_concat_valid(gens: Seq<Word>, factors: Seq<Word>, ng: nat)
+    requires
+        factors_from_generators(gens, factors),
+        forall|i: int| 0 <= i < gens.len() ==> word_valid(#[trigger] gens[i], ng),
+    ensures
+        word_valid(concat_all(factors), ng),
+    decreases factors.len(),
+{
+    if factors.len() == 0 {
+        assert(concat_all(factors) =~= empty_word()) by { reveal_with_fuel(concat_all, 1); }
+    } else {
+        let rest = factors.drop_first();
+        assert(factors_from_generators(gens, rest)) by {
+            assert forall|k: int| 0 <= k < rest.len()
+                implies is_generator_or_inverse(gens, #[trigger] rest[k]) by {
+                assert(rest[k] == factors[k + 1]);
+            }
+        }
+        lemma_factors_concat_valid(gens, rest, ng);
+        assert(is_generator_or_inverse(gens, factors[0]));
+        let j = choose|j: int| 0 <= j < gens.len()
+            && (factors[0] == gens[j] || factors[0] == inverse_word(gens[j]));
+        assert(0 <= j < gens.len()
+            && (factors[0] == gens[j] || factors[0] == inverse_word(gens[j])));
+        if factors[0] != gens[j] {
+            lemma_inverse_word_valid(gens[j], ng);
+        }
+        assert(concat_all(factors) =~= factors.first() + concat_all(rest)) by {
+            reveal_with_fuel(concat_all, 1);
+        }
+        lemma_concat_word_valid(factors.first(), concat_all(rest), ng);
+    }
+}
+
+/// **CS-5c step 2.** A config representative (a `{t,x,y}`-word) lying in `⟨g_subgens⟩` over `g_m`
+/// lies in `T(M)` over `base_A`.
+pub proof fn lemma_cs5_cfg_in_TM(mm: ModMachine, cfg_rep: Word)
+    requires
+        mod_machine_wf(mm),
+        mm_terminal(mm, 0, 0),
+        word_valid(cfg_rep, 3),
+        in_generated_subgroup(g_m(mm), g_subgens(mm), cfg_rep),
+    ensures
+        in_TM(mm, cfg_rep),
+{
+    let gs = g_subgens(mm);
+    let bm = b_m(mm);
+    lemma_b_m_valid(mm);
+    lemma_b_m_upto_num_generators(mm, mm.quads.len());
+    let bng = bm.num_generators;
+    assert(bng == (3 + mm.quads.len()) as nat);
+    lemma_g_m_associations_valid(mm);
+
+    // extract a g_subgens factorisation; v = concat_all(factors) is a b_m word.
+    let factors = choose|f: Seq<Word>| #[trigger] factors_from_generators(gs, f)
+        && equiv_in_presentation(g_m(mm), concat_all(f), cfg_rep);
+    assert(factors_from_generators(gs, factors)
+        && equiv_in_presentation(g_m(mm), concat_all(factors), cfg_rep));
+    let v = concat_all(factors);
+    assert forall|i: int| 0 <= i < gs.len() implies word_valid(#[trigger] gs[i], bng) by {
+        assert(gs[i] == g_m_associations(mm)[i].1);
+    }
+    lemma_factors_concat_valid(gs, factors, bng);
+    lemma_word_valid_mono(cfg_rep, 3, bng);
+
+    // base-faithful g_m → b_m: v ≡_{b_m} cfg_rep, so cfg_rep ∈ ⟨g_subgens⟩ over b_m.
+    lemma_g_m_base_faithful_2word(mm, v, cfg_rep);
+    lemma_equiv_refl(bm, v);
+    assert(in_generated_subgroup(bm, gs, v));               // witness `factors` (concat_all = v ≡ v)
+    lemma_in_subgroup_respects_equiv(bm, gs, v, cfg_rep);
+
+    // diagonal associations: g_subgens == hnn_a_gens(gdata).
+    let gdata = HNNData { base: bm, associations: g_m_associations(mm) };
+    assert(gs =~= hnn_a_gens(gdata)) by {
+        assert(gs.len() == hnn_a_gens(gdata).len());
+        assert forall|i: int| 0 <= i < gs.len() implies gs[i] == hnn_a_gens(gdata)[i] by {
+            assert(gs[i] == g_m_associations(mm)[i].1);
+            assert(hnn_a_gens(gdata)[i] == g_m_associations(mm)[i].0);
+            assert(g_m_associations(mm)[i].0 == g_m_associations(mm)[i].1);
+        }
+    }
+    assert(in_generated_subgroup(bm, hnn_a_gens(gdata), cfg_rep));
+    lemma_vii_subset(mm, cfg_rep);                          // ∈ ⟨T(M), rᵢ, lⱼ⟩
+    lemma_vi(mm, cfg_rep);                                  // ∈ T(M)
 }
 
 } // verus!
