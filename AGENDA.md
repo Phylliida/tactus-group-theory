@@ -558,9 +558,22 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       "infinite-gen representation decision" is largely RESOLVED — the §D probe machine-checks that
       Miller's HNN faithfulness localizes to finite slices, so **no ∞-gen presentation type is
       needed** (use the existing finite `free_product`/`HNNData`/Britton + a `∀w ∃N` compactness
-      quantifier; carry `C₀` via the bespoke `ceer_group.rs`). **NEXT (gated on Danielle's effort-go,
-      direction settled):** A-column `{b,cᵢa⁻ⁱbaⁱ}` free in `C₀⋆F₂` (the one new crux; B-column =
-      banked `conj_free_b`) → wire `C₀` slices → compactness assembly → `C=G=⟨a,t|D̄⟩` + `C₀↪C`.
+      quantifier; carry `C₀` via the bespoke `ceer_group.rs`).
+      **✅ IN-CRATE MATH OF LAYER 0.5 COMPLETE — `C₀ ↪ C` EMBEDDING (session 34, `cohen_layer05.rs`
+      31/0, Danielle's go).** The one new crux + the per-slice + the direct-limit assembly, all
+      verified, additive (gate 2645/20, no regression, no assume/admit/external_body):
+      (1) **A/B-column freeness** `lemma_acol_free`/`lemma_bcol_free` via the **kill-`C₀` retraction**
+      `ρ:C₀⋆F₂→F₂` mapping the columns EXACTLY onto banked `conj_family`/`conj_family_b` (free in F₂)
+      + Layer-1's `lemma_pullback_free` — NOT a free-product normal-form induction. Miller's `i≥1`
+      (exponent `j+1`) convention (ρ must be injective on the column).
+      (2) **per-slice faithfulness** `lemma_miller_faithfulness`: `w=1 in G^(N) ⟹ w=1 in C₀^(N)`,
+      unconditional (finite-Britton `L↪G` + free-product injectivity `C₀↪L`).
+      (3) **direct-limit embedding iff** `lemma_c0_embeds_in_c_iff`: `C`/`C₀` = direct limits of their
+      finite slices (NOT a single Tietze-2-gen object — keeps Layer-2's c-block); for a c-word `w`,
+      `w=1 in C ⟺ w=1 in C₀`. Shared-witness form ⟹ no nesting / no re-encoding (c-words are insulated
+      from `a/b/t`). **REMAINING = pipeline wiring only, no new group theory:** instantiate the
+      abstract `decls_fam` from `ceer_group.rs` (lives in the COMPUTABILITY crate — it imports
+      group-theory, not vice-versa) + tie the limit's `S` to Layer 2.
       See `docs/machine-bridge-and-infinite-gen-plan.md` §C/§D.
 - [ ] **word-numbering bridge** — `wα(c)`, with `wα(c)∈S ⟺ (α,0)∈H₀(M)` (ties the relator set `S`
       to the machine, built from the reduction in §3.3).
