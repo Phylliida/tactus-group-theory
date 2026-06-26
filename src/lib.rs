@@ -524,3 +524,7 @@ pub mod miller_collapse_reln;
 // homomorphism (D̄_M = pushforward(decls); associations discharge to ε). Fresh packaging a=Gen(0),
 // t=Gen(1). Assembled via lemma_hom_preserves_equiv + lemma_apply_hom_eq_embedding.
 pub mod miller_collapse_preserve;
+// GAP-1 §9.2-item-(2) — embedding_injective (the faithfulness "boss fight"): emb_M : G^(M) → K_M is
+// INJECTIVE (Miller Thm 4.1 Tietze collapse = iso) via the mutually-inverse-homomorphisms retraction
+// ψ : a↦Gen(n), t↦Gen(n+2); ψ∘emb_M = wrap-in-place emb(n,n,n+2) ≡ id in G^(M). No freeness needed.
+pub mod miller_collapse_inject;
