@@ -356,6 +356,21 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > threading the §7 `⟨g_subgens,d,b,p⟩`-invariant (base case = step-2 `lemma_cs5_base_case_faithful`; step
 > case = 3b descent + 3c-C1/C2 at the pinch middle + pinch-out + recurse) → `(★k)` fwd → CS-5d tower lift.
 >
+> **✅ CS-5c 3d IN PROGRESS 2026-06-25 (session 28) — `cohen_cs5_recog` 56→83/0, gate GREEN, additive.**
+> **Design LOCKED first (blueprint §7.3): two gaps in §7's sketch caught + fixed** — the "subgroup
+> invariant" is a category error (subword ∉ subgroup) + circular, replaced by a **segment-wise
+> invariant** (every maximal stable-free run ∈⟨g_subgens,d,b⟩, preserved combinatorially through
+> pinch-out, companion-confirmed); and the b-orientation pinch (`p·g·p⁻¹`, middle ∈⟨assoc_rhs⟩) needs
+> its OWN H₀-restriction **C2-b** (the companion's "π lift-back" needed freeness, supplied here). Built
+> bottom-up: **Brick A** (recog↔base_A_plus col correspondence `lemma_cs5_{a,b}_col_correspondence`),
+> **Brick B** (gen-set superset), **Brick C COMPLETE** = `lemma_cs5_middle_h0_restrict_b` (the b-side
+> coordinate survival = the genuinely-new math; reduces to a-side C2 via π + config freeness +
+> `lemma_intersection_property` + the `h0_sel` selector; verified first try), **Brick D partial** =
+> `seg_inv` + `lemma_seg_inv_middle` (consume) + base case `lemma_seg_inv_relabel`. **NEXT =
+> D-preservation (`lemma_seg_inv_pinch_out`, the 3-way-splice merged-run case analysis — the trickiest
+> proof) → Brick E (`lemma_cs5_pinch_descends`, ~250 lines, per-orientation C1+C2 / C1+C2-b) → Brick F
+> (induction + (★k) glue + CS-5d). Full per-brick plan in blueprint §7.4.**
+>
 > **✅ FORK-A STARTED 2026-06-23 (session 14) — elementary foundation arc DONE, ports VERBATIM.**
 > The completeness route is **Fork-A** (predicate presentation; the textbook route per
 > `docs/cohen-faithfulness-primary-source.md` §1/§10). Go taken on the standing "follow the textbook"
