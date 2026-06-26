@@ -83,6 +83,10 @@ use crate::cohen_cs5::{lemma_cs5_recog_compactness, lemma_cs5_backward};
 use crate::cohen_cs4c::{normalize_alphas, lemma_h2_II_normalize_equiv};
 use crate::pred_emb_respects::lemma_emb_respects_source_equiv_pred;
 use crate::cohen_h2::lemma_h2_pred_num_generators;
+use crate::cohen_cs4e::{lemma_cs4e_iso_upto, lemma_h3_pred_upto_base_faithful};
+use crate::cohen_h3::{h3_pred_upto, h3_pred_data};
+use crate::pred_hnn::hnn_pred_associations_isomorphic;
+use crate::h3::lemma_psi_assoc_valid;
 use crate::hnn::{HNNData, hnn_data_valid, hnn_relator, hnn_relators, hnn_presentation,
     stable_letter, stable_letter_inv};
 use crate::pred_presentation::{equiv_in_pred_presentation, pred_presentation_valid};
@@ -4850,6 +4854,106 @@ pub proof fn lemma_cs5_kforward(
 
     // 7. b-relabel bridge: emb(k_b_col, w) = emb(b_col_machine, relabel(w)).
     lemma_emb_b_col_via_relabel(mm, n, w);
+}
+
+/// **The level-`2n` k-iff for a single `w`.** `emb(k_a_col, w) ≡_{h3_pred_upto(2n)} ε ⟺
+/// emb(k_b_col, w) ≡ ε`, via base-faithfulness (`h3_pred_upto(2n) ⟺ h2_pred`, powered by ALL a-level
+/// isos `lemma_cs4e_iso_upto`) sandwiching the `(★k)` decision over `h2_pred` (kforward + backward).
+proof fn lemma_cs5d_level_iff(
+    mm: ModMachine, n: nat, m: nat, is_S: spec_fn(Word) -> bool, w: Word,
+)
+    requires
+        mod_machine_wf(mm),
+        mm_terminal(mm, 0, 0),
+        2 * n < m,
+        s_relators_valid(is_S, g_m(mm).num_generators, n),
+        s_realizes(is_S, mm, n, m),
+        word_valid(w, psi_assoc(mm, n).len()),
+    ensures
+        equiv_in_pred_presentation(h3_pred_upto(mm, n, m, is_S, (2 * n) as nat),
+            apply_embedding(k_a_col(mm, n), w), empty_word())
+        <==> equiv_in_pred_presentation(h3_pred_upto(mm, n, m, is_S, (2 * n) as nat),
+            apply_embedding(k_b_col(mm, n), w), empty_word()),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let base = h3_pred_upto(mm, n, m, is_S, (2 * n) as nat);
+    let ea = apply_embedding(k_a_col(mm, n), w);
+    let eb = apply_embedding(k_b_col(mm, n), w);
+    let hp = h2_pred(mm, n, m, is_S);
+    let h2ng = h2_num_gens(nk, n);
+
+    // ea, eb valid over h2_num_gens (k_a/k_b_col entries = psi_assoc columns).
+    lemma_psi_assoc_valid(mm, n, h2ng);                       // assocs_valid(psi_assoc, h2ng)
+    assert(k_a_col(mm, n).len() == psi_assoc(mm, n).len());
+    assert(k_b_col(mm, n).len() == psi_assoc(mm, n).len());
+    assert forall|i: int| 0 <= i < k_a_col(mm, n).len()
+        implies word_valid(#[trigger] k_a_col(mm, n)[i], h2ng) by {
+        assert(k_a_col(mm, n)[i] == psi_assoc(mm, n)[i].0);
+    }
+    assert forall|i: int| 0 <= i < k_b_col(mm, n).len()
+        implies word_valid(#[trigger] k_b_col(mm, n)[i], h2ng) by {
+        assert(k_b_col(mm, n)[i] == psi_assoc(mm, n)[i].1);
+    }
+    assert(word_valid(w, k_a_col(mm, n).len()) && word_valid(w, k_b_col(mm, n).len()));
+    lemma_apply_embedding_valid(k_a_col(mm, n), w, h2ng);     // word_valid(ea, h2ng)
+    lemma_apply_embedding_valid(k_b_col(mm, n), w, h2ng);     // word_valid(eb, h2ng)
+
+    // all a-level isos ⟹ base-faithfulness h3_pred_upto(2n) ⟺ h2_pred on ea, eb.
+    lemma_cs4e_iso_upto(mm, n, m, is_S, (2 * n) as nat);
+    lemma_h3_pred_upto_base_faithful(mm, n, m, is_S, (2 * n) as nat, ea);
+    lemma_h3_pred_upto_base_faithful(mm, n, m, is_S, (2 * n) as nat, eb);
+
+    // (★k) over h2_pred.
+    assert(equiv_in_pred_presentation(hp, ea, empty_word())
+        ==> equiv_in_pred_presentation(hp, eb, empty_word())) by {
+        if equiv_in_pred_presentation(hp, ea, empty_word()) {
+            lemma_cs5_kforward(mm, n, m, is_S, w);
+        }
+    }
+    assert(equiv_in_pred_presentation(hp, eb, empty_word())
+        ==> equiv_in_pred_presentation(hp, ea, empty_word())) by {
+        if equiv_in_pred_presentation(hp, eb, empty_word()) {
+            lemma_cs5_backward(mm, n, m, is_S, w);
+        }
+    }
+    // chain: equiv(base, ea, ε) ⟺ equiv(hp, ea, ε) ⟺ equiv(hp, eb, ε) ⟺ equiv(base, eb, ε).
+}
+
+/// **CS-5 (item #4) — THE k-ASSOCIATION ISO.**  `hnn_pred_associations_isomorphic(h3_pred_data)`: the
+/// top `k` association `(A₊, A₋)` of the predicate Higman tower is a subgroup isomorphism.  This is the
+/// last open piece of CS-5 (and of the Layer-2 completeness `C ↪ H₃` faithfulness over the predicate
+/// base).  Forall `w` over the `psi_assoc` columns, the level-`2n` k-iff (`lemma_cs5d_level_iff`)
+/// decides `emb(k_a_col, w) ≡ ε ⟺ emb(k_b_col, w) ≡ ε` in `h3_pred_upto(2n)`.
+pub proof fn lemma_cs5_iso(mm: ModMachine, n: nat, m: nat, is_S: spec_fn(Word) -> bool)
+    requires
+        mod_machine_wf(mm),
+        mm_terminal(mm, 0, 0),
+        2 * n < m,
+        s_relators_valid(is_S, g_m(mm).num_generators, n),
+        s_realizes(is_S, mm, n, m),
+    ensures
+        hnn_pred_associations_isomorphic(h3_pred_data(mm, n, m, is_S)),
+{
+    let data = h3_pred_data(mm, n, m, is_S);
+    let kk = data.associations.len();
+    let a_words = Seq::new(kk, |i: int| data.associations[i].0);
+    let b_words = Seq::new(kk, |i: int| data.associations[i].1);
+    assert(data.associations == psi_assoc(mm, n));
+    assert(data.base == h3_pred_upto(mm, n, m, is_S, (2 * n) as nat));
+    assert(kk == psi_assoc(mm, n).len());
+    assert(a_words =~= k_a_col(mm, n));
+    assert(b_words =~= k_b_col(mm, n));
+
+    assert forall|w: Word| #![trigger word_valid(w, kk as nat)] word_valid(w, kk as nat) implies (
+        equiv_in_pred_presentation(data.base, apply_embedding(a_words, w), empty_word())
+        <==> equiv_in_pred_presentation(data.base, apply_embedding(b_words, w), empty_word())
+    ) by {
+        assert(word_valid(w, psi_assoc(mm, n).len()));
+        lemma_cs5d_level_iff(mm, n, m, is_S, w);
+        assert(apply_embedding(a_words, w) == apply_embedding(k_a_col(mm, n), w));
+        assert(apply_embedding(b_words, w) == apply_embedding(k_b_col(mm, n), w));
+    }
 }
 
 } // verus!
