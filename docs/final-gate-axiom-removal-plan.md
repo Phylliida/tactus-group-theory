@@ -765,8 +765,9 @@ weakened directedness, now TRUE via `lemma_emb_slice_independent` on the non-emp
 **`lemma_ceer_limit_commutation(e,n,w)`** = `lemma_limit_commutation` instantiated at `ceer_decls_fam(e)`
 (both hypotheses discharged): `equiv_in_g_limit(ceer_decls_fam(e),n,w,ε) ⟺ equiv_in_pred_presentation(
 p_infty(ceer_decls_fam(e)), emb_n(w), ε)`. Required adding the `miller_collapse*` + `pred_to_finite` cone
-to the export root `src/ceer_lib.rs` and rebuilding `export/`. *(Group-theory side 22/0 confirmed;
-computability side pending the export rebuild + module verify this session.)*
+to the export root `src/ceer_lib.rs` and rebuilding `export/` (2672 verified, 2 errors = the documented
+baseline lake-spawn div lemmas). **VERIFIED: group-theory `miller_collapse_limit` 22/0; computability
+`ceer_layer05` 7/0, full computability crate 255/0 (no regression). No assume/admit/external_body.**
 
 ### 14.4 NEXT — item-3b (part 2): the machine-gated relator-set match (NOT this session)
 Identify `p_infty(ceer_decls_fam(e)).relators` (= `⋃_M D̄_M`, the collapsed relators `{u_a·u_b⁻¹}` over the

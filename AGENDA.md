@@ -909,8 +909,9 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 >   already proven — + `dbar_family_monotone`) are discharged, instantiating the **item-3a iff at the
 >   concrete CEER family**: `equiv_in_g_limit(ceer_decls_fam(e),…) ⟺ equiv_in_pred_presentation(
 >   p_infty(ceer_decls_fam(e)), emb_n(w), ε)`. Needed adding the `miller_collapse*`+`pred_to_finite` cone
->   to the export root `src/ceer_lib.rs` + rebuilding `export/`. *(Verification: group-theory side 22/0
->   confirmed; computability side pending the export rebuild this session.)*
+>   to the export root `src/ceer_lib.rs` + rebuilding `export/` (now 2672 verified, 2 errors = the
+>   documented baseline lake-spawn div lemmas). **VERIFIED: group-theory `miller_collapse_limit` 22/0;
+>   computability `ceer_layer05` 7/0. No assume/admit/external_body. Both committed.**
 > - **NEXT = item-3b (part 2), the load-bearing machine-gated piece — NOT this session.** Identify
 >   `p_infty(ceer_decls_fam(e)).relators` (collapsed relators `{u_a·u_b⁻¹}` over the **{a,t} 2-gen
 >   alphabet**) with `is_S_canonical(mm,n,m)` (c-block words `w_α(c)` over the **Higman tower gens**) —
