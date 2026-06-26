@@ -48,6 +48,11 @@ pub mod pred_amalgamated_free_product;
 #[cfg(verus_keep_ghost)]
 pub mod pred_homomorphism;
 
+// pred_relabel: GAP-1 item-3b brick B3 — the generic pred→pred relabel-iso lift (two mutually-inverse
+// block-shift homomorphisms ⟹ word-problem transports both ways). Machine-free; consumed by B2.
+#[cfg(verus_keep_ghost)]
+pub mod pred_relabel;
+
 // FORK-A brick 6: predicate-base free-product injectivity (analog of
 // normal_form_free_product.rs) via retraction homomorphisms (FA-5). The first
 // real normal-form result over a predicate base. Reversible, zero regression.
