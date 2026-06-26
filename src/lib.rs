@@ -471,3 +471,9 @@ pub mod cohen_cs6;
 // (pure-c w trivial in finite h3_pres ⟹ trivial in c_pred), via the easy finite→predicate relator
 // inclusion (lemma_pred_equiv_from_finite) ∘ lemma_C_faithful. docs/cohen-section1-assembly-plan.md §5.
 pub mod cohen_cs7;
+
+// cohen_bridge: the machine bridge §3.3a. Instantiates the abstract Layer-2 relator predicate is_S to
+// its CANONICAL value S = { w_α(c) : (α,0)∈H₀(M) } (Cohen's word-numbering, book p.279) and discharges
+// s_relators_valid + s_realizes, yielding the CONCRETE faithfulness lemma_C_faithful_printable_canonical
+// (C↪H₃ explicit for the machine set H₀(M)). docs/machine-bridge-and-infinite-gen-plan.md §A.
+pub mod cohen_bridge;
