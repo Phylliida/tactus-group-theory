@@ -777,3 +777,53 @@ genuinely different word spaces, so this is the GAP-1 §3.4 reconciliation flagg
 undesigned decision" (§8.4 / the GATE DESIGN MAP) — it requires GAP-2's concrete `mm` and a co-designed
 bridge (Miller collapse ∘ word-numbering). With it, `lemma_ceer_limit_commutation` + the §10 GAP-3 span +
 Layer-2 faithfulness assemble to delete `axiom_ceer_fp_embedding`.
+
+---
+
+## 15. GAP-1 item-3b DONE (conditional on GAP-2) — the relator-set match + full chain (2026-06-26)
+
+*Co-designed with Danielle (port 8051): the load-bearing §3.4 reconciliation splits into THREE
+machine-INDEPENDENT bricks, with the one machine fact (`H₀` realizes the family relators, = GAP-2)
+isolated as a `requires` hypothesis (a sound conditional — no verifier escape hatches; Route C). She
+gave an explicit go on the decomposition and on the sharpened realizes-contract. All verified, additive.*
+
+**The key realization** (turns the "different word spaces" worry into a definition): `w_c(c_base,n,m,·)`
+*enumerates ALL words* over the 2n-letter c-block alphabet `{c₁,…,cₙ}^±` via α's base-m digits. So for
+`n=2` (Miller's collapsed `⟨a,t⟩`, alphabet `{c₁,c₂}^±` = digits 1..4) the word-numbering is a
+**surjection onto c-block words**, with an explicit section `decode_word`. Then the GAP-2 encoding
+`enc(a,b) := decode(ρ(u_a·u_b⁻¹))` makes Cohen's word-numbering bridge `w_{enc}(c) = ρ(collapsed relator)`
+hold **by construction** — the only residue is `H₀ ⟺ declared`, the deferred GAP-2.
+
+- **B1 — `word_numbering_decode.rs` (group-theory, 3/0):** `lemma_decode_section` — `decode_word` is a
+  section of `w_c` on c-block words (`numbers_word(decode w)` ∧ `w_c(decode w) = w`). Machine-free
+  combinatorics (the "vacuum-sealed" core).
+- **B3 — `pred_relabel.rs` (group-theory, 7/0):** `lemma_equiv_by_relabel` — a generic block-shift
+  relabeling `ρ:Gen(i)↦Gen(off+i)` matching p1/p2 relator sets both ways transports the word problem
+  (`v≡ε in p1 ⟺ ρ(v)≡ε in p2`), via two mutually-inverse pred-homs (§54). Refined so the correspondence
+  states `equiv(target, image, ε)` (not relator membership), which the empty no-op satisfies by
+  reflexivity. `+ lemma_relabel_image_c_alphabet` (ρ-image is a c-block word, bridging to B1).
+- **B2 — `ceer_relator_match.rs` (computability, 6/0):** `lemma_ceer_item3b` — under `ceer_realizes`,
+  `equiv_in_pred(p_infty(ceer_decls_fam(e)), v) ⟺ equiv_in_pred(c_pred(mm,2,m,is_S_canonical), ρ(v))`.
+  The machine content lives entirely in `ceer_realizes` (phrased over the *family relators*: `mm`'s
+  `H₀`, among nonzero word-numbers, is EXACTLY the `decode∘ρ`-images of the collapsed family relators).
+- **Assembly — `ceer_fp_conditional.rs` (computability, 2/0):** `lemma_ceer_word_problem_in_h3` — the
+  full chain `ceer_group_equiv(e,w,ε) ⟺ equiv_in_presentation(h3_pres(mm,2,m), ρ(collapse(ceer_to_word(w))), ε)`,
+  chaining L0.5 (`lemma_ceer_native_embeds_in_c_iff`) + item-3a (`lemma_ceer_limit_commutation`) + item-3b
+  (B2) + GAP-3 (`lemma_C_faithful/sound_printable_canonical`; `ρ(v)` is pure-c so `c_alphabet_word` =
+  `is_c_word`). **Every step machine-checked except `ceer_realizes`.**
+
+**The GAP-2-contract sharpening (Danielle-confirmed).** §13's `mm_realizes_declared` (a ⟺ at enc-images)
+is INSUFFICIENT for item-3b's backward direction: `is_S` accepts `w_c(α)` for *any* `α` with
+`numbers_word ∧ H₀`, but the `enc(a,b)` hit only the sparse word-numbers of the specific Miller words
+`{u_a·u_b⁻¹}` — so a junk `α∈H₀` would make `is_S` accept a non-relator. The fix is **exactness**: the
+realizes-hypothesis adds the BACKWARD clause `∀α. (numbers ∧ α≠0 ∧ H₀(α)) ⟹ α = enc(declared pair)` (=
+§3.4's bijection in directed form). The `α≠0` guard is forced — `mm_in_H0(mm,0,0)` is reflexively true
+under `mm_terminal` (k=0 reaches), while `enc` is never 0; the empty relator is an identity no-op handled
+separately (both relabel-homs map empty↦empty↦ε).
+
+**What remains = GAP-2 only.** `ceer_realizes(e, ceer_to_modmachine(e), m)` is the sole undischarged
+hypothesis — the Route-C-deferred register→modular reduction (`modular_reduction.rs`,
+`lemma_modmachine_realizes`). When a future co-designed GAP-2 session discharges it, `lemma_ceer_word_problem_in_h3`
+becomes the unconditional `(p = h3_pres, emb)` witness for `theorem_zfc_equiv_in_fp_group`, and
+`axiom_ceer_fp_embedding` is removed. **All of GAP-1 + GAP-3 is now machine-checked; the explicit Higman
+chain is complete modulo the one deferred machine reduction.**
