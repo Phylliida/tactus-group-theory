@@ -64,6 +64,10 @@ use crate::pred_presentation::{equiv_in_pred_presentation, pred_presentation_val
 use crate::pred_presentation_lemmas::lemma_pred_relator_is_identity;
 use crate::cohen_h2::{h2_pred, h2_pred_relator, s_relators_valid, s_realizes, lemma_h2_pred_valid};
 use crate::cohen_cs5::{k_a_col, k_b_col, family_II_bc_rhs, lemma_cs5_bc_config_trivial};
+use crate::h3_ii::{recog_data, family_II_assoc};
+use crate::h2::{p_assoc, td_word};
+use crate::f_free_a1::{betas, lemma_betas_index};
+use crate::machine_group::lemma_config_word_zero;
 
 verus! {
 
@@ -2157,6 +2161,146 @@ pub proof fn lemma_cs5_middle_h0_restrict(mm: ModMachine, n: nat, slice: Seq<nat
     lemma_word_valid_mono(cfg_rep, 3, ng1);
     lemma_free_subgroup_to_pres(bp, 3, config_emb(hf), cfg_rep);
     lemma_in_subgroup_respects_equiv(bp, config_emb(hf), cfg_rep, mid_w);
+}
+
+// ============================================================================
+// Brick A (3d) — the recog↔base_A_plus column correspondence.
+// `recog_data(alphas)` a-col = `compose_embeddings(a_col_machine, config_emb(betas))`,
+// b-col = `compose_embeddings(a_col_machine, assoc_rhs_emb(betas))`.  These are the
+// `recog_gens = compose(a_col_machine, base_A_plus cols)` hypotheses that C1
+// (`lemma_cs5_middle_reflect`) needs to reflect a recog-pinch middle to the base_A_plus columns.
+// Mirror of CS-4 `lemma_a_col_correspondence`/`lemma_b_col_correspondence` (with a_col_machine in
+// place of a_words_F, config_emb/assoc_rhs_emb over `betas` in place of the pa columns).
+// ============================================================================
+
+/// The machine-scheme b-column generating sequence: `assoc_rhs_machine(β)` for each `β` in `slice`.
+pub open spec fn assoc_rhs_emb(mm: ModMachine, n: nat, m: nat, slice: Seq<nat>) -> Seq<Word> {
+    Seq::new(slice.len(), |k: int| assoc_rhs_machine(mm, n, m, slice[k]))
+}
+
+/// `recog_data`'s a-column at index `k` (over `betas`) is `config(betas[k],0)`: head `k=0` is the
+/// `p_assoc` `[Gen0] = config(0,0)`; `k≥1` is the family-(II) `config(alphas[k-1],0)`.
+proof fn lemma_cs5_recog_acol_entry(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, k: int)
+    requires
+        0 <= k < betas(alphas).len(),
+    ensures
+        recog_data(mm, n, m, alphas).associations[k].0 =~= config_word(betas(alphas)[k], 0),
+{
+    let nk = g_m(mm).num_generators;
+    let bet = betas(alphas);
+    let rd = recog_data(mm, n, m, alphas);
+    lemma_betas_index(alphas);
+    let pa = p_assoc(nk, n);
+    let fa = family_II_assoc(mm, n, m, alphas);
+    assert(rd.associations =~= pa + fa);
+    assert(pa.len() == 1);
+    if k == 0 {
+        assert(bet[0] == 0);
+        assert(rd.associations[0] == pa[0]);
+        assert(pa[0].0 == seq![Symbol::Gen(0)]);
+        lemma_config_word_zero();                            // config(0,0) =~= [Gen0]
+    } else {
+        assert(bet[k] == alphas[k - 1]);
+        assert(rd.associations[k] == fa[k - 1]);
+        assert(fa[k - 1].0 == config_word(alphas[k - 1], 0));
+    }
+}
+
+/// `recog_data`'s b-column at index `k` (over `betas`) is `family_II_rhs(betas[k])`: head `k=0` is
+/// `td_word = family_II_rhs(0)`; `k≥1` is `family_II_rhs(alphas[k-1])`.
+proof fn lemma_cs5_recog_bcol_entry(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, k: int)
+    requires
+        2 * n < m,
+        0 <= k < betas(alphas).len(),
+    ensures
+        recog_data(mm, n, m, alphas).associations[k].1 =~= family_II_rhs(mm, n, m, betas(alphas)[k]),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let bet = betas(alphas);
+    let rd = recog_data(mm, n, m, alphas);
+    lemma_betas_index(alphas);
+    let pa = p_assoc(nk, n);
+    let fa = family_II_assoc(mm, n, m, alphas);
+    assert(rd.associations =~= pa + fa);
+    assert(pa.len() == 1);
+    if k == 0 {
+        assert(bet[0] == 0);
+        assert(rd.associations[0] == pa[0]);
+        assert(pa[0].1 == td_word(nk, n));
+        // family_II_rhs(0) =~= td_word:  config(0,0)=[Gen0], w_b(_,0)=ε.
+        lemma_config_word_zero();
+        assert(w_b(b_base(nk, n), n, m, 0) =~= empty_word());
+        assert(family_II_rhs(mm, n, m, 0)
+            =~= (seq![Symbol::Gen(0)] + empty_word()) + seq![Symbol::Gen(d_idx(nk, n))]);
+        assert(td_word(nk, n) == seq![Symbol::Gen(0), Symbol::Gen(d_idx(nk, n))]);
+    } else {
+        assert(bet[k] == alphas[k - 1]);
+        assert(rd.associations[k] == fa[k - 1]);
+        assert(fa[k - 1].1 == family_II_rhs(mm, n, m, alphas[k - 1]));
+    }
+}
+
+/// **Brick A (a-side):** `recog`'s a-column equals `compose_embeddings(a_col_machine, config_emb(betas))`.
+/// (Entry-wise: both are `config(betas[k],0)`, and `a_col_machine` fixes config — a machine word.)
+pub proof fn lemma_cs5_a_col_correspondence(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>)
+    ensures
+        Seq::new(recog_data(mm, n, m, alphas).associations.len(),
+                 |k: int| recog_data(mm, n, m, alphas).associations[k].0)
+        =~= compose_embeddings(a_col_machine(mm, n), config_emb(betas(alphas))),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let bet = betas(alphas);
+    let rd = recog_data(mm, n, m, alphas);
+    let rcol = Seq::new(rd.associations.len(), |k: int| rd.associations[k].0);
+    let comp = compose_embeddings(a_col_machine(mm, n), config_emb(bet));
+    lemma_betas_index(alphas);
+    assert(rd.associations.len() == bet.len());
+    assert(config_emb(bet).len() == bet.len());
+    assert(comp.len() == bet.len());
+    assert forall|k: int| 0 <= k < bet.len() implies rcol[k] =~= comp[k] by {
+        lemma_cs5_recog_acol_entry(mm, n, m, alphas, k);     // rcol[k] =~= config(bet[k],0)
+        assert(comp[k] == apply_embedding(a_col_machine(mm, n), config_emb(bet)[k]));
+        assert(config_emb(bet)[k] == config_word(bet[k], 0));
+        // a_col_machine fixes config(bet[k],0) (machine word over 3 ≤ nk).
+        lemma_config_word_valid(bet[k], 0);
+        lemma_word_valid_mono(config_word(bet[k], 0), 3, nk);
+        lemma_a_col_machine_fixes_machine_word(mm, n, config_word(bet[k], 0));
+    }
+}
+
+/// **Brick A (b-side):** `recog`'s b-column equals `compose_embeddings(a_col_machine, assoc_rhs_emb(betas))`.
+/// (Entry-wise: `recog`'s is `family_II_rhs(betas[k])`, `assoc_rhs_emb`'s is `assoc_rhs_machine(betas[k])`,
+/// and `a_col_machine` carries `assoc_rhs_machine ↦ family_II_rhs` — `lemma_a_col_machine_assoc_rhs`.)
+pub proof fn lemma_cs5_b_col_correspondence(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>)
+    requires
+        2 * n < m,
+        forall|i: int| 0 <= i < alphas.len() ==> numbers_word(n, m, #[trigger] alphas[i]),
+    ensures
+        Seq::new(recog_data(mm, n, m, alphas).associations.len(),
+                 |k: int| recog_data(mm, n, m, alphas).associations[k].1)
+        =~= compose_embeddings(a_col_machine(mm, n), assoc_rhs_emb(mm, n, m, betas(alphas))),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let bet = betas(alphas);
+    let rd = recog_data(mm, n, m, alphas);
+    let rcol = Seq::new(rd.associations.len(), |k: int| rd.associations[k].1);
+    let comp = compose_embeddings(a_col_machine(mm, n), assoc_rhs_emb(mm, n, m, bet));
+    lemma_betas_index(alphas);
+    assert(rd.associations.len() == bet.len());
+    assert(assoc_rhs_emb(mm, n, m, bet).len() == bet.len());
+    assert(comp.len() == bet.len());
+    assert forall|k: int| 0 <= k < bet.len() implies rcol[k] =~= comp[k] by {
+        lemma_cs5_recog_bcol_entry(mm, n, m, alphas, k);     // rcol[k] =~= family_II_rhs(bet[k])
+        assert(numbers_word(n, m, bet[k])) by {
+            if k == 0 { assert(bet[0] == 0); } else { assert(bet[k] == alphas[k - 1]); }
+        }
+        assert(comp[k] == apply_embedding(a_col_machine(mm, n), assoc_rhs_emb(mm, n, m, bet)[k]));
+        assert(assoc_rhs_emb(mm, n, m, bet)[k] == assoc_rhs_machine(mm, n, m, bet[k]));
+        lemma_a_col_machine_assoc_rhs(mm, n, m, bet[k]);     // → family_II_rhs(bet[k])
+    }
 }
 
 } // verus!
