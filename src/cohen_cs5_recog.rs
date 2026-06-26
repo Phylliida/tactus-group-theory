@@ -2303,4 +2303,136 @@ pub proof fn lemma_cs5_b_col_correspondence(mm: ModMachine, n: nat, m: nat, alph
     }
 }
 
+// ============================================================================
+// Brick C (3d) — the B-SIDE H₀-restriction `C2-b` (`lemma_cs5_middle_h0_restrict_b`).
+// `mid ∈ ⟨ublock_db_gens⟩ ∩ ⟨assoc_rhs_emb(slice)⟩ ⟹ mid ∈ ⟨assoc_rhs_emb(h0_filter(slice))⟩`.
+// Route (blueprint §7.3): pull a coord word `u` over the b-gens (`lemma_subgroup_to_k_word`); `π`
+// (d,b-kill, `db_projection`) maps the assoc product to the config product `cw = emb(config_emb,u)`
+// (`π∘assoc_rhs = config`); `cw ∈ ⟨g_subgens⟩` + a-side **C2** ⟹ `cw ∈ ⟨config_emb(h0_filter)⟩`;
+// `config_emb(slice)` FREE (over g_m) + the intersection property (`lemma_intersection_property`)
+// restrict `u` to the `h0_filter` positions `⟨h0_sel⟩`; carry `u` back through `assoc_rhs_emb`.
+// ============================================================================
+
+/// Generic: `apply_hom` distributes over a two-part concat (via the `apply_embedding` bridge).
+proof fn lemma_apply_hom_concat(h: HomomorphismData, a: Word, b: Word)
+    ensures
+        apply_hom(h, a + b) =~= concat(apply_hom(h, a), apply_hom(h, b)),
+{
+    let imgs = h.generator_images;
+    lemma_apply_hom_eq_emb(h, a + b);
+    lemma_apply_hom_eq_emb(h, a);
+    lemma_apply_hom_eq_emb(h, b);
+    lemma_apply_embedding_concat(imgs, a, b);
+}
+
+/// `π` kills a single `alphabet_letter(nk,n,d)` (1≤d≤2n) — its index is in the b-block `[nk,nk+n)`.
+proof fn lemma_db_proj_kills_alpha_letter(mm: ModMachine, n: nat, d: nat)
+    requires
+        1 <= d <= 2 * n,
+    ensures
+        apply_hom(db_projection(mm, n), seq![alphabet_letter(g_m(mm).num_generators, n, d)])
+            =~= empty_word(),
+{
+    let nk = g_m(mm).num_generators;
+    let pi = db_projection(mm, n);
+    if d <= n {
+        assert(alphabet_letter(nk, n, d) == Symbol::Gen((nk + d - 1) as nat));
+        lemma_db_proj_kills_high(mm, n, (nk + d - 1) as nat);     // index nk+d-1 ∈ [nk, nk+n)
+    } else {
+        let idx = (nk + (d - n) - 1) as nat;
+        assert(alphabet_letter(nk, n, d) == Symbol::Inv(idx));
+        let w: Word = seq![Symbol::Inv(idx)];
+        assert(w.len() == 1 && w.first() == Symbol::Inv(idx) && w.drop_first() =~= empty_word());
+        reveal_with_fuel(apply_hom, 2);
+        assert(apply_hom(pi, w.drop_first()) =~= empty_word());
+        assert(apply_hom_symbol(pi, w.first()) == inverse_word(pi.generator_images[idx as int]));
+        assert(pi.generator_images[idx as int] =~= empty_word());   // idx ≥ nk branch
+        assert(inverse_word(empty_word()) =~= empty_word());
+        lemma_concat_empty_right(inverse_word(pi.generator_images[idx as int]));
+    }
+}
+
+/// `π` kills `w_c(nk,n,m,γ)` entirely (every letter is an `alphabet_letter` in the b-block).
+proof fn lemma_db_proj_kills_wc(mm: ModMachine, n: nat, m: nat, gamma: nat)
+    requires
+        numbers_word(n, m, gamma),
+        2 * n < m,
+    ensures
+        apply_hom(db_projection(mm, n), w_c(g_m(mm).num_generators, n, m, gamma)) =~= empty_word(),
+    decreases gamma,
+{
+    let nk = g_m(mm).num_generators;
+    let pi = db_projection(mm, n);
+    if gamma == 0 || m <= 1 {
+        assert(w_c(nk, n, m, gamma) =~= empty_word());
+        assert(apply_hom(pi, empty_word()) =~= empty_word()) by { reveal_with_fuel(apply_hom, 1); }
+    } else {
+        let d = (gamma % m) as nat;
+        assert(1 <= d <= 2 * n);
+        assert(numbers_word(n, m, (gamma / m) as nat));
+        let pre = w_c(nk, n, m, (gamma / m) as nat);
+        let letter: Word = Seq::new(1, |_i: int| alphabet_letter(nk, n, d));
+        assert(w_c(nk, n, m, gamma) =~= pre + letter);
+        lemma_apply_hom_concat(pi, pre, letter);
+        lemma_db_proj_kills_wc(mm, n, m, (gamma / m) as nat);     // IH: π(pre) = ε
+        assert(letter =~= seq![alphabet_letter(nk, n, d)]);
+        lemma_db_proj_kills_alpha_letter(mm, n, d);              // π(letter) = ε
+        assert(concat(empty_word(), empty_word()) =~= empty_word());
+    }
+}
+
+/// **`π` carries `assoc_rhs_machine(β) ↦ config(β,0)`**: `π` fixes the config (machine word), and
+/// kills `w_b(nk,…)` (b-block) and the machine-d `Gen(nk+n)`.
+pub proof fn lemma_db_proj_assoc_rhs(mm: ModMachine, n: nat, m: nat, beta: nat)
+    requires
+        numbers_word(n, m, beta),
+        2 * n < m,
+    ensures
+        apply_hom(db_projection(mm, n), assoc_rhs_machine(mm, n, m, beta)) =~= config_word(beta, 0),
+{
+    let nk = g_m(mm).num_generators;
+    lemma_g_m_num_generators(mm);
+    let pi = db_projection(mm, n);
+    let cfg = config_word(beta, 0);
+    let wb = w_b(nk, n, m, beta);
+    let dw: Word = seq![Symbol::Gen((nk + n) as nat)];
+    assert(assoc_rhs_machine(mm, n, m, beta) =~= (cfg + wb) + dw);
+    lemma_apply_hom_concat(pi, cfg + wb, dw);
+    lemma_apply_hom_concat(pi, cfg, wb);
+    // π fixes config (machine word over 3 ≤ nk).
+    lemma_db_proj_fixes_config(mm, n, beta);
+    // π kills w_b = w_c.
+    lemma_db_proj_kills_wc(mm, n, m, beta);
+    // π kills machine-d.
+    lemma_db_proj_kills_high(mm, n, (nk + n) as nat);
+    assert(apply_hom(pi, dw) =~= empty_word());
+    assert(concat(cfg, empty_word()) =~= cfg) by { lemma_concat_empty_right(cfg); }
+    assert(concat(cfg, empty_word()) =~= apply_hom(pi, cfg + wb));
+    assert(concat(apply_hom(pi, cfg + wb), empty_word()) =~= apply_hom(pi, cfg + wb)) by {
+        lemma_concat_empty_right(apply_hom(pi, cfg + wb));
+    }
+}
+
+/// **`comp_images(π, assoc_rhs_emb(slice)) = config_emb(slice)`** (entry-wise `lemma_db_proj_assoc_rhs`).
+pub proof fn lemma_comp_pi_assoc_is_config(mm: ModMachine, n: nat, m: nat, slice: Seq<nat>)
+    requires
+        2 * n < m,
+        forall|i: int| 0 <= i < slice.len() ==> numbers_word(n, m, #[trigger] slice[i]),
+    ensures
+        comp_images(db_projection(mm, n), assoc_rhs_emb(mm, n, m, slice)) =~= config_emb(slice),
+{
+    let pi = db_projection(mm, n);
+    let ae = assoc_rhs_emb(mm, n, m, slice);
+    let comp = comp_images(pi, ae);
+    let ce = config_emb(slice);
+    assert(comp.len() == ae.len() == slice.len());
+    assert(ce.len() == slice.len());
+    assert forall|i: int| 0 <= i < slice.len() implies comp[i] =~= ce[i] by {
+        assert(comp[i] == apply_hom(pi, ae[i]));
+        assert(ae[i] == assoc_rhs_machine(mm, n, m, slice[i]));
+        lemma_db_proj_assoc_rhs(mm, n, m, slice[i]);
+        assert(ce[i] == config_word(slice[i], 0));
+    }
+}
+
 } // verus!
