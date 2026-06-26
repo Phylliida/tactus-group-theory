@@ -67,13 +67,35 @@ full-crate composition but exceeded it in the smaller export composition; fixed 
 - `lemma_ceer_c0_embeds_in_c_iff`: consumes `lemma_c0_embeds_in_c_iff` for the concrete family —
   `equiv_in_g_limit ⟺ equiv_in_c0_limit` over `ceer_decls_fam(e)`.
 
-## What remains (the §3.3 bridge, a separate larger arc)
+## Step (ii) — the native bridge — DONE (`ceer_layer05_bridge.rs`, 41/0)
 
-The concrete instantiation above is the literal AGENDA task #5. NOT yet done: connect the
-group-theory `equiv_in_c0_limit(ceer_decls_fam(e), …)` to the CEER group's **native**
-`ceer_group_equiv(e, …)` (a derivation-translation: `CeerGroupStep ↔ DerivationStep`, picking a level
-`M > all generator indices + stages` in the finite CEER derivation). With
-`ceer_group_backward::lemma_ceer_equiv_iff_group_equiv` (`ceer_equiv ⟺ ceer_group_equiv`) this would
-land the embedding in the form `ceer_equiv ⟺ equiv_in_presentation` that `is_ceer_fp_embedding`
-wants — one rung toward eventually replacing `axiom_ceer_fp_embedding` (`ceer_benign.rs`). That, plus
-the finite Layer-2 `C ↪ H₃`, is the remaining pipeline assembly.
+Connects the group-theory `equiv_in_g_limit(ceer_decls_fam(e), …)` to the CEER group's **native**
+`ceer_group_equiv(e, …)` by translating `CeerGroupStep ↔ DerivationStep` at a finite slice level `M`
+(picked past every generator index + stage in the finite derivation; relator index = stage,
+`inverted` = whether `declared_pair` is stored as `(b,a)`). Both directions —
+`lemma_ceer_group_equiv_implies_c0_limit` (forward) + `lemma_c0_limit_implies_ceer_group_equiv`
+(backward, with inert empty-relator steps lifting to zero CEER steps) — assembled into
+**`lemma_ceer_native_embeds_in_c_iff`**: `ceer_group_equiv(e,w,ε) ⟺ equiv_in_g_limit(…)`. With
+`ceer_group_backward::lemma_ceer_equiv_iff_group_equiv` this lands `ceer_equiv ⟺ equiv_in_g_limit` —
+the `is_ceer_fp_embedding` shape, but over the **direct-limit** `C`.
+
+## What remains — the Layer-2 cross-crate arc (CO-DESIGN GATED, a fresh major piece)
+
+To actually remove `axiom_ceer_fp_embedding` (`ceer_benign.rs`) we need a SINGLE printable f.p.
+presentation, i.e. collapse the direct-limit `C` to the finite Higman group `H₃`. Layer 2 already
+proves this faithfully in group-theory: `cohen_cs7::lemma_C_faithful_printable` /
+`cohen_bridge::lemma_C_faithful_printable_canonical`. But a feasibility scan (2026-06-26) shows this
+is **not** a quick wiring step:
+- `lemma_C_faithful_printable` is **not** in the `cohen_layer05` export cone — it lives in the
+  Higman-tower + predicate-presentation cone (`h3_pres`, `c_pred`, `equiv_in_pred_presentation`,
+  `s_realizes`, `ModMachine`, `cohen_cs6/cs7/bridge`, `higman_completeness`, …). Wiring it needs a
+  **second, larger export-surface extension** (with its own possible exec-layer snags).
+- The mathematical bridge is the **§3.3 machine reduction**: tie the Miller direct-limit `C` (relator
+  set `S = D̄`) to Cohen's `C = ⟨c;S⟩` with `is_S = {w_α(c) : (α,0)∈H₀(M)}`, matching the CEER
+  `decls_fam` to the machine set `s_realizes`. The AGENDA + `machine-bridge-and-infinite-gen-plan.md`
+  flag this as **co-design-gated (a foundational decision, "NOT taken solo")** — the sequential
+  successor to Layer 0.5, not a mechanical finish. Do not start it without Danielle's design go.
+
+Also outstanding (unrelated): `tactus-computability-theory/src/formula.rs::lemma_encode_ge_cost_inner`
+fails "postcondition not satisfied" deterministically (toolchain drift, was stale-cache-masked;
+computability gate 208/1). A deep recursive-arithmetic proof, not part of Layer 0.5.
