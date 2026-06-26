@@ -470,3 +470,70 @@ recurse) → assemble `(★k)` forward → glue backward → CS-5d tower lift.
 - Reusable general lemmas now available in `cohen_cs5_recog.rs`: `lemma_hom_maps_subgroup`,
   `lemma_in_subgroup_gens_in_core`, `lemma_concat_all_in_subgroup`, `lemma_factors_concat_valid`,
   `lemma_g_m_base_faithful_2word`, `lemma_free_subgroup_to_pres`.
+
+---
+
+## 7.3 — ⚠ 3d DESIGN LOCKED (2026-06-25, session 28) — segment invariant + the b-side coordinate survival.
+
+Two genuine gaps in the §7 sketch were found and resolved (companion-confirmed on the invariant;
+b-side derived + cross-checked here). **Build 3d to THIS design.**
+
+### (1) The invariant: a SEGMENT-WISE invariant, not §7's "subgroup ⟨g_subgens,d,b,p⟩".
+§7's "the stable-free middle of `wm` (∈⟨g_subgens,d,b,p⟩ as a subgroup) is ∈⟨g_subgens,d,b⟩" is a
+**category error** (a subword of a subgroup element need not be a subgroup element) AND **circular**
+("a stable-free factor of a ⟨g_subgens,d,b,p⟩-element is in ⟨g_subgens,d,b⟩" = Britton's lemma for
+the sub-HNN = A₊ itself — exactly what we're proving). The rigorous replacement tracks a property of
+the **word representative** (combinatorial), not group membership:
+
+> **INVARIANT(wm)** (segment-wise): *every maximal stable-free run* `wm[a..b]` (bounded by `p^±`
+> letters or the word ends, with no `p^±` strictly inside) is `∈ ⟨ublock_db_gens⟩` (= ⟨g_subgens,d,b⟩)
+> over `base_A_plus_base`.
+
+- **Base case** `wm = relabel(w) = emb(relabel_col, w)`: literally over `relabel_col = [g_subgens,d,b,p]`,
+  so each stable-free run is literally over `{g_subgens,d,b}` ⟹ ∈⟨ublock_db_gens⟩ (near-free, each
+  letter is a generator). NOT a group fact — a spelling fact.
+- **Preservation** under pinch-out `wshort = pre + φ(g) + suf` (removing `p^∓ g p^±` at `i,j`): the
+  only NEW run is the merged `(last run of pre) · φ(g) · (first run of suf)`. The pre/suf runs are
+  maximal stable-free runs of `wm` (bounded by the removed `p`'s) ⟹ ∈⟨ublock_db_gens⟩ by IH; `φ(g)` =
+  the opposite association column `config(β,0)·w_β(b)·d` with `β∈H₀` ⟹ `config(β,0)∈⟨g_subgens⟩`
+  (`lemma_theorem1`) ⟹ `φ(g)∈⟨g_subgens,d,b⟩`; product of three subgroup elements ∈ subgroup. ✓ All
+  other runs of `wshort` are runs of `pre`/`suf` ⟹ runs of `wm` ⟹ ∈ by IH.
+- **Use at the pinch middle**: the middle `g = wm[i+1..j]` IS a maximal stable-free run (bounded by
+  `p` at `i,j`) ⟹ ∈⟨ublock_db_gens⟩ directly — feeds C2's `∈⟨g_subgens,d,b⟩` hypothesis with NO
+  circularity (we use the *reduction-sequence construction*, not the equivalence `w≡_{A₊}ε`).
+
+*Not circular because we never use `w ≡_{A₊} ε` to prove `g∈B`; we maintain `g∈B` through the
+combinatorial reduction sequence.* (Companion-confirmed, session 28.)
+
+### (2) The B-SIDE (`p·g·p⁻¹` pinch, middle ∈⟨b-gens⟩=⟨assoc_rhs⟩) needs its OWN restriction (C2-b).
+`lemma_pd_pinch_out` handles both orientations; the descent must therefore H₀-restrict BOTH the
+a-side middle (∈⟨config_emb(slice)⟩, handled by **C2** = `lemma_cs5_middle_h0_restrict`, DONE) AND the
+b-side middle (∈⟨assoc_rhs_emb(slice)⟩, where `assoc_rhs_machine(β)=config(β,0)·w_β(b)·d`). C2's
+coordinate survival is **config-only**; the b-side is a genuine sibling lemma **C2-b**:
+
+> **C2-b**: `mid ∈ ⟨ublock_db_gens⟩ ∩ ⟨assoc_rhs_emb(slice)⟩ ⟹ mid ∈ ⟨assoc_rhs_emb(h0_filter(slice))⟩`.
+
+The b-orientation MUST occur (both `p`-orientations arise; pinch-out only removes `p`'s, never adds),
+and `base_A_plus_data` MUST be H₀-restricted (the step-4 von-Dyck `lemma_cs5_vondyck_hnn_relator`
+needs `(β,0)∈H₀` for `s_realizes`'s `w_β(c)≡ε`) — so C2-b is unavoidable. **Mechanism** (the
+companion's naive "π-reduction lift-back" is INCOMPLETE — it needs freeness, supplied here):
+1. `mid ∈ ⟨assoc_rhs_emb(slice)⟩` ⟹ a witness reduced word over the FREE family `{assoc_rhs(β)}`
+   (`= {t_β w_β(b) d}`, Cohen's free basis — **already proven**: `free_basis::basis_eltf` /
+   `lemma_basis_elt_free`, modulo a machine-scheme `nk`-vs-`nk+n` relabel of the layout).
+2. `π` (d,b-kill, `db_projection`, DONE) maps it to `π(mid) = Π config(β_i)^{ε_i}` over `g_m`, and
+   `mid∈⟨ublock_db_gens⟩ ⟹ π(mid)∈⟨g_subgens⟩`. Apply **C2** (a-side): `π(mid)∈⟨config_emb(h0_filter)⟩`.
+3. **Lift back via FREENESS**: `config_emb` is a free family (`lemma_config_emb_free_in_free`), so the
+   reduced config indices of `π(mid)` are unique and `∈ ⟨config:H₀⟩ ⟹ all reduced β_i∈H₀` (free-basis
+   subset survival — `lemma_tfree_coord_restrict`-style on the config canon). `π` carries the
+   assoc_rhs reduced word's indices to those config indices bijectively (it kills only the d,b tail,
+   doesn't merge config syllables — they're free-product g_m-syllables separated by the `d`'s) ⟹ the
+   assoc_rhs witness indices are H₀ ⟹ `mid ∈ ⟨assoc_rhs_emb(h0_filter(slice))⟩`. ∎
+
+This is a real brick (assoc_rhs free family at machine scheme + the π index correspondence), NOT a
+one-line corollary, but it REUSES the a-side C2 + config coordinate survival.
+
+### Brick order (bottom-up, each verifies & commits): A (recog↔base_A_plus col correspondence, mirror
+`lemma_a_col_correspondence`, `assoc_rhs_emb`) → B (gen-set ordering bridge, `lemma_in_subgroup_gens_superset`)
+→ C (C2-b, the b-side) → D (segment invariant + preservation) → E (machine-scheme `lemma_map_a_pinch_descends`
+analog, threading INV; per-orientation C1+C2 / C1+C2-b) → F (the `decreases stable_count` induction +
+compactness wiring + (★k)-forward glue + CS-5d tower lift).
