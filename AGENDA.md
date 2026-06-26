@@ -881,6 +881,24 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 
 ### 3.3 — The ZFC bridge + instantiation
 
+> **✅ GAP-3 SOUNDNESS BUILT + GAP-2 SOURCE READ 2026-06-26 (this session — BROKE the read-only-hold
+> cycle with verified, reversible, critical-path code).** `docs/final-gate-axiom-removal-plan.md` §10.
+> Two new bricks, gate 2645→2650/20 (+5 verified, baseline 20 errors unchanged, new modules 0 errors,
+> additive/reversible, no assume/admit/external_body): **(1)** `pred_to_finite.rs` 4/0 —
+> `lemma_pred_equiv_lifts_to_finite`, the GENERIC soundness transport (a `PredPresentation`-equivalence
+> lifts to a finite `Presentation`-equivalence when `cp.num_gens ≤ fp.num_gens`, `presentation_valid(fp)`,
+> and every `cp`-relator is a valid `fp`-word trivial in `fp`; step-by-step derivation lift, machine-free).
+> **(2)** `cohen_bridge.rs::lemma_C_sound_printable_canonical` (cohen_bridge 5/0) — instantiates it at
+> `cp=c_pred`, `fp=h3_pres`, discharging the relator hypothesis via Layer-2 soundness `lemma_III`. **With
+> `lemma_C_faithful_printable_canonical` (faithfulness, HAVE) this is the FULL `equiv_in_pred_presentation
+> (c_pred,w,ε) ⟺ equiv(h3_pres,w,ε)` — the entire GAP-3 connective math (c_pred↔h3_pres span) is
+> machine-checked.** GAP-3 now needs only the *assembly* after GAP-1/GAP-2. **GAP-2 PRIMARY SOURCE READ**
+> (Aanderaa–Cohen "Modular machines I", `pymupdf`, the §8.6 deferred ask): modular-machine def + Turing→
+> modular (Thm 2) + the register→TM→modular route recorded faithfully (gate doc §10.2). The companion
+> confirmed GAP-1's `emb_M` can be **parametric** over the encoding ⟹ GAP-1/GAP-2 decouple. GAP-1
+> (Miller substitute-and-collapse) + GAP-2 (register→modular reduction, "where reinvention is most
+> dangerous") remain the two large textbook-gated builds — NOT started; design pinned for a focused session.
+>
 > **🗺 GATE DESIGN MAP 2026-06-26 — `docs/final-gate-axiom-removal-plan.md` (review-only session, NO
 > code).** Baseline re-verified green (computability `250/0`; group-theory export validated). Pinned
 > the exact axiom-removal chain with *verified* endpoint signatures: Layer-0.5

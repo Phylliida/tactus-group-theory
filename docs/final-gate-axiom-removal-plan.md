@@ -430,3 +430,71 @@ all banked and verified). What remains genuinely open for Danielle collapses to:
 **Still gated:** the §9.2 build is co-design-gated per the standing rule — this audit only *de-risks
 and bounds* it; it does not start it. GAP-2 (§4/§6.2) is untouched and remains the separate, later,
 textbook-gated reduction. *Do not start the §9.2 build without Danielle's effort-go.*
+
+---
+
+## 10. GAP-2 primary-source read (2026-06-26, this session) + GAP-3 SOUNDNESS BUILT
+
+*This session broke the read-only-hold cycle with two verified, reversible, critical-path bricks
+(GAP-3, below) and then read the Aanderaa–Cohen primary source for GAP-2 (gate doc §8.6's deferred
+ask). No GAP-1/GAP-2 implementation started; GAP-2 design pinned against the paper, not re-derived.*
+
+### 10.1 GAP-3 SOUNDNESS — BUILT THIS SESSION (both halves now exist)
+The §5 soundness obligation `equiv_in_pred_presentation(c_pred,w,ε) ⟹ equiv(h3_pres,w,ε)` is DONE:
+- **`pred_to_finite.rs` (4/0)** — generic transport `lemma_pred_equiv_lifts_to_finite`: for any
+  `PredPresentation cp`, `Presentation fp` with `cp.num_generators ≤ fp.num_generators`,
+  `presentation_valid(fp)`, and every `cp`-relator a valid `fp`-word trivial in `fp`,
+  `cp`-equivalence ⟹ `fp`-equivalence. Step-by-step derivation lift: Free* steps map to the identical
+  finite step (`symbol_valid` monotone in `num_generators`); Relator* steps splice/unsplice a trivial
+  word, each produced FORWARD so only relators (not intermediate words) need validity. Machine-free.
+- **`cohen_bridge.rs::lemma_C_sound_printable_canonical` (cohen_bridge 5/0)** — instantiates the
+  above at `cp = c_pred(mm,n,m,is_S_canonical)`, `fp = h3_pres(mm,n,m)`. Gen-count inclusion
+  `h2_num_gens(nk,n)=nk+2n+2 ≤ nk+4n+3=h3_num_gens(nk,n)`; `presentation_valid` via
+  `lemma_h3_pres_valid`; the per-relator hypothesis discharged by Layer-2 soundness `lemma_III`
+  (`(α,0)∈H₀ ⟹ w_α(c)≡1 in h3_pres`) + `lemma_c_word_valid`/`lemma_word_valid_mono`.
+- **Net:** with `lemma_C_faithful_printable_canonical` (faithfulness, HAVE) this is the FULL
+  `equiv_in_pred_presentation(c_pred,w,ε) ⟺ equiv(h3_pres,w,ε)` — the entire `c_pred ↔ h3_pres`
+  span of the §2 chain (the GAP-3 connective math) is now machine-checked. Gate 2650/20 (+5 verified,
+  baseline 20 errors unchanged; new modules contribute 0 errors). Additive, reversible.
+- **What GAP-3 still needs (after GAP-1/GAP-2):** only the *assembly* — chain `equiv_in_g_limit ⟺
+  c_pred` (GAP-1) onto this span, supply `mm` (GAP-2), produce `(p,emb)`, delete the axiom (§5 tail).
+
+### 10.2 GAP-2 — Aanderaa–Cohen "Modular machines I", read verbatim (`pymupdf`, 16 pp.)
+The modular-machine construction and the Turing→modular reduction (Theorem 2), recorded faithfully so
+the GAP-2 build starts from the source. **The repo's `ModMachine`/`mm_in_H0` already ARE this object**
+(Layer 1 is built on it — `machine_group.rs:145–195`, matching `docs/aanderaa-cohen-construction.md`).
+
+- **Modular machine** (p.3): `m>1`, `0<n<m`, quadruples `(a,b,c,R)` and `(a,b,c,L)`, `0≤a,b<m`,
+  `0≤c<m²`, ≤1 quadruple per `(a,b)`. Config `(α,β)∈ℕ²`; write `α=um+a`, `β=vm+b` (`0≤a,b<m`).
+  Terminal iff no quadruple begins `(a,b)`. Else `(a,b,c,R)`: `(α,β)→(um²+c, v)`; `(a,b,c,L)`:
+  `(α,β)→(u, vm²+c)`. `H₀(M) = ∅` if `(0,0)` not terminal, else `{(α,β):(α,β)→(0,0)}`. r.e.
+- **Turing → modular** (p.4): TM `T` alphabet `0..n`. For each quintuple `qaa'q'R` (or `L`), `M` gets
+  **two** quadruples `(a,q,a'm+q',R/L)` and `(q,a,a'm+q',R/L)`. The `m`-ary encoding of the two
+  tape-halves+state gives the `(α,β)↔C` correspondence; `M` simulates `T` step-for-step (terminal↔
+  terminal, `C→C'` ⟹ `(α,β)→(α',β')`). For any r.e. set `S` there is a `T` (halting on blank tape)
+  whose `H₀(M) = S` up to the encoding — the route to "realize a c.e. set as `H₀`".
+- **§3 simplification** (p.7): generically two pairs correspond to one TM config; a **special state
+  `q₀`** (no quintuple ends `q₀R`; the only ones ending `q₀L` are `q*aaq₀L`; none end `q*L`; take
+  `q* = m-1`) collapses to ONE pair/config and ONE quadruple/quintuple — needed to manage the `0`-as-
+  `a₀`-or-`q₀` ambiguity. **Theorem 2(i):** `T` with special `q₀` ⟹ `H₀(T)` and `H₀(M)` have the same
+  many-one degree (recursion `π:ℕ²→configs`, the `P*(T)` recursiveness argument pp.8–9).
+
+**GAP-2 route for the CEER enumerator (register machine, `ceer.rs`).** Paper p.4: "for any r.e. `S`
+there is a `T` such that `f_T` is the characteristic function of `S` … `T` constructed to simulate a
+single-register machine" (ref [18]). So the textbook chain is **register machine → Turing machine
+(blank-tape-halting) → modular machine**, giving `H₀(ceer_to_modmachine(e))` = the enumerated declared
+set. The §4.2 design sub-questions stand, now anchored:
+1. `enc:(a,b)↦α` must compose with `numbers_word`/`w_c` (digits `1≤d≤2n`) — couple to GAP-1's
+   word-numbering OR (companion-recommended, this session) keep `emb_M` *parametric* over `enc` so
+   GAP-1 and GAP-2 decouple.
+2. Target `declared_equiv` (one-step declared pairs), NOT `ceer_equiv` (transitive closure): Cohen's
+   `S` is the relators; the group takes `ncl(S)`. Paper supports this (`H₀` = reaches-origin = the
+   *generated* set; the machine realizes the generators). **Confirmed against the source.**
+3. The dovetailed enumerator-search "∃ stage s halting with output `(a,b)`" becomes "config drives to
+   origin" — the real content, **where reinvention is most dangerous** (§4.2). This is a multi-step
+   new-computability-theory build (register→TM→modular + the `H₀` correspondence proof) and warrants a
+   focused, design-pinned (likely co-designed) session; the simulation must follow the paper's
+   `m`-ary encoding + special-state machinery, not be re-derived.
+
+**Net:** GAP-2 source is now READ (not just located). The construction is pinned to the paper. The
+build itself remains the separate, later, textbook-gated reduction — *not* started this session.
