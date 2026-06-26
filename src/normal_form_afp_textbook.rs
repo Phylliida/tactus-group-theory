@@ -5865,6 +5865,10 @@ proof fn lemma_act_sym_preserves_canonical_g1(
 }
 
 ///  G₂ case of act_sym_preserves_canonical.
+//  rlimit raised explicitly: this proof passes at the default budget in the full-crate
+//  composition (src/lib.rs) but the smaller cross-crate export composition (src/ceer_lib.rs)
+//  shifts the Lean heartbeat budget enough to exceed it. Extra budget is monotone-safe.
+#[verifier::rlimit(400)]
 proof fn lemma_act_sym_preserves_canonical_g2(
     data: AmalgamatedData, s: Symbol, h: Word, syls: Seq<Syllable>,
 )
