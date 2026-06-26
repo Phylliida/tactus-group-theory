@@ -73,6 +73,15 @@
 #[cfg(verus_keep_ghost)] pub mod kp_pinch;
 #[cfg(verus_keep_ghost)] pub mod layout;
 #[cfg(verus_keep_ghost)] pub mod machine_group;
+// GAP-1 (final gate) Miller substitute-and-collapse cone — exported so the computability crate
+// can instantiate the limit-commutation iff (item-3a) at the concrete CEER family.
+#[cfg(verus_keep_ghost)] pub mod miller_collapse;
+#[cfg(verus_keep_ghost)] pub mod miller_collapse_assoc;
+#[cfg(verus_keep_ghost)] pub mod miller_collapse_eval;
+#[cfg(verus_keep_ghost)] pub mod miller_collapse_reln;
+#[cfg(verus_keep_ghost)] pub mod miller_collapse_preserve;
+#[cfg(verus_keep_ghost)] pub mod miller_collapse_inject;
+#[cfg(verus_keep_ghost)] pub mod miller_collapse_limit;
 #[cfg(verus_keep_ghost)] pub mod normal_form_afp_textbook;
 #[cfg(verus_keep_ghost)] pub mod normal_form_amalgamated;
 #[cfg(verus_keep_ghost)] pub mod normal_form_free_product;
@@ -94,6 +103,7 @@
 #[cfg(verus_keep_ghost)] pub mod pred_normal_form_amalgamated;
 #[cfg(verus_keep_ghost)] pub mod pred_presentation;
 #[cfg(verus_keep_ghost)] pub mod pred_presentation_lemmas;
+#[cfg(verus_keep_ghost)] pub mod pred_to_finite;
 #[cfg(verus_keep_ghost)] pub mod pred_tower;
 #[cfg(verus_keep_ghost)] pub mod presentation;
 #[cfg(verus_keep_ghost)] pub mod presentation_lemmas;

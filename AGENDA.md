@@ -881,6 +881,43 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 
 ### 3.3 — The ZFC bridge + instantiation
 
+> **✅ GAP-2 = ROUTE C (deferred) + GAP-1 ITEM-3a INSTANTIATED FOR THE CONCRETE CEER FAMILY
+> 2026-06-26 (this session, co-designed live w/ Danielle port 8051).** Read the AC paper + substrate
+> first (the durable "follow the textbook, don't reinvent" rule). **Finding:** `lemma_modmachine_realizes`
+> (GAP-2 proper) is not an encoding tweak — it requires building **Turing-completeness of modular
+> machines** (a deterministic `mm` started at `enc(a,b)` must itself dovetail-search the enumerator);
+> the faithful route is register→TM→modular, with register→TM deferred by the paper to ref [18] (not in
+> repo). **Danielle's call: do NOT build GAP-2-proper; take Route C** — leave `ceer_to_modmachine`/
+> `lemma_modmachine_realizes` as the documented obligation (`tactus-computability-theory/src/
+> modular_reduction.rs` skeleton), and complete the *machine-independent family theory* for item-3a,
+> with any machine-needing lemma made CONDITIONAL on a realizes-hypothesis (`requires … ensures …` — a
+> sound conditional, NOT assume/admit). **Built this session:**
+> - **The empty-relator fix (group-theory, `miller_collapse_limit.rs`, VERIFIED 22/0, committed).**
+>   Discovered the literal `dbar_family_monotone(ceer_decls_fam(e))` is **FALSE** for some `e`: the
+>   CEER family pads non-fitting stages with `empty_word()`, so the trivial relator can appear at one
+>   slice and vanish at a larger one (counterexample: enumerator 0→(2,0),1→(0,0),2→(1,1) — `empty ∈
+>   dbar(2)` but `∉ dbar(3)`). The genuine relators `u_a·u_b⁻¹` ARE slice-monotone. **Fix (A)+(B),
+>   Danielle-approved, contained (dbar_family_monotone used ONLY here, lemma_limit_commutation not yet
+>   wired):** (A) weaken `dbar_family_monotone` to quantify only over `r != empty_word()`; (B) strip the
+>   empty (no-op) relator steps from the backward derivation before slice extraction (`strip_empty_steps`
+>   + `lemma_empty_step_noop`/`_strip_preserves_produces`/`_strip_yields_nonempty`; `step_nonempty`/
+>   `derivation_nonempty` threaded through the four backward consumers).
+> - **`lemma_ceer_dbar_family_monotone(e)` + `lemma_ceer_limit_commutation(e,n,w)`
+>   (`tactus-computability-theory/src/ceer_layer05.rs`).** The weakened directedness is now TRUE &
+>   provable for the concrete CEER family (non-empty collapse images are slice-independent via
+>   `lemma_emb_slice_independent`); both `lemma_limit_commutation` hypotheses (`decls_family_valid` —
+>   already proven — + `dbar_family_monotone`) are discharged, instantiating the **item-3a iff at the
+>   concrete CEER family**: `equiv_in_g_limit(ceer_decls_fam(e),…) ⟺ equiv_in_pred_presentation(
+>   p_infty(ceer_decls_fam(e)), emb_n(w), ε)`. Needed adding the `miller_collapse*`+`pred_to_finite` cone
+>   to the export root `src/ceer_lib.rs` + rebuilding `export/`. *(Verification: group-theory side 22/0
+>   confirmed; computability side pending the export rebuild this session.)*
+> - **NEXT = item-3b (part 2), the load-bearing machine-gated piece — NOT this session.** Identify
+>   `p_infty(ceer_decls_fam(e)).relators` (collapsed relators `{u_a·u_b⁻¹}` over the **{a,t} 2-gen
+>   alphabet**) with `is_S_canonical(mm,n,m)` (c-block words `w_α(c)` over the **Higman tower gens**) —
+>   genuinely different word spaces, so this is the GAP-1 §3.4 reconciliation flagged "the load-bearing
+>   undesigned decision," and it needs GAP-2's concrete `mm`. Co-design-gated. Escape valve (Danielle):
+>   if it walls, the `dbar_family_monotone` family bricks (done) stand on their own.
+
 > **✅ GAP-1 §6.1 DECIDED + item-(2) `embedding_preserving` PROVEN 2026-06-26 (live with Danielle).**
 > `docs/final-gate-axiom-removal-plan.md` §12. The §6.1 packaging gate was crossed *with Danielle present*:
 > **(A) fresh `{a,t}`-Presentation** (`emb_M` at a=Gen(0),t=Gen(1)), **D̄_M = pushforward(decls)**. Built
