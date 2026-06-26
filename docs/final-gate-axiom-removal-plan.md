@@ -827,3 +827,53 @@ hypothesis — the Route-C-deferred register→modular reduction (`modular_reduc
 becomes the unconditional `(p = h3_pres, emb)` witness for `theorem_zfc_equiv_in_fp_group`, and
 `axiom_ceer_fp_embedding` is removed. **All of GAP-1 + GAP-3 is now machine-checked; the explicit Higman
 chain is complete modulo the one deferred machine reduction.**
+
+## 16. GAP-2 "clean half" BUILT — TM→modular simulation + full H₀ correspondence (2026-06-26)
+
+*Danielle opened the GAP-2-proper build (the Route-C-deferred register→modular reduction) — "the big
+one." Companion-confirmed route (port 8051): **register machine → TM → modular** (paper-faithful), with
+the **TM→modular half** (Aanderaa–Cohen Thm 2, the explicitly-specified "clean half") built first; the
+register→TM half (ref [18]) is the deferred dragon. Read the AC paper Thm 2 from the PDF **images**
+(`pymupdf` render), not the garbled OCR — the residue bookkeeping is the danger zone. Plan +
+brick-decomposition: `tactus-computability-theory/docs/gap2-register-modular-plan.md`.*
+
+**The key modeling choice:** represent a TM in **Minsky pair-arithmetic form** `(u, v, a, q)` — `u,v`
+the two half-tapes packed base `m`, `a` scanned, `q` state — so a TM step is *pure base-`m` arithmetic*,
+no `Seq` tape. Symbols (`0..n`) and states (`n+1..m-1`) share the residue space, which is the AC trick.
+Two pair-encodings `rep1=(um+a,vm+q)`, `rep2=(um+q,vm+a)`; an R-move lands on rep2 of the next config,
+an L-move on rep1 (they alternate). The decisive reuse: the exported, already-verified
+`machine_group::lemma_step_preserves_h0` reduces the whole H₀ correspondence to **one per-step
+simulation lemma**.
+
+**Built (all verified, no assume/admit/external_body, committed in `tactus-computability-theory`):**
+- **G2-A `tm.rs` (4/0)** — the TM formalism (`Tm`/`Quintuple`/`TmConfig`, `tm_step`, `tm_run`,
+  `tm_halts_at`, `tm_wf` with disjoint symbol/state ranges + determinism).
+- **G2-B `tm_modular.rs` construction (cumulative)** — `tm_to_modmachine` (2 quads per quintuple);
+  `lemma_tm_modmachine_wf` proves `mod_machine_wf` incl. **determinism** (disjoint sym/state ranges ⟹
+  first quad `(a,q)` and second quad `(q,a)` never collide + TM determinism).
+- **G2-C `tm_modular.rs` simulation (13/0)** — `rep1`/`rep2` + **`lemma_sim_step`**: both encodings of a
+  config yield (one modular step) the `sim_target` pair = the right rep of the next config. *The
+  arithmetic heart* — the "where reinvention is most dangerous" piece, machine-checked.
+- **G2-D forward `tm_h0.rs` (3/0)** — `lemma_mm_terminal_origin` ((0,0) terminal: every quad has a
+  residue ≥ n+1) + `lemma_rep_reaches_origin_h0` (TM reaches origin ⟹ `rep1(c) ∈ H₀`, chaining
+  `lemma_step_preserves_h0` along the run; no digit-invariant needed).
+- **G2-D backward `tm_h0_bwd.rs` (14/0)** — the `digits_le` tape digit-invariant + preservation;
+  `lemma_tm_terminal_to_mm_terminal` (wf TM-terminal ⟹ both reps modular-terminal); the backward
+  induction `lemma_mm_reaches_implies_tm` (determinism forces the modular run to track the TM trace);
+  and the packaged **`lemma_tm_h0_iff`**: `rep1(c) ∈ H₀(tm_to_modmachine(tm)) ⟺ TM reaches the origin
+  config from c`. **The full H₀ correspondence, both directions.**
+
+**What remains for GAP-2 (the deferred dragon):**
+- **G2-E — register → TM** (ref [18], NOT in repo, the genuine new formalism): `rm_to_tm(rm)` (registers
+  in unary on the tape, Inc/DecJump as quintuple gadgets) with `rm halts ⟺ tm reaches origin`; + the
+  dovetail **search RM** `search_rm(e)` (input `enc(a,b)`, halts ⟺ `declared_equiv(e,a,b)`, built with
+  the existing `multi_output_machine` RM-composition infra). Then `ceer_to_modmachine(e) :=
+  tm_to_modmachine(rm_to_tm(search_rm(e)))`.
+- **G2-F — wire `enc` to the word-numbering + discharge `ceer_realizes`** (the `decode∘ρ` packaging is
+  GAP-1's, already proven; only `enc = decode∘ρ(relator)` identification + the `lemma_tm_h0_iff`
+  application remain).
+
+**Net:** the AC Theorem-2 simulation — the textbook-specified, arithmetic-heavy core that the
+read-only-hold sessions feared — is now machine-checked and faithful. GAP-2 narrows to the
+register→TM reduction (G2-E) + the final `enc`/`ceer_realizes` wiring (G2-F). `ceer_realizes`
+remains a sound `requires`-hypothesis until G2-E/F land.
