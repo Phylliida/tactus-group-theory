@@ -450,3 +450,23 @@ both COMPLETE; `cohen_cs5_recog` GREEN at 56/0. NEXT = build **3d** (the `lemma_
 peel over `base_A_plus_data`, threading the §7 `⟨g_subgens,d,b,p⟩`-subgroup invariant; base case = step
 2 `lemma_cs5_base_case_faithful`, step case = 3b descent + 3c-C1/C2 at the pinch middle + pinch-out +
 recurse) → assemble `(★k)` forward → glue backward → CS-5d tower lift.
+
+**3d build notes (for the next session, from the 3c-C2 build):**
+- `lemma_pd_pinch_out` (`phi_l_pinch.rs:607`) is **generic over `HNNData`** — applies to
+  `base_A_plus_data` directly (the pinch-out step is free). `britton_lemma_full` is also generic.
+  The *bulk* of new work is the machine-scheme analog of `lemma_map_a_pinch_descends`
+  (`phi_l_pinch.rs:353`, ~250 lines): `a_col_machine` carries a `base_A_plus_data` pinch to a
+  `recog_data` pinch (reuse the 3b descent bridges `lemma_a_col_machine_assoc_rhs` etc., already built).
+- **Generating-set ordering — RESOLVE FIRST.** The §7 invariant subgroup is `⟨relabel_col⟩` and
+  `relabel_col(mm,n)` (`cohen_cs5_recog.rs:149`) is **literally** `[g_subgens, d, b-block, p]` — so the
+  invariant *base case* is `relabel(w)=apply_embedding(relabel_col,w) ∈ ⟨relabel_col⟩` via
+  `lemma_apply_embedding_in_subgroup` (trivial, no superset needed). BUT the pinch-middle that feeds
+  3c-C2 needs `⟨ublock_db_gens⟩`, and `ublock_db_gens` was defined with a *uniform tail* `[b-block, d]`
+  (order `[g_subgens, b, d]`) ≠ `relabel_col`-minus-p's `[g_subgens, d, b]`. They generate the SAME
+  subgroup but are different sequences. Either (a) bridge with `lemma_in_subgroup_gens_superset` (both
+  directions — they're permutations), or (b) re-define `ublock_db_gens` to match `relabel_col`'s order
+  `[g_subgens, d, b]` so the invariant's base part is literally `ublock_db_gens` (cleaner; touches only
+  the two `ublock_db_gens` index proofs in `lemma_cs5_project_to_gsubgens` — re-verify those).
+- Reusable general lemmas now available in `cohen_cs5_recog.rs`: `lemma_hom_maps_subgroup`,
+  `lemma_in_subgroup_gens_in_core`, `lemma_concat_all_in_subgroup`, `lemma_factors_concat_valid`,
+  `lemma_g_m_base_faithful_2word`, `lemma_free_subgroup_to_pres`.
