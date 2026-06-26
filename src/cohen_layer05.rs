@@ -636,7 +636,7 @@ pub proof fn lemma_miller_data_valid(n: nat, decls: Seq<Word>)
     lemma_acol_valid(n);
     lemma_bcol_valid(n);
     assert(data.associations.len() == n + 1);
-    assert forall|i: int| 0 <= i < data.associations.len() implies
+    assert forall|i: int| #![trigger data.associations[i]] 0 <= i < data.associations.len() implies
         word_valid(data.associations[i].0, data.base.num_generators)
         && word_valid(data.associations[i].1, data.base.num_generators) by {
         assert(data.associations[i].0 == a_col(n)[i]);
@@ -694,6 +694,69 @@ pub proof fn lemma_miller_faithfulness(n: nat, decls: Seq<Word>, w: Word)
     assert(presentation_valid(c0_slice(n, decls)));
     lemma_free_group_valid(2);
     lemma_free_product_injective_left(c0_slice(n, decls), free_group(2), w);
+}
+
+// ===========================================================================
+// 8. The direct-limit faithfulness `C₀ ↪ C` (Miller Thm 4.1, the meta-`∀w∃N` form).
+//
+// Following the textbook (companion-confirmed): represent the infinite Miller group `C` and the
+// countable `C₀` as the **direct limits** of their finite slices, rather than forcing either into a
+// single finite/2-generated presentation (which would pay the "Tietze tax" and break Layer 2's
+// c-block view). `decls_fam(N)` is the monotone family of declared `c`-relators visible at level `N`
+// (its concrete value is the bespoke CEER group's stage-`N` declared pairs — a separate cross-crate
+// instantiation; here it is abstract, parameterizing the result over ANY valid family).
+//
+//   equiv_in_c0_limit(fam, w₁, w₂) := ∃M.  w₁ ≡_{C₀^(M)} w₂
+//   equiv_in_g_limit (fam, w₁, w₂) := ∃M ≥ n.  w₁ ≡_{G^(M)} w₂   (witness ≥ the word's c-bound)
+//
+// **No nesting / no re-encoding needed.** A `c`-word `w` (over the `c`-block only) is insulated from
+// the `a/b/t` generators — and the substrate forces `t` to the top index regardless — so the two
+// limits can share the SAME witness `M`: `w ≡_{G^(M)} ε` ⟹ (per-slice faithfulness) `w ≡_{C₀^(M)} ε`.
+// That is the direct-limit embedding `C₀ ↪ C`, machine-checked.
+// ===========================================================================
+
+/// A valid declared-relator family: every level-`M` relator is a word over the `M` c-generators.
+pub open spec fn decls_family_valid(fam: spec_fn(nat) -> Seq<Word>) -> bool {
+    forall|big_m: nat, j: int| 0 <= j < fam(big_m).len()
+        ==> word_valid(#[trigger] fam(big_m)[j], big_m)
+}
+
+/// `w` is trivial in the countable `C₀` — i.e. in some finite slice `C₀^(M)`.
+pub open spec fn equiv_in_c0_limit(fam: spec_fn(nat) -> Seq<Word>, w1: Word, w2: Word) -> bool {
+    exists|big_m: nat| equiv_in_presentation(#[trigger] c0_slice(big_m, fam(big_m)), w1, w2)
+}
+
+/// `w` is trivial in the (countable) Miller group `C` — i.e. in some finite slice `G^(M)` whose
+/// `c`-block already contains all of `w`'s generators (`M ≥ n`).
+pub open spec fn equiv_in_g_limit(fam: spec_fn(nat) -> Seq<Word>, n: nat, w1: Word, w2: Word) -> bool {
+    exists|big_m: nat| n <= big_m
+        && equiv_in_presentation(#[trigger] hnn_presentation(miller_data(big_m, fam(big_m))), w1, w2)
+}
+
+/// **THE LAYER-0.5 EMBEDDING `C₀ ↪ C`.** For any valid declared-relator family and any `c`-word `w`
+/// (over `n` c-generators): if `w` is trivial in the direct limit `C` (some slice `G^(M)`, `M ≥ n`),
+/// then `w` is trivial in the countable `C₀`. The two limits share the witnessing slice `M`; the
+/// descent at that level is exactly `lemma_miller_faithfulness`. This is Miller Thm 4.1's faithful
+/// embedding, in direct-limit form — the headline of Layer 0.5 (modulo the CEER instantiation of
+/// `decls_fam`, a separate cross-crate step).
+pub proof fn lemma_c0_embeds_in_c(fam: spec_fn(nat) -> Seq<Word>, n: nat, w: Word)
+    requires
+        decls_family_valid(fam),
+        word_valid(w, n),
+        equiv_in_g_limit(fam, n, w, empty_word()),
+    ensures
+        equiv_in_c0_limit(fam, w, empty_word()),
+{
+    let big_m = choose|big_m: nat| n <= big_m
+        && equiv_in_presentation(#[trigger] hnn_presentation(miller_data(big_m, fam(big_m))), w, empty_word());
+    // the family is valid at level M, and w (a c-word over n) is valid over the M-slice c-block
+    assert(forall|j: int| 0 <= j < fam(big_m).len() ==> word_valid(#[trigger] fam(big_m)[j], big_m));
+    lemma_word_valid_mono(w, n, big_m);
+    // per-slice faithfulness at the shared witness M
+    lemma_miller_faithfulness(big_m, fam(big_m), w);
+    assert(equiv_in_presentation(c0_slice(big_m, fam(big_m)), w, empty_word()));
+    // witness M for the C₀ limit
+    assert(equiv_in_c0_limit(fam, w, empty_word()));
 }
 
 } // verus!
