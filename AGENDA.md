@@ -895,6 +895,18 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 > computability theory, textbook-gated). GAP 3 = assembly (faithfulness HAVE + soundness `lemma_III`
 > HAVE). Companion-model cross-checked. **Surfaced §6.1–6.2 for Danielle; NOT taken solo.**
 >
+> **🗺 GAP-1 INFRASTRUCTURE AUDIT 2026-06-26 (2nd session) — gate doc §9 (read-only, NO code).**
+> Baseline re-green (computability `250/0`; `tietze` module `10/0`). Audited the toolkit routing-(a)
+> (Miller's literal `cᵢ↦uᵢ(a,t)` substitute-and-collapse, the textbook choice per §8.5) would consume:
+> **it is mostly pre-paid** — Tietze T1/T3/T4 (`tietze.rs`, verified) + `apply_embedding` substitution
+> hom + **both** faithfulness specs `embedding_injective`/`embedding_preserving` (`benign.rs`, exercised
+> all over `cohen_cs4*`) + the banked `conj_family` free columns are all banked. The genuine new work
+> narrows to: (1) define `emb_M: cᵢ↦uᵢ(a,t)` uniformly per slice, (2) instantiate the two faithfulness
+> specs per slice (finite relators ⇒ `tietze.rs` applies directly, no PredPresentation port), (3) one
+> witness-preserving **limit-commutation** lemma (the sole new-math, companion-flagged risk). **Net:
+> §6.1 is no longer an undesigned architecture decision — it is a bounded EFFORT-go on the §9.2 build
+> (direction = textbook-forced (a); (b)=dragon). Companion-confirmed. Surfaced, NOT taken/started.**
+>
 > **✅ DESIGN PASS 2026-06-25 (session 32) — `docs/machine-bridge-and-infinite-gen-plan.md`.** The
 > dependency structure of the last two arcs is now mapped. Headline: the genuine critical path is
 > **Layer 0.5 first**, then §3.3-proper (Layer 0.5 produces the real `C`'s relator set `S`; §3.3 then
