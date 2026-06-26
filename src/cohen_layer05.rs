@@ -48,8 +48,10 @@ use crate::conj_free_core::lemma_conj_family_free;
 use crate::conj_free_b::{conj_family_b, conj_word_b, lemma_conj_family_b_free};
 use crate::cohen_layer05_probe::{c0_slice, l_slice, assoc_col0, assoc_col1,
     lemma_hnn_base_faithful_from_free_columns};
-use crate::hnn::{HNNData, hnn_data_valid, hnn_presentation};
+use crate::hnn::{HNNData, hnn_data_valid, hnn_presentation, lemma_base_embeds_in_hnn};
 use crate::normal_form_free_product::lemma_free_product_injective_left;
+use crate::free_product::free_product;
+use crate::britton_via_tower::lemma_left_embeds_in_fp;
 
 verus! {
 
@@ -721,9 +723,11 @@ pub open spec fn decls_family_valid(fam: spec_fn(nat) -> Seq<Word>) -> bool {
         ==> word_valid(#[trigger] fam(big_m)[j], big_m)
 }
 
-/// `w` is trivial in the countable `C₀` — i.e. in some finite slice `C₀^(M)`.
-pub open spec fn equiv_in_c0_limit(fam: spec_fn(nat) -> Seq<Word>, w1: Word, w2: Word) -> bool {
-    exists|big_m: nat| equiv_in_presentation(#[trigger] c0_slice(big_m, fam(big_m)), w1, w2)
+/// `w` is trivial in the countable `C₀` — i.e. in some finite slice `C₀^(M)` (`M ≥ n`, so the slice's
+/// `c`-block already contains all of the `c`-word `w`'s generators).
+pub open spec fn equiv_in_c0_limit(fam: spec_fn(nat) -> Seq<Word>, n: nat, w1: Word, w2: Word) -> bool {
+    exists|big_m: nat| n <= big_m
+        && equiv_in_presentation(#[trigger] c0_slice(big_m, fam(big_m)), w1, w2)
 }
 
 /// `w` is trivial in the (countable) Miller group `C` — i.e. in some finite slice `G^(M)` whose
@@ -733,19 +737,35 @@ pub open spec fn equiv_in_g_limit(fam: spec_fn(nat) -> Seq<Word>, n: nat, w1: Wo
         && equiv_in_presentation(#[trigger] hnn_presentation(miller_data(big_m, fam(big_m))), w1, w2)
 }
 
-/// **THE LAYER-0.5 EMBEDDING `C₀ ↪ C`.** For any valid declared-relator family and any `c`-word `w`
-/// (over `n` c-generators): if `w` is trivial in the direct limit `C` (some slice `G^(M)`, `M ≥ n`),
-/// then `w` is trivial in the countable `C₀`. The two limits share the witnessing slice `M`; the
-/// descent at that level is exactly `lemma_miller_faithfulness`. This is Miller Thm 4.1's faithful
-/// embedding, in direct-limit form — the headline of Layer 0.5 (modulo the CEER instantiation of
-/// `decls_fam`, a separate cross-crate step).
+/// **Per-slice soundness `C₀^(M) → G^(M)`.** A relation trivial in the slice `C₀^(M)` is trivial in
+/// `G^(M)` — the forward (well-definedness) half: `C₀ ↪ L` (free-product left inclusion) then `L ↪ G`
+/// (HNN base inclusion). No validity preconditions needed.
+proof fn lemma_c0_slice_embeds_in_g(n: nat, decls: Seq<Word>, w: Word)
+    requires
+        equiv_in_presentation(c0_slice(n, decls), w, empty_word()),
+    ensures
+        equiv_in_presentation(hnn_presentation(miller_data(n, decls)), w, empty_word()),
+{
+    // C₀^(M) ↪ L^(M) = free_product(C₀^(M), F₂)
+    lemma_left_embeds_in_fp(c0_slice(n, decls), free_group(2), w, empty_word());
+    assert(l_slice(n, decls) == free_product(c0_slice(n, decls), free_group(2)));
+    // L^(M) = base ↪ G^(M) = HNN(L^(M), t)
+    assert(miller_data(n, decls).base == l_slice(n, decls));
+    lemma_base_embeds_in_hnn(miller_data(n, decls), w, empty_word());
+}
+
+/// **THE LAYER-0.5 EMBEDDING `C₀ ↪ C` — FAITHFULNESS.** For any valid declared-relator family and any
+/// `c`-word `w` (over `n` c-generators): if `w` is trivial in the direct limit `C` (some slice
+/// `G^(M)`, `M ≥ n`), then `w` is trivial in the countable `C₀`. The two limits share the witnessing
+/// slice `M`; the descent at that level is exactly `lemma_miller_faithfulness`. This is the hard
+/// direction of Miller Thm 4.1's embedding, in direct-limit form.
 pub proof fn lemma_c0_embeds_in_c(fam: spec_fn(nat) -> Seq<Word>, n: nat, w: Word)
     requires
         decls_family_valid(fam),
         word_valid(w, n),
         equiv_in_g_limit(fam, n, w, empty_word()),
     ensures
-        equiv_in_c0_limit(fam, w, empty_word()),
+        equiv_in_c0_limit(fam, n, w, empty_word()),
 {
     let big_m = choose|big_m: nat| n <= big_m
         && equiv_in_presentation(#[trigger] hnn_presentation(miller_data(big_m, fam(big_m))), w, empty_word());
@@ -755,8 +775,42 @@ pub proof fn lemma_c0_embeds_in_c(fam: spec_fn(nat) -> Seq<Word>, n: nat, w: Wor
     // per-slice faithfulness at the shared witness M
     lemma_miller_faithfulness(big_m, fam(big_m), w);
     assert(equiv_in_presentation(c0_slice(big_m, fam(big_m)), w, empty_word()));
-    // witness M for the C₀ limit
-    assert(equiv_in_c0_limit(fam, w, empty_word()));
+    // witness M (≥ n) for the C₀ limit
+    assert(equiv_in_c0_limit(fam, n, w, empty_word()));
+}
+
+/// **THE LAYER-0.5 EMBEDDING `C₀ ↪ C` — SOUNDNESS (well-definedness).** The easy direction: a `c`-word
+/// trivial in `C₀` is trivial in `C` (same witnessing slice, forward inclusion `C₀^(M) → G^(M)`).
+pub proof fn lemma_c_contains_c0(fam: spec_fn(nat) -> Seq<Word>, n: nat, w: Word)
+    requires
+        equiv_in_c0_limit(fam, n, w, empty_word()),
+    ensures
+        equiv_in_g_limit(fam, n, w, empty_word()),
+{
+    let big_m = choose|big_m: nat| n <= big_m
+        && equiv_in_presentation(#[trigger] c0_slice(big_m, fam(big_m)), w, empty_word());
+    lemma_c0_slice_embeds_in_g(big_m, fam(big_m), w);
+    assert(equiv_in_g_limit(fam, n, w, empty_word()));
+}
+
+/// **`C₀ ↪ C` IS AN EMBEDDING (the iff).** For a `c`-word `w`, triviality in the direct limit `C` is
+/// EQUIVALENT to triviality in the countable `C₀`: `C`'s word problem (restricted to `c`-words)
+/// decides `C₀`'s, and the embedding is well-defined. Miller Thm 4.1, fully, in direct-limit form —
+/// the in-crate mathematical content of Layer 0.5. (The concrete `decls_fam` from the bespoke CEER
+/// group is a separate cross-crate instantiation.)
+pub proof fn lemma_c0_embeds_in_c_iff(fam: spec_fn(nat) -> Seq<Word>, n: nat, w: Word)
+    requires
+        decls_family_valid(fam),
+        word_valid(w, n),
+    ensures
+        equiv_in_g_limit(fam, n, w, empty_word()) <==> equiv_in_c0_limit(fam, n, w, empty_word()),
+{
+    if equiv_in_g_limit(fam, n, w, empty_word()) {
+        lemma_c0_embeds_in_c(fam, n, w);
+    }
+    if equiv_in_c0_limit(fam, n, w, empty_word()) {
+        lemma_c_contains_c0(fam, n, w);
+    }
 }
 
 } // verus!
