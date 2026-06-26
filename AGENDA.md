@@ -881,6 +881,20 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
 
 ### 3.3 — The ZFC bridge + instantiation
 
+> **🗺 GATE DESIGN MAP 2026-06-26 — `docs/final-gate-axiom-removal-plan.md` (review-only session, NO
+> code).** Baseline re-verified green (computability `250/0`; group-theory export validated). Pinned
+> the exact axiom-removal chain with *verified* endpoint signatures: Layer-0.5
+> `lemma_ceer_native_embeds_in_c_iff` (CEER group ⟺ `equiv_in_g_limit`) + Layer-2
+> `lemma_C_faithful_printable_canonical` (`h3_pres` ⟹ `c_pred`) are the two PROVEN ends; the gate =
+> three connective gaps. **Central finding (newly sharpened):** the two `C`s are *different spec
+> objects* — L0.5's `equiv_in_g_limit` is a **growing-generator** direct limit (deliberately un-Tietze'd
+> c-block) while L2's `c_pred` is a **fixed finite** c-block. Reconciling them (GAP 1) is the
+> load-bearing undesigned decision (R1 substitute-and-collapse / R2 re-present-fixed / R3 spec-predicate
+> — companion-favored R1∘R3, "prove relator-set containment both ways, never reason about normal
+> closures"). GAP 2 = the Aanderaa–Cohen register→modular reduction `ceer_to_modmachine` (new
+> computability theory, textbook-gated). GAP 3 = assembly (faithfulness HAVE + soundness `lemma_III`
+> HAVE). Companion-model cross-checked. **Surfaced §6.1–6.2 for Danielle; NOT taken solo.**
+>
 > **✅ DESIGN PASS 2026-06-25 (session 32) — `docs/machine-bridge-and-infinite-gen-plan.md`.** The
 > dependency structure of the last two arcs is now mapped. Headline: the genuine critical path is
 > **Layer 0.5 first**, then §3.3-proper (Layer 0.5 produces the real `C`'s relator set `S`; §3.3 then
