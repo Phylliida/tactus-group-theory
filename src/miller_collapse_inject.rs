@@ -14,9 +14,20 @@ use crate::miller_collapse_assoc::conj_t;
 use crate::miller_collapse_reln::{col_img_a, col_img_b, lemma_ia_form, lemma_ia_conj, lemma_ib_form};
 use crate::miller_collapse_eval::{lemma_emb_gen_power, lemma_apply_embedding_singleton,
     lemma_inverse_b_sub};
-use crate::machine_group::{symbol_power, lemma_symbol_power_valid};
+use crate::machine_group::{symbol_power, lemma_symbol_power_valid, lemma_word_valid_mono};
 use crate::normal_form_afp_textbook::lemma_right_cancel;
 use crate::britton_infra::lemma_hnn_presentation_valid;
+use crate::miller_collapse::{miller_collapse_emb, lemma_miller_collapse_emb_len,
+    lemma_miller_collapse_emb_valid};
+use crate::miller_collapse_eval::{lemma_emb_head, lemma_emb_a, lemma_emb_b, lemma_emb_t,
+    lemma_word_power_singleton};
+use crate::miller_collapse_preserve::{k_m, dbar, lemma_k_m_valid, lemma_source_relators_struct};
+use crate::h3_ii::{compose_embeddings, lemma_apply_embedding_compose};
+use crate::homomorphism::{HomomorphismData, apply_hom, is_valid_homomorphism,
+    lemma_hom_preserves_equiv, lemma_apply_hom_word_valid};
+use crate::free_basis::lemma_apply_hom_eq_embedding;
+use crate::presentation_lemmas::lemma_relator_is_identity;
+use crate::benign::{embedding_injective, lemma_apply_embedding_valid};
 
 verus! {
 
@@ -554,6 +565,291 @@ proof fn lemma_word_powers_valid_local(n: nat, i: nat)
     lemma_symbol_power_valid(Symbol::Gen(n), i, (n + 3) as nat);
     assert forall|m: int| 0 <= m < b_sub(n, (n + 2) as nat).len()
         implies symbol_valid(#[trigger] b_sub(n, (n + 2) as nat)[m], (n + 3) as nat) by {}
+}
+
+// ===========================================================================
+// §C — the wrap-identity + retraction assembly.
+// ===========================================================================
+
+/// **THE WRAP-IDENTITY.**  The "wrap-in-place" composite `emb(n,n,n+2) = ψ∘emb_M`, as an embedding on
+/// G^(M)'s OWN generators, acts as the identity on equivalence classes:
+/// `apply_embedding(emb(n,n,n+2), w) ≡ w`.  Per-generator (G1): a/t reflexive, b via R0, cⱼ via the
+/// c-crux `lemma_mcw_recovers_c`.
+pub proof fn lemma_wrap_is_identity(n: nat, decls: Seq<Word>, w: Word)
+    requires
+        forall|k: int| 0 <= k < decls.len() ==> word_valid(#[trigger] decls[k], n),
+        word_valid(w, (n + 3) as nat),
+    ensures
+        equiv_in_presentation(hnn_presentation(miller_data(n, decls)),
+            apply_embedding(miller_collapse_emb(n, n, (n + 2) as nat), w), w),
+{
+    let data = miller_data(n, decls);
+    let g = hnn_presentation(data);
+    let wrap = miller_collapse_emb(n, n, (n + 2) as nat);
+    lemma_miller_data_valid(n, decls);
+    lemma_hnn_presentation_valid(data);
+    assert(g.num_generators == n + 3);
+    lemma_miller_collapse_emb_len(n, n, (n + 2) as nat);
+    lemma_miller_collapse_emb_valid(n, n, (n + 2) as nat, (n + 3) as nat);
+    lemma_collapse_b_recovers(n, decls);
+
+    assert forall|gg: int| 0 <= gg < g.num_generators
+        implies equiv_in_presentation(g, #[trigger] wrap[gg], seq![Symbol::Gen(gg as nat)]) by {
+        if gg < n {
+            lemma_emb_head(n, n, (n + 2) as nat, gg as nat);
+            lemma_mcw_recovers_c(n, decls, gg as nat);
+        } else if gg == n as int {
+            lemma_emb_a(n, n, (n + 2) as nat);
+            lemma_equiv_refl(g, seq![Symbol::Gen(n)]);
+            assert(seq![Symbol::Gen(gg as nat)] =~= seq![Symbol::Gen(n)]);
+        } else if gg == (n + 1) as int {
+            lemma_emb_b(n, n, (n + 2) as nat);
+            assert(seq![Symbol::Gen(gg as nat)] =~= seq![Symbol::Gen((n + 1) as nat)]);
+        } else {
+            lemma_emb_t(n, n, (n + 2) as nat);
+            lemma_equiv_refl(g, seq![Symbol::Gen((n + 2) as nat)]);
+            assert(seq![Symbol::Gen(gg as nat)] =~= seq![Symbol::Gen((n + 2) as nat)]);
+        }
+    }
+    lemma_emb_id_on_gens_preserves(g, wrap, w);
+}
+
+/// The retraction `ψ`'s generator images:  `a = Gen(0) ↦ Gen(n)`,  `t = Gen(1) ↦ Gen(n+2)`.
+pub open spec fn section_imgs(n: nat) -> Seq<Word> {
+    seq![ seq![Symbol::Gen(n)], seq![Symbol::Gen((n + 2) as nat)] ]
+}
+
+/// `inverse_word([Gen(x)]) =~= [Inv(x)]` (singleton-inverse, bridged through the `Seq::new` form).
+proof fn lemma_inv_gen(x: nat)
+    ensures
+        inverse_word(seq![Symbol::Gen(x)]) =~= seq![Symbol::Inv(x)],
+{
+    lemma_inverse_singleton(Symbol::Gen(x));
+    assert(seq![Symbol::Gen(x)] =~= Seq::new(1, |_i: int| Symbol::Gen(x)));
+    assert(Seq::new(1, |_i: int| inverse_symbol(Symbol::Gen(x))) =~= seq![Symbol::Inv(x)]);
+}
+
+/// Relabel of the collapsed `b`/`b⁻¹` under `ψ`:  `b_sub(0,1) ↦ b_sub(n,n+2)`, `binv_sub` likewise.
+proof fn lemma_relabel_bt(n: nat)
+    ensures
+        apply_embedding(section_imgs(n), b_sub(0, 1)) =~= b_sub(n, (n + 2) as nat),
+        apply_embedding(section_imgs(n), binv_sub(0, 1)) =~= binv_sub(n, (n + 2) as nat),
+{
+    let psi = section_imgs(n);
+    reveal_with_fuel(apply_embedding, 4);
+    assert(psi[0] == seq![Symbol::Gen(n)]);
+    assert(psi[1] == seq![Symbol::Gen((n + 2) as nat)]);
+    lemma_inv_gen((n + 2) as nat);    // inverse_word([Gen(n+2)]) =~= [Inv(n+2)]
+    lemma_inv_gen(n);                 // inverse_word([Gen(n)])   =~= [Inv(n)]
+}
+
+/// **RELABEL_MCW.**  Applying `ψ` to `uⱼ(a=0,t=1)` gives `uⱼ(a=n,t=n+2)` (the index relabel that makes
+/// `ψ∘emb_M = emb(n,n,n+2)`).
+proof fn lemma_relabel_mcw(n: nat, k: nat)
+    ensures
+        apply_embedding(section_imgs(n), miller_collapse_word(k, 0, 1))
+            =~= miller_collapse_word(k, n, (n + 2) as nat),
+{
+    let psi = section_imgs(n);
+    let i = (k + 1) as nat;
+    let p0 = seq![Symbol::Gen(1)];
+    let p1 = word_power(binv_sub(0, 1), i);
+    let p2 = seq![Symbol::Gen(0)];
+    let p3 = word_power(b_sub(0, 1), i);
+    let p4 = seq![Symbol::Inv(1)];
+    let p5 = symbol_power(Symbol::Inv(0), i);
+    let p6 = binv_sub(0, 1);
+    let p7 = symbol_power(Symbol::Gen(0), i);
+
+    // distribute apply_embedding over the 8-piece left-assoc concat
+    lemma_apply_embedding_concat(psi, ((((((p0 + p1) + p2) + p3) + p4) + p5) + p6), p7);
+    lemma_apply_embedding_concat(psi, (((((p0 + p1) + p2) + p3) + p4) + p5), p6);
+    lemma_apply_embedding_concat(psi, ((((p0 + p1) + p2) + p3) + p4), p5);
+    lemma_apply_embedding_concat(psi, (((p0 + p1) + p2) + p3), p4);
+    lemma_apply_embedding_concat(psi, ((p0 + p1) + p2), p3);
+    lemma_apply_embedding_concat(psi, (p0 + p1), p2);
+    lemma_apply_embedding_concat(psi, p0, p1);
+
+    // piece evaluations
+    lemma_apply_embedding_singleton(psi, Symbol::Gen(1));   // p0 → [Gen(n+2)]
+    lemma_apply_embedding_singleton(psi, Symbol::Gen(0));   // p2 → [Gen(n)]
+    lemma_apply_embedding_singleton(psi, Symbol::Inv(1));   // p4 → [Inv(n+2)]
+    lemma_inv_gen((n + 2) as nat);                         // inverse_word([Gen(n+2)]) = [Inv(n+2)]
+    lemma_relabel_bt(n);                                    // ae(b_sub01)=b_sub, ae(binv_sub01)=binv_sub
+    lemma_apply_embedding_word_power(psi, binv_sub(0, 1), i);   // p1 → wp(binv_sub(n,n+2),i)
+    lemma_apply_embedding_word_power(psi, b_sub(0, 1), i);      // p3 → wp(b_sub(n,n+2),i)
+    lemma_emb_gen_power(psi, 0, i);                            // p5, p7 (symbol-powers of Gen(0)/Inv(0))
+    lemma_inv_gen(n);                                         // inverse_word([Gen(n)]) = [Inv(n)]
+    lemma_word_power_singleton(Symbol::Inv(n), i);            // wp([Inv(n)],i)=symbol_power(Inv(n),i)
+    lemma_word_power_singleton(Symbol::Gen(n), i);            // wp([Gen(n)],i)=symbol_power(Gen(n),i)
+
+    // each evaluated piece equals the corresponding piece of mcw(k,n,n+2)
+    let gt_n = seq![Symbol::Gen((n + 2) as nat)];
+    let it_n = seq![Symbol::Inv((n + 2) as nat)];
+    let ga_n = seq![Symbol::Gen(n)];
+    assert(apply_embedding(psi, p0) =~= gt_n);
+    assert(apply_embedding(psi, p1) =~= word_power(binv_sub(n, (n + 2) as nat), i));
+    assert(apply_embedding(psi, p2) =~= ga_n);
+    assert(apply_embedding(psi, p3) =~= word_power(b_sub(n, (n + 2) as nat), i));
+    assert(apply_embedding(psi, p4) =~= it_n);
+    assert(apply_embedding(psi, p5) =~= symbol_power(Symbol::Inv(n), i));
+    assert(apply_embedding(psi, p6) =~= binv_sub(n, (n + 2) as nat));
+    assert(apply_embedding(psi, p7) =~= symbol_power(Symbol::Gen(n), i));
+
+    // assemble:  ae(p0)+...+ae(p7) =~= mcw(k,n,n+2)
+    assert(miller_collapse_word(k, n, (n + 2) as nat) =~=
+        ((((((apply_embedding(psi, p0) + apply_embedding(psi, p1)) + apply_embedding(psi, p2))
+            + apply_embedding(psi, p3)) + apply_embedding(psi, p4)) + apply_embedding(psi, p5))
+            + apply_embedding(psi, p6)) + apply_embedding(psi, p7));
+}
+
+/// **RELABEL.**  `ψ∘emb_M = emb(n,n,n+2)`  (the composite is the routing-neutral "wrap-in-place" emb).
+proof fn lemma_section_compose(n: nat, decls: Seq<Word>)
+    ensures
+        compose_embeddings(section_imgs(n), miller_collapse_emb(n, 0, 1))
+            =~= miller_collapse_emb(n, n, (n + 2) as nat),
+{
+    let psi = section_imgs(n);
+    let emb_m = miller_collapse_emb(n, 0, 1);
+    let wrap = miller_collapse_emb(n, n, (n + 2) as nat);
+    let comp = compose_embeddings(psi, emb_m);
+    lemma_miller_collapse_emb_len(n, 0, 1);
+    lemma_miller_collapse_emb_len(n, n, (n + 2) as nat);
+    assert(comp.len() == n + 3);
+    assert forall|kk: int| 0 <= kk < comp.len() implies comp[kk] =~= wrap[kk] by {
+        assert(comp[kk] == apply_embedding(psi, emb_m[kk]));
+        if kk < n {
+            lemma_emb_head(n, 0, 1, kk as nat);
+            lemma_relabel_mcw(n, kk as nat);
+            lemma_emb_head(n, n, (n + 2) as nat, kk as nat);
+        } else if kk == n as int {
+            lemma_emb_a(n, 0, 1);
+            lemma_apply_embedding_singleton(psi, Symbol::Gen(0));
+            lemma_emb_a(n, n, (n + 2) as nat);
+        } else if kk == (n + 1) as int {
+            lemma_emb_b(n, 0, 1);
+            lemma_relabel_bt(n);
+            lemma_emb_b(n, n, (n + 2) as nat);
+        } else {
+            lemma_emb_t(n, 0, 1);
+            lemma_apply_embedding_singleton(psi, Symbol::Gen(1));
+            lemma_emb_t(n, n, (n + 2) as nat);
+        }
+    }
+}
+
+/// The retraction homomorphism `ψ : K_M → G^(M)`,  `a ↦ Gen(n)`, `t ↦ Gen(n+2)`.
+pub open spec fn section_hom(n: nat, decls: Seq<Word>) -> HomomorphismData {
+    HomomorphismData {
+        source: k_m(n, decls),
+        target: hnn_presentation(miller_data(n, decls)),
+        generator_images: section_imgs(n),
+    }
+}
+
+/// **The composite identity:**  `ψ(emb_M(w)) ≡ w` in G^(M)  (the heart of the retraction).
+pub proof fn lemma_collapse_section_id(n: nat, decls: Seq<Word>, w: Word)
+    requires
+        forall|k: int| 0 <= k < decls.len() ==> word_valid(#[trigger] decls[k], n),
+        word_valid(w, (n + 3) as nat),
+    ensures
+        equiv_in_presentation(hnn_presentation(miller_data(n, decls)),
+            apply_hom(section_hom(n, decls), apply_embedding(miller_collapse_emb(n, 0, 1), w)), w),
+{
+    let h = section_hom(n, decls);
+    let emb_m = miller_collapse_emb(n, 0, 1);
+    let u = apply_embedding(emb_m, w);
+    lemma_apply_hom_eq_embedding(h, u);                  // apply_hom(h,u) =~= apply_embedding(section_imgs,u)
+    lemma_miller_collapse_emb_len(n, 0, 1);              // emb_m.len() == n+3
+    lemma_apply_embedding_compose(section_imgs(n), emb_m, w);  // = apply_embedding(compose, w)
+    lemma_section_compose(n, decls);                    // compose =~= wrap
+    lemma_wrap_is_identity(n, decls, w);                // apply_embedding(wrap, w) ≡ w
+}
+
+/// **ψ is a valid homomorphism.**  Its only relators `D̄_M = emb_M(decls)` push back to `decls ≡ ε`.
+pub proof fn lemma_section_hom_valid(n: nat, decls: Seq<Word>)
+    requires
+        forall|k: int| 0 <= k < decls.len() ==> word_valid(#[trigger] decls[k], n),
+    ensures
+        is_valid_homomorphism(section_hom(n, decls)),
+{
+    let h = section_hom(n, decls);
+    let data = miller_data(n, decls);
+    let g = hnn_presentation(data);
+    lemma_miller_data_valid(n, decls);
+    lemma_hnn_presentation_valid(data);
+    lemma_k_m_valid(n, decls);
+    assert(g.num_generators == n + 3);
+    assert(h.generator_images.len() == 2);
+    assert(h.source.num_generators == 2);
+
+    assert forall|ii: int| 0 <= ii < h.generator_images.len()
+        implies word_valid(#[trigger] h.generator_images[ii], h.target.num_generators) by {
+        assert forall|m: int| 0 <= m < h.generator_images[ii].len()
+            implies symbol_valid(#[trigger] h.generator_images[ii][m], h.target.num_generators) by {}
+    }
+
+    lemma_source_relators_struct(n, decls);   // g.relators =~= decls + hnn_relators
+    assert forall|ii: int| 0 <= ii < h.source.relators.len()
+        implies equiv_in_presentation(h.target, apply_hom(h, h.source.relators[ii]), empty_word()) by {
+        // h.source.relators = dbar(n,decls) ;  dbar[ii] = apply_embedding(emb_M, decls[ii])
+        let r = h.source.relators[ii];
+        assert(r == dbar(n, decls)[ii]);
+        assert(r == apply_embedding(miller_collapse_emb(n, 0, 1), decls[ii]));
+        assert(ii < decls.len());
+
+        // apply_hom(h, r) ≡ decls[ii]  via the composite identity
+        lemma_word_valid_mono(decls[ii], n, (n + 3) as nat);
+        lemma_collapse_section_id(n, decls, decls[ii]);
+
+        // decls[ii] ≡ ε  (it is g.relators[ii])
+        lemma_relator_is_identity(g, ii);
+        assert(g.relators[ii] == decls[ii]);
+        lemma_equiv_transitive(g, apply_hom(h, r), decls[ii], empty_word());
+    }
+}
+
+/// **★ THE BOSS FIGHT — `embedding_injective`.**  `K_M`-equiv of `emb_M`-images ⟹ `G^(M)`-equiv.
+/// Miller Thm 4.1's Tietze collapse is an isomorphism, via the retraction `ψ` (`lemma_collapse_section_id`
+/// + `lemma_section_hom_valid`).  No freeness — that is the SEPARATE `C₀ ↪ G` HNN-faithfulness (Layer 0.5).
+pub proof fn lemma_collapse_injective(n: nat, decls: Seq<Word>)
+    requires
+        forall|k: int| 0 <= k < decls.len() ==> word_valid(#[trigger] decls[k], n),
+    ensures
+        embedding_injective(hnn_presentation(miller_data(n, decls)), k_m(n, decls),
+            miller_collapse_emb(n, 0, 1)),
+{
+    let data = miller_data(n, decls);
+    let g = hnn_presentation(data);
+    let km = k_m(n, decls);
+    let emb_m = miller_collapse_emb(n, 0, 1);
+    let h = section_hom(n, decls);
+    lemma_miller_data_valid(n, decls);
+    lemma_hnn_presentation_valid(data);
+    lemma_miller_collapse_emb_len(n, 0, 1);
+    assert(g.num_generators == n + 3);
+    assert(emb_m.len() == g.num_generators);
+    lemma_section_hom_valid(n, decls);   // h valid (source = km = h.source)
+
+    assert forall|w1: Word, w2: Word|
+        word_valid(w1, g.num_generators) && word_valid(w2, g.num_generators)
+        && equiv_in_presentation(km, apply_embedding(emb_m, w1), apply_embedding(emb_m, w2))
+        implies #[trigger] equiv_in_presentation(g, w1, w2) by {
+        // apply ψ:  equiv(g, ψ(emb_M(w1)), ψ(emb_M(w2)))
+        lemma_hom_preserves_equiv(h, apply_embedding(emb_m, w1), apply_embedding(emb_m, w2));
+        // ψ(emb_M(wi)) ≡ wi
+        lemma_collapse_section_id(n, decls, w1);
+        lemma_collapse_section_id(n, decls, w2);
+        // word-validity of ψ(emb_M(w1)) for the symmetric step
+        lemma_miller_collapse_emb_valid(n, 0, 1, 2);
+        lemma_apply_embedding_valid(emb_m, w1, 2);          // emb_M(w1) valid in K_M (=2 gens)
+        lemma_apply_hom_word_valid(h, apply_embedding(emb_m, w1));   // ψ-image valid in g
+        // w1 ≡ ψ(emb_M(w1)) ≡ ψ(emb_M(w2)) ≡ w2
+        lemma_equiv_symmetric(g, apply_hom(h, apply_embedding(emb_m, w1)), w1);
+        lemma_equiv_transitive(g, w1, apply_hom(h, apply_embedding(emb_m, w1)),
+            apply_hom(h, apply_embedding(emb_m, w2)));
+        lemma_equiv_transitive(g, w1, apply_hom(h, apply_embedding(emb_m, w2)), w2);
+    }
 }
 
 } // verus!

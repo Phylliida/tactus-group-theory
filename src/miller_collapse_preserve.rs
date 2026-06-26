@@ -79,7 +79,7 @@ pub proof fn lemma_k_m_valid(n: nat, decls: Seq<Word>)
 }
 
 /// Structure of the source relators:  `base.relators (= decls) + hnn_relators`.
-proof fn lemma_source_relators_struct(n: nat, decls: Seq<Word>)
+pub proof fn lemma_source_relators_struct(n: nat, decls: Seq<Word>)
     requires
         forall|k: int| 0 <= k < decls.len() ==> word_valid(#[trigger] decls[k], n),
     ensures
