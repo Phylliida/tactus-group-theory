@@ -459,3 +459,9 @@ pub mod cohen_cs5;
 // emb∘emb compose, and the factoring a_col = comp_emb(a_col_machine, relabel_col). Reduces psi-scheme
 // (★k) forward to the machine-scheme recognition. docs/cohen-cs5-blueprint.md §5.
 pub mod cohen_cs5_recog;
+
+// cohen_cs6: Layer 2 — Cohen §1 assembly, brick CS-6. The faithfulness assembly C ↪ H₃ over the
+// predicate base: lemma_C_faithful (pure-c w trivial in h3_pred ⟹ trivial in c_pred), via the
+// two-step descent — Britton down the H₃ tower (CS-4/CS-5 isos) ∘ the c-retraction (CS-2).
+// docs/cohen-section1-assembly-plan.md §3.
+pub mod cohen_cs6;
