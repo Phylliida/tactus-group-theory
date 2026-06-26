@@ -461,7 +461,7 @@ pub proof fn lemma_h2_II_relators_eq(mm: ModMachine, n: nat, m: nat, alphas: Seq
     crate::h2::lemma_h2_num_generators(mm, n);
 }
 
-proof fn lemma_h2_II_contains_gm(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, w: Word)
+pub proof fn lemma_h2_II_contains_gm(mm: ModMachine, n: nat, m: nat, alphas: Seq<nat>, w: Word)
     requires
         g_m(mm).relators.contains(w),
     ensures
