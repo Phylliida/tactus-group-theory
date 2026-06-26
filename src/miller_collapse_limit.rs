@@ -281,4 +281,315 @@ pub proof fn lemma_fin_equiv_to_pred(
     assert(pred_derivation_valid(cp, pd, w1, w2));
 }
 
+// ===========================================================================
+// §C.  FORWARD:  equiv_in_g_limit ⟹ equiv_in_pred_presentation(P_∞).  (No monotonicity needed.)
+// ===========================================================================
+
+/// `apply_embedding` fixes `ε`.
+pub proof fn lemma_apply_embedding_empty(emb: Seq<Word>)
+    ensures
+        apply_embedding(emb, empty_word()) == empty_word(),
+{
+    assert(empty_word().len() == 0);
+}
+
+/// A sequence contains the element at any in-range index.
+pub proof fn lemma_seq_index_contains(s: Seq<Word>, i: int)
+    requires
+        0 <= i < s.len(),
+    ensures
+        s.contains(s[i]),
+{
+    assert(s[i] == s[i]);
+}
+
+/// **FORWARD.**  If `w` (a `c`-word over `n` generators) is trivial in the direct limit, then its
+/// collapse image `emb_n(w)` is trivial in the union predicate presentation `P_∞`.
+pub proof fn lemma_limit_to_pred(fam: spec_fn(nat) -> Seq<Word>, n: nat, w: Word)
+    requires
+        decls_family_valid(fam),
+        word_valid(w, n),
+        equiv_in_g_limit(fam, n, w, empty_word()),
+    ensures
+        equiv_in_pred_presentation(p_infty(fam),
+            apply_embedding(miller_collapse_emb(n, 0, 1), w), empty_word()),
+{
+    // 1. extract the witness slice M ≥ n
+    let big_m = choose|big_m: nat| n <= big_m
+        && equiv_in_presentation(#[trigger] hnn_presentation(miller_data(big_m, fam(big_m))), w, empty_word());
+    assert(n <= big_m && equiv_in_presentation(hnn_presentation(miller_data(big_m, fam(big_m))), w, empty_word()));
+
+    let decls = fam(big_m);
+    assert forall|k: int| 0 <= k < decls.len() implies word_valid(#[trigger] decls[k], big_m) by {
+        assert(decls[k] == fam(big_m)[k]);   // fire decls_family_valid at (big_m, k)
+    }
+    let g = hnn_presentation(miller_data(big_m, decls));
+    let km = k_m(big_m, decls);
+    let emb_m = miller_collapse_emb(big_m, 0, 1);
+    let emb_n = miller_collapse_emb(n, 0, 1);
+
+    // 2. item-2 preserving:  equiv(km, emb_m(w), emb_m(ε)) ⟹ equiv(km, emb_m(w), ε)
+    lemma_collapse_preserving(big_m, decls);     // embedding_preserving(g, km, emb_m)
+    lemma_source_relators_struct(big_m, decls);  // g.num_generators == big_m + 3
+    lemma_word_valid_mono(w, n, (big_m + 3) as nat);
+    lemma_apply_embedding_empty(emb_m);
+    assert(equiv_in_presentation(km, apply_embedding(emb_m, w), apply_embedding(emb_m, empty_word())));
+    assert(equiv_in_presentation(km, apply_embedding(emb_m, w), empty_word()));
+
+    // 3. witness-preservation:  emb_m(w) == emb_n(w)
+    lemma_emb_slice_independent(n, big_m, w);
+    assert(equiv_in_presentation(km, apply_embedding(emb_n, w), empty_word()));
+
+    // 4. forward bridge:  km ↪ P_∞(fam)  (every km relator is in D̄_{big_m} ⊆ ⋃, witness big_m)
+    assert forall|k: int| 0 <= k < km.relators.len()
+        implies #[trigger] (p_infty(fam).relators)(km.relators[k]) by {
+        assert(km.relators == dbar(big_m, fam(big_m)));
+        lemma_seq_index_contains(dbar(big_m, fam(big_m)), k);   // dbar(big_m,·).contains(km.relators[k])
+        assert(dbar_union_pred(fam, km.relators[k]));           // witness big_m
+    }
+    lemma_fin_equiv_to_pred(km, p_infty(fam), apply_embedding(emb_n, w), empty_word());
+}
+
+// ===========================================================================
+// §D.  BACKWARD:  equiv_in_pred_presentation(P_∞) ⟹ equiv_in_g_limit.  (Compactness, route (i).)
+// ===========================================================================
+
+/// A successful `P_{≤m1}` step is a successful `P_{≤m2}` step (`m1 ≤ m2`), by monotonicity.
+proof fn lemma_step_slice_monotone(
+    fam: spec_fn(nat) -> Seq<Word>, m1: nat, m2: nat, w: Word, step: PredDerivationStep, w2: Word,
+)
+    requires
+        dbar_family_monotone(fam),
+        m1 <= m2,
+        apply_step_pred(p_le(fam, m1), w, step) == Some(w2),
+    ensures
+        apply_step_pred(p_le(fam, m2), w, step) == Some(w2),
+{
+    match step {
+        PredDerivationStep::FreeReduce { position } => { }
+        PredDerivationStep::FreeExpand { position, symbol } => { }
+        PredDerivationStep::RelatorInsert { position, relator, inverted } => {
+            assert(dbar(m1, fam(m1)).contains(relator));   // from success
+            assert(dbar(m2, fam(m2)).contains(relator));   // fires monotonicity
+        }
+        PredDerivationStep::RelatorDelete { position, relator, inverted } => {
+            assert(dbar(m1, fam(m1)).contains(relator));
+            assert(dbar(m2, fam(m2)).contains(relator));
+        }
+    }
+}
+
+/// A whole `P_{≤m1}` derivation is a `P_{≤m2}` derivation (`m1 ≤ m2`).
+proof fn lemma_produces_slice_monotone(
+    fam: spec_fn(nat) -> Seq<Word>, m1: nat, m2: nat, steps: Seq<PredDerivationStep>, start: Word, end: Word,
+)
+    requires
+        dbar_family_monotone(fam),
+        m1 <= m2,
+        pred_derivation_produces(p_le(fam, m1), steps, start) == Some(end),
+    ensures
+        pred_derivation_produces(p_le(fam, m2), steps, start) == Some(end),
+    decreases steps.len(),
+{
+    if steps.len() == 0 {
+    } else {
+        let h = steps.first();
+        let tail = steps.drop_first();
+        assert(pred_derivation_produces(p_le(fam, m1), steps, start) == (match apply_step_pred(p_le(fam, m1), start, h) {
+            Some(next) => pred_derivation_produces(p_le(fam, m1), tail, next),
+            None => None::<Word>,
+        }));
+        let res1 = apply_step_pred(p_le(fam, m1), start, h);
+        assert(res1 is Some);
+        let w1 = res1.unwrap();
+        assert(apply_step_pred(p_le(fam, m1), start, h) == Some(w1));
+        assert(pred_derivation_produces(p_le(fam, m1), tail, w1) == Some(end));
+        lemma_step_slice_monotone(fam, m1, m2, start, h, w1);
+        lemma_produces_slice_monotone(fam, m1, m2, tail, w1, end);
+        assert(pred_derivation_produces(p_le(fam, m2), steps, start) == (match apply_step_pred(p_le(fam, m2), start, h) {
+            Some(next) => pred_derivation_produces(p_le(fam, m2), tail, next),
+            None => None::<Word>,
+        }));
+    }
+}
+
+/// A single `P_∞` step is realized in SOME slice `P_{≤m0}` with `m0 ≥ n` (the relator's witness level,
+/// raised to `n`).
+proof fn lemma_first_step_slice(
+    fam: spec_fn(nat) -> Seq<Word>, n: nat, w: Word, step: PredDerivationStep, w2: Word,
+)
+    requires
+        dbar_family_monotone(fam),
+        apply_step_pred(p_infty(fam), w, step) == Some(w2),
+    ensures
+        exists|m0: nat| #![trigger apply_step_pred(p_le(fam, m0), w, step)]
+            n <= m0 && apply_step_pred(p_le(fam, m0), w, step) == Some(w2),
+{
+    match step {
+        PredDerivationStep::FreeReduce { position } => {
+            assert(n <= n && apply_step_pred(p_le(fam, n), w, step) == Some(w2));
+        }
+        PredDerivationStep::FreeExpand { position, symbol } => {
+            assert(n <= n && apply_step_pred(p_le(fam, n), w, step) == Some(w2));
+        }
+        PredDerivationStep::RelatorInsert { position, relator, inverted } => {
+            assert(dbar_union_pred(fam, relator));
+            let big_m0 = choose|big_m0: nat| (#[trigger] dbar(big_m0, fam(big_m0))).contains(relator);
+            assert(dbar(big_m0, fam(big_m0)).contains(relator));
+            let m0: nat = if big_m0 >= n { big_m0 } else { n };
+            assert(dbar(m0, fam(m0)).contains(relator));    // fires monotonicity (big_m0 <= m0)
+            assert(n <= m0 && apply_step_pred(p_le(fam, m0), w, step) == Some(w2));
+        }
+        PredDerivationStep::RelatorDelete { position, relator, inverted } => {
+            assert(dbar_union_pred(fam, relator));
+            let big_m0 = choose|big_m0: nat| (#[trigger] dbar(big_m0, fam(big_m0))).contains(relator);
+            assert(dbar(big_m0, fam(big_m0)).contains(relator));
+            let m0: nat = if big_m0 >= n { big_m0 } else { n };
+            assert(dbar(m0, fam(m0)).contains(relator));
+            assert(n <= m0 && apply_step_pred(p_le(fam, m0), w, step) == Some(w2));
+        }
+    }
+}
+
+/// **Compactness extraction.**  A `P_∞`-derivation lives in a single slice `P_{≤M*}` (`M* ≥ n`):
+/// take the max of `n` and the per-step relator witness levels; monotonicity stabilizes all of them.
+proof fn lemma_extract_slice(
+    fam: spec_fn(nat) -> Seq<Word>, n: nat, steps: Seq<PredDerivationStep>, start: Word, end: Word,
+)
+    requires
+        dbar_family_monotone(fam),
+        pred_derivation_produces(p_infty(fam), steps, start) == Some(end),
+    ensures
+        exists|m: nat| #![trigger pred_derivation_produces(p_le(fam, m), steps, start)]
+            n <= m && pred_derivation_produces(p_le(fam, m), steps, start) == Some(end),
+    decreases steps.len(),
+{
+    if steps.len() == 0 {
+        assert(n <= n && pred_derivation_produces(p_le(fam, n), steps, start) == Some(end));
+    } else {
+        let h = steps.first();
+        let tail = steps.drop_first();
+        assert(pred_derivation_produces(p_infty(fam), steps, start) == (match apply_step_pred(p_infty(fam), start, h) {
+            Some(next) => pred_derivation_produces(p_infty(fam), tail, next),
+            None => None::<Word>,
+        }));
+        let res = apply_step_pred(p_infty(fam), start, h);
+        assert(res is Some);
+        let w1 = res.unwrap();
+        assert(apply_step_pred(p_infty(fam), start, h) == Some(w1));
+        assert(pred_derivation_produces(p_infty(fam), tail, w1) == Some(end));
+
+        lemma_extract_slice(fam, n, tail, w1, end);
+        let m1 = choose|m1: nat| #![trigger pred_derivation_produces(p_le(fam, m1), tail, w1)]
+            n <= m1 && pred_derivation_produces(p_le(fam, m1), tail, w1) == Some(end);
+        assert(n <= m1 && pred_derivation_produces(p_le(fam, m1), tail, w1) == Some(end));
+
+        lemma_first_step_slice(fam, n, start, h, w1);
+        let m0 = choose|m0: nat| #![trigger apply_step_pred(p_le(fam, m0), start, h)]
+            n <= m0 && apply_step_pred(p_le(fam, m0), start, h) == Some(w1);
+        assert(n <= m0 && apply_step_pred(p_le(fam, m0), start, h) == Some(w1));
+
+        let mf: nat = if m0 >= m1 { m0 } else { m1 };
+        lemma_step_slice_monotone(fam, m0, mf, start, h, w1);       // head succeeds in mf
+        lemma_produces_slice_monotone(fam, m1, mf, tail, w1, end);  // tail produces in mf
+        assert(pred_derivation_produces(p_le(fam, mf), steps, start) == (match apply_step_pred(p_le(fam, mf), start, h) {
+            Some(next) => pred_derivation_produces(p_le(fam, mf), tail, next),
+            None => None::<Word>,
+        }));
+        assert(n <= mf && pred_derivation_produces(p_le(fam, mf), steps, start) == Some(end));
+    }
+}
+
+/// **BACKWARD.**  If the collapse image `emb_n(w)` is trivial in the union presentation `P_∞`, then
+/// the original `c`-word `w` is trivial in the direct limit.
+pub proof fn lemma_pred_to_limit(fam: spec_fn(nat) -> Seq<Word>, n: nat, w: Word)
+    requires
+        decls_family_valid(fam),
+        dbar_family_monotone(fam),
+        word_valid(w, n),
+        equiv_in_pred_presentation(p_infty(fam),
+            apply_embedding(miller_collapse_emb(n, 0, 1), w), empty_word()),
+    ensures
+        equiv_in_g_limit(fam, n, w, empty_word()),
+{
+    let emb_n = miller_collapse_emb(n, 0, 1);
+    let v = apply_embedding(emb_n, w);
+
+    // 1. extract a single slice mf ≥ n in which the (collapsed) derivation lives
+    let d = choose|d: PredDerivation| pred_derivation_valid(p_infty(fam), d, v, empty_word());
+    assert(pred_derivation_produces(p_infty(fam), d.steps, v) == Some(empty_word()));
+    lemma_extract_slice(fam, n, d.steps, v, empty_word());
+    let mf = choose|mf: nat| #![trigger pred_derivation_produces(p_le(fam, mf), d.steps, v)]
+        n <= mf && pred_derivation_produces(p_le(fam, mf), d.steps, v) == Some(empty_word());
+    assert(n <= mf && pred_derivation_produces(p_le(fam, mf), d.steps, v) == Some(empty_word()));
+    let pd = PredDerivation { steps: d.steps };
+    assert(pred_derivation_valid(p_le(fam, mf), pd, v, empty_word()));
+    assert(equiv_in_pred_presentation(p_le(fam, mf), v, empty_word()));
+
+    // 2. existing generic transport P_{≤mf} → finite K_{mf}
+    let decls = fam(mf);
+    assert forall|k: int| 0 <= k < decls.len() implies word_valid(#[trigger] decls[k], mf) by {
+        assert(decls[k] == fam(mf)[k]);
+    }
+    let km = k_m(mf, decls);
+    lemma_k_m_valid(mf, decls);
+    lemma_dbar_valid(mf, decls);
+    assert forall|r: Word| #[trigger] (p_le(fam, mf).relators)(r) implies
+        (equiv_in_presentation(km, r, empty_word()) && word_valid(r, 2)) by {
+        assert(dbar(mf, decls).contains(r));   // = (p_le(fam,mf).relators)(r), decls = fam(mf)
+        let idx = choose|idx: int| 0 <= idx < dbar(mf, decls).len() && dbar(mf, decls)[idx] == r;
+        assert(0 <= idx < dbar(mf, decls).len() && dbar(mf, decls)[idx] == r);
+        assert(km.relators[idx] == r);
+        lemma_relator_is_identity(km, idx);
+    }
+    lemma_pred_equiv_lifts_to_finite(p_le(fam, mf), km, v, empty_word());
+    assert(equiv_in_presentation(km, v, empty_word()));
+
+    // 3. witness-preservation: v = emb_n(w) == emb_mf(w)
+    lemma_emb_slice_independent(n, mf, w);
+    let emb_mf = miller_collapse_emb(mf, 0, 1);
+    assert(v == apply_embedding(emb_mf, w));
+    lemma_apply_embedding_empty(emb_mf);
+    assert(equiv_in_presentation(km, apply_embedding(emb_mf, w), apply_embedding(emb_mf, empty_word())));
+
+    // 4. item-2 injective pulls back to G^(mf)
+    lemma_collapse_injective(mf, decls);
+    lemma_source_relators_struct(mf, decls);
+    lemma_word_valid_mono(w, n, (mf + 3) as nat);
+    let g = hnn_presentation(miller_data(mf, decls));
+    assert(equiv_in_presentation(g, w, empty_word()));
+    assert(equiv_in_g_limit(fam, n, w, empty_word()));   // witness mf ≥ n
+}
+
+// ===========================================================================
+// §E.  HEADLINE — the limit-commutation iff (machine-independent core, "3a").
+// ===========================================================================
+
+/// **★ LIMIT-COMMUTATION (GAP-1 item-3, machine-independent core).**  For a valid, directed collapsed
+/// relator family and any `c`-word `w` over `n` generators:
+///
+///     equiv_in_g_limit(fam, n, w, ε)  ⟺  equiv_in_pred_presentation(P_∞(fam), emb_n(w), ε)
+///
+/// The direct limit `C = ⋃_M G^(M)`'s `c`-word problem equals the word problem of the fixed-`{a,t}`
+/// presentation `P_∞ = ⟨a,t | ⋃_M D̄_M⟩`.  Identifying `⋃_M D̄_M` with Cohen's `is_S_canonical(mm,…)`
+/// (item "3b", §3.4) is the remaining machine-gated step (needs GAP-2).
+pub proof fn lemma_limit_commutation(fam: spec_fn(nat) -> Seq<Word>, n: nat, w: Word)
+    requires
+        decls_family_valid(fam),
+        dbar_family_monotone(fam),
+        word_valid(w, n),
+    ensures
+        equiv_in_g_limit(fam, n, w, empty_word())
+            <==> equiv_in_pred_presentation(p_infty(fam),
+                    apply_embedding(miller_collapse_emb(n, 0, 1), w), empty_word()),
+{
+    if equiv_in_g_limit(fam, n, w, empty_word()) {
+        lemma_limit_to_pred(fam, n, w);
+    }
+    if equiv_in_pred_presentation(p_infty(fam),
+        apply_embedding(miller_collapse_emb(n, 0, 1), w), empty_word()) {
+        lemma_pred_to_limit(fam, n, w);
+    }
+}
+
 } // verus!
