@@ -346,3 +346,76 @@ free-base `lemma_intersection_property`; everything else is the CS-4 peel struct
 machine-scheme layout translation (3a/3b) and the step-2 base case swapped in. The layout translation
 (machine-scheme `w_b(nk)` vs h2 `w_b(nk+n)`) is mechanical but pervasive — define the `assoc_rhs_machine`
 ↔ `family_II_rhs`/`family_II_bc_rhs` relabeling identities (3b, 4) once and reuse.
+
+---
+
+## 7. ⚠ DESIGN CORRECTION (2026-06-25, session 26) — R1 needs a `⟨U,d,b,p⟩`-SUBGROUP INVARIANT through 3d.
+
+**The finding (confirmed: textbook §1b + companion model + analysis).** The §5/§6 R1 route — peel
+`relabel(w)` over `base_A_plus_data` whose base is the **full** `g_m ∗ free(d,b)` — has a **recursion
+gap** at the H₀-restriction (3c). The H₀-restriction needs each pinch middle `∈ ⟨U⟩ ∩ ⟨t_β:slice⟩ =
+⟨t_β:(β,0)∈H₀⟩` (property vi/vii). The middle is `∈ ⟨U⟩` ONLY because the recognized base is `⟨U⟩`.
+With a **full-`g_m`** base this holds at **iteration 0 only**: `relabel(w)` literally avoids `x=Gen(1)`,
+`y=Gen(2)` (since `relabel_col` maps U-gens → `g_subgens = {Gen0,Gen3,Gen4,…}`, never x/y), so its
+middles are `⟨U,d,b⟩`-words. But a pinch-OUT reinserts the association image `config(β,0)·w_β(b)·d`,
+and `config(β,0) = x⁻ᵝ t xᵝ` **uses x** — so at iteration ≥1 the peeled word uses x, and later middles
+are no longer forced into `⟨U⟩`. **A full-`g_m` base cannot prove the per-step H₀-restriction.** This is
+exactly Cohen's reason for the base being `⟨U⟩ ∗ ⟨d,b⟩` (pp.280–281), not `K ∗ ⟨d,b⟩`.
+
+**The fix (textbook-faithful, salvages ALL prior work — steps 1/2/3a/3b/3c-C1/step-4 stand).** R1's
+machine base (`base_A_plus_base = g_m ∗ free(d,b)`) is KEPT (it dodges the unsound standalone-`⟨U⟩`
+presentation §5 rejected). Cohen's `⟨U⟩ ∗ ⟨d,b⟩` is MODELED as the **subgroup
+`⟨g_subgens, d-block, b-block, p⟩`** of `hnn_presentation(base_A_plus_data(H₀-slice))`. Thread an extra
+induction invariant through 3d:
+
+> **INVARIANT (3d):** the word `w_k` currently being peeled is `∈ ⟨g_subgens ∪ {b-block, d}, p⟩` as a
+> subgroup of `base_A_plus_data(H₀-slice)`'s presentation (equivalently: `w_k ≡` a word literally over
+> those generator indices).
+
+- **Base case (iteration 0):** `relabel(w) = apply_embedding(relabel_col, w)` is a literal product of
+  `relabel_col` entries `= [g_subgens…, d, b…, p]` ⟹ `∈` the subgroup by
+  `lemma_apply_embedding_in_subgroup` (near-free).
+- **Preservation:** pinch-out replaces a middle (`∈ ⟨t_β:(β,0)∈H₀⟩ ⊆ ⟨g_subgens⟩` by `theorem1`, since
+  `(β,0)∈H₀ ⟹ config(β,0)∈⟨g_subgens⟩`) with the opposite association column `config(β,0)·w_β(b)·d`
+  (`∈ ⟨g_subgens,d,b⟩` for `β∈H₀`). `pre`/`suf` are subwords of `w_k` (invariant by IH). So `w_{k+1} ∈`
+  the subgroup. ∎
+- **Use at the pinch middle:** the stable-free middle of `w_k` is `∈ ⟨g_subgens, d, b⟩` (base part of
+  the subgroup, no `p`) — THIS supplies the `∈ ⟨U,d,b⟩` hypothesis that C2 (below) needs.
+
+### 7.1 — The corrected 3c-C2 (the H₀-restriction INTERSECTION lemma — E2.E generalization, the crux).
+The per-step tool, robust to the invariant threading. Signature (machine scheme):
+```
+lemma_cs5_middle_h0_restrict(mm, n, m, slice, mid_w):
+  requires
+    [slice number-words, 2n<m, mod_machine_wf, mm_terminal(mm,0,0)]
+    word_valid(mid_w, nk+n+1),                                       // base word, no p
+    in_generated_subgroup(base_A_plus_base, ublock_db_gens(mm,n), mid_w),   // ∈ ⟨g_subgens,d,b⟩  (from INVARIANT)
+    in_generated_subgroup(base_A_plus_base, config_cols(slice), mid_w),     // ∈ ⟨config(β,0):slice⟩ (from C1)
+  ensures
+    in_generated_subgroup(base_A_plus_base, config_cols(h0_filter(slice)), mid_w)  // ∈ ⟨config(β,0):H₀∩slice⟩
+```
+Proof route (generalizes E2.E `lemma_in_TM_config_implies_H0` from a single config to a product):
+1. **Project `d,b` away** (a `g_m`-retraction `base_A_plus_base → g_m`, kill `d,b`, fix machine): get
+   `g' ≡ mid_w` with `g' ∈ ⟨g_subgens⟩` (a literal U-word) AND `g' ∈ ⟨config(β,0):slice⟩` over `g_m`.
+2. **`g' ∈ ⟨g_subgens⟩` over `b_m` ⟹ `in_TMstable(g')`** (`lemma_vii_subset`, `g_subgens=hnn_a_gens`
+   diagonal) **⟹ `in_TM(g'_3)`** (`lemma_vi`, needs a `word_valid(·,3)` rep — take the config-product
+   form of `g'`, which IS over `{t,x,y}`).
+3. **Coordinate survival** (`lemma_tfree_coord_restrict`, the E2.E core): `g'_3 ∈ ⟨config(β,0):slice⟩`
+   reduces to a CanonLetter form whose surviving coords `(β,0)` each appear in the H₀-canon of `in_TM`
+   ⟹ every surviving `β ∈ H₀`. (The `config(β,0)` are a FREE family — companion-confirmed: this is a
+   free-basis-subset intersection `⟨config:S⟩ ∩ ⟨config:H₀⟩ = ⟨config:S∩H₀⟩`, coord-survival rules out
+   hidden relations.)
+4. **Reconstruct** `g'` from its reduced H₀-coords as a product of `config(β,0):H₀∩slice` (the
+   `gsconfig` power-in-subgroup recursion, cf. `r_prime.rs`); lift back to `mid_w ≡ g'`.
+
+This is the genuine multi-session work (E2.E-scale + a reconstruction). Build bottom-up; each rung
+verifies & commits.
+
+### 7.2 — Then 3d (with the invariant) + step 4 (DONE) + CS-5d.
+3d mirrors `lemma_map_a_forward` PLUS the §7 invariant (extra conjunct in the `decreases stable_count`
+induction; the per-step C2 call uses the invariant-supplied `∈⟨U,d,b⟩`). Step 4 von-Dyck
+(`lemma_cs5_vondyck_relator`, DONE) already wants the H₀-slice — it composes unchanged. CS-5d
+(tower lift via `lemma_h3_pred_upto_base_faithful` at k=2n) unchanged.
+
+**Status (session 26):** finding documented; baseline `cohen_cs5_recog` GREEN at 38/0. NEXT = build
+3c-C2 (`lemma_cs5_middle_h0_restrict`) bottom-up, then 3d with the invariant.
