@@ -509,3 +509,7 @@ pub mod pred_to_finite;
 // hygiene only; the two faithfulness directions (item-2) and limit-commutation glue (item-3) are
 // the effort-gated build and are NOT here. docs/final-gate-axiom-removal-plan.md §3/§8.5/§9.2.
 pub mod miller_collapse;
+// GAP-1 §9.2-item-(2) BRICK 1 — the conjugation telescoping engine `(tat⁻¹)ⁱ ≡ taⁱt⁻¹` that makes
+// Miller's `uⱼ` discharge the HNN associations as free tautologies after the cⱼ↦uⱼ, b↦tat⁻¹
+// substitution. Presentation-generic; no codomain commitment. docs/final-gate-axiom-removal-plan.md §9.2.
+pub mod miller_collapse_assoc;
