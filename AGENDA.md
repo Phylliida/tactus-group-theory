@@ -584,6 +584,15 @@ path now moves to §3.2 (Layer 2: the Higman embedding `C ↪ H₃`).*
       abstract `decls_fam` from `ceer_group.rs` (lives in the COMPUTABILITY crate — it imports
       group-theory, not vice-versa) + tie the limit's `S` to Layer 2.
       See `docs/machine-bridge-and-infinite-gen-plan.md` §C/§D.
+      **✅ CROSS-CRATE WIRING (step ii) DONE — confirmed 2026-06-30** (computability crate, commits
+      `d0570f2`→`2c63438`, crate 1979/0 green). `ceer_layer05.rs` instantiates `ceer_decls_fam(e)` from
+      the CEER group's stage-`M` declared pairs + proves `lemma_ceer_decls_family_valid` +
+      `lemma_ceer_c0_embeds_in_c_iff` (the abstract Miller iff specialized to the real CEER) +
+      `lemma_ceer_limit_commutation` (item-3a, concrete family). `ceer_layer05_bridge.rs` (971 lines)
+      completes the **native bridge** `lemma_ceer_native_embeds_in_c_iff`:
+      `ceer_group_equiv(e,w,ε) ⟺ equiv_in_g_limit(ceer_decls_fam(e),…)` (both directions —
+      translate/untranslate derivations). **So Layer 0.5 is fully wired; the ONLY thing still tying to
+      the machine is `S`, which lives entirely inside GAP-2 (`ceer_realizes`).**
 - [ ] **word-numbering bridge** — `wα(c)`, with `wα(c)∈S ⟺ (α,0)∈H₀(M)` (ties the relator set `S`
       to the machine, built from the reduction in §3.3).
 - [x] **H₁ = K_M ∗ (C × ⟨b_j⟩) ∗ ⟨d⟩** — literal finite `h1_base` built (`h1.rs`), and
