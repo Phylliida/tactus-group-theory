@@ -7,6 +7,11 @@
 //! ghost spec layer (`CosetTable`, `symbol_to_column`, `trace_word`, …) live in the clean
 //! cross-crate export cone (`ceer_lib.rs`) while this showcase stays in the full crate only.
 //! Nothing outside this file references its items.
+//!
+//! NOTE (2026-07-02, "flag decides"): the exec fns below carry Verus-style
+//! ghost blocks, so they are pinned to Z3 with #[verifier::z3] until their
+//! proofs are ported to Lean tactics (this also sidesteps the usize::MAX /
+//! IntegerTypeBound(UnsignedMax) Lean deferral mentioned above).
 use vstd::prelude::*;
 use crate::symbol::*;
 use crate::word::*;
@@ -206,6 +211,7 @@ proof fn lemma_rt_trace_word_unfold(
 }
 
 ///  Scan a relator from a coset, returning the final coset or usize::MAX if undefined.
+#[verifier::z3]
 pub fn scan_relator_exec(
     table: &RuntimeCosetTable,
     coset: usize,
@@ -393,6 +399,7 @@ pub fn inverse_column_exec(col: usize) -> (out: usize)
 ///  Forward scans from `coset` through relator symbols until hitting UNDEF.
 ///  Backward scans from `coset` through inverse symbols until meeting the forward scan.
 ///  If exactly one gap remains, fills it (deduction). If the endpoints disagree, returns Coincidence.
+#[verifier::z3]
 pub fn scan_and_fill_exec(
     table: &mut RuntimeCosetTable,
     coset: usize,
@@ -610,6 +617,7 @@ pub fn scan_and_fill_exec(
 //  ============================================================
 
 ///  Check that the runtime coset table is complete (no UNDEF entries in active region).
+#[verifier::z3]
 pub fn check_rt_complete_exec(rt: &RuntimeCosetTable) -> (result: bool)
     requires
         rt.num_cosets >= 1,
@@ -716,6 +724,7 @@ pub open spec fn rt_consistent_at(rt: RuntimeCosetTable, ci: int, coli: int) -> 
 }
 
 ///  Check that the runtime coset table is consistent (inverse symmetry).
+#[verifier::z3]
 pub fn check_rt_consistent_exec(rt: &RuntimeCosetTable) -> (result: bool)
     requires
         rt.num_cosets >= 1,
@@ -934,6 +943,7 @@ proof fn lemma_rt_consistent_implies_spec(rt: RuntimeCosetTable)
 }
 
 ///  Helper: scan one relator from all cosets, checking closure.
+#[verifier::z3]
 fn check_one_relator_closed_exec(
     rt: &RuntimeCosetTable,
     relator: &Vec<crate::runtime::RuntimeSymbol>,
@@ -980,6 +990,7 @@ fn check_one_relator_closed_exec(
 }
 
 ///  Check that all relators trace back to the starting coset.
+#[verifier::z3]
 pub fn check_rt_relator_closed_exec(
     rt: &RuntimeCosetTable,
     relators: &Vec<Vec<crate::runtime::RuntimeSymbol>>,
@@ -1063,6 +1074,7 @@ pub fn check_rt_relator_closed_exec(
 ///      Phase 3: Define new coset at first UNDEF entry.
 ///
 ///  Returns None if max_cosets exceeded or a coincidence is found.
+#[verifier::z3]
 pub fn enumerate_cosets_exec(
     num_gens: usize,
     relators: &Vec<Vec<crate::runtime::RuntimeSymbol>>,
