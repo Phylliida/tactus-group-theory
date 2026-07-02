@@ -1,3 +1,11 @@
+//! Runtime (executable) word operations.
+//!
+//! NOTE (2026-07-02, "flag decides"): under --lean-backend an exec fn's
+//! proof { } / assert-by blocks are Lean tactic text by default. The exec
+//! fns below carry Verus-style ghost blocks, so they are pinned to Z3 with
+//! #[verifier::z3] until their proofs are ported to Lean tactics (porting
+//! one = rewrite its blocks as Lean, drop the attr).
+
 use vstd::prelude::*;
 use crate::symbol::*;
 use crate::word::*;
@@ -69,6 +77,7 @@ pub fn find_cancellation_exec(w: &Vec<RuntimeSymbol>) -> (out: usize)
 }
 
 ///  Reduce at position pos: remove elements at pos and pos+1.
+#[verifier::z3]
 pub fn reduce_at_exec(w: &Vec<RuntimeSymbol>, pos: usize) -> (out: Vec<RuntimeSymbol>)
     requires
         has_cancellation_at(runtime_word_view(w@), pos as int),
@@ -115,6 +124,7 @@ pub fn reduce_at_exec(w: &Vec<RuntimeSymbol>, pos: usize) -> (out: Vec<RuntimeSy
 }
 
 ///  Reduce a word to normal form.
+#[verifier::z3]
 pub fn reduce_word_exec(w: &Vec<RuntimeSymbol>) -> (out: Vec<RuntimeSymbol>)
     requires
         w@.len() < usize::MAX,
@@ -217,6 +227,7 @@ pub open spec fn runtime_hom_view(h: &RuntimeHomData) -> HomomorphismData {
 }
 
 ///  Inverse a runtime word: reverse and invert each symbol.
+#[verifier::z3]
 pub fn inverse_word_exec(w: &Vec<RuntimeSymbol>) -> (out: Vec<RuntimeSymbol>)
     ensures
         runtime_word_view(out@) =~= inverse_word(runtime_word_view(w@)),
@@ -323,6 +334,7 @@ pub fn apply_hom_symbol_exec(
 }
 
 ///  Append all elements from src to dst (exec helper).
+#[verifier::z3]
 fn append_vec(dst: &mut Vec<RuntimeSymbol>, src: &Vec<RuntimeSymbol>)
     ensures
         dst@ =~= old(dst)@ + src@,
@@ -384,6 +396,7 @@ pub proof fn lemma_runtime_word_view_subrange(w: Seq<RuntimeSymbol>, lo: int, hi
 }
 
 ///  Apply homomorphism to a word (exec).
+#[verifier::z3]
 pub fn apply_hom_exec(
     h: &RuntimeHomData,
     w: &Vec<RuntimeSymbol>,
