@@ -1,6 +1,14 @@
 # The Miller CEER carrier is NOT finitely presentable — formalization plan
 
-*Opened 2026-07-03 (conversation with Danielle). Status: DESIGN — no code yet.*
+*Opened 2026-07-03 (conversation with Danielle). Status: **NF-1 + NF-A core VERIFIED & COMMITTED**
+(`src/carrier_not_fp.rs`, commit d10bdf2, module-scoped 31/0 with `miller_collapse_limit`; full-crate
+gate re-check pending). What landed: `lemma_fin_equiv_lifts_to_pred` (NF-1, mirror of
+`pred_to_finite`), `lemma_slice_equiv_monotone` + `lemma_trivial_in_some_slice` (slice plumbing over
+the banked strip/extract/monotone toolkit, made `pub`), `relators_trivial_upto` +
+`lemma_relators_in_common_slice` (common-slice induction), and the **NF-A headline
+`lemma_carrier_not_fp_over_std_gens`** — the refutation is now conditional ONLY on the escape
+hypothesis `limit_escapes_every_slice(fam)`. REMAINING = discharge the escape hypothesis
+(NF-2a/2b/3/4 below), then v2 (NF-6) + ZFC instantiation (NF-7).*
 
 ## 0. The statement
 
