@@ -171,7 +171,7 @@ proof fn lemma_produces_cons(
 }
 
 /// Stripping empty (no-op) steps preserves the produced word.
-proof fn lemma_strip_preserves_produces(
+pub proof fn lemma_strip_preserves_produces(
     p: PredPresentation, steps: Seq<PredDerivationStep>, start: Word, end: Word,
 )
     requires
@@ -207,7 +207,7 @@ proof fn lemma_strip_preserves_produces(
 }
 
 /// The stripped derivation has no empty-relator steps.
-proof fn lemma_strip_yields_nonempty(steps: Seq<PredDerivationStep>)
+pub proof fn lemma_strip_yields_nonempty(steps: Seq<PredDerivationStep>)
     ensures
         derivation_nonempty(strip_empty_steps(steps)),
     decreases steps.len(),
@@ -545,7 +545,7 @@ proof fn lemma_step_slice_monotone(
 }
 
 /// A whole `P_{≤m1}` derivation is a `P_{≤m2}` derivation (`m1 ≤ m2`).
-proof fn lemma_produces_slice_monotone(
+pub proof fn lemma_produces_slice_monotone(
     fam: spec_fn(nat) -> Seq<Word>, m1: nat, m2: nat, steps: Seq<PredDerivationStep>, start: Word, end: Word,
 )
     requires
@@ -628,7 +628,7 @@ proof fn lemma_first_step_slice(
 
 /// **Compactness extraction.**  A `P_∞`-derivation lives in a single slice `P_{≤M*}` (`M* ≥ n`):
 /// take the max of `n` and the per-step relator witness levels; monotonicity stabilizes all of them.
-proof fn lemma_extract_slice(
+pub proof fn lemma_extract_slice(
     fam: spec_fn(nat) -> Seq<Word>, n: nat, steps: Seq<PredDerivationStep>, start: Word, end: Word,
 )
     requires

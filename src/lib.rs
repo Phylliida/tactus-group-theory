@@ -543,3 +543,11 @@ pub mod miller_collapse_inject;
 // faithful collapse + a forward finite→pred bridge + a backward compactness extraction (route (i),
 // monotone family).  The machine-gated relator-set match (3b, §3.4) stays separate.
 pub mod miller_collapse_limit;
+
+// carrier_not_fp: the NON-FINITE-PRESENTABILITY arc (docs/carrier-not-fp-plan.md) — NF-1 generic
+// finite→pred equivalence lift over target-trivial relators (mirror of pred_to_finite) + the NF-A
+// core refutation: any finite 2-generator presentation of P_∞'s trivial words puts all its relators
+// in one finite slice (compactness), contradicting the escape hypothesis.  The escape hypothesis
+// itself (every slice misses a P_∞-trivial word) is discharged by the later Miller-faithfulness
+// bricks; with it, the Miller CEER carrier is NOT finitely presentable.
+pub mod carrier_not_fp;
