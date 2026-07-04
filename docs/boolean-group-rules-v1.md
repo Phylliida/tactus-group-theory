@@ -295,3 +295,32 @@ then F7-pair-cancelled: **the graveyard self-cleans**, endpoints stay canonical.
 Everything else — generic erasers, certificate-carrying erasers, shared-context consumers —
 is one of the three confirmed laundering modes. Rule-of-thumb for the auditor and all future
 opcode design: **nothing is ever erased against nothing.**
+
+## A.7 Audited families round 2 + the collapsed-token finding (auditor corpus now 22)
+
+**S7 erase-pair quartet: CLEAN** (mechanical confirmation of §6.3's hand analysis; anchored net
+relator, benign `st` H₁ signature). **S6 zigzag comparator (minimal model): CLEAN** — the
+bounce/mark idiom validated.
+
+**The unit-sweep finding.** The walk-through unit-deletion (`w ⟨M1 = w₁`, walks, `w₁ ⟩ = w`)
+generates the data-only group consequence **`⟨M1⟩ = 1`** (survivor `br.M.one.cb`). The Law 4′
+check flags it — correctly conservative — but this one is *legitimately semantic*:
+
+> `f(1∧1)·f(1)⁻¹ = ⟨M11⟩·1⁻¹` freely reduces to exactly `⟨M1⟩` ∈ Sem.
+
+It is a §2.1 **cancellation-collapsed schema token**. Two theory notes: (i) the bracketed
+encoding blocks naive tail-collapse (a closing bracket interrupts the §2.1 cancellation), yet
+the machine REGENERATES the collapsed tokens as derived consequences — the group finds its own
+schema tokens; (ii) such tokens are honest, witnessed, data-only relators that the Lemma-2
+parser must treat as first-class (they are short and concrete; same for `⟨X0⟩ = 1` from the
+additive unit sweep, witness `f(0⊕0)·f(0)⁻¹`).
+
+**Auditor upgrade: the witnessed whitelist.** Data-only survivors are now matched (up to cyclic
+rotation/inversion) against DECLARED semantic tokens, each declaration owing a witness pair;
+undeclared data-only survivors remain poison flags. Corpus: `unit_sweep_raw` → POISON
+(undeclared), `unit_sweep_whitelisted` → CLEAN. **Audit protocol from here: every data-only
+survivor must either ship a witness (whitelist entry) or kill the design.**
+
+Families still awaiting this treatment: PASS1 structural-swap windows + R2 macro composite,
+S3 full MATCH-SUBTERM listing, PASS3 spine-advance composite, and (ZFC layer) S10–S16.
+Method identical: transcribe into the corpus, run, explain every survivor.
