@@ -213,6 +213,55 @@ the machine's own normal-form discipline — the unconsumed window letter. *The 
 the free group's sliding moves is exactly the machine's operational invariant.* The classical
 police letters were scaffolding for this alignment; here it arises intrinsically.
 
+### 4.4 M4 — mixed transduction (mixed cycle words): defect flow
+
+`R = { qa = bq′, q′b = aq }` — right-mover transducing `a→b` in state `q`, `b→a` in state `q′`.
+(Label correction vs the first draft: this is not direction reversal — both rules move right —
+it is the smallest system whose *cycle word is mixed*. True left-movers are deferred to M5′.)
+
+*Thue side:* orient left-to-right; state letters move strictly right ⟹ terminating; no critical
+pairs ⟹ complete. Irreducibles: **no `qa` and no `q′b`** — the follow-constraint is now
+state-dependent (`a` forbidden after `q`, `b` forbidden after `q′`).
+
+*Group side:* eliminating `q′ = b⁻¹qa` turns the second relator into `qab = baq`:
+
+> `G ≅ ⟨ a, b, q | q(ab)q⁻¹ = ba ⟩` — HNN of `F(a,b)`, associated subgroups `⟨ab⟩ → ⟨ba⟩`,
+> **mixed** cycle words. Compensations: `hᵢ = (ab)^{−mᵢ} gᵢ (ba)^{mᵢ₊₁}`.
+
+**The new phenomenon.** The M3 head-cap argument FAILS locally: because `wᵢ` may start with `a`
+after `q′`, syllable heads are unbounded, and there is a genuine *local masquerade* — with
+`mᵢ = 1`, the `u`-syllable `a` (from adjacent `…q′q…`) maps exactly to the `v`-syllable `b⁻¹`
+(from adjacent `…qq′…`): `(ab)⁻¹·a = b⁻¹`. The group locally "tries" to commute the resting head's
+phase, `q′q ↔ qq′`. Compensations are no longer locally impossible — only **globally
+inconsistent**.
+
+**Theorem (M4 positivity).** The positive trace of `ncl(R)` equals the Thue congruence.
+
+*Proof shape (defect flow).* Case analysis on the reduced form of `(ab)^{−mᵢ}gᵢ(ba)^{mᵢ₊₁}`
+against the constrained syllable shapes (`P` or `P·b⁻¹`, `P` positive, with the state-dependent
+start constraint) gives three forced lemmas:
+1. `mᵢ < 0` is impossible (it prepends positive `ab…`, forcing an `h`-syllable with `s′ᵢ = q′`
+   whose data starts with `b` — forbidden).
+2. `mᵢ ≥ 2` is impossible (≥ 3 uncancellable negative letters: after the single `a`-head cancels,
+   the next junction pits `b⁻¹` against a non-`b`-start `wᵢ`).
+3. `mᵢ = 1` forces the exact masquerade: `gᵢ = a` (`sᵢ = q′, wᵢ = ε, sᵢ₊₁ = q`),
+   `hᵢ = b⁻¹` (`s′ᵢ = q, w′ᵢ = ε, s′ᵢ₊₁ = q′`), and `mᵢ₊₁ = 0`.
+Then the propagation analysis: a defect at junction `i` forces `mᵢ₊₂ = 1` with syllable `i+1`
+empty on both sides (`u = ⋯q′qq′q⋯` vs `v = ⋯qq′qq′⋯`, pure alternating state runs) — any data
+letter in the run yields an `a`-start after `q` on one side, contradiction. So the defect **flows
+rightward through state-only material and cannot stop**; at the right boundary (`m_{k+1} = 0`
+by definition) the final equation `hₖ = (ab)^{−1}gₖ` demands a positive syllable equal to
+`b⁻¹wₖ` — impossible. Hence all `mᵢ = 0`, tuples equal, states and data read back as in M3. ∎
+
+**Structural lessons.** (i) The general positivity condition is not purely local: it is local
+caps *plus a boundary-discharge argument* — compensation defects are conserved, forced to
+propagate, and annihilated only at word ends. Very machine-flavored: the group's cheat attempt
+behaves like a particle that must exit through the boundary and can't. (ii) Corollary warning:
+on **circular** words the defect could cycle forever — conjugacy-positivity may fail where
+equality-positivity holds. Our target (the word problem on codes) only needs equality. (iii) The
+masquerade defect has semantic meaning: the group attempts to identify the two rest-phases of the
+head (`q′q` vs `qq′`); the machine's state discipline plus finite word length refuses it.
+
 ---
 
 ## 5. The general program
@@ -254,11 +303,12 @@ in itself, and the Proof Factory tutorial world.
 
 ### 5.4 Escalation ladder (next steps)
 
-- **M4 — direction reversal:** `{qa = bq′, q′b = aq}` ⟹ `⟨a,b,q | q(ab)q⁻¹ = ba⟩`; associated
-  subgroups on mixed cycle words — head caps must become syllable *shape* invariants. The next
-  dragon-check.
+- ~~M4 — mixed cycle words~~ **DONE, positivity holds** (§4.4; new global defect-flow mechanism).
+- **M5′ — true direction reversal** (left-moving rules, e.g. `aq = q′b`): head can revisit
+  material; syllable decomposition changes qualitatively.
 - **M5 — mint/retire** (length-imbalanced rules): associated-subgroup elements of unequal lengths.
 - **M6 — data-carrying states** (copy walks): state chunks per transported letter; many cycles.
+- **M7 — two interacting loops** (two stable letters): first multi-HNN defect interaction.
 - Then: assemble Probe 0's full opcode audit; prove Lemma 2 for the actual instruction set.
 
 ---
