@@ -31,6 +31,12 @@ def cyc(w):
     while len(w) >= 2 and w[0] == -w[-1]: w = w[1:-1]
     return w
 
+def cyckey(w):
+    w = cyc(w)
+    if not w: return ()
+    return min(min(w[k:] + w[:k] for k in range(len(w))),
+               min(inv(w)[k:] + inv(w)[:k] for k in range(len(w))))
+
 def subst(w, s, sol):
     out = []
     for x in w:
@@ -42,7 +48,7 @@ def subst(w, s, sol):
 # ---------- systems ----------
 
 class System:
-    def __init__(self, name, letters, states, rules, expect):
+    def __init__(self, name, letters, states, rules, expect, whitelist=()):
         self.name = name
         self.ids = {nm: i + 1 for i, nm in enumerate(letters)}
         self.names = {i + 1: nm for i, nm in enumerate(letters)}
@@ -50,6 +56,8 @@ class System:
         self.data = {i for i in self.names if i not in self.states}
         self.rules = [(self.word(l), self.word(r)) for l, r in rules]
         self.expect = expect  # 'POISON' or 'CLEAN'
+        # declared-semantic data-only relators (collapsed schema tokens), by cyclic key
+        self.whitelist = {cyckey(self.word(w)) for w in whitelist}
 
     def word(self, s):
         out = []
@@ -101,13 +109,11 @@ def law4prime(sys_, tries=40):
         surv, _ = eliminate(relators, sys_.states, rng)
         for r in surv:
             c = cyc(r)
-            if c and all(abs(x) in sys_.data for x in c):
+            if c and all(abs(x) in sys_.data for x in c) and cyckey(c) not in sys_.whitelist:
                 worst.append(c)
-    # dedupe up to cyclic rotation/inversion crudely
     seen, out = set(), []
     for c in worst:
-        key = min(min(c[k:] + c[:k] for k in range(len(c))),
-                  min(inv(c)[k:] + inv(c)[:k] for k in range(len(c))))
+        key = cyckey(c)
         if key not in seen:
             seen.add(key); out.append(c)
     return out
@@ -191,6 +197,21 @@ S.append(System("s9_fixed_peel_pair_deposit",
     [("z x1", "g1 g1 zp"), ("zp x1", "g1 g1 z"),
      ("z x2", "g2 g2 zp"), ("zp x2", "g2 g2 z")],
     'CLEAN'))
+
+S.append(System("s7_erase_pair_quartet", ["st", "P", "e", "e1", "e3", "e4"],
+    ["e", "e1", "e3", "e4"],
+    [("st e", "e1"), ("e1 P", "P e3"), ("e3 st", "e4"), ("P e4", "e P")], 'CLEAN'))
+S.append(System("s6_zigzag_comparator", ["st", "sm", "A", "k", "k1", "k2", "k3"],
+    ["k", "k1", "k2", "k3"],
+    [("st k", "k1 sm"), ("k1 A", "A k2"), ("k2 st", "sm k3"),
+     ("sm k3", "k3 sm"), ("A k3", "k A"), ("sm k", "k sm")], 'CLEAN'))
+S.append(System("unit_sweep_raw", ["br", "cb", "M", "one", "u", "w", "w1"],
+    ["w", "w1"],
+    [("w br M one", "w1"), ("w1 u", "u w1"), ("w1 cb", "w")], 'POISON'))
+S.append(System("unit_sweep_whitelisted", ["br", "cb", "M", "one", "u", "w", "w1"],
+    ["w", "w1"],
+    [("w br M one", "w1"), ("w1 u", "u w1"), ("w1 cb", "w")], 'CLEAN',
+    whitelist=["br M one cb"]))
 
 # ---------- run ----------
 
