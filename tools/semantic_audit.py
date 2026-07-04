@@ -273,6 +273,27 @@ S.append(System("pass3_spine_advance",
     [("ke br M", "brm Mm ke1"), ("ke1 P", "P ke1"), ("ke1 br M", "brm Mm ke"),
      ("ke P", "P ke")], 'CLEAN'))
 
+S.append(System("pico_shield_lifecycle",
+    ["F", "Fp", "a", "am", "ac", "Al", "Al2", "Lb", "Rb", "Rbh", "T", "P",
+     "h", "d", "d1", "c", "c2", "k", "g", "e", "e1", "g2", "g3"],
+    ["h", "d", "d1", "c", "c2", "k", "g", "e", "e1", "g2", "g3"],
+    [("h F", "F d"), ("d a", "a am d1"), ("am d1", "c"),          # builder: dup at font
+     ("c Fp", "Fp c"), ("c Lb", "Lb c"),                          # carry into yard
+     ("c Rb", "ac Rb c2"),                                        # yard deposit (single rule)
+     ("Lb c2", "c2 Lb"), ("Fp c2", "c2 Fp"), ("a c2", "c2 a"),
+     ("F c2", "h F"),                                             # builder cycle closes
+     ("k ac", "Al g"),                                            # verify: re-flavor, hand off
+     ("g Al", "e"),                                               # export pickup
+     ("e Rb", "Rbh e1"),                                          # out-cross, wall flips
+     ("e1 P", "P e1"), ("e1 T", "Al2 T g2"),                      # store deposit (single rule)
+     ("P g2", "g2 P"), ("Rbh g2", "g3 Rb"),                       # in-cross, wall un-flips
+     ("g3 Al", "e")],                                             # export cycle closes
+    'CLEAN'))
+S.append(System("pico_export_deposit_WRONG",
+    ["Al2", "T", "Th", "P", "e1", "g2"], ["e1", "g2"],
+    [("e1 T", "g2 Al2 Th"), ("e1 Th", "g2 Al2 T"),
+     ("P e1", "e1 P"), ("g2 P", "P g2")], 'POISON'))
+
 # ---------- run ----------
 
 if __name__ == "__main__":

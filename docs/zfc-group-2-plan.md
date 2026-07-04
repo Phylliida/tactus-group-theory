@@ -571,3 +571,28 @@ validated as the primary mechanical discriminator on the entire corpus; H₁ sta
 Natural Python successors (no tactus needed): the schema EXPANDER for boolean-group-rules-v1
 (feeding this auditor the literal ~450 rules), the Boolean machine SIMULATOR (completeness
 fuzzing on random formulas vs sorted-ANF), and a bounded group-consequence fuzzer.
+
+## V.6 The PICO shield lifecycle: mechanically audited CLEAN (session's final result)
+
+`tools/semantic_audit.py`, corpus 30: **`pico_shield_lifecycle` — the full composite of V.1
+(font-copier builder → re-flavor verifier → export-through-wall → store deposit), 18 rules,
+11 states, three interlocking cycles — audits CLEAN** under the complete battery (Law 1,
+randomized-Tietze survivors, conjugation-resolution, H₁ triage; benign signatures only:
+`ac` verification-consumption, `Al→Al2` transport balance). This upgrades V.1's closure-SKETCH
+to a machine-checked verdict: **M8a-full's closure check is done at prototype-tool strength.**
+The formal Lemma-2 (positivity) remains the ground truth, but every mechanical probe we possess
+— including the two that caught real poisons earlier the same evening — passes the ZFC layer's
+core mechanism.
+
+Design corrections locked in by the transcription (each violation mechanically confirmed
+poisonous): deposits are SINGLE RULES (no gratuitous flavor pairs — flavors only where a
+certificate is genuinely needed); where an anchor must flip, the returning state goes AFTER the
+flipped anchor (`e₁T = Al₂·T·g₂` fine; state-before variant forces `(T̂T⁻¹)² = 1` — corpus:
+`pico_export_deposit_WRONG`, survivor `T.-Th.T.-Th`). Wall-crossing pairs use distinct
+state-pairs per direction (flip-pairing law).
+
+Final tally at session close: 30 systems, 5 poisons (all became laws), 25 clean (all became
+validated components), 0 unexplained survivors. The audit chain now covers: all M-ladder rungs,
+the Boolean machine's F-families and passes, the erasure trichotomy, and the ZFC layer's
+builder/verifier/export lifecycle. Remaining for future sessions: S10–S16 detail families
+(same method), M8b on paper, then the formal campaign per Part II.
