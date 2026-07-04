@@ -162,3 +162,172 @@ took, with far more reuse available.
 *Everything above this line is executable by future sessions from the three thread documents +
 memory. The thread's discipline — laws before rules, rungs before machines, audits before
 expansions, honest labels on every proof — is itself part of the handoff.*
+
+---
+
+# PART III — Expanded detail (execution-grade)
+
+## III.1 The calculus, pinned exactly (closed-store variant)
+
+Ring basis: `→` is DEFINED: `A→B := 1 ⊕ A ⊕ (A∧B)`; `¬A := 1⊕A`; `A∨B := A⊕B⊕(A∧B)`;
+`A↔B := 1⊕A⊕B`; `∃x := ¬∀x¬`. **All store lines are SENTENCES** (universal closures) — the
+"closed Hilbert" discipline: axioms = closures of instances of {ring tautologies (P), Q1
+`∀xφ→φ[t/x]`, Q2 `∀x(φ→ψ)→(∀xφ→∀xψ)`, Q3 `φ→∀xφ` (x∉FV φ), Eq axioms, NBG A1–A_k}; sole rule =
+MP on sentences. (Standard fact that this is complete for provability of sentences — cite a
+logic text at write-up time; flagged as a checkable lemma, not an assumption of the design.)
+
+**Machine invariant.** Reachable configurations from `f(σ)` include
+`code(σ ∧ Θ_m)`, `Θ_m = 1 ∧ γ₁ ∧ ⋯ ∧ γ_m` right-nested, each γᵢ a store line of some fixed
+ℋ*-proof. (`f(σ) = H₀·⌜σ ∧ 1⌝` — the `1` is the store seed; Law 5.)
+
+## III.2 RCL, case by case
+
+*Induction on m; each case is a Thue-PATH construction (backward halves come free from Thue
+symmetry — completeness builds paths, not algorithms).*
+
+**(1) NBG axiom.** One concrete store-append rule per axiom: at store tail,
+`s_tail ⟩ = ⟨M-node γ-code ⟩ s_tail′`-shaped (a single long rule; the axiom code is a fixed
+word). Hygiene trivial (state-led sides). k ≈ 18 rules, the longest in R.
+
+**(2) Logical-axiom instance (yard lifecycle).** Open shield (S13; Law 6 pre-check: the
+open-rule's window requires no yard-bracket present). Mint γ letter-by-letter inside `(·∨⊤)`
+(one mint rule per letter, shielded, motion ✓). Verify by SCHEMA-MATCH (S14):
+- P-instances: run the Probe-0 ENGINE inside the shield on the candidate's ring skeleton
+  (blocks = maximal non-ring subtrees, see (3)) and check it normalizes to `1`. (Elegant: the
+  Boolean group is its own tautology checker.)
+- Q1: the SUBST-COMPARATOR in verify mode (III.3-S10): first substituted occurrence of t is
+  marked as TEMPLATE; each later occurrence compared against the template by courier-zigzag;
+  non-x positions compared pointwise; capture check via binder-stack marks on the enclosing
+  `A v|^i` nodes between root and occurrence.
+- Q2/Q3/Eq: pointwise comparators + FV-CHECK (S12) for Q3's side condition; closure-prefix
+  check: the ∀-block at γ's root binds every free variable (FV sweep against the binder list).
+Unshield (anchored two-ended wrapper erasure; sound because a VERIFIED logical-axiom closure is
+valid, hence `Θ ⊢ γ` for every Θ — no live anchor needed, but the net cycle-relator must retain
+the schema-pattern anchor letters: this is exactly rung M8a). Close shield.
+
+**(3) MP.** Given live `γ_j` and `γ_k = γ_j→γ_m` (i.e. `1⊕γ_j⊕(γ_j∧γ_m)`): MP-MATCH (S15)
+verifies the A-part equals `γ_j` by BLOCK COMPARE — literal code equality of maximal non-ring
+subtrees (proof lines are taken α-LITERAL, so literal comparison suffices — pin this convention).
+Then the engine-over-blocks (S1′ lift of Probe 0: sweeps treat atoms and `A`-rooted subtrees as
+opaque blocks, skipping via MATCH-SUBTERM walks) derives the ring identity
+`A ∧ (1⊕A⊕(A∧B)) ~ A∧B` instantiated at the blocks — appending `γ_m` to the store.
+
+**(4) Finish.** At `σ ∧ Θ′ ∧ (σ↔τ)`: engine-over-blocks transmutation `A∧(A↔B) ~ B∧(A↔B)`
+(ring identity: `A∧(1⊕A⊕B) ~ B∧(1⊕A⊕B)` — check: both `≡ A∧B∧...`; verified at rule-list time
+by the engine itself). Then reverse the entire store-construction path (Thue symmetry) landing
+at `f(τ)`. ∎-plan, now case-complete.
+
+## III.3 New subroutines: rule-schema detail
+
+- **S10 SUBST-COMPARATOR** (verify mode): states `σ₀` (at ∀xφ's binder, records x's stroke
+  count via zigzag against the candidate's occurrence — NOT in state: by comparator walks),
+  `σ_T` (template-marking the first t-occurrence: mark t's letters `Σ→Σ•` between substitution
+  boundaries), `σ_C` (compare later occurrence against template: courier-zigzag letter pairs,
+  marks flip to `Σ◦`), `σ_X` (at φ's x-occurrences: verify the candidate has a full template
+  copy), binder-stack: entering `⟨A v|^j` during the walk pushes a bracket-mark; capture check =
+  template's variables compared against marked binders (zigzag per binder). Exit: MATCH / FAIL
+  turns (Law 3). ≈ 30 schemas.
+- **S11 ALPHA:** rename binder `v|^i → v|^j` and all bound occurrences: FV-CHECK for j-freshness,
+  then per-occurrence stroke-retarget by courier (delete/mint strokes under the anchor `v` —
+  anchored, Law 4′ ✓). ≈ 12 schemas.
+- **S12 FV-CHECK:** sweep for free `v|^i`: at each `v`, zigzag-compare stroke count against the
+  target (comparator), tracking binder-scope by bracket marks; exits FREE-FOUND / CLEAN. ≈ 10.
+- **S13 SHIELD-MANAGER:** open `s = ⟨ₛ ∨ ⊤ ⟩ₛ-seeded s₁`-shaped mint (dedicated shield-bracket
+  flavor ⟨ₛ; open-rule window includes a yard-absence guard letter — the "yard closed" flag
+  letter Y₀ ↔ Y₁ toggled by open/close: Law 6 enforced by the flag, which lives in the wrapper
+  E); unshield = two-ended anchored erasure of `⟨ₛ∨` and `⊤⟩ₛ` with the walk between; close =
+  reverse of open on the emptied yard. ≈ 12 schemas.
+- **S14 SCHEMA-MATCH ×(6 logical + 18 NBG):** each = a dispatch window on the yard root + calls
+  into S10/S12/comparators; per-schema ≈ 4–8 dispatch schemas + shared workers.
+- **S15 MP-MATCH:** locate-implication sweep + block-compare loop. ≈ 10.
+- **S16 STORE-CTL:** tail-finding sweeps, store-line addressing marks. ≈ 8.
+
+## III.4 The M8 rungs, as concrete systems (do these FIRST, M-ladder style)
+
+**M8a — the shield lifecycle rung.** Minimal system: letters `{⟨ₛ, ⟩ₛ, a, x}`, designated
+"axiom word" `aa`; states: `o` (open), `β` (mint), `κ` (verify), `υ` (unshield). Rules (shape):
+`o x = x o` (seek), `o = ⟨ₛ β ⟩ₛ` (open, mint-must-move variant with the seed),
+`β = a• β` (shielded mint), `β = κ` (switch to verify), `κ a• a• = a a κ₁` (the pattern check —
+verify-and-promote fused so the certificate letters ARE the anchor), `⟨ₛ κ₁ ... ⟩ₛ`-erasure
+quartet (unshield), exit. **Positivity target:** the only live material a full lifecycle cycle
+can net-create is the designated word `aa` — i.e. every cycle's net relator is (state-conjugated)
+`o⁻¹·aa·o′`-shaped with the pattern letters present. Danger to probe: interleaving two partial
+lifecycles (Law 6 flag off) — expect a counterexample WITHOUT the flag, a proof WITH it: that
+pair is the rung's content, mirroring M3-vs-M4's structure.
+
+**M8b — the subst-comparator rung.** Minimal system: one binder `A v`, strokes, template marks;
+the comparator cycles from S10 stripped to two variables. Positivity target: comparator cycles
+net only anchored relators; the capture-check marks can't be laundered. Expect: M4-style defect
+flow with binder-brackets as boundaries.
+
+## III.5 Formalization: lemma-level plans (names approximate — grep before writing)
+
+**Phase 0 (`thue.rs`):**
+```
+pub struct ThueRule { pub lhs: Word, pub rhs: Word }
+pub open spec fn thue_step(R: Seq<ThueRule>, u: Word, v: Word) -> bool   // ∃ i, prefix, suffix
+pub open spec fn thue_derives(R, steps: Seq<...>, u, v) -> bool          // path
+pub open spec fn thue_equiv(R, u, v) -> bool
+pub open spec fn positive_word(w: Word) -> bool                          // trivially true (Words are positive); the
+                                                                         // group side uses presentation words
+pub open spec fn rules_presentation(R) -> Presentation                   // relators lhs·rhs⁻¹ — NEEDS inverse letters:
+                                                                         // reuse presentation.rs relator encoding directly
+pub proof fn lemma_thue_implies_group(R, u, v)                           // easy: each step = RelatorInsert/Delete + free moves
+pub open spec fn positivity(R) -> bool                                   // ∀ u v: equiv_in_presentation(...) <==> thue_equiv(...)
+```
+Care point: `Word = Seq<Symbol>` with `Gen/Inv` — positives = all-`Gen` words; the bridge lemma
+maps Thue steps to derivation steps (RelatorDelete needs the relator as a subword — mind the
+`lhs·rhs⁻¹` orientation; mirror `pred_to_finite`'s forward-splice style).
+
+**Phase 1 pilot (`m3_blinker.rs`), brick list:**
+1. `blinker_rules()`, `blinker_pres()` (4 gens: a,b,q,q'; relators qa(bq′)⁻¹, q′a(bq)⁻¹).
+2. Thue side: completeness of `{qa→bq′, q′a→bq}` (no-critical-pairs + #a-decrease termination —
+   induction infra: a small `terminating_confluent` toolkit, reusable for every rung).
+3. Tietze elimination q′: `lemma_blinker_iso_hnn`: equiv_in_presentation(blinker_pres,·,·) ⟺
+   equiv_in_presentation(hnn_presentation(blinker_hnn),·,·) under the substitution embedding —
+   use `lemma_same_group_iff` (base_swap.rs) + `apply_embedding`; `blinker_hnn = HNNData{ base:
+   free 2-gen pres, associations: [(a², b²)] }` — associations as words `[Gen0,Gen0]/[Gen1,Gen1]`.
+4. `lemma_blinker_assoc_iso`: `hnn_associations_isomorphic(blinker_hnn)` — both columns free
+   families in the free base (easy instance of banked `is_free_family` tools, f_free.rs).
+5. Syllable spec: `spec fn sub_word(u) -> Word`, `spec fn syllables(u) -> Seq<Word>`,
+   `spec fn head_a_exp(w) -> int`; lemma: irreducible ⟹ `head_a_exp ∈ {0,1}` per syllable.
+6. Britton cascade: no-q⁻¹ words are Britton-reduced (positive stable letters);
+   equality ⟹ compensation tuples — derive from `britton_lemma_full` applied to `U·V⁻¹` with the
+   pinch induction (mirror the `lemma_pred_to_limit` cascade style).
+7. Parity kill: compensations `a^{2m}` vs head-cap — pure Seq arithmetic.
+8. Readback + assembly: `theorem_m3_positivity: positivity(blinker_rules())`.
+Estimate: 1–3 sessions, ~30–50 lemmas. THE TEMPLATE for all other rungs.
+
+**Phase 1 crown (`junction_decoupling.rs`):** statement over the banked multi-HNN tower
+(`pred_tower`/`britton_via_tower` shapes): for a tower with stable-positive letter images
+(spec `stable_positive_images(emb)`), two positive words are equal iff their per-junction
+compensation systems solve — packaged as `lemma_junction_decoupling` reducing multi-loop
+positivity to a per-junction predicate. Consumes `britton_lemma_full` at each level (the
+descent mirrors `lemma_h3_pred_descends_to_h2`'s two-step style).
+
+**Phase 2 (verified auditor, `semantic_audit/` module or standalone crate):**
+```
+Rule { lhs: Vec<u32>, rhs: Vec<u32> }   // letters: data < 2^16 <= states
+spec fn affix_disjoint(r) -> bool; exec fn check_affix(r) ensures matches spec
+spec fn net_relator(cycle: Seq<Rule-orientations>) -> Word  // via reduction.rs normal_form (BANKED, verified)
+spec fn law4p_ok(w: Word) -> bool  // contains a state-letter after reduction
+exec: state graph build; cycle basis = spanning tree + back edges (each back edge one cycle);
+      per-cycle net relator via verified free reduction; Law 6 flag check; bounded KB probe.
+```
+Correctness spec: `audit_ok(R) ==> laws_1_4p_6(R)` — the theorem the tool's certificate means.
+Reuses: `reduction.rs` (verified normal form!), Vec/exec idioms per the fixed Lean-backend
+toolkit. ~2–4 sessions.
+
+**Phase 3–4:** as Part II; completeness lemmas in the `gap2_srm_walk` idiom (config spec fns +
+`lemma_*_step` + `lemma_run_split` composition; measures as `decreases`). RCL formalization
+target statement (computability crate):
+`lemma_replay_complete(pf: HilbertProof, ...) ensures thue_equiv(zfc_rules(), f(σ), f(τ))`.
+
+## III.6 What "done" looks like
+
+`theorem_boolean_logic_group`: positivity + completeness for the expanded v1 rule list ⟹ the
+presentation `⟨Σ∪States | R⟩` realizes propositional equivalence on codes. Then
+`theorem_zfc_group_2` (both crates): `equiv_in_presentation(G₂, f(σ), f(τ)) ⟺ NBG ⊢ σ↔τ`
+(+ ZFC corollary on set-sentences, + the polynomial-overhead statement as a derivation-length
+bound threaded through the replay lemmas). Artifacts: the printed presentation, the two papers,
+Proof Factory worlds 1–2.
