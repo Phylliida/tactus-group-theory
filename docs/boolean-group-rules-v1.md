@@ -375,3 +375,14 @@ bounded-bit mint counting (shuttle), shared-context consumption (S9), duplicate-
 detection (friendly fire, documented), wall-first flavor deposits (deposit-order), shared-state
 flavor-flips (flip-pairing). Six modes, six probes, twenty-eight systems, zero unexplained
 survivors.
+
+## A.10 THE ENGINE'S HEART RUNS (tools/boolean_engine.py)
+
+The pair-cancellation engine — F7's fused comparator–eraser on real encoded atoms over the flat
+⊕-spine (v1.1 encoding note: the sum spine is bracket-free; ⊕ is AC and the spine unambiguous) —
+**audits CLEAN (0/0/0) and executes**: `p₁ ⊕ p₂ ⊕ p₂ ⟶ p₁` in ten Thue steps: two zigzag
+round-trips eating one stroke from each copy per cycle (the anchored quartet across `⊞P`), the
+5-letter skeleton-consumption window, the transducing done-wall exit. **Ten relator applications
+in the group of Boolean logic, computing `x ⊕ x = 0` — the ring's arithmetic performed by the
+group itself.** Every rule an audited shape; the trace is the first normalization the Boolean
+group ever performed.
