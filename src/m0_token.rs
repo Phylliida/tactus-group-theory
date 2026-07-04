@@ -22,6 +22,7 @@ use crate::presentation::*;
 use crate::presentation_lemmas::lemma_freely_equivalent_implies_equiv;
 use crate::homomorphism::*;
 use crate::higman_operations::{free_group, lemma_free_group_valid};
+use crate::free_word_problem::lemma_free_group_equiv_freely_equivalent;
 
 verus! {
 
@@ -430,5 +431,36 @@ pub proof fn lemma_rel_e4()
     assert(img == w0);
 }
 
+
+// ── is_valid_homomorphism: shape (lemma_psi_shape) + the 9 relator conditions ──
+pub proof fn lemma_psi_valid()
+    ensures is_valid_homomorphism(psi_hom())
+{
+    lemma_psi_shape();
+    assert forall|i: int| 0 <= i < token_pres().relators.len() implies
+        equiv_in_presentation(free_group(4),
+            apply_hom(psi_hom(), #[trigger] token_pres().relators[i]), empty_word()) by {
+        if i == 0 { assert(token_pres().relators[0] =~= seq![Symbol::Gen(4), Symbol::Gen(5), Symbol::Inv(3), Symbol::Inv(2)]); lemma_rel_r1(); }
+        if i == 1 { assert(token_pres().relators[1] =~= seq![Symbol::Gen(0), Symbol::Gen(2), Symbol::Gen(3), Symbol::Gen(1)]); lemma_rel_d1(); }
+        if i == 2 { assert(token_pres().relators[2] =~= seq![Symbol::Gen(2), Symbol::Gen(3), Symbol::Gen(1), Symbol::Gen(0)]); lemma_rel_d2(); }
+        if i == 3 { assert(token_pres().relators[3] =~= seq![Symbol::Gen(3), Symbol::Gen(1), Symbol::Gen(0), Symbol::Gen(2)]); lemma_rel_d3(); }
+        if i == 4 { assert(token_pres().relators[4] =~= seq![Symbol::Gen(1), Symbol::Gen(0), Symbol::Gen(2), Symbol::Gen(3)]); lemma_rel_d4(); }
+        if i == 5 { assert(token_pres().relators[5] =~= seq![Symbol::Gen(0), Symbol::Gen(4), Symbol::Gen(5), Symbol::Gen(1)]); lemma_rel_e1(); }
+        if i == 6 { assert(token_pres().relators[6] =~= seq![Symbol::Gen(4), Symbol::Gen(5), Symbol::Gen(1), Symbol::Gen(0)]); lemma_rel_e2(); }
+        if i == 7 { assert(token_pres().relators[7] =~= seq![Symbol::Gen(5), Symbol::Gen(1), Symbol::Gen(0), Symbol::Gen(4)]); lemma_rel_e3(); }
+        if i == 8 { assert(token_pres().relators[8] =~= seq![Symbol::Gen(1), Symbol::Gen(0), Symbol::Gen(4), Symbol::Gen(5)]); lemma_rel_e4(); }
+    }
+}
+
+// ── M0-soundness: thue ⟹ ψ-equal, by REUSE (the agent's A3/A4/step_sound) ──
+pub proof fn lemma_m0_soundness(u: Word, v: Word)
+    requires equiv_in_presentation(token_pres(), u, v)
+    ensures freely_equivalent(apply_hom(psi_hom(), u), apply_hom(psi_hom(), v))
+{
+    lemma_psi_valid();
+    lemma_hom_preserves_equiv(psi_hom(), u, v);
+    lemma_free_group_equiv_freely_equivalent(4,
+        apply_hom(psi_hom(), u), apply_hom(psi_hom(), v));
+}
 
 } // verus!
