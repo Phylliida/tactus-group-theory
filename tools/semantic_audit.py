@@ -294,6 +294,24 @@ S.append(System("pico_export_deposit_WRONG",
     [("e1 T", "g2 Al2 Th"), ("e1 Th", "g2 Al2 T"),
      ("P e1", "e1 P"), ("g2 P", "P g2")], 'POISON'))
 
+S.append(System("s10_binder_stack",              # M8b core: push/pop bracket marks + zigzag
+    ["Tm", "br", "brb", "v", "st", "stm", "dn", "up"], ["dn", "up"],
+    [("dn br", "brb dn"),          # descend: push (transduce bracket in passing)
+     ("dn v", "v dn"),             # walk variables
+     ("dn st", "stm up"),          # mark one stroke, turn (transducing turn)
+     ("v up", "up v"),             # ascend walk
+     ("brb up", "up br"),          # ascend: pop (restore bracket)
+     ("Tm up", "dn Tm")],          # single-rule restart at top anchor
+    'CLEAN'))
+S.append(System("s13_yard_flag",                 # Law-6 flag toggle: open/close flips
+    ["Y0", "Y1", "P", "Tm", "Tw", "W", "o", "o1", "cl", "cl1"],
+    ["o", "o1", "cl", "cl1"],
+    [("o Y0", "Y1 o1"),            # open: flag flips, distinct state-pair
+     ("o1 P", "P o1"), ("o1 Tm", "cl Tw"),
+     ("P cl", "cl P"), ("Y1 cl", "cl1 Y0"),      # close: flag flips back, distinct state-pair
+     ("W cl1", "o W")],
+    'CLEAN'))
+
 # ---------- run ----------
 
 if __name__ == "__main__":
