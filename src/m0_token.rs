@@ -586,4 +586,141 @@ pub proof fn lemma_gen1_id()
 }
 
 
+// ── wrap-identity building block: φ∘ψ ≡ id on each generator ──
+pub proof fn lemma_gen_wrap(g: int)
+    requires 0 <= g < 6
+    ensures equiv_in_presentation(token_pres(),
+        apply_hom(phi_hom(), psi_images()[g]), seq![Symbol::Gen(g as nat)])
+{
+    let p = token_pres(); lemma_token_pres_valid();
+    if g == 0 {
+        assert(psi_images()[0] =~= seq![Symbol::Gen(0)]);
+        assert(apply_hom(phi_hom(), seq![Symbol::Gen(0)]) =~= seq![Symbol::Gen(0)]) by (compute);
+        lemma_equiv_refl(p, seq![Symbol::Gen(0)]);
+        assert(seq![Symbol::Gen(g as nat)] =~= seq![Symbol::Gen(0)]);
+    }
+    else if g == 1 {
+        assert(psi_images()[1] =~= seq![Symbol::Inv(3), Symbol::Inv(1), Symbol::Inv(0)]);
+        assert(apply_hom(phi_hom(), seq![Symbol::Inv(3), Symbol::Inv(1), Symbol::Inv(0)]) =~= seq![Symbol::Inv(3), Symbol::Inv(2), Symbol::Inv(0)]) by (compute);
+        lemma_gen1_id();
+        assert(seq![Symbol::Gen(g as nat)] =~= seq![Symbol::Gen(1)]);
+    }
+    else if g == 2 {
+        assert(psi_images()[2] =~= seq![Symbol::Gen(1)]);
+        assert(apply_hom(phi_hom(), seq![Symbol::Gen(1)]) =~= seq![Symbol::Gen(2)]) by (compute);
+        lemma_equiv_refl(p, seq![Symbol::Gen(2)]);
+        assert(seq![Symbol::Gen(g as nat)] =~= seq![Symbol::Gen(2)]);
+    }
+    else if g == 3 {
+        assert(psi_images()[3] =~= seq![Symbol::Gen(3)]);
+        assert(apply_hom(phi_hom(), seq![Symbol::Gen(3)]) =~= seq![Symbol::Gen(3)]) by (compute);
+        lemma_equiv_refl(p, seq![Symbol::Gen(3)]);
+        assert(seq![Symbol::Gen(g as nat)] =~= seq![Symbol::Gen(3)]);
+    }
+    else if g == 4 {
+        assert(psi_images()[4] =~= seq![Symbol::Gen(2)]);
+        assert(apply_hom(phi_hom(), seq![Symbol::Gen(2)]) =~= seq![Symbol::Gen(4)]) by (compute);
+        lemma_equiv_refl(p, seq![Symbol::Gen(4)]);
+        assert(seq![Symbol::Gen(g as nat)] =~= seq![Symbol::Gen(4)]);
+    }
+    else {
+        assert(psi_images()[5] =~= seq![Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(3)]);
+        assert(apply_hom(phi_hom(), seq![Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(3)]) =~= seq![Symbol::Inv(4), Symbol::Gen(2), Symbol::Gen(3)]) by (compute);
+        lemma_gen5_id();
+        assert(seq![Symbol::Gen(g as nat)] =~= seq![Symbol::Gen(5)]);
+    }
+}
+
+
+// ── per-symbol wrap: φ(ψ(s)) ≡ [s] (Gen via gen_wrap; Inv via inverse) ──
+pub proof fn lemma_sym_wrap(s: Symbol)
+    requires generator_index(s) < 6
+    ensures equiv_in_presentation(token_pres(),
+        apply_hom(phi_hom(), apply_hom_symbol(psi_hom(), s)), seq![s])
+{
+    let p = token_pres(); lemma_token_pres_valid(); lemma_phi_valid(); lemma_psi_shape();
+    match s {
+        Symbol::Gen(g) => {
+            lemma_gen_wrap(g as int);
+            assert(apply_hom_symbol(psi_hom(), Symbol::Gen(g)) == psi_images()[g as int]);
+            assert(seq![s] =~= seq![Symbol::Gen(g)]);
+        }
+        Symbol::Inv(g) => {
+            lemma_gen_wrap(g as int);
+            assert(apply_hom_symbol(psi_hom(), Symbol::Inv(g)) == inverse_word(psi_images()[g as int]));
+            lemma_hom_respects_inverse(phi_hom(), psi_images()[g as int]);
+            lemma_apply_hom_word_valid(phi_hom(), psi_images()[g as int]);
+            crate::higman_consequences::lemma_equiv_inverse(p, apply_hom(phi_hom(), psi_images()[g as int]), seq![Symbol::Gen(g)]);
+            lemma_inverse_singleton(Symbol::Gen(g));
+            assert(seq![Symbol::Gen(g)] =~= Seq::new(1, |_i: int| Symbol::Gen(g)));
+            assert(Seq::new(1, |_i: int| inverse_symbol(Symbol::Gen(g))) =~= seq![Symbol::Inv(g)]);
+            assert(inverse_word(seq![Symbol::Gen(g)]) =~= seq![Symbol::Inv(g)]);
+            assert(seq![s] =~= seq![Symbol::Inv(g)]);
+        }
+    }
+}
+
+// ── wrap-identity: φ(ψ(w)) ≡ w for all valid w (induction) ──
+pub proof fn lemma_wrap(w: Word)
+    requires word_valid(w, 6)
+    ensures equiv_in_presentation(token_pres(), apply_hom(phi_hom(), apply_hom(psi_hom(), w)), w)
+    decreases w.len()
+{
+    let p = token_pres(); lemma_token_pres_valid(); lemma_phi_valid();
+    if w.len() == 0 {
+        assert(apply_hom(psi_hom(), w) =~= empty_word());
+        assert(apply_hom(phi_hom(), apply_hom(psi_hom(), w)) =~= empty_word());
+        assert(w =~= empty_word());
+        lemma_equiv_refl(p, w);
+    } else {
+        let s = w.first(); let rest = w.drop_first();
+        assert(symbol_valid(s, 6)) by { assert(w[0] == s); }
+        assert(word_valid(rest, 6)) by {
+            assert forall|i: int| 0 <= i < rest.len() implies symbol_valid(#[trigger] rest[i], 6) by {
+                assert(rest[i] == w[i + 1]);
+            }
+        }
+        assert(apply_hom(psi_hom(), w)
+            =~= concat(apply_hom_symbol(psi_hom(), s), apply_hom(psi_hom(), rest)));
+        lemma_hom_respects_concat(phi_hom(), apply_hom_symbol(psi_hom(), s), apply_hom(psi_hom(), rest));
+        lemma_sym_wrap(s);
+        lemma_wrap(rest);
+        lemma_equiv_concat(p, apply_hom(phi_hom(), apply_hom_symbol(psi_hom(), s)), seq![s],
+                              apply_hom(phi_hom(), apply_hom(psi_hom(), rest)), rest);
+        assert(concat(seq![s], rest) =~= w);
+    }
+}
+
+// ── ψ FAITHFUL: freely_equivalent(ψu,ψv) ⟹ u ≡ v  (the completeness half) ──
+pub proof fn lemma_psi_faithful(u: Word, v: Word)
+    requires
+        word_valid(u, 6), word_valid(v, 6),
+        freely_equivalent(apply_hom(psi_hom(), u), apply_hom(psi_hom(), v)),
+    ensures equiv_in_presentation(token_pres(), u, v)
+{
+    let p = token_pres(); lemma_token_pres_valid(); lemma_phi_valid(); lemma_psi_valid();
+    lemma_free_group_valid(4); lemma_psi_shape();
+    lemma_apply_hom_word_valid(psi_hom(), u);
+    lemma_apply_hom_word_valid(psi_hom(), v);
+    lemma_freely_equivalent_implies_equiv(free_group(4),
+        apply_hom(psi_hom(), u), apply_hom(psi_hom(), v));
+    lemma_hom_preserves_equiv(phi_hom(), apply_hom(psi_hom(), u), apply_hom(psi_hom(), v));
+    lemma_wrap(u); lemma_wrap(v);
+    lemma_apply_hom_word_valid(phi_hom(), apply_hom(psi_hom(), u));
+    lemma_equiv_symmetric(p, apply_hom(phi_hom(), apply_hom(psi_hom(), u)), u);
+    lemma_equiv_transitive(p, u, apply_hom(phi_hom(), apply_hom(psi_hom(), u)),
+        apply_hom(phi_hom(), apply_hom(psi_hom(), v)));
+    lemma_equiv_transitive(p, u, apply_hom(phi_hom(), apply_hom(psi_hom(), v)), v);
+}
+
+// ── M0 (the token quotient is FREE via ψ): the iff, both directions VERIFIED ──
+pub proof fn lemma_m0(u: Word, v: Word)
+    requires word_valid(u, 6), word_valid(v, 6)
+    ensures equiv_in_presentation(token_pres(), u, v)
+        <==> freely_equivalent(apply_hom(psi_hom(), u), apply_hom(psi_hom(), v))
+{
+    if equiv_in_presentation(token_pres(), u, v) { lemma_m0_soundness(u, v); }
+    if freely_equivalent(apply_hom(psi_hom(), u), apply_hom(psi_hom(), v)) { lemma_psi_faithful(u, v); }
+}
+
 } // verus!
