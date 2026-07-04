@@ -244,3 +244,16 @@ Honest residue: this validates the token *algebra* (which relations hold) but NO
 positivity conjecture (that `Thue(T̂)` reproduces the whole positive trace) — that still needs
 the marker-over-Adjan-base proof of §4, including the flagged marker–relator overlap case. The
 probe tells us what `T̂` must contain; it does not tell us `T̂` suffices.
+
+---
+
+## 12. M0 CLOSED (2026-07-04, `docs/m0-closure.md`)
+
+The M0 positivity conjecture posed in §4 is closed at paper-strength + mechanical corroboration.
+Key move: a SECOND Tietze elimination (`0 = X⁻¹M1`) shows the token quotient is **FREE**,
+`G_T ≅ F(Σ∖{⟩,0})` — so the flagged marker–relator overlap **dissolves** (no relator remains).
+The nine-rule `T̂` orients into a convergent rewriting system `R̂`; the scar-lemma readback gives
+`ψ`-injectivity on irreducibles. Both owed checks RUN (`tools/m0_check.py`): KB pass CLEAN (35
+critical pairs joinable, **no fifth rule**, confluent); injectivity fuzz CLEAN at **9,447,857**
+irreducibles (0 `ψ`-collisions). The base layer of Lemma 2 is now a concrete free group + `ψ`,
+not a parameter — `thue.rs` unblocked. Full detail + ledger: `docs/m0-closure.md`.
