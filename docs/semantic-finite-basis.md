@@ -459,6 +459,53 @@ free group's own signature system works FOR the parser — cross-factor images a
 infrastructure (walls) becomes centrality. (3) Definitional shrink rules (`qa = p`) are legal —
 the Boolean-collapse shrink was fatal for its affix-sharing, not its shrinking.
 
+### 4.9 M7 — interacting loops: the emergence hunt (both topologies cleared)
+
+**(a) The ratio pair** — two self-loop transducers with different ratios on SHARED data:
+`R = { qa = bq, ra = b²r }`. Complete (`#a` decreases, no critical pairs); irreducibles: no `qa`,
+`ra`. Eliminating `b = qaq⁻¹` and setting the **comparison element** `t := q⁻¹r`:
+
+> `G ≅ BS(1,2) ∗ ⟨q⟩` — the interaction of the two loops IS a Baumslag–Solitar relation
+> (`tat⁻¹ = a²`) between the shared letter and the loop-comparison element.
+
+*The emergence hunt.* The danger is BS-arithmetic (`ta = a²t`, `ta² = a⁴t`, …) manufacturing
+deposit collisions beyond single rules. Walk/deposit analysis (items: `a: dep(a)`;
+`q: U`; `b: U·dep(a)·D`; `r: U·dep(t)`, note `r` never comes down; `b`-tails are the ONLY `D`s,
+hence the only mergers): merged deposits can only take the form **`aⁿ` or `aⁿ·t`** — `t` always
+last — because `ra` is forbidden and nothing else appends `a`-material after a `t` at the same
+height. These are exactly the BS-normal forms `(k,c) ∈ {(0,n),(1,n)}`, pairwise distinct, so
+BS-arithmetic never fires inside a deposit. **The irreducibility condition `ra` IS the
+BS-normal-form condition; rule 2 IS the BS relation** (`sub(ra) = q·ta = q·a²t = sub(b²r)` —
+the one collision is the rule, forbidden side excluded). Height/multiplicity bookkeeping as in
+§4.5.1 disambiguates cluster attribution (`U dep(aⁿt)` = `bⁿr`; `U dep(aⁿ) D` = `bⁿ`; baseline
+deposits = `a`-runs; `U`-runs = `q`-runs). Positivity holds. ∎
+
+**(b) The twin blinkers** — two M3-blinkers over the SAME data:
+`R = {qa = bq′, q′a = bq, ra = br′, r′a = br}` ⟹ `G = ⟨a,b,q,r | qa²q⁻¹ = b², ra²r⁻¹ = b²⟩`:
+a double HNN with IDENTICAL associated subgroups — the designed defect-exchange scenario
+(`z := r⁻¹q` centralizes `a²`). And the exchange channel never opens: positive words contain no
+stable-letter inverses, so there are NO pinches, every expression is Britton-reduced, and
+compensations live at each junction separately — each junction's equation has the SAME form as
+M3's (`hᵢ = a^{−2mᵢ}gᵢb^{2mᵢ₊₁}`), and M3's parity head-cap kills them all, junction by junction,
+regardless of which stable letters flank the syllable. Positivity holds by M3's proof verbatim. ∎
+
+**(c) The junction decoupling lemma** (the structural prize of the hunt). For one-state-per-side
+rule shapes, spanning-tree elimination always gives positive letters *stable-positive* images
+(each eliminated state solves as `s′ = x·s·y⁻¹` — base-letter inverses only). Hence positive
+words are pinch-free, every expression is Britton-reduced over the multi-splitting, and
+**compensations decouple per junction: multi-loop soundness reduces to single-loop mechanisms
+applied at each junction independently.** Defect species from different stable letters cannot
+exchange without pinches — the conspiracy channel doesn't exist for positive words. This
+essentially completes the structural half of the general Lemma 2: eliminate, classify each
+junction's splitting locally, apply the matching single-loop mechanism.
+
+**Verdict.** The emergence hunt came back empty in both minimal interaction topologies; the
+parser principle survived the boss room. Remaining risk classes (named, not yet hunted):
+completion-divergent systems (infinite Knuth–Bendix — breaks the proof *architecture*, not
+necessarily positivity) and data-data rule mixtures (state-free semantic commutations/braidings
+interleaved with machine rules; note Garside theory covers braid-shaped cases). These become
+**M8** if the Probe 0 opcode audit ever needs them.
+
 ### 4.8 Consolidation: the mechanism inventory
 
 | Rung | System | Group | Proof mechanism | Law discovered |
@@ -470,6 +517,7 @@ the Boolean-collapse shrink was fatal for its affix-sharing, not its shrinking.
 | M5′ | shuttle (two-way) | `ℤ² ∗ F(q)` | free-product NF + **rule ⇄ ambiguity bijection** (§4.5.1, complete) | trajectory-injectivity; completion = commutation |
 | M5 | mint/retire | HNN uneq. lengths; `BS(1,2)`; `BS(2,3)` | head-caps; **faithful affine invariant**; **Adjan/Remmers** | cycle-relator principle; mint-must-move |
 | M6 | couriers (data-carrying states) | `ℤ² ∗ ℤ`; `(F₂×ℤ) ∗ ℤ` | free-product NF + **unforgeable negative markers** + centrality-restoration | parser principle promoted (§5.0) |
+| M7 | interacting loops (shared data) | `BS(1,2) ∗ ℤ`; double HNN, equal assoc. | irreducibility = **BS normal form**; **junction decoupling** (pinch-free positives ⟹ per-junction single-loop caps) | interaction rule = BS relation; no defect-exchange channel |
 
 Meta-observations: (1) six rungs, six distinct mechanisms — the conjecture keeps converting
 attacks into tools, never into counterexamples; (2) every mechanism is a normal-form argument
@@ -549,9 +597,13 @@ in itself, and the Proof Factory tutorial world.
   Adjan/Remmers — monsters aren't dragons).
 - ~~M6 — data-carrying states~~ **DONE, positivity holds** (§4.7; couriers, unforgeable markers,
   shared walls = centrality; parser principle promoted to §5.0).
-- **M7 — two interacting loops** (two stable letters with shared data): first multi-splitting
-  defect interaction — per §5.0, the designated emergence hunt; chief remaining dragon suspect.
-- Then: assemble Probe 0's full opcode audit; prove Lemma 2 for the actual instruction set.
+- ~~M7 — two interacting loops~~ **DONE, positivity holds in both topologies** (§4.9; ratio pair
+  = `BS(1,2) ∗ ℤ` with irreducibility = BS normal form; twin blinkers = M3 per-junction; the
+  **junction decoupling lemma** closes the structural half of general Lemma 2).
+- **M8 (contingent):** completion-divergent systems; data-data rule mixtures (Garside-shaped) —
+  only if the Probe 0 audit needs them.
+- **NEXT: the Probe 0 opcode audit** — assemble the sorted-ANF instruction set (§5.3), check Laws
+  0–5, classify each junction's splitting, assign mechanisms per §4.9(c).
 
 ---
 
