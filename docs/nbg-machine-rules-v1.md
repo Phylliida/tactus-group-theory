@@ -98,3 +98,28 @@ mints (trivial), the RCL against §5's macro programs (the induction cases are 1
 bullet list), and Lemma-2-ZFC via junction decoupling over §4's cycle inventory — every cycle
 class already has its proven mechanism named in the table. **Nothing in this machine awaits a
 design decision; every family awaits only transcription, expansion, audit, and proof.**
+
+---
+
+## 8. BUILT AND RUNNING (tools/nbg_machine.py — session finale)
+
+The shield-pipeline core EXISTS as an executing machine: **1068 literal rules expanded from the
+N-family schemas, audited CLEAN (0 pure-code poisons), and RUN**: request-driven build fetched
+`E∈`, `v`, `|` from the font through the shield into the yard (63 Thue steps), verify+export
+re-flavored and carried each through the flipping wall into the store (49 steps), ending with
+the yard empty, walls restored, and the store holding `⌜E∈ v |⌝` in order — the first formula
+the NBG group ever wrote, derived move-by-legal-move.
+
+Build lessons (each now law/taxonomy):
+- **Choice-conditioning law:** choice points must be window-conditioned — shared-LHS branch
+  rules (`hF = F·d_x` for many x) identify their branches and cascade to code letters. REQUEST
+  TOKENS (`r_x·h = d_x`) are the conditioning mechanism, mirroring how the real machine's
+  comparator-driven construction conditions every choice on content.
+- **Letter taxonomy, final:** CODE / TRANSIENT / states. Survivor tiers: pure-code = poison;
+  transient-only or mixed = warn (shielded-material junk relations, e.g. the cross-letter
+  courier-flavor relations `x•⁻¹x◦ = y•⁻¹y◦` from shared return states — semantically inert
+  since yard content is ⊤-material; positivity's parser handles them as decoration relators).
+- **Audit and simulation are complementary halves:** the auditor catches soundness poisons the
+  simulator never sees; the simulator catches LIVENESS gaps (five missing walk-rule families
+  found tonight) the auditor never sees. They are the executable shadows of Lemma 2 and
+  Lemma 1 respectively — the formalization will need exactly both.

@@ -48,7 +48,7 @@ def subst(w, s, sol):
 # ---------- systems ----------
 
 class System:
-    def __init__(self, name, letters, states, rules, expect, whitelist=()):
+    def __init__(self, name, letters, states, rules, expect, whitelist=(), transient=()):
         self.name = name
         self.ids = {nm: i + 1 for i, nm in enumerate(letters)}
         self.names = {i + 1: nm for i, nm in enumerate(letters)}
@@ -58,6 +58,9 @@ class System:
         self.expect = expect  # 'POISON' or 'CLEAN'
         # declared-semantic data-only relators (collapsed schema tokens), by cyclic key
         self.whitelist = {cyckey(self.word(w)) for w in whitelist}
+        # transient letters (marks/flavors/walls, never in canonical codes): data-only
+        # survivors composed PURELY of transient letters are WARN, not POISON
+        self.transient = {self.ids[t] for t in transient}
 
     def word(self, s):
         out = []
@@ -125,21 +128,30 @@ def conj_resolutions(sys_, surv):
                     seen[key] = val
     return derived
 
-def law4prime(sys_, tries=40):
+def law4prime(sys_, tries=40, return_warns=False):
     relators = [red(l + inv(r)) for l, r in sys_.rules]
-    worst = []
+    worst, warns = [], []
     for t in range(tries):
         rng = random.Random(t)
         surv, _ = eliminate(relators, sys_.states, rng)
         for r in list(surv) + conj_resolutions(sys_, surv):
             c = cyc(r)
             if c and all(abs(x) in sys_.data for x in c) and cyckey(c) not in sys_.whitelist:
-                worst.append(c)
+                if sys_.transient and any(abs(x) in sys_.transient for x in c):
+                    warns.append(c)      # transient-only OR mixed: tiered warns, not auto-poison
+                else:
+                    worst.append(c)      # PURE-CODE data survivor: definite poison
     seen, out = set(), []
     for c in worst:
         key = cyckey(c)
         if key not in seen:
             seen.add(key); out.append(c)
+    if return_warns:
+        wseen, wout = set(), []
+        for c in warns:
+            k = cyckey(c)
+            if k not in wseen: wseen.add(k); wout.append(c)
+        return out, wout
     return out
 
 def h1_data_vectors(sys_):
