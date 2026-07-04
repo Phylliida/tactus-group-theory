@@ -324,3 +324,31 @@ survivor must either ship a witness (whitelist entry) or kill the design.**
 Families still awaiting this treatment: PASS1 structural-swap windows + R2 macro composite,
 S3 full MATCH-SUBTERM listing, PASS3 spine-advance composite, and (ZFC layer) S10–S16.
 Method identical: transcribe into the corpus, run, explain every survivor.
+
+## A.8 PASS1 audited + the deposit-order law + the conjugation-resolution upgrade (corpus 25)
+
+**pass1_swap_core: CLEAN.** The distribution redex machinery — the 6-letter swap window
+`H⟨M⟨X = ⟨X⟨M·D`, in-macro mint/retire of `▲`, transducing turn at `⟩→⟩•`, walk-back, home
+return — validated. Two design requirements surfaced and pinned:
+- **Home-anchor requirement:** home detection MUST use a dedicated wrapper letter `Hm`
+  (`Hm·D₃ = H·Hm`). Using an ordinary letter creates duplicate-LHS rules whose group consequence
+  identifies states — friendly-fire control collapse (semantically sound, hence outside the
+  soundness auditor's scope: documented as a completeness hazard, fix mandatory).
+
+**The deposit-order law (micro-law, mechanically confirmed).** Courier deposits at a placeholder:
+the S4 spec order (`c_x ▲ = x◦ ▲ r` — deposit BEFORE the placeholder, single rule, no flavor
+pair) is **load-bearing, not stylistic**. The tempting alternative — flavor-flipping the
+placeholder with wall-first deposits (`▲ k = ▲̂ x◦ g`, `▲̂ k = ▲ x◦ g`) — creates hidden
+wall-flavor torsion: combining the two flavors' conjugation forms forces **`(▲̂⁻¹▲)² = 1`**,
+a data-only relator invisible to plain Tietze-survivor checking. My own first transcription of
+the courier used the wrong order — the transcription-bug class the tool exists for.
+(`pass1_dup_courier_SPEC_order` → CLEAN; `pass1_deposit_WRONG_order` → POISON, survivor
+`trib.-tri.trib.-tri`.)
+
+**Auditor upgrade: conjugation-resolution.** The mechanical form of the hand-combination that
+refuted the shuttle: survivors of shape `s·A·s⁻¹·B` are indexed by `(state s, core A)`; pairs
+with equal keys derive `B₁·B₂⁻¹`, which re-enters the data-only check. This closes the main
+consequence-closure gap flagged in the capstone IV.2′ meta-lesson (Tietze alone ≠ audit). All
+previously-audited systems keep their verdicts under the upgrade (shuttle still POISON via its
+own mechanism; font-copier still CLEAN — its two conjugation forms have DIFFERENT cores, so no
+resolution fires: the discriminator is exact on the corpus).
