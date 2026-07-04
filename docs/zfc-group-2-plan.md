@@ -331,3 +331,69 @@ presentation `⟨Σ∪States | R⟩` realizes propositional equivalence on codes
 (+ ZFC corollary on set-sentences, + the polynomial-overhead statement as a derivation-length
 bound threaded through the replay lemmas). Artifacts: the printed presentation, the two papers,
 Proof Factory worlds 1–2.
+
+---
+
+# PART IV — Session-close puzzling: pre-solved unknowns (2026-07-03, final hours)
+
+## IV.1 BUG FOUND AND FIXED: the yard-builder as specced in III.2(2) was poison
+
+"Mint γ letter-by-letter inside the shield" is a **stationary mint**: sequential builder rules
+`β₀ = x β₁`, `β₁ = y β₀` cycle to `xy = 1` for every minted pair — total collapse (Law 4
+violation; the same laundering shape as §6.3's eraser). Confirmed by direct computation.
+**Probe 0 is NOT affected** — the Boolean machine only ever ▲-courier-copies existing material.
+Two legal builder designs:
+- **Font-copier (RECOMMENDED):** the wrapper `E` gains a FONT segment — a fixed transparent word
+  containing each alphabet letter once (permanently shielded decoration). Building = dup one
+  font letter (`d x = x x• d`, M5-doubler) + courier the twin into the yard. Every build cycle
+  threads the font anchors — Law 4′ by construction, and it reuses only proven families.
+- **Shuttle-builder (alternate):** mint only at a wall with flavor flip, walk to the other wall,
+  flip, return; two trips restore flavors and mint two letters. Verified by the IV.2 computation
+  that its cycle relators stay wall-anchored.
+
+## IV.2 M8a set up completely: the shuttle mini-system's group, computed
+
+Rules (states γ,γ₁,γ₂,γ₃; walls L/L̂, R/R̂; data a):
+`γR = aγ₁R̂`, `aγ₁ = γ₁a`, `Lγ₁ = L̂γ₂`, `γ₂a = aγ₂`, `γ₂R̂ = aγ₃R`, `aγ₃ = γ₃a`,
+`L̂γ₃ = Lγ`, `γa = aγ`. Eliminating the states:
+
+> γ₁ = a⁻¹γRR̂⁻¹; γ₂ = L̂⁻¹La⁻¹γRR̂⁻¹; γ₃ = a⁻¹L̂⁻¹La⁻¹γ (the R-flavors cancel); and the
+> closing relation gives **L̂aL̂⁻¹ = La⁻¹L⁻¹** — plus commutations `[a,γ] = [a, RR̂⁻¹] =
+> [a, L̂⁻¹L] = 1` from the walk rules.
+
+**No data-only relator arises** — in particular NOT `aa = 1`: the two-trip cycle's net effect is
+wall-anchored (`ĉ = c⁻¹` for the wall-conjugates `c = LaL⁻¹`, `ĉ = L̂aL̂⁻¹`). Law 4′ vindicated
+by computation, and **M8a's target is now concrete**: positivity for
+`⟨a, L, L̂, R, R̂, γ | [a,γ], [a,RR̂⁻¹], [a,L̂⁻¹L], L̂aL̂⁻¹ = La⁻¹L⁻¹⟩` vs the 8-rule Thue system —
+a free-product-with-commutations analysis in the M5′/M6 style. A future session can attack this
+cold; the setup (usually half the work) is done. Add to the M8a rung: the full lifecycle then
+composes this with verify+unshield.
+
+## IV.3 RISK RETIRED: completion-divergence — the parser subsumes confluence
+
+Two observations close risk-register item 2 entirely:
+1. Critical pairs in our rule format arise ONLY when a right-consuming and a left-consuming
+   state sit adjacent to a shared data letter (`qa` vs `ar` in M5′) — and such completions are
+   *automatically Thue-consequences* (both sides rewrite from one common word), so the
+   congruence is never affected; only proof architecture was at stake.
+2. The parser arguments never needed Thue-confluence: the GROUP normal form (free product / HNN
+   splitting) is canonical regardless, and the parser reconstructs a canonical word directly
+   from it — each parse-step inversion is a rule application, so both `u` and `v` Thue-reach the
+   parser's output. **The parser IS the normal-form algorithm; "irreducible representative" can
+   be defined as the parser's output.** Bounded-KB probing in the auditor becomes a nice-to-have
+   diagnostic, not a correctness requirement.
+Additional structural note: under the one-side-per-state discipline (each state consumes from
+exactly one side — our machines satisfy it), state-state critical pairs cannot occur at all;
+only the benign data-adjacency collisions above exist.
+
+## IV.4 Updated risk register (post-puzzling)
+
+1. **M8a full positivity** — setup COMPLETE (IV.2); remaining: the free-product-with-commutations
+   parser argument + the lifecycle composition. Estimated one focused paper session.
+2. **M8b subst-comparator cycles** — untouched; expected M4-class; do after M8a.
+3. **Unified single-loop theorem** (would collapse Phase 1 into ~2 modules): open, valuable,
+   not blocking (per-rung proofs suffice).
+4. **Probe-0 completeness reachability details** (mark-residue liveness across pass restarts):
+   engineering; surfaces mechanically when the expander exists.
+5. ~~Completion-divergence~~ RETIRED (IV.3). ~~Yard-builder soundness~~ FIXED (IV.1).
+6. (Other arc) carrier-not-fp NF-2b (class-valuation retraction) — unchanged, low-risk, specced.
