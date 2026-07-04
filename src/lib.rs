@@ -551,3 +551,8 @@ pub mod miller_collapse_limit;
 // itself (every slice misses a P_∞-trivial word) is discharged by the later Miller-faithfulness
 // bricks; with it, the Miller CEER carrier is NOT finitely presentable.
 pub mod carrier_not_fp;
+
+// m0_token: the M0 token layer (docs/m0-closure.md) built by REUSE — the T̂ Thue congruence as
+// equiv_in_presentation(token_pres), ψ as a HomomorphismData into free_group(4). Encoding +
+// validity; M0-soundness = lemma_hom_preserves_equiv (agent's hand-rolled closures dissolve).
+pub mod m0_token;
