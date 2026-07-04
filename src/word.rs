@@ -19,6 +19,12 @@ pub open spec fn concat(w1: Word, w2: Word) -> Word {
 
 /// The formal inverse of a word: reverse and invert each symbol.
 /// (s₁ s₂ ... sₙ)⁻¹ = sₙ⁻¹ ... s₂⁻¹ s₁⁻¹
+///
+/// Lean backend: emitted as axiom + defining equation (`.eq_def`) —
+/// the drop_first recursion's termination fact (`len (subrange s 1
+/// len) < len s`) is a broadcast axiom Lean's decreasing_by can't
+/// reach in the preamble layout. Verus verifies termination Z3-side.
+#[verifier::lean_axiom_eq]
 pub open spec fn inverse_word(w: Word) -> Word
     decreases w.len(),
 {
