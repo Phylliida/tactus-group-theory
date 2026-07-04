@@ -105,4 +105,21 @@ pub proof fn lemma_psi_shape()
     }
 }
 
+// ── rule-soundness: the path (SHAKEOUT FINDING 2026-07-04) ──────────────────
+// Each of the 9 relators r: ψ(r) freely reduces to ε ⟹ equiv_in_presentation(
+// free_group(4), apply_hom(psi_hom, r), ε), the relator condition of
+// is_valid_homomorphism.  Reusable chain: `lemma_reduces_to_normal_form` +
+// `lemma_freely_equivalent_implies_equiv` (both verified here).  BUT the
+// `normal_form(ψ(r)) == ε` step must NOT go through `by (compute)`:
+//   FINDING — `assert(normal_form(img) =~= empty_word()) by (compute)` fails with
+//   "assert_by_compute exceeded maximum recursion depth" (symbol.rs:18) — the
+//   `reduce_n_steps ∘ apply_hom` recursion is deeper than the compute engine's cap.
+// Correct route (next session, compile-iterate): unfold `apply_hom` on each concrete
+// relator to its 6-symbol image, then witness `reduces_to(img, ε)` by an EXPLICIT
+// chain of `reduce_at` steps (the free cancellations, e.g. d1: Gen0 Gen1 Gen3 Inv3
+// Inv1 Inv0 → reduce@2 → reduce@1 → reduce@0 → ε) via `lemma_reduces_one_step_equiv`
+// / a hand `reduces_in_steps` witness — 3 cancellations per relator, mechanical.
+// Then: `lemma_psi_valid` (is_valid_homomorphism) and `lemma_m0_soundness`
+// (= `lemma_hom_preserves_equiv` + `lemma_free_group_equiv_freely_equivalent`).
+
 } // verus!
