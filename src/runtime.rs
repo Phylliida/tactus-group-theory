@@ -50,6 +50,48 @@ pub fn is_inverse_pair_exec(s1: &RuntimeSymbol, s2: &RuntimeSymbol) -> (out: boo
     }
 }
 
+///  --- Lean-backend fcf unfold lemmas (find_cancellation_exec migration) ---
+///  One unfold step of find_cancellation_from each, stated at the WORD
+///  level (no runtime_word_view) so the emitted proof-fn files need only
+///  the fcf def — broadcast seq axioms are not available in proof-fn
+///  files, only in exec obligation files, where the view-bridging happens
+///  in the site proof blocks. Subtraction-free so omega handles Nat arith.
+///  Lean `by` bodies route to Lean and emit as theorems into every exec
+///  fn's obligation file.
+
+proof fn lemma_fcf_end(v: Word, i: nat)
+    requires i + 1 >= v.len()
+    ensures find_cancellation_from(v, i) == v.len()
+by {
+    rw [reduction.find_cancellation_from.eq_def]
+    split <;> omega
+}
+
+proof fn lemma_fcf_found(v: Word, i: nat)
+    requires
+        i + 1 < v.len(),
+        is_inverse_pair(v[i as int], v[i as int + 1]),
+    ensures find_cancellation_from(v, i) == i
+by {
+    rw [reduction.find_cancellation_from.eq_def]
+    split
+    · omega
+    · simp_all
+}
+
+proof fn lemma_fcf_step(v: Word, i: nat)
+    requires
+        i + 1 < v.len(),
+        !is_inverse_pair(v[i as int], v[i as int + 1]),
+    ensures
+        find_cancellation_from(v, i) == find_cancellation_from(v, i + 1)
+by {
+    rw [reduction.find_cancellation_from.eq_def]
+    split
+    · omega
+    · simp_all
+}
+
 ///  Find the first cancellation position, or return w.len() if none.
 pub fn find_cancellation_exec(w: &Vec<RuntimeSymbol>) -> (out: usize)
     requires
@@ -58,6 +100,9 @@ pub fn find_cancellation_exec(w: &Vec<RuntimeSymbol>) -> (out: usize)
         out == find_cancellation_from(runtime_word_view(w@), 0),
 {
     if w.len() <= 1 {
+        assert(find_cancellation_from(runtime_word_view(w@), 0) == w@.len()) by {
+            intros; haveI : alloc.Allocator alloc.Global := ⟨⟩; have hlen := std_specs.vec.axiom_spec_len runtime.RuntimeSymbol alloc.Global w; have hend := runtime.lemma_fcf_end (runtime.runtime_word_view (view.View.view w)) 0 (by simp only [runtime.runtime_word_view]; rw [seq.axiom_seq_new_len]; omega); simp_all [runtime.runtime_word_view, seq.axiom_seq_new_len] <;> omega
+        };
         return w.len();
     }
     let mut i: usize = 0;
@@ -69,11 +114,24 @@ pub fn find_cancellation_exec(w: &Vec<RuntimeSymbol>) -> (out: usize)
                 == find_cancellation_from(runtime_word_view(w@), i as nat),
         decreases w.len() - i,
     {
+        assert(i + 1 < w@.len()) by {
+            intros; haveI : alloc.Allocator alloc.Global := ⟨⟩; have hlen := std_specs.vec.axiom_spec_len runtime.RuntimeSymbol alloc.Global w; omega
+        };
         if is_inverse_pair_exec(&w[i], &w[i + 1]) {
+            assert(find_cancellation_from(runtime_word_view(w@), i as nat) == i as nat) by {
+                intros; haveI : alloc.Allocator alloc.Global := ⟨⟩; have hlen := std_specs.vec.axiom_spec_len runtime.RuntimeSymbol alloc.Global w; have hfound := runtime.lemma_fcf_found (runtime.runtime_word_view (view.View.view w)) i (by simp only [runtime.runtime_word_view]; rw [seq.axiom_seq_new_len]; omega) (by simp only [runtime.runtime_word_view]; rw [seq.axiom_seq_new_index _ _ _ _ (by simp only [Int.ofNat_eq_natCast]; omega), seq.axiom_seq_new_index _ _ _ _ (by simp only [Int.ofNat_eq_natCast]; omega)]; first | assumption | simp_all); first | assumption | omega | (simp_all <;> omega)
+            };
             return i;
         }
+        assert(find_cancellation_from(runtime_word_view(w@), i as nat)
+            == find_cancellation_from(runtime_word_view(w@), (i + 1) as nat)) by {
+            intros; haveI : alloc.Allocator alloc.Global := ⟨⟩; have hlen := std_specs.vec.axiom_spec_len runtime.RuntimeSymbol alloc.Global w; have hstep := runtime.lemma_fcf_step (runtime.runtime_word_view (view.View.view w)) i (by simp only [runtime.runtime_word_view]; rw [seq.axiom_seq_new_len]; omega) (by simp only [runtime.runtime_word_view]; rw [seq.axiom_seq_new_index _ _ _ _ (by simp only [Int.ofNat_eq_natCast]; omega), seq.axiom_seq_new_index _ _ _ _ (by simp only [Int.ofNat_eq_natCast]; omega)]; first | assumption | simp_all); first | assumption | omega | (simp_all <;> omega)
+        };
         i = i + 1;
     }
+    assert(find_cancellation_from(runtime_word_view(w@), i as nat) == w@.len()) by {
+        intros; haveI : alloc.Allocator alloc.Global := ⟨⟩; have hlen := std_specs.vec.axiom_spec_len runtime.RuntimeSymbol alloc.Global w; have hend := runtime.lemma_fcf_end (runtime.runtime_word_view (view.View.view w)) i (by simp only [runtime.runtime_word_view]; rw [seq.axiom_seq_new_len]; omega); simp_all [runtime.runtime_word_view, seq.axiom_seq_new_len] <;> omega
+    };
     w.len()
 }
 
