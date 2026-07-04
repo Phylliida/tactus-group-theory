@@ -101,13 +101,37 @@ def eliminate(relators, states, rng):
         rel = [r3 for r3 in rel if r3]
         states.discard(s)
 
+def conj_resolutions(sys_, surv):
+    """Resolve pairs of survivors of shape s·A·s⁻¹·B (same state s, same core A):
+    derive B₁·B₂⁻¹ — the consequence-combination step Tietze alone misses
+    (the mechanism behind the shuttle's a²=1 and deposit-order torsion)."""
+    derived, seen = [], {}
+    for r in surv:
+        c = cyc(r); n = len(c)
+        for i in range(n):
+            s = c[i]
+            if abs(s) not in sys_.states or s < 0: continue
+            for j in range(n):
+                if i == j or c[j] != -s: continue
+                A = tuple(c[(i + 1 + t) % n] for t in range((j - i - 1) % n))
+                B = tuple(c[(j + 1 + t) % n] for t in range((i - j - 1) % n))
+                if any(abs(x) == abs(s) for x in A): continue
+                key = (abs(s), red(A))
+                val = red(inv(B))                    # s·A·s⁻¹ = B⁻¹
+                if key in seen:
+                    if seen[key] != val:
+                        derived.append(red(seen[key] + inv(val)))
+                else:
+                    seen[key] = val
+    return derived
+
 def law4prime(sys_, tries=40):
     relators = [red(l + inv(r)) for l, r in sys_.rules]
     worst = []
     for t in range(tries):
         rng = random.Random(t)
         surv, _ = eliminate(relators, sys_.states, rng)
-        for r in surv:
+        for r in list(surv) + conj_resolutions(sys_, surv):
             c = cyc(r)
             if c and all(abs(x) in sys_.data for x in c) and cyckey(c) not in sys_.whitelist:
                 worst.append(c)
@@ -212,6 +236,29 @@ S.append(System("unit_sweep_whitelisted", ["br", "cb", "M", "one", "u", "w", "w1
     ["w", "w1"],
     [("w br M one", "w1"), ("w1 u", "u w1"), ("w1 cb", "w")], 'CLEAN',
     whitelist=["br M one cb"]))
+
+S.append(System("pass1_swap_core",
+    ["Hm", "br", "cb", "cbm", "M", "X", "u", "tri", "H", "D", "D1", "D2", "D3"],
+    ["H", "D", "D1", "D2", "D3"],
+    [("H br M br X", "br X br M D"), ("D", "tri D1"), ("D1 u", "u D1"),
+     ("D1 cb", "cbm D2"), ("u D2", "D2 u"), ("tri D2", "D3"),
+     ("M D3", "D3 M"), ("X D3", "D3 X"), ("br D3", "D3 br"), ("Hm D3", "H Hm")],
+    'CLEAN'))
+S.append(System("pass1_dup_courier_SPEC_order",
+    ["c", "cm", "cc", "cc2", "tri", "P", "mk", "dp", "k", "g2", "un"],
+    ["mk", "dp", "k", "g2", "un"],
+    [("mk c", "cm mk"), ("dp cm", "cm cc dp"), ("g2 cc", "k"),
+     ("cm k", "k cm"), ("P k", "k P"),
+     ("tri k", "cc2 tri g2"),                       # deposit BEFORE ▲ (S4 spec order)
+     ("g2 P", "P g2"), ("g2 cm", "cm g2"), ("un cm", "c un")],
+    'CLEAN'))
+S.append(System("pass1_deposit_WRONG_order",
+    ["cc", "cc2", "tri", "trib", "P", "k", "g2"],
+    ["k", "g2"],
+    [("g2 cc", "k"), ("P k", "k P"), ("g2 P", "P g2"),
+     ("tri k", "trib cc2 g2"),                      # deposit AFTER the flipped wall
+     ("trib k", "tri cc2 g2")],
+    'POISON'))
 
 # ---------- run ----------
 
