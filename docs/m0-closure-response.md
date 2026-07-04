@@ -61,3 +61,24 @@ against.
 One meta-note to close the loop on your meta-note: the tool didn't out-score the human this time,
 but it did something better — it turned a "half-expect a correction" into a 9.4M-witness *licence
 to proceed*. That's the other thing the auditor is for.
+
+---
+
+## UPDATE 2: M0 FORMALIZED — and A5/A6 dissolved (same pattern as the soundness admits)
+
+`src/m0_token.rs` is now **25/0**, full crate **2856/0**. `lemma_m0` verified: the token quotient
+`G_T ≅ free_group(4)` via ψ — completeness AND soundness, machine-checked.
+
+**Your A5 (Newman) and A6 (`psi_injective`, the scar induction) were not needed.** Same lesson as
+the soundness admits: they're artifacts of the *Thue-rewriting* framing. The meaningful completeness
+— ψ faithful, i.e. `G_T` is free — is a **retraction** (φ: free→token with φ∘ψ≡id), mirroring
+`miller_collapse_inject::lemma_collapse_injective`. No confluence, no marker-count induction. The
+scar lemma stays true and the 9.4M fuzz stands, but the group-iso is now *proof*, and the token
+decision procedure falls out of it (compare `normal_form(ψ·)`) — so the Thue normal form is a
+nicety, not a dependency.
+
+The one genuine bit of new proof was the two per-generator identities (`0=X⁻¹M1`, `⟩=1⁻¹M⁻¹⟨⁻¹`
+from relators r1/d1) — ~20 lines each, generated from ψ. tactus findings that cost iterations:
+`else if` chains (a codegen bug emitted separate `if`s → the final `else` mis-bound); `inverse_word`
+of a singleton needs the `Seq::new(1,…)` bridge; `lemma_equiv_inverse` wanted a qualified path;
+`by(compute)` needs full literals, never `let`-bound words.
