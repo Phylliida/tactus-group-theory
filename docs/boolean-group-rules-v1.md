@@ -1,0 +1,164 @@
+# The Group of Boolean Logic — concrete rule list v1
+## (expansion-ready; companion to semantic-finite-basis.md §6)
+
+*2026-07-03. Status: complete machine specification at schema granularity — every state named,
+every family an explicit schema over explicit finite index sets, mechanically expandable. The
+expander + Law-auditor script (§8) is the designated next brick; hand-expansion is deliberately
+NOT attempted (the laws are machine-checkable; transcription should be machine-done).*
+
+---
+
+## 1. Alphabet and encoding (final v1 decisions)
+
+**Data letters** `Σ = { ⟨, ⟩, X, M, 1, 0, P, | }` — bracketed Polish: every binary node is
+`⟨ op u v ⟩` (`op ∈ {X, M}`, X = ⊕, M = ∧); atoms `P|^i`; constants `1, 0`.
+**Marked twins** `Σ• = { ⟨•, ⟩•, X•, M•, 1•, 0•, P•, |• }` (copy/progress marks) and a second
+flavor `Σ◦` (copied/processed marks). **Placeholder** `▲` (insertion point; minted/retired within
+a single macro, always with motion). Marked letters and `▲` are code-transient; their rules are
+witnessed via 0-anchored contexts (witness-liberation, §6.3 of the main note).
+
+**Encoding.** `f(σ) = H₀ · ⌜σ⌝` with `H₀` the home-state chunk (Law 5: the boot lives in `f`).
+Canonical code: `f̂(ν) = H₀ · ⌜ν⌝` for ν sorted ANF (right-nested `⟨X m ⟨X m′ …⟩⟩`, monomials
+right-nested sorted `⟨M a ⟨M a′ …⟩⟩`, no duplicate atoms in monomials, no duplicate monomials,
+constants only as the empty-sum `0` / empty-product `1`). Completeness target:
+`f(σ) ⇝* f̂(ANF σ)` — machine ends back at home in `H₀`.
+
+**States** are chunks (comma-free realization layer, main note §6.4 item 2); listed here as
+atomic names. Convention: every rule has exactly one state per side (no data-data rules — M8
+avoided), sides affix-disjoint (Law 1 checked per family below).
+
+## 2. Global architecture
+
+Four passes, chained through home: `H₀ → PASS1 → H₀¹ → PASS2 → H₀² → PASS3 → H₀³ → PASS4 → H₀`.
+Each pass: sweep right seeking its redex; on finding one, run the macro, then RETURN HOME and
+restart the pass (maximal simplicity; termination by pass-specific measures). A clean sweep (no
+redex, reaching the right end) transitions to the next pass's home state via a transducing turn
+at the terminal position (Law 3).
+
+Termination measures (for the completeness proof, v2): PASS1: #(M-above-X) in the tree order;
+PASS2: per-monomial inversions + duplicate count; PASS3: monomial-sequence inversions + duplicate
+pairs; PASS4: #constants in non-normal position. Each macro strictly decreases its measure.
+
+## 3. Subroutine library (rule families with index sets)
+
+Notation: `s x = x s′` families list their letter range explicitly. `#rules` = expanded count.
+
+**S1 — WALK(s; L):** `s x = x s` for `x ∈ L ⊆ Σ ∪ Σ• ∪ Σ◦`. Guard motion (M1). Used by every
+traveling state; each instantiation lists its `L`. Hygiene: ✓ (distinct first/last letters).
+
+**S2 — TURN(s → s′; W → W′):** `s W = W′ s′`, `W ≠ W′` marked/unmarked bracket flavors. (Law 3.)
+
+**S3 — MATCH-SUBTERM(m-family):** mark the extent of the subterm opening at the current `⟨`.
+Classical innermost-pair marking: repeat { sweep right from region start; on window `⟨ z ⟩` with
+`z ∈ {1,0}` or `z` a fully-marked atom/subterm boundary pattern, mark the pair }. Schemas:
+- `m ⟨ = ⟨† m₁` (flag region start; `⟨†` a third bracket flavor)
+- `m₁ x = x m₁` for x ∈ Σ (seek)
+- innermost-mark: `m₁ ⟨ z ⟩ = ⟨• z• ⟩• m₂`-shaped windows, z-range: `{1, 0, P}` + stroke-runs
+  handled by atom-marking sub-rules `m₂ | = |• m₂`, closing `m₂ ⟩ = ⟩• m₃`
+- restart/exit: `m₃` returns to region start (WALK left over marked), exits when `⟨†`'s partner
+  is marked: `⟨† … all-marked … ⟩•` detection window `m ⟨† = …` etc.
+~10 schemas, expanded ≈ 30 rules. Cycles: every mark cycle's net relator carries bracket anchors
+(mark-flavors change per cycle) — Law 4′ ✓ by construction; unmark pass (S8) is the inverse
+family, separate states (no mark/unmark two-rule laundering cycles: different state sets, and
+mark→unmark composites pass through pass-transition states carrying bracket anchors).
+
+**S4 — COURIER(c_x; over L):** pickup `g x• = c_x` (x ∈ Σ: 8 rules per pickup site family),
+slide `c_x y = y c_x` (y ∈ L), deposit-at-placeholder `c_x ▲ = x◦ ▲ r` (deposit the copied
+letter, in order, left of ▲; `r` = return state). M6-proven shapes. ≈ 8 + 8·|L| + 8 rules
+per instantiation.
+
+**S5 — DUP-REGION (alternative copier, BS-doubler idiom, M5(b)):** `d x = x x• d` for
+`x ∈ Σ` within a MATCHed region — kept in v1 as the copier for PASS1's C-copy (dup, then
+courier the marked twins rightward to the ▲ site, preserving order). 8 rules + courier calls.
+
+**S6 — COMPARE-ATOMS (zigzag, F4/M3-M4 class):** two adjacent atom codes `P|^i … P|^j`
+(with bounded intervening structure held in state): blinker states `k, k′` alternate marking one
+stroke on each side per round trip: `k |= |• k₁`, WALK, `k₁ | = |• k₂` (right side), WALK back,
+`k₂ → k` — turns transduce at the `P`/bracket anchors. Exits: both sides exhaust same round →
+EQUAL-exit state; one side exhausts first → LESS/GREATER-exit states (three exit turns, Law 3).
+≈ 12 schemas / ≈ 25 rules. Cycle relators: anchored on `P`/brackets ✓ Law 4′.
+
+**S7 — ERASE-PAIR (the §6.3 anchored zigzag; F7):** on a certified-equal adjacent duplicate
+pair: fused comparator–eraser deleting in lockstep across the anchor: core quartet
+`| e = e₁`, `e₁ P = P e₃`, `e₃ | = e₄`, `P e₄ = e P` (net `| e P | = e P`, anchored ✓) +
+structural-letter analogues for the monomial spine (`M`/bracket quartets, same shape) +
+factor-fold entry (below). ≈ 10 schemas / ≈ 25 rules.
+
+**S8 — UNMARK(u; L):** `u x• = x u` for the pass's marked range; sweeps restore Σ after macros.
+
+**S9 — UNIT-SWEEPS (guarded constant deletion; the §6.1 featured-catch idiom):**
+- `w ⟨ M 1 = w₁` … `w₁ ⟩ = w` -shaped windows deleting unit-wraps `⟨M 1 u⟩ → u` in passing
+  (delete the 4 structural letters around `u` in two anchored bites, state-carrying);
+- dual `⟨M u 1⟩`, additive units `⟨X 0 u⟩`, `⟨X u 0⟩`;
+- zero-product collapse `⟨M 0 u⟩ → 0` and `⟨M u 0⟩ → 0`: NOT naked (u unbounded) — implemented
+  as: mark u (S3), erase u against its own mark-twin via S5-inverse (un-dup: `d′ x x• = x d′`??
+  — NO: un-dup of unequal material is unsound; instead) — v1 route: DUP-INVERSE ELIMINATION:
+  build nothing; use S7-style anchored consumption of the marked region against the `0` anchor:
+  quartet family `x• z₀ = z₀'`, alternating flavors of the dedicated zero-anchor letter pair
+  (z₀, z₀′ = marked `0` flavors) — cycle relator `x• z₀ x'• = z₀`-shaped: anchored on z₀ ✓
+  Law 4′ ✓ (the anchor is the certificate AND it survives every cycle).
+  ≈ 14 schemas / ≈ 40 rules.
+
+## 4. Pass programs
+
+**PASS1 (distribute/flatten):** dispatch `D` sweeps (S1 over Σ); redex windows `D ⟨ M ⟨ X` (R1
+shape) and `D ⟨ M` + later `⟨ X` at second arg (R2 shape, detected on the return leg): macro =
+structural swap window (`⟨M⟨X…` → `⟨X⟨M…` prefix rules, 4–6 concrete windows) + mint `▲` at
+insertion point (`p = ▲ p′`, motion ✓ Law 4) + S3(MATCH C) + S5(dup C) + S4(courier twins to ▲,
+order-preserving) + retire `▲` (`r ▲ = r′`, motion ✓) + S8 + return home. ≈ 20 schemas beyond
+subroutines.
+
+**PASS2 (monomial normalize):** for each monomial: adjacent-atom S6 compare; GREATER → swap via
+S4-courier (transport the smaller atom's code across, ▲-mediated); EQUAL → dedup `a∧a→a`: S7 on
+the atom pair + unit-fix (the spine `⟨M a ⟨M a u⟩⟩ → ⟨M a u⟩`: two structural deletions,
+anchored windows). Bubble until clean sweep. ≈ 15 schemas.
+
+**PASS3 (sum normalize):** adjacent-monomial compare = lexicographic S6 loop over the two spines
+(reusing S6 with monomial-boundary turns); GREATER → S4 swap; EQUAL → **pair-cancel**: S7 fused
+zigzag over the two spines (atom-by-atom, structural quartet per level), ending in `⟨X 0 0⟩`-core
+→ S9 sweeps. Bubble until clean sweep. ≈ 15 schemas.
+
+**PASS4 (constants + exit):** S9 sweeps to fixpoint; empty-sum/product conventions (`⟨X m 0⟩`
+tail trimming, top-level `0`/`1` finalization); final clean sweep exits into `H₀` at home via
+terminal transducing turn. ≈ 8 schemas.
+
+## 5. State inventory (v1)
+
+`H₀, H₀¹, H₀², H₀³` (homes); `D, D←` (PASS1 dispatch); S3: `m, m₁, m₂, m₃, m←`; S5: `d`;
+S4: `g, r` + `c_x` (8); S6: `k, k₁, k₂, k₃` + 3 exits; S7: `e, e₁, e₃, e₄` + spine variants
+(≈ 6); S9: `w, w₁, …` (≈ 6); S8: `u`; PASS2/3 dispatchers + swap crews (≈ 10).
+**Total ≈ 45–55 states** — within the audit's 30–60 estimate.
+
+## 6. Rule-count tally (expanded, estimated)
+
+S1 instantiations ≈ 120; S3 ≈ 30; S4 ≈ 60 (two instantiations); S5 ≈ 8; S6 ≈ 25; S7 ≈ 25;
+S8 ≈ 16; S9 ≈ 40; pass-specific windows ≈ 60. **Total ≈ 380–420 rules** — order 10², as
+estimated; every rule ∈ Sem (0-anchored witnesses for marked/transient material).
+
+## 7. Audit summary (family level)
+
+- **Law 1:** every schema has state-led vs data-led sides or distinct state flavors — affix-
+  disjoint by shape; cross-relator pieces = single chunks (comma-free layer pending, §6.4-2).
+- **Law 0/4/4′ cycle survey:** cycles = {sweep round-trips (net-trivial, harmless), mark/unmark
+  (bracket-anchored), courier loops (transport = intended), zigzag rounds (anchored quartets),
+  dup (BS, cleared), mint/retire ▲ (per-macro, with motion)}. NO data-only net relators found at
+  schema level. **The expander must re-verify on the literal graph** — §6.3's laundering example
+  shows this check must be mechanical, not visual.
+- **Law 2/3/5:** no absorption shapes; all turns transduce; boot in `f`. ✓
+- **M8 check:** zero data-data rules. ✓ Completion-divergence: deferred to mechanical KB run.
+
+## 8. The expander/auditor (designated next brick — build, don't hand-check)
+
+A small tool (Rust or Python, this repo's choice) that: (1) expands §3–§4's schemas × index sets
+into the literal rule list; (2) checks Law 1 per rule (affix-disjointness, chunk-piece bounds);
+(3) builds the state graph, enumerates cycle basis, computes each cycle's net relator via free
+reduction, checks Law 4′ (no data-only relators); (4) runs Knuth–Bendix to bounded depth
+(completion-divergence probe, M8); (5) emits the presentation (generators + relators) — i.e.,
+**the tool's output IS the group of Boolean logic**, machine-audited against the laws. Natural
+follow-ups: a brute-force positivity fuzzer (random positive word pairs, group-equality via the
+splitting normal forms vs Thue-reachability) and eventually the tactus formalization.
+
+---
+*v1 caveats, honestly: PASS1's R2-redex handling and PASS3's monomial-boundary turns are the two
+spots most likely to need schema surgery on expansion; S9's zero-anchored consumption is new —
+flagged for the fuzzer. Nothing here is theory-risk; it is all Law-auditable construction.*

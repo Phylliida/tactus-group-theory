@@ -691,6 +691,15 @@ sweeps for spine alignment + guarded `0`-absorption; all rules affix-disjoint, o
 anchored cycles, 0-anchored witnesses; junctions all in the proven inventory. Remaining F7 work
 is transcription (the concrete rule list), not design.
 
+### 6.5 The concrete rule list (v1)
+
+**`boolean-group-rules-v1.md`** — the complete machine at expansion-ready granularity: final
+encoding (bracketed Polish + marked twins + placeholder), 4-pass architecture with termination
+measures, 9-subroutine library (WALK/TURN/MATCH/COURIER/DUP/COMPARE/ERASE-PAIR/UNMARK/UNIT-SWEEPS)
+with explicit schemas × index sets, pass programs, state inventory (≈45–55), expanded-count tally
+(≈380–420 rules, all ∈ Sem), family-level audit (Laws 0–5 + 4′ + M8), and the spec for the
+**expander/auditor tool** whose output IS the presentation, machine-checked against the laws.
+
 ### 6.4 Open engineering (the honest gaps, post-6.3)
 
 1. ~~F7 micro-witnesses~~ **CLOSED at design level (§6.3)** — the old "every configuration ≡ the
