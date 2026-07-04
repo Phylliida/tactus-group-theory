@@ -109,12 +109,14 @@ pub open spec fn rt_table_get(t: &RuntimeCosetTable, c: usize, col: usize) -> us
 }
 
 ///  Runtime symbol to column.
+#[verifier::tactus_tactic("first | tactus_auto | tactus_usize_bound")]
 pub fn symbol_to_column_exec(s: &crate::runtime::RuntimeSymbol) -> (out: usize)
     requires
         symbol_to_column(crate::runtime::runtime_symbol_view(*s)) < usize::MAX,
     ensures
         out == symbol_to_column(crate::runtime::runtime_symbol_view(*s)) as usize,
 {
+    proof { cases hs : s.deref <;> simp_all [todd_coxeter.symbol_to_column, runtime.runtime_symbol_view] }
     match s {
         crate::runtime::RuntimeSymbol::Gen(i) => 2 * *i,
         crate::runtime::RuntimeSymbol::Inv(i) => 2 * *i + 1,
@@ -387,10 +389,12 @@ pub enum ScanResult {
 }
 
 ///  Compute the inverse column index (exec version).
+#[verifier::tactus_tactic("first | tactus_auto | tactus_usize_bound")]
 pub fn inverse_column_exec(col: usize) -> (out: usize)
     requires col < usize::MAX,
     ensures out == inverse_column(col as nat) as usize,
 {
+    proof { simp_all [todd_coxeter.inverse_column] }
     if col % 2 == 0 { col + 1 } else { col - 1 }
 }
 

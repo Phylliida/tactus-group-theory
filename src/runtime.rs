@@ -42,6 +42,7 @@ pub fn is_inverse_pair_exec(s1: &RuntimeSymbol, s2: &RuntimeSymbol) -> (out: boo
     ensures
         out == is_inverse_pair(runtime_symbol_view(*s1), runtime_symbol_view(*s2)),
 {
+    proof { cases hs1 : s1.deref <;> cases hs2 : s2.deref <;> simp_all [symbol.is_inverse_pair, symbol.inverse_symbol, runtime.runtime_symbol_view] }
     match (s1, s2) {
         (RuntimeSymbol::Gen(i), RuntimeSymbol::Inv(j)) => *i == *j,
         (RuntimeSymbol::Inv(i), RuntimeSymbol::Gen(j)) => *i == *j,
