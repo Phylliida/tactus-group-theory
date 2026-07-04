@@ -113,3 +113,23 @@ Rough estimate: v1 ≈ 3–5 sessions, v2 + ZFC instance ≈ 2–4 more. All add
   finite `R` even gets the *trivial words* right. State it that way.
 - The H₂ argument (§1) is a by-hand check; if any formalization step surprises us, re-derive
   against it before trusting either.
+
+---
+
+## 6. NF-3 PROVEN + NF-2b PINNED (2026-07-04, `docs/law-p-prime.md` §8–§9)
+
+- **NF-3 (escape combinatorics) — PROVEN on paper.** Weight bound `w(E) ≤ |E|` for the closure of
+  a finite pair-list `E` (induction: each added pair raises the class-weight by ≤ 1), giving the
+  class bound `|C| ≤ |E|+1` and hence the escape corollary (an infinite `~`-class over-fills every
+  finite stage ⟹ some `~`-pair escapes the stage's closure). **Verus shape chosen: contraction
+  induction** (contract the last pair `(a,b)` by `ρ=(b↦a)`; `k+2` distinct pairwise-related
+  elements descend to `k+1` over `k−1` pairs — IH), avoiding partition formalization. Signature
+  `lemma_closure_class_bound(ps, xs)` drafted; fully self-contained (no Miller machinery) — the
+  warm-up brick before NF-2b.
+- **NF-2b (the gating brick) — PINNED to signature level.** Backward direction via the
+  **representative collapse**: `rep(ps,i)` = least closure-representative; `collapse_word` sends
+  `gᵢ ↦ g_{rep(i)}`; every `c0_slice` relator collapses to a freely-trivial word (equal reps), so
+  `collapse` transports slice-equivalence to FREE-group equivalence (shape of
+  `lemma_hom_pred_preserves_equiv`, target free); then `g_αg_β⁻¹` slice-trivial ⟹ `rep(α)=rep(β)`
+  ⟹ `in_closure(pairs(m),α,β)`. Chaining NF-3+NF-2b through the banked descent discharges
+  `limit_escapes_every_slice` and makes NF-A unconditional.

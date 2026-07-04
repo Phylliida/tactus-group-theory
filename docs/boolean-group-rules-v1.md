@@ -386,3 +386,17 @@ round-trips eating one stroke from each copy per cycle (the anchored quartet acr
 in the group of Boolean logic, computing `x ⊕ x = 0` — the ring's arithmetic performed by the
 group itself.** Every rule an audited shape; the trace is the first normalization the Boolean
 group ever performed.
+
+## A.11 Whitelist consequence-closure → Law P′ (see docs/law-p-prime.md)
+
+The A.7 witnessed-whitelist protocol has a follow-on obligation, worked out 2026-07-04. The two
+collapsed unit tokens `⟨M1⟩ = ε`, `⟨X0⟩ = ε` are not closed under consequence: eliminating `⟩`
+derives the positive pair **`M1 = X0`** (sound — it is the collapsed schema `1∧u ↔ 0⊕u`, both
+`≡ u`, witnessed). And they are not closed under rotation: naive rotation-free `T̂` is refuted by
+a bicyclic-monoid invariant (`⟩⟨M1 ↦ qp ≠ ε`). The `token_interaction_probe` in
+`tools/semantic_audit.py` (run this session) mechanically reproduces both — returning the 8
+rotation-identities plus `M1 = X0` as the minimal `T̂` generating set. This turns plain positivity
+(the V.3/`positivity` spec) into **Law P′** (`positivity_mod` over the join `Thue(R) ∨ ≈_T`) and
+adds the **M0 rung** (that `≈_T` is a finite Thue congruence `T̂`). Canonical codes are proved
+`T̂`-irreducible (endpoint lemma), so endpoint soundness is unaffected. Full treatment, NF-3
+proof, NF-2b pin: `docs/law-p-prime.md`.
