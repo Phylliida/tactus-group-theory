@@ -182,6 +182,16 @@ S.append(System("font_copier_core", ["a", "am", "ac", "F", "Fp", "D", "Dh", "h",
      ("c D", "ac Dh c2"), ("c Dh", "ac D c2"), ("Fp c2", "c2 Fp"), ("a c2", "c2 a"),
      ("F c2", "h F")], 'CLEAN'))
 
+S.append(System("s9_zero_consume_AS_WRITTEN_A4",
+    ["x1", "x2", "Oh", "Ok", "z", "z1"], ["z", "z1"],
+    [("x1 z", "z1"), ("x2 z", "z1"), ("z1 Oh", "Ok z"), ("z1 Ok", "Oh z")],
+    'POISON'))
+S.append(System("s9_fixed_peel_pair_deposit",
+    ["x1", "x2", "g1", "g2", "z", "zp"], ["z", "zp"],
+    [("z x1", "g1 g1 zp"), ("zp x1", "g1 g1 z"),
+     ("z x2", "g2 g2 zp"), ("zp x2", "g2 g2 z")],
+    'CLEAN'))
+
 # ---------- run ----------
 
 if __name__ == "__main__":
