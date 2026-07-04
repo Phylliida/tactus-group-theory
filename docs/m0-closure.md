@@ -230,3 +230,25 @@ fine-print bug. **M0 stands at paper-strength + heavy mechanical corroboration.*
 
 Ledger update: §7(a) DONE (clean), §7(b) DONE (clean, 9.4M), §7(c) subsumed (canonical-code
 irreducibility is now just `not has_redex`, already the fuzz's filter).
+
+---
+
+## 10. FORMALIZED (2026-07-04): M0 fully machine-verified, `src/m0_token.rs` 25/0
+
+M0 is now machine-checked in Verus/tactus — **both directions**, full crate 2856/0 (additive):
+`lemma_m0`: `equiv_in_presentation(token_pres, u, v) ⟺ freely_equivalent(ψ(u), ψ(v))`, i.e.
+**`G_T ≅ free_group(4)` via ψ — the token quotient is FREE.**
+
+**A5 and A6 dissolved.** The completeness direction was NOT done via Newman-confluence (A5) or the
+scar induction (A6). Those prove M0 in its *Thue-rewriting* form; the *meaningful* content — the
+group iso `G_T ≅ F(4)`, which is what §1's second-Tietze insight actually established and what
+Lemma 2 needs — is proved by a **retraction** φ: free_group(4) → token_pres with φ∘ψ ≡ id (mirror
+of `miller_collapse_inject::lemma_collapse_injective`, the G1 engine). No confluence, no scar
+induction. The Thue normal-form characterization remains a valid separate combinatorial result, but
+it is OFF the critical path: the token-layer decision procedure comes free from the iso (compare
+`normal_form(ψ(u))` vs `normal_form(ψ(v))`), and §5's "base is free" is exactly `lemma_m0`.
+
+The retraction's mathematical core is `lemma_gen5_id`/`lemma_gen1_id`: `0 = X⁻¹M1` (via r1) and
+`⟩ = 1⁻¹M⁻¹⟨⁻¹` (via d1) — the two derived generators recovered from the relators, verified. The
+§9 fuzz (9.4M irreducibles) and the KB pass remain the evidence for the Thue-form should anyone
+want it; the group-iso form is now proof, not evidence.
