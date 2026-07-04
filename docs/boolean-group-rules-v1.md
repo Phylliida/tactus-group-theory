@@ -272,3 +272,26 @@ v1.1 expanded estimate: previous ≈ 380–420, plus A.1–A.4 refinements net +
 boundary turns were under-counted; S3 fully priced) ⟹ **≈ 440–480 rules**. Still order 10².
 All new cycles anchored; no data-data rules introduced (the A.1(9′) note shows where the shape
 discipline bites and how left-mover shapes stay legal).
+
+## A.6 CORRECTION to A.4 (mechanically confirmed): zero-anchored consumption is POISON
+
+The A.4 quartet consumes arbitrary letters through a shared state-pair (`x z = z₁` for all x).
+**Any two such rules identify their letters**: eliminating `z₁` from `x₁z = z₁`, `x₂z = z₁`
+leaves the data-only survivor `x₁·x₂⁻¹`. Confirmed by `tools/semantic_audit.py`
+(`s9_zero_consume_AS_WRITTEN_A4` → POISON, survivor `x1.-x2`). The anchor-flavor alternation
+protected the CYCLE but not the RULE-PAIR — a third laundering mode: **shared-context
+consumption**.
+
+**The fix — peel-with-pair-deposit (S9′, mechanically confirmed CLEAN):** to annihilate
+`⟨M u 0⟩ → 0`, never consume `u` against nothing. Peel `u` head-letter-wise, each peel
+DEPOSITING a designated ghost-atom pair: window `z·x = p_x p_x·z′`-shaped (per-letter distinct
+both sides ⟹ no identification; alternating states for hygiene). Semantic witness: inside the
+zero-summand, `(x∧u′)∧0 ⊕ R ≡ u′∧0 ⊕ (p_x ⊕ p_x) ⊕ R` — both `≡ R`. The deposited pairs are
+then F7-pair-cancelled: **the graveyard self-cleans**, endpoints stay canonical.
+
+**The erasure trichotomy (closing the theory):** the ONLY legal loss mechanisms are
+(a) F7 lockstep duplicate-cancel (the copy is the record), (b) uncompute-by-reversal
+(Thue symmetry), (c) peel-with-pair-deposit (which reduces to (a) after deposit).
+Everything else — generic erasers, certificate-carrying erasers, shared-context consumers —
+is one of the three confirmed laundering modes. Rule-of-thumb for the auditor and all future
+opcode design: **nothing is ever erased against nothing.**
