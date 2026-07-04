@@ -154,6 +154,15 @@ All mechanically auditable on a candidate `(f, R)` except Law P, which is the re
   (schema-level insertion relators trivialize the guard).
 - **Law P — positivity** (the theorem, not an audit): the group trace on positive words equals
   the Thue congruence. Proven mechanisms so far: §4; general routes: §5.1, §5.2.
+- **Law P′ — two-layer positivity** (`docs/law-p-prime.md`, 2026-07-04): when the machine has a
+  witnessed whitelist `T` of data-only ε-tokens, plain positivity is FALSE (state-free words are
+  Thue-inert but `⟨M1⟩ = ε` in `G`). Correct statement: `u = v` in `G` ⟺ `u ~ v` under
+  `Thue(R) ∨ ≈_T`, with `≈_T` a finite Thue congruence `T̂` (the **M0 rung**, below M1). Two
+  laws fell out, both mechanically confirmed: **consequence-closure** (the whitelist must contain
+  derived tokens — e.g. `M1 = X0` from `{⟨M1⟩,⟨X0⟩}`, itself the collapsed schema `1∧u ↔ 0⊕u`,
+  witnessed) and **rotation-closure** (whitelist tokens are CYCLIC words; naive `T̂` refuted by a
+  bicyclic-monoid invariant, `⟩⟨M1 ↦ qp ≠ ε`). `positivity_mod(rules, toks)` generalizes Law P;
+  plain positivity = empty token list.
 
 ---
 
