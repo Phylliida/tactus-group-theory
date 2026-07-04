@@ -369,6 +369,29 @@ pub proof fn lemma_inverse_word_element(w: Word, k: int)
 }
 
 ///  Apply homomorphism to a single symbol (exec).
+///  Image of a Gen symbol (single-arm helper — concrete `Symbol::Gen(i)`
+///  gives a clean postcondition the Lean backend can discharge; the
+///  parent's per-arm postconditions then close from these + a
+///  `runtime_symbol_view` unfold).
+#[verifier::tactus_tactic("first | tactus_auto | (intros <;> simp only [homomorphism.apply_hom_symbol, runtime.runtime_hom_view, symbol.Symbol.isGen, symbol.Symbol.Gen_val0] at * <;> rw [seq.axiom_seq_new_index _ _ _ _ (by simp_all)] <;> congr 1)")]
+fn apply_hom_gen(h: &RuntimeHomData, i: usize) -> (out: Vec<RuntimeSymbol>)
+    requires (i as int) < h.generator_images@.len(),
+    ensures runtime_word_view(out@) =~=
+        apply_hom_symbol(runtime_hom_view(h), Symbol::Gen(i as nat)),
+{
+    copy_word(&h.generator_images[i])
+}
+
+#[verifier::tactus_tactic("first | tactus_auto | (intros <;> simp only [homomorphism.apply_hom_symbol, runtime.runtime_hom_view, symbol.Symbol.isGen, symbol.Symbol.Inv_val0] at * <;> rw [seq.axiom_seq_new_index _ _ _ _ (by simp_all)] <;> congr 1)")]
+fn apply_hom_inv(h: &RuntimeHomData, i: usize) -> (out: Vec<RuntimeSymbol>)
+    requires (i as int) < h.generator_images@.len(),
+    ensures runtime_word_view(out@) =~=
+        apply_hom_symbol(runtime_hom_view(h), Symbol::Inv(i as nat)),
+{
+    inverse_word_exec(&h.generator_images[i])
+}
+
+#[verifier::tactus_tactic("first | tactus_auto | (intros <;> simp_all only [runtime.runtime_symbol_view])")]
 pub fn apply_hom_symbol_exec(
     h: &RuntimeHomData,
     s: &RuntimeSymbol,
@@ -383,13 +406,52 @@ pub fn apply_hom_symbol_exec(
             apply_hom_symbol(runtime_hom_view(h), runtime_symbol_view(*s)),
 {
     match s {
-        RuntimeSymbol::Gen(i) => {
-            h.generator_images[*i].clone()
-        },
-        RuntimeSymbol::Inv(i) => {
-            inverse_word_exec(&h.generator_images[*i])
-        },
+        RuntimeSymbol::Gen(i) => apply_hom_gen(h, *i),
+        RuntimeSymbol::Inv(i) => apply_hom_inv(h, *i),
     }
+}
+
+///  Copy a word element-by-element (RuntimeSymbol is Copy). Replaces
+///  Vec::clone in apply_hom_symbol_exec: the Lean backend axiomatizes
+///  strictly_cloned (call_ensures has no Lean form), which leaves
+///  Vec::clone's ensures a disjunction too weak to prove view
+///  equality — the element loop's ensures is provable directly.
+fn copy_word(v: &Vec<RuntimeSymbol>) -> (out: Vec<RuntimeSymbol>)
+    ensures out@ =~= v@,
+{
+    let mut out: Vec<RuntimeSymbol> = Vec::new();
+    let mut j: usize = 0;
+    while j < v.len()
+        invariant
+            j <= v@.len(),
+            out@.len() == j as int,
+            forall|k: int| 0 <= k < j ==> out@[k] == v@[k],
+        decreases v.len() - j,
+    {
+        out.push(v[j]);
+        //  Maintain the two content invariants across the push. The
+        //  post-push `out` is bound as a `let`-FVar aliasing a fresh
+        //  mut-post name; goal-only `zetaDelta` reduces it so its atoms
+        //  align with the Vec::push ensures hyps (see
+        //  BUG-call-arg-temp-claimed-typ.md — the let-zeta friction).
+        assert(out@.len() == (j + 1) as int) by {
+            simp (config := { zetaDelta := true }) only []
+            simp_all
+        };
+        assert(forall|k: int| 0 <= k < (j + 1) as int ==> out@[k] == v@[k]) by {
+            simp (config := { zetaDelta := true }) only []
+            simp_all
+            intro k hk1 hk2
+            by_cases hc : k < (j : Int)
+            · rw [seq.axiom_seq_push_index_different _ _ _ _ (by simp_all)]
+              simp_all
+            · have hkj : k = (j : Int) := by omega
+              rw [hkj, seq.axiom_seq_push_index_same _ _ _ _ (by simp_all)]
+              simp (config := { zetaDelta := true }) only [Int.ofNat_eq_natCast]
+        };
+        j = j + 1;
+    }
+    out
 }
 
 ///  Append all elements from src to dst (exec helper).
