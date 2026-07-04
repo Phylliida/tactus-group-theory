@@ -130,6 +130,27 @@ boundaries (arrange the guard chunks as a comma-free code of long strings — se
 - **Length changes** (σ, τ of different sizes) go through affix-disjoint state rules
   ("mint/retire a blank guard"), permitted by the taxonomy.
 
+### 3.5 The Laws of Semantic Machines (consolidated design discipline)
+
+All mechanically auditable on a candidate `(f, R)` except Law P, which is the research theorem.
+
+- **Law 0 — cycle-relator principle** (the master law): Tietze elimination turns every control
+  cycle's NET EFFECT into a relator. The relator set the group actually sees = intended windows ∪
+  cycle net-effects. Design so these coincide: audit the state graph's cycles, not just the rules.
+- **Law 1 — affix hygiene:** each relator's two sides affix-disjoint (its free reduction IS the
+  intended window); cross-relator pieces confined to guard-chunk boundaries (comma-free guards).
+- **Law 2 — no absorption, injective actions:** no `uw = w` / `u = uw` shapes anywhere in the
+  consequence-closure of the intended instruction algebra; generators act injectively on classes
+  (reversible-machine discipline; evaluation only via replay with history).
+- **Law 3 — trajectory-injectivity** (Law 0 instance): no two states connected by a net-trivial
+  trajectory; turns must transduce (`qW = rW′`, `W ≠ W′`).
+- **Law 4 — mint must move** (Law 0 instance): minting/retiring cycles have nonzero net head
+  displacement (stationary pumps force `h = g⁻¹`).
+- **Law 5 — boot via encoding:** guard insertion lives in the wrapper `E` inside `f`, never in `R`
+  (schema-level insertion relators trivialize the guard).
+- **Law P — positivity** (the theorem, not an audit): the group trace on positive words equals
+  the Thue congruence. Proven mechanisms so far: §4; general routes: §5.1, §5.2.
+
 ---
 
 ## 4. The M-ladder: minimal positivity theorems (PROVEN)
@@ -294,7 +315,7 @@ position sum). Irreducibles: no `qa`, `ar`, `bqr`.
 > `sub(bqr) = q(as)q⁻¹ = q(sa)q⁻¹ = sub(qrb)`. **Knuth–Bendix completion on the Thue side = the
 > commutation structure of the group.** (Dictionary entry.)
 
-**Theorem (M5′ positivity, proof at sketch+spot-check rigor).** The positive trace of `ncl(R)`
+**Theorem (M5′ positivity; proof completed in §4.5.1).** The positive trace of `ncl(R)`
 equals the Thue congruence. *Proof architecture:* free-product normal forms in `ℤ² ∗ F(q)` under
 `sub: a↦a, q↦q, b↦qaq⁻¹, r↦sq⁻¹`; the parsing ambiguities of a normal form are in bijection with
 the three rules — `sub(bq)` merges to a `qa`-shape (`qa` forbidden in irreducibles ⟹ reads back
@@ -312,6 +333,48 @@ vs HNN), because the composite cycle `s = rq` acts trivially on the data it slid
 against the completed rule set, with group structure mirroring the completion's geometry.
 (iii) The return-collapse law is the first constraint that binds the OPCODE DESIGNER rather than
 the prover — it goes into the Probe 0 instruction-set discipline next to affix hygiene.
+
+#### 4.5.1 M5′ readback, full enumeration (debt paid — upgrades §4.5 to a complete proof)
+
+**Item-walk model.** `G ≅ ℤ²(a,s) ∗ ⟨q⟩`; represent normal forms as reduced walks: moves
+`U` (=q), `Dn` (=q⁻¹) and deposits in `ℕ²∖0` (components = (a-count, s-count)). Letter images:
+`a: dep(1,0)`; `q: U`; `b: U·dep(1,0)·Dn`; `r: dep(0,1)·Dn`. Reduction: adjacent opposite moves
+with nothing between cancel; adjacent deposits sum. **All deposits are strictly positive, so
+deposits never vanish** — the only reductions are move-cancellations. Reduced walks = free-product
+normal forms (maximal move-runs = q-syllables, deposits = ℤ²-syllables).
+
+**Run images** (`n ≥ 1`): `a^n ↦ dep(n,0)`; `q^n ↦ Uⁿ`; `b^n ↦ U·dep(n,0)·Dn` (b|b telescopes);
+`r^n ↦ (dep(0,1)·Dn)ⁿ` (no internal reduction).
+
+**Junction table** (only nontrivial entries; all others concatenate cleanly):
+`B|Q`: b-tail `Dn` cancels one `U` — for q-run length 1 the elevated deposit is exposed to the
+next run; `R|Q`: r-tail `Dn` cancels one `U` — exposes `dep(0,1)`; `R|B`: r-tail `Dn` cancels
+b-head `U`, deposits merge to `dep(n,1)·Dn`; cascades chain through `q¹`-runs only
+(`rq¹rq¹… ↦ dep(0,c)`-chains; `q¹rb^n ↦ U·dep(n,1)·Dn`).
+
+**Deterministic parser** (deposit context `(a-comp n, s-comp c, prev move, next move)` → run
+readback; move-run lengths recover q-run lengths):
+
+| context | reads back as |
+|---|---|
+| `dep(n,0)`, prev ∈ {start, Dn}, next ∈ {U, end} | `a^n` |
+| `U^j·dep(n,0)·Dn` | `q^{j−1} b^n` |
+| `U^j·dep(n,0)·U^t` (t≥1) | `q^{j−1} b^n q^{t+1−1}`-split, i.e. `q^{j−1} b^n q^{t}` with one U consumed |
+| `dep(n,c≥1)·Dn` (prev ∉ U-elevation of a b) | `(rq)^{c−1} r b^n` |
+| `dep(n,c≥1)·U^t` (t≥0, then next run) | `(rq)^{c−1} r b^n q^{t+1}` |
+| `U^j·dep(n,1)·Dn` | `q^{j−1}·q¹ r b^n` (i.e. `q^j r b^n`) |
+
+**The ambiguity ⇄ rule bijection** (why the parser is well-defined exactly on irreducibles):
+each would-be double-reading is precisely one rule of the completed system, with the reducible
+side excluded:
+1. `qa` forbidden ⟺ a-deposits never merge across a cancelled `q¹` (kills the `…q¹a` reading;
+   Thue-equivalent reading `…bq`-side survives).
+2. `ar` forbidden ⟺ a-run deposits never acquire s-components rightward (kills `a^n r…`; the
+   `r b^n`-side survives via the R|B merge).
+3. `bq¹r` forbidden ⟺ the elevated pattern `U·dep(n,1)·Dn` has the UNIQUE reading `q¹ r b^n` —
+   the excluded reading `b^n q r` is its head-passing partner (`bqr ~ qrb`), i.e. **the parser's
+   last ambiguity is literally the completion rule.**
+Hence `sub` is injective on irreducibles; with confluence, M5′ positivity is fully proven. ∎
 
 ### 4.6 M5 — mint/retire (length-imbalanced rules): the cycle-relator principle, and monsters that aren't dragons
 
@@ -357,6 +420,25 @@ ANF machine's copying walks (which need doubling) are cleared. (iv) The group-th
 of the ambient group (distortion, non-Hopficity) is orthogonal to trace-soundness — the program
 does not need tame groups, only tame *traces*.
 
+### 4.7 Consolidation: the mechanism inventory
+
+| Rung | System | Group | Proof mechanism | Law discovered |
+|---|---|---|---|---|
+| M1 | `gn = ng` | `F(a,b) ∗ ℤ²` | free-product normal form | — |
+| M2 | `qa = bq′` | `F(q,a,b)` (Tietze-free) | complete rewriting + no-cancellation readback | — |
+| M3 | blinker (2-cycle) | HNN `⟨a²⟩→⟨b²⟩` | **intrinsic Britton** + parity head-caps | irreducibility cap = unconsumed window letter |
+| M4 | mixed cycle word | HNN `⟨ab⟩→⟨ba⟩` | **global defect flow** (masquerade → forced propagation → boundary annihilation) | conjugacy caveat; caps can be non-local |
+| M5′ | shuttle (two-way) | `ℤ² ∗ F(q)` | free-product NF + **rule ⇄ ambiguity bijection** (§4.5.1, complete) | trajectory-injectivity; completion = commutation |
+| M5 | mint/retire | HNN uneq. lengths; `BS(1,2)`; `BS(2,3)` | head-caps; **faithful affine invariant**; **Adjan/Remmers** | cycle-relator principle; mint-must-move |
+
+Meta-observations: (1) six rungs, six distinct mechanisms — the conjecture keeps converting
+attacks into tools, never into counterexamples; (2) every mechanism is a normal-form argument
+against a structure obtained by *eliminating the control graph* (free / free-product / HNN /
+affine) — suggesting the general Lemma-2 proof shape: eliminate the spanning tree, classify the
+resulting splitting, run the matching normal-form argument with the machine's irreducibility
+discipline as the cap; (3) ambient-group pathology (distortion, non-Hopficity) never leaked into
+the trace; (4) every near-miss became a LAW (§3.5) rather than a wound.
+
 ---
 
 ## 5. The general program
@@ -399,9 +481,9 @@ in itself, and the Proof Factory tutorial world.
 ### 5.4 Escalation ladder (next steps)
 
 - ~~M4 — mixed cycle words~~ **DONE, positivity holds** (§4.4; new global defect-flow mechanism).
-- ~~M5′ — two-way motion~~ **DONE, positivity holds** (§4.5; return-collapse law, head-passing =
-  completion = commutation, shuttle group = `ℤ² ∗ F(q)`). Full readback enumeration still to be
-  written out mechanically.
+- ~~M5′ — two-way motion~~ **DONE, positivity holds, proof COMPLETE** (§4.5 + §4.5.1 readback
+  enumeration; return-collapse law, head-passing = completion = commutation, shuttle group =
+  `ℤ² ∗ F(q)`).
 - ~~M5 — mint/retire~~ **DONE, positivity holds** (§4.6; cycle-relator principle + "mint must
   move" law; doubler = BS(1,2) sound via affine invariant; ratio rule = BS(2,3) sound via
   Adjan/Remmers — monsters aren't dragons).
