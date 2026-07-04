@@ -352,3 +352,26 @@ consequence-closure gap flagged in the capstone IV.2′ meta-lesson (Tietze alon
 previously-audited systems keep their verdicts under the upgrade (shuttle still POISON via its
 own mechanism; font-copier still CLEAN — its two conjugation forms have DIFFERENT cores, so no
 resolution fires: the discriminator is exact on the corpus).
+
+## A.9 Round 4: S3 restart turns + PASS3 spine-advance (corpus 28) — the flip-pairing law
+
+**The flip-pairing law (generalizing the deposit-order law).** Two rules
+`α·s = β·s′` and `β·s = α·s′` — a flavor-flip pair SHARING its state-pair — force
+`(α⁻¹β)² = 1`: data-only torsion (mechanically: `s3_restart_flip_SHARED_states` → POISON,
+survivor `brg.-brf.brg.-brf`). Fixes, all validated: (i) carry flip-PARITY in the states
+(`s3_restart_flip_PARITY_states` → CLEAN); (ii) a SINGLE restart rule with no flavor pair
+(A.1's original `⟨† m₃ = m₄ ⟨†` — nothing to combine); (iii) the font-copier escape: if the
+anchors cross sides with a deposit between (`s·α = X·β·s′` shape), the pair yields the
+consistent `s·m·s⁻¹ = X·m⁻¹·X⁻¹` instead of torsion. Side-of-approach and deposit placement
+decide — **the law is a design heuristic; the auditor's survivor + conjugation-resolution
+passes are the judge, instance by instance.**
+
+**PASS3 spine-advance: CLEAN** — the two-spine advance cycle (`ke⟨M = ⟨•M•ke₁`, walk,
+`ke₁⟨M = ⟨•M•ke`) nets the anchored conjugation `ke·(⟨M)²·ke⁻¹ = (⟨•M•)²`; no combination
+fires (state-pairs differ). The A.3 design is validated as written.
+
+Running tally of laundering modes, all mechanically detectable: state-cycles (Law 0/4),
+bounded-bit mint counting (shuttle), shared-context consumption (S9), duplicate-LHS home
+detection (friendly fire, documented), wall-first flavor deposits (deposit-order), shared-state
+flavor-flips (flip-pairing). Six modes, six probes, twenty-eight systems, zero unexplained
+survivors.

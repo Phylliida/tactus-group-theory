@@ -260,6 +260,19 @@ S.append(System("pass1_deposit_WRONG_order",
      ("trib k", "tri cc2 g2")],
     'POISON'))
 
+S.append(System("s3_restart_flip_SHARED_states",
+    ["brf", "brg", "cb", "cbm", "m1", "m3"], ["m1", "m3"],
+    [("m1 cb", "cbm m3"), ("brf m3", "brg m1"), ("brg m3", "brf m1")], 'POISON'))
+S.append(System("s3_restart_flip_PARITY_states",
+    ["brf", "brg", "cb", "cbm", "m1a", "m3a", "m1b", "m3b"],
+    ["m1a", "m3a", "m1b", "m3b"],
+    [("m1a cb", "cbm m3a"), ("brf m3a", "brg m1b"),
+     ("m1b cb", "cbm m3b"), ("brg m3b", "brf m1a")], 'CLEAN'))
+S.append(System("pass3_spine_advance",
+    ["br", "brm", "M", "Mm", "P", "ke", "ke1"], ["ke", "ke1"],
+    [("ke br M", "brm Mm ke1"), ("ke1 P", "P ke1"), ("ke1 br M", "brm Mm ke"),
+     ("ke P", "P ke")], 'CLEAN'))
+
 # ---------- run ----------
 
 if __name__ == "__main__":
