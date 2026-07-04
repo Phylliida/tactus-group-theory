@@ -382,7 +382,7 @@ fn apply_hom_gen(h: &RuntimeHomData, i: usize) -> (out: Vec<RuntimeSymbol>)
     copy_word(&h.generator_images[i])
 }
 
-#[verifier::tactus_tactic("first | tactus_auto | (intros <;> simp only [homomorphism.apply_hom_symbol, runtime.runtime_hom_view, symbol.Symbol.isGen, symbol.Symbol.Inv_val0] at * <;> rw [seq.axiom_seq_new_index _ _ _ _ (by simp_all)] <;> congr 1)")]
+#[verifier::tactus_tactic("first | tactus_auto | (intros <;> simp only [homomorphism.apply_hom_symbol, runtime.runtime_hom_view, symbol.Symbol.isGen, symbol.Symbol.Inv_val0, false_and, if_false, and_true] <;> rw [seq.axiom_seq_new_index _ _ _ _ (by simp_all <;> omega)] <;> congr 1)")]
 fn apply_hom_inv(h: &RuntimeHomData, i: usize) -> (out: Vec<RuntimeSymbol>)
     requires (i as int) < h.generator_images@.len(),
     ensures runtime_word_view(out@) =~=
@@ -391,7 +391,6 @@ fn apply_hom_inv(h: &RuntimeHomData, i: usize) -> (out: Vec<RuntimeSymbol>)
     inverse_word_exec(&h.generator_images[i])
 }
 
-#[verifier::tactus_tactic("first | tactus_auto | (intros <;> simp_all only [runtime.runtime_symbol_view])")]
 pub fn apply_hom_symbol_exec(
     h: &RuntimeHomData,
     s: &RuntimeSymbol,
@@ -405,9 +404,28 @@ pub fn apply_hom_symbol_exec(
         runtime_word_view(out@) =~=
             apply_hom_symbol(runtime_hom_view(h), runtime_symbol_view(*s)),
 {
+    //  The asserts bring the match discriminant into scope for the
+    //  fn's postcondition: in each arm `*s` IS `Gen(i)`/`Inv(i)`, so
+    //  `runtime_symbol_view(*s)` reduces — WITHOUT an assert the
+    //  helper-dispatch postcondition obligation carries no usable
+    //  `s.is_gen` fact and `runtime_symbol_view(s.deref)` stays opaque.
     match s {
-        RuntimeSymbol::Gen(i) => apply_hom_gen(h, *i),
-        RuntimeSymbol::Inv(i) => apply_hom_inv(h, *i),
+        RuntimeSymbol::Gen(i) => {
+            let r = apply_hom_gen(h, *i);
+            assert(runtime_symbol_view(*s) == Symbol::Gen(*i as nat)) by {
+                intros
+                simp_all (config := { zetaDelta := true }) [runtime.runtime_symbol_view, runtime.RuntimeSymbol.isGen, runtime.RuntimeSymbol.Gen_val0]
+            };
+            r
+        },
+        RuntimeSymbol::Inv(i) => {
+            let r = apply_hom_inv(h, *i);
+            assert(runtime_symbol_view(*s) == Symbol::Inv(*i as nat)) by {
+                intros
+                simp_all (config := { zetaDelta := true }) [runtime.runtime_symbol_view, runtime.RuntimeSymbol.isGen, runtime.RuntimeSymbol.Inv_val0]
+            };
+            r
+        },
     }
 }
 
