@@ -16,7 +16,10 @@
 use vstd::prelude::*;
 use crate::symbol::*;
 use crate::word::*;
+use crate::reduction::{has_cancellation_at, reduce_at, reduces_one_step, reduces_in_steps,
+    reduces_to, freely_equivalent, lemma_reduces_to_refl};
 use crate::presentation::*;
+use crate::presentation_lemmas::lemma_freely_equivalent_implies_equiv;
 use crate::homomorphism::*;
 use crate::higman_operations::{free_group, lemma_free_group_valid};
 
@@ -121,5 +124,311 @@ pub proof fn lemma_psi_shape()
 // / a hand `reduces_in_steps` witness — 3 cancellations per relator, mechanical.
 // Then: `lemma_psi_valid` (is_valid_homomorphism) and `lemma_m0_soundness`
 // (= `lemma_hom_preserves_equiv` + `lemma_free_group_equiv_freely_equivalent`).
+
+// ── reduction-chain helper: 3 explicit cancellations w0→w1→w2→ε ────────────
+proof fn reduces3(w0: Word, i0: int, w1: Word, i1: int, w2: Word, i2: int)
+    requires
+        has_cancellation_at(w0, i0), w1 == reduce_at(w0, i0),
+        has_cancellation_at(w1, i1), w2 == reduce_at(w1, i1),
+        has_cancellation_at(w2, i2), reduce_at(w2, i2) == empty_word(),
+    ensures reduces_to(w0, empty_word())
+{
+    assert(reduces_one_step(w2, empty_word())) by {
+        assert(has_cancellation_at(w2, i2) && empty_word() == reduce_at(w2, i2));
+    }
+    assert(reduces_in_steps(w2, empty_word(), 1)) by {
+        assert(reduces_one_step(w2, empty_word())
+            && reduces_in_steps(empty_word(), empty_word(), 0));
+    }
+    assert(reduces_one_step(w1, w2)) by {
+        assert(has_cancellation_at(w1, i1) && w2 == reduce_at(w1, i1));
+    }
+    assert(reduces_in_steps(w1, empty_word(), 2)) by {
+        assert(reduces_one_step(w1, w2) && reduces_in_steps(w2, empty_word(), 1));
+    }
+    assert(reduces_one_step(w0, w1)) by {
+        assert(has_cancellation_at(w0, i0) && w1 == reduce_at(w0, i0));
+    }
+    assert(reduces_in_steps(w0, empty_word(), 3)) by {
+        assert(reduces_one_step(w0, w1) && reduces_in_steps(w1, empty_word(), 2));
+    }
+    assert(reduces_to(w0, empty_word())) by {
+        assert(reduces_in_steps(w0, empty_word(), 3));
+    }
+}
+
+// 4-step variant for the e-family (length-8 images).
+proof fn reduces4(w0: Word, i0: int, w1: Word, i1: int, w2: Word, i2: int, w3: Word, i3: int)
+    requires
+        has_cancellation_at(w0, i0), w1 == reduce_at(w0, i0),
+        has_cancellation_at(w1, i1), w2 == reduce_at(w1, i1),
+        has_cancellation_at(w2, i2), w3 == reduce_at(w2, i2),
+        has_cancellation_at(w3, i3), reduce_at(w3, i3) == empty_word(),
+    ensures reduces_to(w0, empty_word())
+{
+    assert(reduces_one_step(w3, empty_word())) by {
+        assert(has_cancellation_at(w3, i3) && empty_word() == reduce_at(w3, i3));
+    }
+    assert(reduces_in_steps(w3, empty_word(), 1)) by {
+        assert(reduces_one_step(w3, empty_word())
+            && reduces_in_steps(empty_word(), empty_word(), 0));
+    }
+    assert(reduces_one_step(w2, w3)) by {
+        assert(has_cancellation_at(w2, i2) && w3 == reduce_at(w2, i2));
+    }
+    assert(reduces_in_steps(w2, empty_word(), 2)) by {
+        assert(reduces_one_step(w2, w3) && reduces_in_steps(w3, empty_word(), 1));
+    }
+    assert(reduces_one_step(w1, w2)) by {
+        assert(has_cancellation_at(w1, i1) && w2 == reduce_at(w1, i1));
+    }
+    assert(reduces_in_steps(w1, empty_word(), 3)) by {
+        assert(reduces_one_step(w1, w2) && reduces_in_steps(w2, empty_word(), 2));
+    }
+    assert(reduces_one_step(w0, w1)) by {
+        assert(has_cancellation_at(w0, i0) && w1 == reduce_at(w0, i0));
+    }
+    assert(reduces_in_steps(w0, empty_word(), 4)) by {
+        assert(reduces_one_step(w0, w1) && reduces_in_steps(w1, empty_word(), 3));
+    }
+    assert(reduces_to(w0, empty_word())) by {
+        assert(reduces_in_steps(w0, empty_word(), 4));
+    }
+}
+
+// close the relator condition once reduces_to(img, ε) is in hand.
+proof fn relator_trivial_from_reduces(img: Word)
+    requires reduces_to(img, empty_word()), word_valid(img, 4),
+    ensures equiv_in_presentation(free_group(4), img, empty_word())
+{
+    lemma_reduces_to_refl(empty_word());
+    assert(freely_equivalent(img, empty_word())) by {
+        assert(reduces_to(img, empty_word()) && reduces_to(empty_word(), empty_word()));
+    }
+    lemma_free_group_valid(4);
+    assert(word_valid(empty_word(), 4));
+    lemma_freely_equivalent_implies_equiv(free_group(4), img, empty_word());
+}
+
+// ── d1 END-TO-END (template for the other length-6 relators) ────────────────
+pub proof fn lemma_rel_d1()
+    ensures equiv_in_presentation(free_group(4),
+        apply_hom(psi_hom(),
+            seq![Symbol::Gen(0), Symbol::Gen(2), Symbol::Gen(3), Symbol::Gen(1)]),
+        empty_word())
+{
+    let img = apply_hom(psi_hom(),
+        seq![Symbol::Gen(0), Symbol::Gen(2), Symbol::Gen(3), Symbol::Gen(1)]);
+    // ψ(⟨M1⟩) = ⟨ M 1 1⁻¹M⁻¹⟨⁻¹   (full literals — compute doesn't see through `let`)
+    let w0: Word = seq![Symbol::Gen(0), Symbol::Gen(1), Symbol::Gen(3),
+                        Symbol::Inv(3), Symbol::Inv(1), Symbol::Inv(0)];
+    let w1: Word = seq![Symbol::Gen(0), Symbol::Gen(1), Symbol::Inv(1), Symbol::Inv(0)];
+    let w2: Word = seq![Symbol::Gen(0), Symbol::Inv(0)];
+    assert(apply_hom(psi_hom(),
+        seq![Symbol::Gen(0), Symbol::Gen(2), Symbol::Gen(3), Symbol::Gen(1)])
+        =~= seq![Symbol::Gen(0), Symbol::Gen(1), Symbol::Gen(3),
+                 Symbol::Inv(3), Symbol::Inv(1), Symbol::Inv(0)]) by (compute);
+    assert(img =~= w0);
+    assert(has_cancellation_at(w0, 2));
+    assert(w1 == reduce_at(w0, 2)) by { assert(w1 =~= reduce_at(w0, 2)); }
+    assert(has_cancellation_at(w1, 1));
+    assert(w2 == reduce_at(w1, 1)) by { assert(w2 =~= reduce_at(w1, 1)); }
+    assert(has_cancellation_at(w2, 0));
+    assert(reduce_at(w2, 0) == empty_word()) by { assert(reduce_at(w2, 0) =~= empty_word()); }
+    reduces3(w0, 2, w1, 1, w2, 0);
+    assert(word_valid(w0, 4));
+    relator_trivial_from_reduces(w0);
+    assert(img == w0);
+}
+
+// ── the other 8 relators (GENERATED from ψ by tools, no hand-transcription) ──
+pub proof fn lemma_rel_r1()
+    ensures equiv_in_presentation(free_group(4),
+        apply_hom(psi_hom(), seq![Symbol::Gen(4), Symbol::Gen(5), Symbol::Inv(3), Symbol::Inv(2)]), empty_word())
+{
+    let img = apply_hom(psi_hom(), seq![Symbol::Gen(4), Symbol::Gen(5), Symbol::Inv(3), Symbol::Inv(2)]);
+    let w0: Word = seq![Symbol::Gen(2), Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(3), Symbol::Inv(3), Symbol::Inv(1)];
+    let w1: Word = seq![Symbol::Gen(1), Symbol::Gen(3), Symbol::Inv(3), Symbol::Inv(1)];
+    let w2: Word = seq![Symbol::Gen(1), Symbol::Inv(1)];
+    assert(apply_hom(psi_hom(), seq![Symbol::Gen(4), Symbol::Gen(5), Symbol::Inv(3), Symbol::Inv(2)]) =~= seq![Symbol::Gen(2), Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(3), Symbol::Inv(3), Symbol::Inv(1)]) by (compute);
+    assert(img =~= w0);
+    assert(has_cancellation_at(w0, 0));
+    assert(w1 == reduce_at(w0, 0)) by { assert(w1 =~= reduce_at(w0, 0)); }
+    assert(has_cancellation_at(w1, 1));
+    assert(w2 == reduce_at(w1, 1)) by { assert(w2 =~= reduce_at(w1, 1)); }
+    assert(has_cancellation_at(w2, 0));
+    assert(reduce_at(w2, 0) == empty_word()) by { assert(reduce_at(w2, 0) =~= empty_word()); }
+    reduces3(w0, 0, w1, 1, w2, 0);
+    assert(word_valid(w0, 4));
+    relator_trivial_from_reduces(w0);
+    assert(img == w0);
+}
+
+pub proof fn lemma_rel_d2()
+    ensures equiv_in_presentation(free_group(4),
+        apply_hom(psi_hom(), seq![Symbol::Gen(2), Symbol::Gen(3), Symbol::Gen(1), Symbol::Gen(0)]), empty_word())
+{
+    let img = apply_hom(psi_hom(), seq![Symbol::Gen(2), Symbol::Gen(3), Symbol::Gen(1), Symbol::Gen(0)]);
+    let w0: Word = seq![Symbol::Gen(1), Symbol::Gen(3), Symbol::Inv(3), Symbol::Inv(1), Symbol::Inv(0), Symbol::Gen(0)];
+    let w1: Word = seq![Symbol::Gen(1), Symbol::Inv(1), Symbol::Inv(0), Symbol::Gen(0)];
+    let w2: Word = seq![Symbol::Inv(0), Symbol::Gen(0)];
+    assert(apply_hom(psi_hom(), seq![Symbol::Gen(2), Symbol::Gen(3), Symbol::Gen(1), Symbol::Gen(0)]) =~= seq![Symbol::Gen(1), Symbol::Gen(3), Symbol::Inv(3), Symbol::Inv(1), Symbol::Inv(0), Symbol::Gen(0)]) by (compute);
+    assert(img =~= w0);
+    assert(has_cancellation_at(w0, 1));
+    assert(w1 == reduce_at(w0, 1)) by { assert(w1 =~= reduce_at(w0, 1)); }
+    assert(has_cancellation_at(w1, 0));
+    assert(w2 == reduce_at(w1, 0)) by { assert(w2 =~= reduce_at(w1, 0)); }
+    assert(has_cancellation_at(w2, 0));
+    assert(reduce_at(w2, 0) == empty_word()) by { assert(reduce_at(w2, 0) =~= empty_word()); }
+    reduces3(w0, 1, w1, 0, w2, 0);
+    assert(word_valid(w0, 4));
+    relator_trivial_from_reduces(w0);
+    assert(img == w0);
+}
+
+pub proof fn lemma_rel_d3()
+    ensures equiv_in_presentation(free_group(4),
+        apply_hom(psi_hom(), seq![Symbol::Gen(3), Symbol::Gen(1), Symbol::Gen(0), Symbol::Gen(2)]), empty_word())
+{
+    let img = apply_hom(psi_hom(), seq![Symbol::Gen(3), Symbol::Gen(1), Symbol::Gen(0), Symbol::Gen(2)]);
+    let w0: Word = seq![Symbol::Gen(3), Symbol::Inv(3), Symbol::Inv(1), Symbol::Inv(0), Symbol::Gen(0), Symbol::Gen(1)];
+    let w1: Word = seq![Symbol::Inv(1), Symbol::Inv(0), Symbol::Gen(0), Symbol::Gen(1)];
+    let w2: Word = seq![Symbol::Inv(1), Symbol::Gen(1)];
+    assert(apply_hom(psi_hom(), seq![Symbol::Gen(3), Symbol::Gen(1), Symbol::Gen(0), Symbol::Gen(2)]) =~= seq![Symbol::Gen(3), Symbol::Inv(3), Symbol::Inv(1), Symbol::Inv(0), Symbol::Gen(0), Symbol::Gen(1)]) by (compute);
+    assert(img =~= w0);
+    assert(has_cancellation_at(w0, 0));
+    assert(w1 == reduce_at(w0, 0)) by { assert(w1 =~= reduce_at(w0, 0)); }
+    assert(has_cancellation_at(w1, 1));
+    assert(w2 == reduce_at(w1, 1)) by { assert(w2 =~= reduce_at(w1, 1)); }
+    assert(has_cancellation_at(w2, 0));
+    assert(reduce_at(w2, 0) == empty_word()) by { assert(reduce_at(w2, 0) =~= empty_word()); }
+    reduces3(w0, 0, w1, 1, w2, 0);
+    assert(word_valid(w0, 4));
+    relator_trivial_from_reduces(w0);
+    assert(img == w0);
+}
+
+pub proof fn lemma_rel_d4()
+    ensures equiv_in_presentation(free_group(4),
+        apply_hom(psi_hom(), seq![Symbol::Gen(1), Symbol::Gen(0), Symbol::Gen(2), Symbol::Gen(3)]), empty_word())
+{
+    let img = apply_hom(psi_hom(), seq![Symbol::Gen(1), Symbol::Gen(0), Symbol::Gen(2), Symbol::Gen(3)]);
+    let w0: Word = seq![Symbol::Inv(3), Symbol::Inv(1), Symbol::Inv(0), Symbol::Gen(0), Symbol::Gen(1), Symbol::Gen(3)];
+    let w1: Word = seq![Symbol::Inv(3), Symbol::Inv(1), Symbol::Gen(1), Symbol::Gen(3)];
+    let w2: Word = seq![Symbol::Inv(3), Symbol::Gen(3)];
+    assert(apply_hom(psi_hom(), seq![Symbol::Gen(1), Symbol::Gen(0), Symbol::Gen(2), Symbol::Gen(3)]) =~= seq![Symbol::Inv(3), Symbol::Inv(1), Symbol::Inv(0), Symbol::Gen(0), Symbol::Gen(1), Symbol::Gen(3)]) by (compute);
+    assert(img =~= w0);
+    assert(has_cancellation_at(w0, 2));
+    assert(w1 == reduce_at(w0, 2)) by { assert(w1 =~= reduce_at(w0, 2)); }
+    assert(has_cancellation_at(w1, 1));
+    assert(w2 == reduce_at(w1, 1)) by { assert(w2 =~= reduce_at(w1, 1)); }
+    assert(has_cancellation_at(w2, 0));
+    assert(reduce_at(w2, 0) == empty_word()) by { assert(reduce_at(w2, 0) =~= empty_word()); }
+    reduces3(w0, 2, w1, 1, w2, 0);
+    assert(word_valid(w0, 4));
+    relator_trivial_from_reduces(w0);
+    assert(img == w0);
+}
+
+pub proof fn lemma_rel_e1()
+    ensures equiv_in_presentation(free_group(4),
+        apply_hom(psi_hom(), seq![Symbol::Gen(0), Symbol::Gen(4), Symbol::Gen(5), Symbol::Gen(1)]), empty_word())
+{
+    let img = apply_hom(psi_hom(), seq![Symbol::Gen(0), Symbol::Gen(4), Symbol::Gen(5), Symbol::Gen(1)]);
+    let w0: Word = seq![Symbol::Gen(0), Symbol::Gen(2), Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(3), Symbol::Inv(3), Symbol::Inv(1), Symbol::Inv(0)];
+    let w1: Word = seq![Symbol::Gen(0), Symbol::Gen(1), Symbol::Gen(3), Symbol::Inv(3), Symbol::Inv(1), Symbol::Inv(0)];
+    let w2: Word = seq![Symbol::Gen(0), Symbol::Gen(1), Symbol::Inv(1), Symbol::Inv(0)];
+    let w3: Word = seq![Symbol::Gen(0), Symbol::Inv(0)];
+    assert(apply_hom(psi_hom(), seq![Symbol::Gen(0), Symbol::Gen(4), Symbol::Gen(5), Symbol::Gen(1)]) =~= seq![Symbol::Gen(0), Symbol::Gen(2), Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(3), Symbol::Inv(3), Symbol::Inv(1), Symbol::Inv(0)]) by (compute);
+    assert(img =~= w0);
+    assert(has_cancellation_at(w0, 1));
+    assert(w1 == reduce_at(w0, 1)) by { assert(w1 =~= reduce_at(w0, 1)); }
+    assert(has_cancellation_at(w1, 2));
+    assert(w2 == reduce_at(w1, 2)) by { assert(w2 =~= reduce_at(w1, 2)); }
+    assert(has_cancellation_at(w2, 1));
+    assert(w3 == reduce_at(w2, 1)) by { assert(w3 =~= reduce_at(w2, 1)); }
+    assert(has_cancellation_at(w3, 0));
+    assert(reduce_at(w3, 0) == empty_word()) by { assert(reduce_at(w3, 0) =~= empty_word()); }
+    reduces4(w0, 1, w1, 2, w2, 1, w3, 0);
+    assert(word_valid(w0, 4));
+    relator_trivial_from_reduces(w0);
+    assert(img == w0);
+}
+
+pub proof fn lemma_rel_e2()
+    ensures equiv_in_presentation(free_group(4),
+        apply_hom(psi_hom(), seq![Symbol::Gen(4), Symbol::Gen(5), Symbol::Gen(1), Symbol::Gen(0)]), empty_word())
+{
+    let img = apply_hom(psi_hom(), seq![Symbol::Gen(4), Symbol::Gen(5), Symbol::Gen(1), Symbol::Gen(0)]);
+    let w0: Word = seq![Symbol::Gen(2), Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(3), Symbol::Inv(3), Symbol::Inv(1), Symbol::Inv(0), Symbol::Gen(0)];
+    let w1: Word = seq![Symbol::Gen(1), Symbol::Gen(3), Symbol::Inv(3), Symbol::Inv(1), Symbol::Inv(0), Symbol::Gen(0)];
+    let w2: Word = seq![Symbol::Gen(1), Symbol::Inv(1), Symbol::Inv(0), Symbol::Gen(0)];
+    let w3: Word = seq![Symbol::Inv(0), Symbol::Gen(0)];
+    assert(apply_hom(psi_hom(), seq![Symbol::Gen(4), Symbol::Gen(5), Symbol::Gen(1), Symbol::Gen(0)]) =~= seq![Symbol::Gen(2), Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(3), Symbol::Inv(3), Symbol::Inv(1), Symbol::Inv(0), Symbol::Gen(0)]) by (compute);
+    assert(img =~= w0);
+    assert(has_cancellation_at(w0, 0));
+    assert(w1 == reduce_at(w0, 0)) by { assert(w1 =~= reduce_at(w0, 0)); }
+    assert(has_cancellation_at(w1, 1));
+    assert(w2 == reduce_at(w1, 1)) by { assert(w2 =~= reduce_at(w1, 1)); }
+    assert(has_cancellation_at(w2, 0));
+    assert(w3 == reduce_at(w2, 0)) by { assert(w3 =~= reduce_at(w2, 0)); }
+    assert(has_cancellation_at(w3, 0));
+    assert(reduce_at(w3, 0) == empty_word()) by { assert(reduce_at(w3, 0) =~= empty_word()); }
+    reduces4(w0, 0, w1, 1, w2, 0, w3, 0);
+    assert(word_valid(w0, 4));
+    relator_trivial_from_reduces(w0);
+    assert(img == w0);
+}
+
+pub proof fn lemma_rel_e3()
+    ensures equiv_in_presentation(free_group(4),
+        apply_hom(psi_hom(), seq![Symbol::Gen(5), Symbol::Gen(1), Symbol::Gen(0), Symbol::Gen(4)]), empty_word())
+{
+    let img = apply_hom(psi_hom(), seq![Symbol::Gen(5), Symbol::Gen(1), Symbol::Gen(0), Symbol::Gen(4)]);
+    let w0: Word = seq![Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(3), Symbol::Inv(3), Symbol::Inv(1), Symbol::Inv(0), Symbol::Gen(0), Symbol::Gen(2)];
+    let w1: Word = seq![Symbol::Inv(2), Symbol::Gen(1), Symbol::Inv(1), Symbol::Inv(0), Symbol::Gen(0), Symbol::Gen(2)];
+    let w2: Word = seq![Symbol::Inv(2), Symbol::Inv(0), Symbol::Gen(0), Symbol::Gen(2)];
+    let w3: Word = seq![Symbol::Inv(2), Symbol::Gen(2)];
+    assert(apply_hom(psi_hom(), seq![Symbol::Gen(5), Symbol::Gen(1), Symbol::Gen(0), Symbol::Gen(4)]) =~= seq![Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(3), Symbol::Inv(3), Symbol::Inv(1), Symbol::Inv(0), Symbol::Gen(0), Symbol::Gen(2)]) by (compute);
+    assert(img =~= w0);
+    assert(has_cancellation_at(w0, 2));
+    assert(w1 == reduce_at(w0, 2)) by { assert(w1 =~= reduce_at(w0, 2)); }
+    assert(has_cancellation_at(w1, 1));
+    assert(w2 == reduce_at(w1, 1)) by { assert(w2 =~= reduce_at(w1, 1)); }
+    assert(has_cancellation_at(w2, 1));
+    assert(w3 == reduce_at(w2, 1)) by { assert(w3 =~= reduce_at(w2, 1)); }
+    assert(has_cancellation_at(w3, 0));
+    assert(reduce_at(w3, 0) == empty_word()) by { assert(reduce_at(w3, 0) =~= empty_word()); }
+    reduces4(w0, 2, w1, 1, w2, 1, w3, 0);
+    assert(word_valid(w0, 4));
+    relator_trivial_from_reduces(w0);
+    assert(img == w0);
+}
+
+pub proof fn lemma_rel_e4()
+    ensures equiv_in_presentation(free_group(4),
+        apply_hom(psi_hom(), seq![Symbol::Gen(1), Symbol::Gen(0), Symbol::Gen(4), Symbol::Gen(5)]), empty_word())
+{
+    let img = apply_hom(psi_hom(), seq![Symbol::Gen(1), Symbol::Gen(0), Symbol::Gen(4), Symbol::Gen(5)]);
+    let w0: Word = seq![Symbol::Inv(3), Symbol::Inv(1), Symbol::Inv(0), Symbol::Gen(0), Symbol::Gen(2), Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(3)];
+    let w1: Word = seq![Symbol::Inv(3), Symbol::Inv(1), Symbol::Gen(2), Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(3)];
+    let w2: Word = seq![Symbol::Inv(3), Symbol::Inv(1), Symbol::Gen(1), Symbol::Gen(3)];
+    let w3: Word = seq![Symbol::Inv(3), Symbol::Gen(3)];
+    assert(apply_hom(psi_hom(), seq![Symbol::Gen(1), Symbol::Gen(0), Symbol::Gen(4), Symbol::Gen(5)]) =~= seq![Symbol::Inv(3), Symbol::Inv(1), Symbol::Inv(0), Symbol::Gen(0), Symbol::Gen(2), Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(3)]) by (compute);
+    assert(img =~= w0);
+    assert(has_cancellation_at(w0, 2));
+    assert(w1 == reduce_at(w0, 2)) by { assert(w1 =~= reduce_at(w0, 2)); }
+    assert(has_cancellation_at(w1, 2));
+    assert(w2 == reduce_at(w1, 2)) by { assert(w2 =~= reduce_at(w1, 2)); }
+    assert(has_cancellation_at(w2, 1));
+    assert(w3 == reduce_at(w2, 1)) by { assert(w3 =~= reduce_at(w2, 1)); }
+    assert(has_cancellation_at(w3, 0));
+    assert(reduce_at(w3, 0) == empty_word()) by { assert(reduce_at(w3, 0) =~= empty_word()); }
+    reduces4(w0, 2, w1, 2, w2, 1, w3, 0);
+    assert(word_valid(w0, 4));
+    relator_trivial_from_reduces(w0);
+    assert(img == w0);
+}
+
 
 } // verus!
