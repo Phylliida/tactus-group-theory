@@ -128,6 +128,48 @@ def conj_resolutions(sys_, surv):
                     seen[key] = val
     return derived
 
+def _pos_pair_split(c):
+    """If cyclically-reduced c has a rotation of sign-form (+...+)(-...-), return (P, N)
+    with P, N positive words and the relator meaning P = N.  Else None.  (A cancellation
+    product of two positive tokens is always P·N^-1 for positive P,N by construction; this
+    recovers the readable positive PAIR.)"""
+    c = cyc(c)
+    if not c: return None
+    n = len(c)
+    for k in range(n):
+        rot = c[k:] + c[:k]
+        signs = [x > 0 for x in rot]
+        if any(signs) and any(not s for s in signs) \
+           and all(signs[:signs.index(False)]) and not any(signs[signs.index(False):]):
+            P = tuple(rot[:signs.index(False)])
+            N = tuple(-x for x in reversed(rot[signs.index(False):]))
+            return (P, N)
+    return None
+
+def token_interaction_probe(whitelist_words):
+    """Consequence-closure candidates for the whitelist (Law P', law-p-prime.md §7).
+    whitelist_words: list of int-tuples (positive token words, each ε-trivial in G).
+    Cancel every ORDERED pair of tokens at every cyclic alignment; keep the products that are
+    GENUINE TWO-SIDED positive pairs (P = N, both nonempty) — the readable derived tokens each
+    owing a witness.  (NOT a length filter: the derived relator can equal parent length, e.g.
+    M1 = X0.  Corrected 2026-07-04 after the length-filter missed exactly that.)
+    Returns {cyckey(P·N^-1): (P, N)}."""
+    toks = [red(w) for w in whitelist_words if red(w)]
+    parents = {cyckey(w) for w in toks}
+    found = {}
+    for a in toks:
+        for b in toks:
+            for s in range(len(a)):
+                for t in range(len(b)):
+                    c = red((a[s:] + a[:s]) + inv(b[t:] + b[:t]))
+                    pn = _pos_pair_split(c)
+                    if pn is None: continue
+                    P, N = pn
+                    key = cyckey(red(P + inv(N)))
+                    if key and key not in parents:
+                        found.setdefault(key, (P, N))
+    return found
+
 def law4prime(sys_, tries=40, return_warns=False):
     relators = [red(l + inv(r)) for l, r in sys_.rules]
     worst, warns = [], []
