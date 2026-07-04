@@ -313,6 +313,50 @@ against the completed rule set, with group structure mirroring the completion's 
 (iii) The return-collapse law is the first constraint that binds the OPCODE DESIGNER rather than
 the prover — it goes into the Probe 0 instruction-set discipline next to affix hygiene.
 
+### 4.6 M5 — mint/retire (length-imbalanced rules): the cycle-relator principle, and monsters that aren't dragons
+
+**The cycle-relator principle (unifying law).** Tietze elimination makes every control cycle
+contribute its NET EFFECT as a relator/associated word. Consequences already seen and new:
+- M5′ return-collapse: cycle with net effect "state swap" ⟹ state identification.
+- **Stationary pump poison:** `{q = pg, p = qh}` (mint in place, return) ⟹ `q = qhg` ⟹ `hg = 1`
+  ⟹ `h = g⁻¹`: minted letters collapse to mutual inverses. Law: **mint must move** — minting/
+  retiring cycles need nonzero net head displacement. (Sibling of trajectory-injectivity; both are
+  "a cycle's collapsed relator is its net effect, and net effects must be intended instructions.")
+
+**(a) Mint-with-motion** `{qa = gbq}` (read `a`, write `gb`, move): `G = HNN(F(a,b,g), q, ⟨a⟩→⟨gb⟩)`
+— unequal-length associated words. Positivity holds by the cleanest head-cap yet: irreducibles
+forbid `qa`, so syllables never start with `a`; a compensation `a^{−m}` with `m>0` leaves negative
+letters (nothing to cancel into a non-`a`-start), with `m<0` creates an `a`-start; each junction is
+pinned at the left edge of its right-hand syllable. All compensations vanish. ∎
+
+**(b) The doubler** `{qa = a²q}` (duplicate transparent material while walking — semantically
+legal: `σ⊕C ~ σ⊕C⊕C` for guard `C ≡ 0`): affix-disjoint, hygienic, and
+
+> `G = ⟨a,q | qaq⁻¹ = a²⟩ = BS(1,2)`.
+
+**Theorem.** Positivity holds for the doubler. *Proof (complete, short):* the affine
+representation `a ↦ (t↦t+1)`, `q ↦ (t↦2t)` is faithful (`BS(1,2) ≅ ℤ[1/2] ⋊ ℤ`); a positive word
+maps to `t ↦ 2^m t + N` with `m = #q` and `N = Σ_{a's} 2^{#q's to the left}` — exactly the Thue
+invariant of `qa → a²q`; the normal form `a^N q^m` is determined by `(m, N)`. ∎
+(`⟨a⟩` is exponentially distorted here — doubling walks are where exponential overhead lives,
+consistent with the after-zfc-group discussion; soundness is unaffected.)
+
+**(c) The ratio rule** `{qa² = a³q}` (2 guards ↦ 3 guards — semantically legal for `C ≡ 0`
+bookkeeping): affix-disjoint, hygienic, and `G = BS(2,3)` — **non-Hopfian, non-residually-finite,
+the canonical pathology.** Yet positivity holds: the presentation is Adjan cycle-free (left graph
+edge `q–a`, right graph edge `a–q`, no cycles), so by **Adjan's embedding theorem** (Remmers'
+geometric proof) the positive monoid embeds in the group. *The ambient group's pathology does not
+leak into the positive trace.* Monsters are not dragons — twice over. (Adjan/Remmers is hereby
+unlocked as a direct tool for cycle-free opcode shapes; §5.2's small-cancellation route is its
+generalization for the non-cycle-free ones.)
+
+**Lessons.** (i) Length imbalance per se is harmless (a) — even with self-reference (b) and
+non-Hopfian ratios (c). (ii) The dangerous thing about mint/retire is only the stationary loop —
+a design law, mechanically checkable on the state graph (cycle net-displacement ≠ 0). (iii) The
+ANF machine's copying walks (which need doubling) are cleared. (iv) The group-theoretic wildness
+of the ambient group (distortion, non-Hopficity) is orthogonal to trace-soundness — the program
+does not need tame groups, only tame *traces*.
+
 ---
 
 ## 5. The general program
@@ -358,7 +402,9 @@ in itself, and the Proof Factory tutorial world.
 - ~~M5′ — two-way motion~~ **DONE, positivity holds** (§4.5; return-collapse law, head-passing =
   completion = commutation, shuttle group = `ℤ² ∗ F(q)`). Full readback enumeration still to be
   written out mechanically.
-- **M5 — mint/retire** (length-imbalanced rules): associated-subgroup elements of unequal lengths.
+- ~~M5 — mint/retire~~ **DONE, positivity holds** (§4.6; cycle-relator principle + "mint must
+  move" law; doubler = BS(1,2) sound via affine invariant; ratio rule = BS(2,3) sound via
+  Adjan/Remmers — monsters aren't dragons).
 - **M6 — data-carrying states** (copy walks): state chunks per transported letter; many cycles.
 - **M7 — two interacting loops** (two stable letters): first multi-HNN defect interaction.
 - Then: assemble Probe 0's full opcode audit; prove Lemma 2 for the actual instruction set.
