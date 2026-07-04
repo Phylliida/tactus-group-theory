@@ -19,7 +19,7 @@ use crate::word::*;
 use crate::reduction::{has_cancellation_at, reduce_at, reduces_one_step, reduces_in_steps,
     reduces_to, freely_equivalent, lemma_reduces_to_refl};
 use crate::presentation::*;
-use crate::presentation_lemmas::lemma_freely_equivalent_implies_equiv;
+use crate::presentation_lemmas::*;
 use crate::homomorphism::*;
 use crate::higman_operations::{free_group, lemma_free_group_valid};
 use crate::free_word_problem::lemma_free_group_equiv_freely_equivalent;
@@ -462,5 +462,128 @@ pub proof fn lemma_m0_soundness(u: Word, v: Word)
     lemma_free_group_equiv_freely_equivalent(4,
         apply_hom(psi_hom(), u), apply_hom(psi_hom(), v));
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMPLETENESS (A5+A6 dissolve): ψ is FAITHFUL via a RETRACTION φ: free_group(4)
+// → token_pres with φ∘ψ ≡ id.  Mirror of miller_collapse_inject's
+// lemma_collapse_injective (§54 "mutually-inverse homs ⟹ iso, no Britton-peel").
+// This gives  G_T ≅ free_group(4)  — the token quotient is FREE, the meaningful
+// M0 content — WITHOUT confluence (A5) or the scar induction (A6): both were
+// artifacts of the Thue-rewriting framing; the group-iso framing needs neither.
+//   φ: free_group(4) gens (LAng=0,M=1,X=2,One=3) -> token_pres gens (LAng=0,M=2,X=4,One=3)
+// ═══════════════════════════════════════════════════════════════════════════
+
+pub open spec fn phi_images() -> Seq<Word> {
+    seq![ seq![Symbol::Gen(0)],   // LAng -> LAng
+          seq![Symbol::Gen(2)],   // M -> M
+          seq![Symbol::Gen(4)],   // X -> X
+          seq![Symbol::Gen(3)] ]  // One -> One
+}
+
+pub open spec fn phi_hom() -> HomomorphismData {
+    HomomorphismData {
+        source: free_group(4),
+        target: token_pres(),
+        generator_images: phi_images(),
+    }
+}
+
+pub proof fn lemma_phi_valid()
+    ensures is_valid_homomorphism(phi_hom())
+{
+    reveal(presentation_valid);
+    lemma_free_group_valid(4);
+    lemma_token_pres_valid();
+    assert(free_group(4).relators.len() == 0);
+    assert forall|i: int| 0 <= i < phi_hom().generator_images.len()
+        implies word_valid(#[trigger] phi_hom().generator_images[i], 6) by {
+        assert(word_valid(phi_hom().generator_images[i], 6));
+    }
+}
+
+
+// reduces_to a NONEMPTY target via 3 explicit cancellations (for the per-gen identities).
+proof fn reduces3_to(w0: Word, i0: int, w1: Word, i1: int, w2: Word, i2: int, w3: Word)
+    requires
+        has_cancellation_at(w0, i0), w1 == reduce_at(w0, i0),
+        has_cancellation_at(w1, i1), w2 == reduce_at(w1, i1),
+        has_cancellation_at(w2, i2), w3 == reduce_at(w2, i2),
+    ensures reduces_to(w0, w3)
+{
+    assert(reduces_one_step(w2, w3)) by { assert(has_cancellation_at(w2, i2) && w3 == reduce_at(w2, i2)); }
+    assert(reduces_in_steps(w2, w3, 1)) by { assert(reduces_one_step(w2, w3) && reduces_in_steps(w3, w3, 0)); }
+    assert(reduces_one_step(w1, w2)) by { assert(has_cancellation_at(w1, i1) && w2 == reduce_at(w1, i1)); }
+    assert(reduces_in_steps(w1, w3, 2)) by { assert(reduces_one_step(w1, w2) && reduces_in_steps(w2, w3, 1)); }
+    assert(reduces_one_step(w0, w1)) by { assert(has_cancellation_at(w0, i0) && w1 == reduce_at(w0, i0)); }
+    assert(reduces_in_steps(w0, w3, 3)) by { assert(reduces_one_step(w0, w1) && reduces_in_steps(w1, w3, 2)); }
+    assert(reduces_to(w0, w3)) by { assert(reduces_in_steps(w0, w3, 3)); }
+}
+
+pub proof fn lemma_gen5_id()
+    ensures equiv_in_presentation(token_pres(), seq![Symbol::Inv(4), Symbol::Gen(2), Symbol::Gen(3)], seq![Symbol::Gen(5)])
+{
+    let p = token_pres();
+    let pre: Word = seq![Symbol::Inv(4)]; let suf: Word = seq![Symbol::Gen(2), Symbol::Gen(3)];
+    let rr: Word = seq![Symbol::Gen(4), Symbol::Gen(5), Symbol::Inv(3), Symbol::Inv(2)]; let lhs: Word = seq![Symbol::Inv(4), Symbol::Gen(4), Symbol::Gen(5), Symbol::Inv(3), Symbol::Inv(2), Symbol::Gen(2), Symbol::Gen(3)];
+    let prefsuf: Word = seq![Symbol::Inv(4), Symbol::Gen(2), Symbol::Gen(3)]; let tgt: Word = seq![Symbol::Gen(5)];
+    lemma_token_pres_valid();
+    assert(p.relators[0] =~= rr);
+    lemma_relator_is_identity(p, 0);
+    lemma_equiv_refl(p, pre); lemma_equiv_refl(p, suf);
+    lemma_equiv_concat(p, pre, pre, rr, empty_word());
+    assert(concat(pre, empty_word()) =~= pre);
+    lemma_equiv_concat(p, concat(pre, rr), pre, suf, suf);
+    assert(lhs =~= concat(concat(pre, rr), suf));
+    assert(concat(pre, suf) =~= prefsuf);
+    let w0: Word = seq![Symbol::Inv(4), Symbol::Gen(4), Symbol::Gen(5), Symbol::Inv(3), Symbol::Inv(2), Symbol::Gen(2), Symbol::Gen(3)];
+    let w1: Word = seq![Symbol::Gen(5), Symbol::Inv(3), Symbol::Inv(2), Symbol::Gen(2), Symbol::Gen(3)];
+    let w2: Word = seq![Symbol::Gen(5), Symbol::Inv(3), Symbol::Gen(3)];
+    assert(has_cancellation_at(w0, 0));
+    assert(w1 == reduce_at(w0, 0)) by { assert(w1 =~= reduce_at(w0, 0)); }
+    assert(has_cancellation_at(w1, 2));
+    assert(w2 == reduce_at(w1, 2)) by { assert(w2 =~= reduce_at(w1, 2)); }
+    assert(has_cancellation_at(w2, 1));
+    assert(tgt == reduce_at(w2, 1)) by { assert(tgt =~= reduce_at(w2, 1)); }
+    reduces3_to(w0, 0, w1, 2, w2, 1, tgt);
+    assert(w0 =~= lhs);
+    lemma_reduces_to_equiv(p, lhs, tgt);
+    assert(word_valid(lhs, 6));
+    lemma_equiv_symmetric(p, lhs, prefsuf);
+    lemma_equiv_transitive(p, prefsuf, lhs, tgt);
+}
+
+pub proof fn lemma_gen1_id()
+    ensures equiv_in_presentation(token_pres(), seq![Symbol::Inv(3), Symbol::Inv(2), Symbol::Inv(0)], seq![Symbol::Gen(1)])
+{
+    let p = token_pres();
+    let pre: Word = seq![Symbol::Inv(3), Symbol::Inv(2), Symbol::Inv(0)]; let suf: Word = seq![];
+    let rr: Word = seq![Symbol::Gen(0), Symbol::Gen(2), Symbol::Gen(3), Symbol::Gen(1)]; let lhs: Word = seq![Symbol::Inv(3), Symbol::Inv(2), Symbol::Inv(0), Symbol::Gen(0), Symbol::Gen(2), Symbol::Gen(3), Symbol::Gen(1)];
+    let prefsuf: Word = seq![Symbol::Inv(3), Symbol::Inv(2), Symbol::Inv(0)]; let tgt: Word = seq![Symbol::Gen(1)];
+    lemma_token_pres_valid();
+    assert(p.relators[1] =~= rr);
+    lemma_relator_is_identity(p, 1);
+    lemma_equiv_refl(p, pre); lemma_equiv_refl(p, suf);
+    lemma_equiv_concat(p, pre, pre, rr, empty_word());
+    assert(concat(pre, empty_word()) =~= pre);
+    lemma_equiv_concat(p, concat(pre, rr), pre, suf, suf);
+    assert(lhs =~= concat(concat(pre, rr), suf));
+    assert(concat(pre, suf) =~= prefsuf);
+    let w0: Word = seq![Symbol::Inv(3), Symbol::Inv(2), Symbol::Inv(0), Symbol::Gen(0), Symbol::Gen(2), Symbol::Gen(3), Symbol::Gen(1)];
+    let w1: Word = seq![Symbol::Inv(3), Symbol::Inv(2), Symbol::Gen(2), Symbol::Gen(3), Symbol::Gen(1)];
+    let w2: Word = seq![Symbol::Inv(3), Symbol::Gen(3), Symbol::Gen(1)];
+    assert(has_cancellation_at(w0, 2));
+    assert(w1 == reduce_at(w0, 2)) by { assert(w1 =~= reduce_at(w0, 2)); }
+    assert(has_cancellation_at(w1, 1));
+    assert(w2 == reduce_at(w1, 1)) by { assert(w2 =~= reduce_at(w1, 1)); }
+    assert(has_cancellation_at(w2, 0));
+    assert(tgt == reduce_at(w2, 0)) by { assert(tgt =~= reduce_at(w2, 0)); }
+    reduces3_to(w0, 2, w1, 1, w2, 0, tgt);
+    assert(w0 =~= lhs);
+    lemma_reduces_to_equiv(p, lhs, tgt);
+    assert(word_valid(lhs, 6));
+    lemma_equiv_symmetric(p, lhs, prefsuf);
+    lemma_equiv_transitive(p, prefsuf, lhs, tgt);
+}
+
 
 } // verus!
