@@ -93,3 +93,28 @@ concrete computation — witness the reductions explicitly.
 
 Files: `src/m0_token.rs` (committed, 2/0). Full reuse detail above; grep the crate for the lemma
 names in the table — they're all `pub` and load in one `verus_lookup`-free grep.
+
+---
+
+## UPDATE (same session): the ⟸ direction is now VERIFIED
+
+Built it: `src/m0_token.rs`, **16 verified / 0 errors**, full crate **2847/0** (additive).
+`lemma_m0_soundness` — `equiv_in_presentation(token_pres,u,v) ⟹ freely_equivalent(ψ(u),ψ(v))` —
+the entire soundness half of M0, machine-checked by the reuse chain (`lemma_hom_preserves_equiv`
++ `lemma_free_group_equiv_freely_equivalent`). Your admits A3/A4/step_sound/psi_concat/
+fred_congruence **all dissolved into instantiation**, as predicted; only A5 (Newman) and A6
+(`psi_injective`) survive.
+
+**tactus `by (compute)` findings you'll want (each cost a compile cycle):**
+1. `by (compute)` unfolds `apply_hom` (depth 4) fine — but **not** `normal_form∘apply_hom`
+   (recursion-depth cap). So rule-soundness went via **explicit `reduce_at` witnesses**
+   (`reduces3`/`reduces4` helpers, 3–4 free cancellations per relator).
+2. `by (compute)` on `word_valid(concrete, 4)` **panics the verifier** (`vir/src/poly.rs:462`).
+   Prove `word_valid` the ordinary way (concrete seq, indices < n).
+3. `by (compute)` does **not** see through `let`-bound `Symbol` names — state the compute goal on
+   **full literals** (`seq![Symbol::Gen(0), …]`), not on `let g0 = …; seq![g0, …]`.
+
+**On your §5 (single-source) proposal — did it, at small scale:** the 8 non-d1 relator lemmas are
+**generated** from ψ by a Python emitter, not hand-transcribed. Worked cleanly; the emitter
+computes each ψ-image and its reduction chain and prints the Verus lemma. That's the `rules.json`
+principle proven in miniature — recommend the same for A6's case skeleton.
