@@ -262,6 +262,57 @@ equality-positivity holds. Our target (the word problem on codes) only needs equ
 masquerade defect has semantic meaning: the group attempts to identify the two rest-phases of the
 head (`q′q` vs `qq′`); the machine's state discipline plus finite word length refuses it.
 
+### 4.5 M5′ — two-way motion: return-collapse, head-passing, and the shuttle theorem
+
+**Phenomenon 1 — the return-collapse law.** Two-way motion enables closed head trajectories.
+Micro-example: `{qa = bq′, bq′ = q″a}` (step right, step back left) has the Thue consequence
+`qa ~ q″a`, whose collapsed relator is `q = q″`. General law: **if the machine can connect two
+configurations with identical tape and head position but different states, the group identifies
+the state chunks.** For transparent guards this identification is semantically SOUND but
+control-fatal — a new failure category: *friendly fire* (consequences that respect the Lindenbaum
+congruence but destroy the machine's state discipline, after which unintended transitions may
+cascade into genuine unsoundness). Design law: **trajectory-injectivity** — no two states
+connected by a net-trivial trajectory; enforced by transduce-on-turn (walls change flavor:
+`qW = rW′` with `W ≠ W′`, never `qW = rW`) and phase/zone discipline. One-way systems (M2–M4)
+satisfied it vacuously.
+
+**Phenomenon 2 — head collisions = critical pairs; completion = head-passing.** With left- and
+right-movers, LHSs overlap (`q·a·r`): Knuth–Bendix completion adds head-passing rules. These are
+Thue-consequences (congruence unchanged) and group-consequences (immediate), so positivity may be
+proven against the completed system.
+
+**The shuttle core.** `R = { qa = bq, ar = rb }` — a right-mover `q` and a left-mover `r`, both
+transducing `a→b`. Completion: the overlap `qar` gives exactly one critical pair, joined by the
+head-passing rule; `{qa→bq, ar→rb, bqr→qrb}` is complete (lex measure: `#a`, then state-letter
+position sum). Irreducibles: no `qa`, `ar`, `bqr`.
+
+*Group side:* `b = qaq⁻¹` and `b = r⁻¹ar` give `G = ⟨a,q,r | qaq⁻¹ = r⁻¹ar⟩`; substituting
+`s := rq` turns the relator into `[s,a] = 1`:
+
+> `G ≅ ℤ²(a,s) ∗ F(q)` — a **free product**; no HNN sliding at all. The head-passing/completion
+> rule `bqr = qrb` is, on the group side, precisely the commutator `[s,a]`:
+> `sub(bqr) = q(as)q⁻¹ = q(sa)q⁻¹ = sub(qrb)`. **Knuth–Bendix completion on the Thue side = the
+> commutation structure of the group.** (Dictionary entry.)
+
+**Theorem (M5′ positivity, proof at sketch+spot-check rigor).** The positive trace of `ncl(R)`
+equals the Thue congruence. *Proof architecture:* free-product normal forms in `ℤ² ∗ F(q)` under
+`sub: a↦a, q↦q, b↦qaq⁻¹, r↦sq⁻¹`; the parsing ambiguities of a normal form are in bijection with
+the three rules — `sub(bq)` merges to a `qa`-shape (`qa` forbidden in irreducibles ⟹ reads back
+as `bq`), `sub(ar) = sub(rb) = (as)q⁻¹`-shape (`ar` forbidden ⟹ reads back as `rb`), and the
+`ℤ²`-commutation ambiguity is exactly `bqr` vs `qrb` (`bqr` forbidden ⟹ reads back as `qrb`).
+Every NF-ambiguity is one rule, always resolved to the irreducible side; injectivity on
+irreducibles follows by syllable-wise parsing. Spot-checked collision families:
+`arq ~ rqa` (both ⇝ `rbq` ✓), `arqrq ~ rqarq` (both ⇝ `rqrbq` ✓), `bqⁿ` (unique preimage of
+`qaq^{n-1}` since `qa…` is reducible ✓). The full case enumeration is mechanical; flagged for a
+complete write-out (or SAT-audit) later. ∎(sketch)
+
+**Lessons.** (i) Two-way motion produced no dragon — instead the *group got tamer* (free product
+vs HNN), because the composite cycle `s = rq` acts trivially on the data it slides past.
+(ii) The completion/commutation dictionary suggests the general soundness proof should be stated
+against the completed rule set, with group structure mirroring the completion's geometry.
+(iii) The return-collapse law is the first constraint that binds the OPCODE DESIGNER rather than
+the prover — it goes into the Probe 0 instruction-set discipline next to affix hygiene.
+
 ---
 
 ## 5. The general program
@@ -304,8 +355,9 @@ in itself, and the Proof Factory tutorial world.
 ### 5.4 Escalation ladder (next steps)
 
 - ~~M4 — mixed cycle words~~ **DONE, positivity holds** (§4.4; new global defect-flow mechanism).
-- **M5′ — true direction reversal** (left-moving rules, e.g. `aq = q′b`): head can revisit
-  material; syllable decomposition changes qualitatively.
+- ~~M5′ — two-way motion~~ **DONE, positivity holds** (§4.5; return-collapse law, head-passing =
+  completion = commutation, shuttle group = `ℤ² ∗ F(q)`). Full readback enumeration still to be
+  written out mechanically.
 - **M5 — mint/retire** (length-imbalanced rules): associated-subgroup elements of unequal lengths.
 - **M6 — data-carrying states** (copy walks): state chunks per transported letter; many cycles.
 - **M7 — two interacting loops** (two stable letters): first multi-HNN defect interaction.
