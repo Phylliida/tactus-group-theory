@@ -162,3 +162,113 @@ splitting normal forms vs Thue-reachability) and eventually the tactus formaliza
 *v1 caveats, honestly: PASS1's R2-redex handling and PASS3's monomial-boundary turns are the two
 spots most likely to need schema surgery on expansion; S9's zero-anchored consumption is new —
 flagged for the fuzzer. Nothing here is theory-risk; it is all Law-auditable construction.*
+
+---
+
+# Appendix A — expanded schemas for the flagged spots (v1.1)
+
+## A.1 S3 MATCH-SUBTERM, full listing
+
+Goal: from a state at a subterm's opening bracket, mark exactly that subterm's extent.
+Letters: third bracket flavor `⟨†` (region start), marked `⟨•,⟩•`, and per-letter marks.
+States: `m` (entry), `m₁` (seek innermost), `m₂` (atom interior), `m₃` (rewind), `m₄` (exit test).
+
+```
+(1)  m ⟨ = ⟨† m₁                        (flag region start)
+(2)  m₁ x = x m₁            x ∈ {X, M, ⟨}        (descend/seek rightward)
+(3)  m₁ ⟨ c = ⟨• c• m₃      c ∈ {1, 0}           (innermost constant leaf: wait—leaves sit inline;
+                                                   leaf marking:)
+(3′) m₁ c = c• m₃           c ∈ {1, 0}           (mark constant leaf)
+(4)  m₁ P = P• m₂                                (enter atom)
+(5)  m₂ | = |• m₂                                (mark strokes)
+(6)  m₂ y = y m₃-dispatch    y ∈ {⟨, X, M, P, 1, 0, ⟩}  (atom done; y unconsumed — handled by m₃ rules below)
+(7)  m₁ ⟩ = ⟩• m₃                                (close reached with children marked ⟹ mark it)
+(8)  m₁ x• = x• m₁                               (skip already-marked material)
+(9)  m₃ x• = x• m₃ ; m₃ x = x m₃  (x data)       (rewind right-to-left is not needed: rewind LEFT:)
+(9′) x m₃ = m₃ x  — NO (data-data shape) — rewind as: m₃ walks LEFT via left-moving state rules:
+     x• m₃ = m₃ x• and x m₃ = m₃ x are ILLEGAL shapes (state on wrong side is fine — rule shape
+     `a s = s' a` IS legal, one state per side): use m₃ with left-motion:
+(9″) x• m₃L = m₃L x•, x m₃L = m₃L x   x ∈ Σ      (left rewind, M5′-legal left-mover shapes)
+(10) ⟨† m₃L = ⟨† m₄?? — turn at region start: ⟨† m₃L = m₄ ⟨†   (transducing turn on flavor? ⟨†
+     already distinct — Law 3 satisfied by state change + distinct wall)
+(11) m₄: re-seek (as m₁) — if the sweep finds NO unmarked letter before the matching ⟩•-candidate,
+     exit; else loop to m₁. Exit detection: m₄ reaches a ⟩ whose interior is fully marked:
+     m₄ ⟩ = ⟩• m_done   (the region's own close: it is the FIRST unmarked ⟩ met when everything
+     interior is marked — invariant maintained by (7) marking closes only when reached through
+     marked material).
+```
+Correctness invariant (for the completeness proof): after each m₄-loop, the set of marked
+letters is a union of complete subtrees of the region, growing by ≥1 leaf per loop; termination:
+#unmarked in region strictly decreases. Cycle audit: all loops pass through the `⟨†` anchor
+(rewind turns there) — Law 4′ ✓. (The m₂→m₃ hand-off (6) needs per-y dispatch rules; 7 rules.)
+Expanded count ≈ 34.
+
+## A.2 PASS1, R2 redex (`⟨M A ⟨X B C⟩⟩` with A X-free) — full macro
+
+Detection: on the return leg (left-moving `D←` after a clean right sweep segment), window
+`D← ⟨ X = flag` is wrong-side; instead: during the RIGHT sweep, at each `⟨M`, push a bracket
+mark `⟨ₘ` (M-context flag); when the sweep later meets `⟨X` while the nearest enclosing flag is
+`⟨ₘ` — adjacency encoded by: the flag is on THIS M-node's opening, and the X-node is its SECOND
+child. Second-child detection: after `⟨ₘ M`, run MATCH-SUBTERM on the first child A (marks it),
+so the next unmarked `⟨` after A's marked block is the second child's opening: window
+`d₂ ⟨ X = ⟨• X• d₃` fires only in that configuration (state d₂ is only produced post-MATCH).
+Macro (mirror of R1 with roles swapped): structural rewrite target
+`⟨X ⟨M A B⟩ ⟨M A C⟩⟩` — copy A (not C): A is already MARKED (bonus from detection):
+DUP its marked block in place (S5 on marked letters: `d x• = x◦ x•? d` — twin flavor emits the
+copy as ◦-marked), courier the ◦-copy rightward past B to the C-position insertion point `▲`
+(minted after B's end — B's end located by a second MATCH-SUBTERM), then the bounded structural
+windows: `⟨ₘ M → ⟨ X ⟨ M`-shaped re-bracketing at the redex root (4 concrete windows: root
+rewrite, mid-separator `⟨M`-insertion at ▲, two close-bracket fixes), unmark-sweep (S8), retire
+▲, return home. New states: `d₂, d₃, dup-crew, c-crew (reused), r₂`. ≈ 22 schemas.
+Cycle audit: all macro cycles thread the `⟨ₘ` flag anchor; the flag is created and consumed
+within one macro (flag-mint has motion; Law 4/4′ ✓).
+
+## A.3 PASS3 monomial-boundary turns — comparator lifting
+
+Comparing adjacent monomials `⟨X m ⟨X m′ R⟩⟩`: the S6 atom-comparator runs on the FIRST atoms of
+m, m′; on EQUAL, advance both spines one `⟨M a`-segment (marking consumed segments) and recurse;
+on LESS/GREATER exit with the verdict. Boundary rules (the flagged spot): the zigzag's turns
+happen at the two monomials' current-segment `P`-anchors; the SPINE-ADVANCE windows are:
+```
+(t1) k= ⟨ M = ⟨• M• k=′        (left spine: consume segment head after EQUAL verdict)
+(t2) k=′ walks right (over marked) to the right spine; k=′ ⟨ M = ⟨• M• k=″ (right spine)
+(t3) k=″ → k (restart S6 on next atom pair)
+(t4) end-cases: left spine exhausted first (window `k= a-tail-end pattern` where the spine's
+     last atom lacks a following ⟨M): verdicts SHORTER-LEFT (⟹ m < m′ in deg-lex) etc.
+     — 4 end-windows (left/right × exhausted/continuing).
+```
+The monomial-boundary turn anchors are the `⟨M`-flavored marks — every zigzag cycle nets a
+relator containing them (Law 4′ ✓). On final EQUAL-exhausted-both: enter F7 pair-cancel (S7)
+with both spines fully marked (the marks BECOME the dual-erase's synchronization track — this
+is the fusion that makes S7's lockstep well-defined). ≈ 14 schemas.
+
+## A.4 S9 zero-anchored consumption, full quartet family
+
+Purpose: `⟨M u 0⟩ → 0` and mirror — consume the (arbitrary) subterm u against the live `0`
+anchor. Letters: anchor flavors `0̂, 0̌` (alternating); states `z, z₁`.
+```
+(z1) x 0̂ = 0̌      — ILLEGAL as written (no state) — actual family:
+(z1) z x = z₁      x ∈ Σ∪Σ•   (consume one letter of u, left of the anchor-state pair)
+     — z sits immediately LEFT of the anchor; consumption happens on z's left ⟹ left-moving
+     retire: x z = z₁  (state-right shape, M5′-legal)
+(z2) z₁ 0̂ = 0̌ z    (touch the anchor, flip its flavor — the anchor IS the certificate and it
+                    survives every cycle)
+(z3) x z = z₁ ; z₁ 0̌ = 0̂ z   (the alternating twin)
+(z4) entry: w ⟨ M = z-init windows from the S9 dispatch (detect `M`-node with 0 second child:
+     via MATCH on first child + window `z-init 0 ⟩ = 0̂ ⟩ z` anchor-flavoring)
+(z5) exit: z reaches the node's ⟨: window `⟨ z₁? …` → delete the bracket pair and M around the
+     bare anchor: `⟨ M-mark z 0̂ ⟩ = 0 w′`-shaped bounded window (restore plain 0, exit state).
+```
+Net cycle relator (one z/z₁ round): `x·z·0̂ ↔ z·0̌`-composite ⟹ contains z-states AND the anchor
+flavor flip — never data-only (Law 4′ ✓ — and the flavor alternation means even TWO rounds net
+an anchored relator, unlike the laundering pattern). Backward soundness: reversed, the family
+MINTS arbitrary letters next to a live flipped anchor inside the M-node being deleted — sound:
+the node is ≡ 0 regardless of u's content (0-conjunct), which is precisely the semantic witness
+family. ≈ 18 rules expanded.
+
+## A.5 Revised tally
+
+v1.1 expanded estimate: previous ≈ 380–420, plus A.1–A.4 refinements net +40–60 (R2 macro and
+boundary turns were under-counted; S3 fully priced) ⟹ **≈ 440–480 rules**. Still order 10².
+All new cycles anchored; no data-data rules introduced (the A.1(9′) note shows where the shape
+discipline bites and how left-mover shapes stay legal).
