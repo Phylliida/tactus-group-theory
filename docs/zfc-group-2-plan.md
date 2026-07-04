@@ -596,3 +596,21 @@ validated components), 0 unexplained survivors. The audit chain now covers: all 
 the Boolean machine's F-families and passes, the erasure trichotomy, and the ZFC layer's
 builder/verifier/export lifecycle. Remaining for future sessions: S10–S16 detail families
 (same method), M8b on paper, then the formal campaign per Part II.
+
+## V.7 S10–S16: the new shapes audited (corpus 32 — closing entry)
+
+The only genuinely NEW rule shapes in the ZFC detail families are: the **S10 binder-stack**
+(push bracket-marks descending, pop ascending, zigzag turn on the compared material — this IS
+M8b's cycle class) and the **S13 yard-flag toggle** (Law 6's open/close flips). Both audit
+**CLEAN** (`s10_binder_stack`, `s13_yard_flag`; benign push/pop and mark-balance H₁ signatures;
+flag flips use distinct state-pairs per direction, per the flip-pairing law). The remaining
+families — S11 ALPHA, S12 FV-CHECK, S14/S15 matchers, S16 store-ctl — are compositions of
+already-validated shapes (couriers, comparators, walks, single-rule deposits): audit coverage
+of the ZFC layer's rule-shape vocabulary is COMPLETE at prototype strength.
+
+**M8b status change:** core cycle class prototype-audited CLEAN; the owed paper session now
+carries only the formal argument, with its expected mechanism (M4-class defect flow over
+binder-bracket boundaries) unchanged and its risk substantially reduced.
+
+Corpus final: **32 systems — every M-ladder rung, every Boolean family, every ZFC shape;
+5 poisons → 5 laws → 5 probes; 27 validated components; 0 unexplained survivors.**
