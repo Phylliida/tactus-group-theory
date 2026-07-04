@@ -146,6 +146,10 @@ All mechanically auditable on a candidate `(f, R)` except Law P, which is the re
   trajectory; turns must transduce (`qW = rW′`, `W ≠ W′`).
 - **Law 4 — mint must move** (Law 0 instance): minting/retiring cycles have nonzero net head
   displacement (stationary pumps force `h = g⁻¹`).
+- **Law 4′ — anchored erasure** (Law 0 instance, from §6.3): erasure/absorption cycles must
+  straddle an anchor so their net cycle-relator stays state/anchor-carrying, never data-only —
+  cycles LAUNDER certificates (`{|s = s′, |s′ = s}` nets `|| = 1`, poison, despite both rules
+  being individually hygienic and semantically witnessed).
 - **Law 5 — boot via encoding:** guard insertion lives in the wrapper `E` inside `f`, never in `R`
   (schema-level insertion relators trivialize the guard).
 - **Law P — positivity** (the theorem, not an audit): the group trace on positive words equals
@@ -648,11 +652,52 @@ used anywhere** (every rule carries a state) ⟹ the Garside-shaped M8 class is 
 Completion-divergence (the other M8 class): unknown until the concrete rule list exists — audit
 item for v2.
 
-### 6.3 Open engineering (the honest gaps)
+### 6.3 F7 micro-design (v1 closure of the theory-touching gap)
 
-1. **F7 micro-witnesses:** lockstep dual-erase must keep every intermediate configuration a
-   genuine formula ≡-equal to the whole (wrap the duplicate pair as one `⊕`-summand `≡ 0`, consume
-   outside-in). The design pattern exists; the concrete windows are not yet written.
+**The laundering disaster (a real poison, caught by the Law 0 audit).** First attempt: a
+certificate-carrying eraser inside a `≡0` summand, alternating states for hygiene:
+`|s = s′`, `|s′ = s`. Each rule is affix-disjoint and semantically witnessable — and the two-rule
+CYCLE eliminates the states: `s = ||s ⟹ || = 1`. Stroke pairs become deletable in ALL contexts;
+atom indices collapse mod 2; soundness dies. **Cycles launder certificates**: a state cannot
+carry "I'm inside a zero summand" through a loop, because the group cancels the state around the
+loop and keeps only the data-effect.
+
+> **Law 4′ (anchor-straddling).** Every erasure/absorption cycle must straddle an anchor letter,
+> so its NET cycle-relator remains state/anchor-carrying (e.g. `|sP| = sP`), never data-only.
+> (Refines Laws 0/4: check not just that cycles displace, but that their net relators keep a
+> non-data letter.)
+
+The compliant eraser: a **fused comparator–eraser zigzag** at the seam of the duplicate pair —
+delete one stroke left of the anchor, cross, delete one stroke right, return: rules
+`|s = s₁`, `s₁P = Ps₃`, `s₃| = s₄`, `Ps₄ = sP`; net cycle-relator `|sP| = sP` (anchored ✓);
+bidirectionally preserves the count-difference invariant (backwards it inserts on both sides),
+so equal stays equal and unequal stays unequal. Junction types: M3/M4 zigzag class. The same
+idiom handles monomial-spine consumption and the `0`-cleanup sweeps (`sX0 = s′`, per §6.1's
+featured catch).
+
+**The witness-liberation lemma (the gap-closer).** §6.3's old requirement — "every intermediate
+configuration a genuine formula ≡ the whole" — is TOO STRONG and not required. Sem-membership of
+a rule needs only ONE witness context in which both sides are codes of equivalent formulas; and
+for any desynchronizing window (one copy shorter than its twin mid-erase), a **0-anchored
+witness** exists: place the window inside a product with an explicit `0` conjunct — both sides'
+formulas are `≡ 0` regardless of the desynchronization, hence equivalent. Intermediate
+configurations of real derivations need not be codes at all (they never were, in any M-ladder
+proof); global soundness is carried by positivity (Law P), not by configuration well-formedness.
+This dissolves the value-synchronization tension entirely: lockstep erasure does not need
+value-preserving intermediate formulas, only anchored cycles and the difference invariant.
+
+**F7 verdict: CLOSED at design level.** Window set: fused zigzag eraser (above) + factor-fold
+sweeps for spine alignment + guarded `0`-absorption; all rules affix-disjoint, one-state-per-side,
+anchored cycles, 0-anchored witnesses; junctions all in the proven inventory. Remaining F7 work
+is transcription (the concrete rule list), not design.
+
+### 6.4 Open engineering (the honest gaps, post-6.3)
+
+1. ~~F7 micro-witnesses~~ **CLOSED at design level (§6.3)** — the old "every configuration ≡ the
+   whole" requirement was too strong (witness-liberation lemma); remaining F7 work = rule-list
+   transcription. NOTE: the Law 0 audit must now check Law 4′ (anchored cycle-relators) on the
+   full rule list — the laundering eraser shows a hygienic, semantically-witnessed rule PAIR can
+   still be poison as a cycle.
 2. **Chunk realization layer:** states-as-transparent-chunks (comma-free code of `X·code(C_q)`
    blocks) — Law 1's cross-relator clause lives here; needs the concrete chunk assignment.
 3. **Completeness proof:** that the machine actually normalizes every code (sweep termination,
