@@ -436,3 +436,122 @@ half).
 **Risk register delta:** shuttle-builder REMOVED from the design space (refuted, not just
 deprecated); M8a-core reduced to proven classes; M8a-full = unshield composite only; the
 auditor spec gains the consequence-closure check (mandatory, per the meta-lesson).
+
+---
+
+# PART V — Final de-risking + formalization, precisely (last session hours)
+
+## V.1 M8a-full DISSOLVED: never delete shields — export through the wall
+
+The remaining "unshield composite" risk assumed unshielding = deleting wrapper brackets around
+unbounded verified content (two-ended anchored erasure — a new mechanism class). **Redesign:
+shield brackets are PERMANENT wrapper structure (Law 5 material); verified content is RELEASED
+by an export-courier THROUGH the wall** (`c_A ⟩ₛ = ⟩̂ₛ c_A′` with flavor alternation, deposit
+outside, return). Semantics unchanged (the residual shield stays `(junk ∨ ⊤) ≡ ⊤` forever; the
+export step carries the same `Θ ⊢ A` obligation, now discharged by the verifier's re-flavoring
+`κ a◦ = A κ₁` — the pattern-check consumed into a letter-flavor, not a state certificate).
+Mechanically this is M6 courier + IV.2′ deposit mechanics — **all proven or
+elimination-checked classes; the bracket-deletion mechanism is deleted from the design space.**
+PICO-composite check (builder + verifier + export, minimal instance): eliminating states, the
+verifier chain (κ, κ₁, υ) is TREE-shaped (each state defined once) ⟹ contributes definitions,
+not relations; the only cycles are the builder cycle (IV.2′, checked) and the verify-export
+cycle, whose net relator carries `A, a◦`, wall flavors, and the dispatch state — anchored.
+No data-only consequences found at closure-sketch strength; formal-strength confirmation
+delegated to the auditor's closure probe on the literal rule list. **Risk register: M8a-full
+downgraded from "open mechanism" to "transcription + mechanical closure check."** (M8b
+unchanged: expected M4-class, one paper session.)
+
+## V.2 The H₁/SNF diagnostic (calibrated honestly)
+
+The shuttle poison `a² = 1` is abelianization-visible (`2a = 0` in `H₁`). Auditor probe:
+abelianize the eliminated presentation (relator matrix over ℤ on all letters), compute Smith
+normal form, inspect the data-letter sublattice. Calibration from today's corpus: torsion on a
+SINGLE data letter (`2a = 0`, `2| = 0`) = near-certain poison; torsion on DIFFERENCES can be
+benign — the (sound!) blinker has `2(a−b) = 0` in `H₁`, a false positive. So: **warning-level
+triage, not rejection** — single-letter torsion blocks, difference-torsion flags for review.
+Cheap (SNF), catches every poison found today at the right severity.
+
+## V.3 Formalization, at code level (signature drafts against the real substrate;
+grep names before use — conventions per `presentation.rs`/`word.rs`)
+
+**`thue.rs` (Phase 0), the actual definitions:**
+```rust
+pub struct ThueRule { pub lhs: Word, pub rhs: Word }
+
+pub open spec fn positive_word(w: Word) -> bool {
+    forall|i: int| 0 <= i < w.len() ==> w[i] is Gen
+}
+pub open spec fn thue_step(rules: Seq<ThueRule>, u: Word, v: Word) -> bool {
+    exists|r: int, p: int, fwd: bool| 0 <= r < rules.len() && {
+        let (l, rr) = if fwd { (rules[r].lhs, rules[r].rhs) } else { (rules[r].rhs, rules[r].lhs) };
+        0 <= p && p + l.len() <= u.len()
+        && u.subrange(p, p + l.len() as int) == l
+        && v == u.subrange(0, p) + rr + u.subrange(p + l.len() as int, u.len() as int)
+    }
+}
+pub open spec fn thue_chain(rules: Seq<ThueRule>, ws: Seq<Word>) -> bool { /* consecutive steps */ }
+pub open spec fn thue_equiv(rules: Seq<ThueRule>, u: Word, v: Word) -> bool {
+    exists|ws: Seq<Word>| ws.len() >= 1 && ws.first() == u && ws.last() == v && thue_chain(rules, ws)
+}
+pub open spec fn rules_pres(rules: Seq<ThueRule>, n: nat) -> Presentation {
+    Presentation { num_generators: n,
+        relators: Seq::new(rules.len(), |i: int| concat(rules[i].lhs, inverse_word(rules[i].rhs))) }
+}
+pub open spec fn positivity(rules: Seq<ThueRule>, n: nat) -> bool {
+    forall|u: Word, v: Word| positive_word(u) && positive_word(v)
+        && word_valid(u, n) && word_valid(v, n)
+        ==> (equiv_in_presentation(rules_pres(rules, n), u, v) <==> thue_equiv(rules, u, v))
+}
+```
+**Bridge lemma (the easy direction), with its derivation construction pinned:** one Thue step
+`p·l·s → p·r·s` = `RelatorInsert` of `l·r⁻¹`-inverse-oriented at position `p` followed by
+`l.len()` `FreeReduce` steps at the seam (mirror `pred_to_finite::lemma_splice_trivial`'s
+congruence style — or construct via `lemma_equiv_concat_left/right` + `lemma_relator_is_identity`
+avoiding explicit step lists entirely; the latter is fewer lemmas).
+
+**`m3_blinker.rs` (Phase 1 pilot), the actual statement set:**
+```rust
+pub open spec fn blinker_rules() -> Seq<ThueRule>  // gens: a=0,b=1,q=2,q'=3; qa=bq', q'a=bq
+pub open spec fn sub_qp(w: Word) -> Word           // letterwise; q' ↦ [Inv(1),Gen(2),Gen(0)]
+pub open spec fn blinker_hnn() -> HNNData          // base: 2-gen free; assoc [(aa, bb)]; stable=2
+pub proof fn lemma_blinker_transport(u: Word, v: Word)   // Tietze elimination of q'
+    requires positive_word(u), positive_word(v), word_valid(u, 4), word_valid(v, 4)
+    ensures equiv_in_presentation(rules_pres(blinker_rules(), 4), u, v)
+        <==> equiv_in_presentation(hnn_presentation(blinker_hnn()), sub_qp(u), sub_qp(v))
+pub open spec fn syllables(w: Word) -> Seq<Word>   // split sub_qp(u) at stable letters
+pub open spec fn head_a_exp(s: Word) -> int
+pub proof fn lemma_irreducible_head_cap(u: Word, i: int) // no-qa/q'a ==> head ∈ {0,1}
+pub proof fn lemma_britton_compensations(...)      // UV⁻¹ pinch cascade via britton_lemma_full:
+    // ensures exists|m: Seq<int>| per-junction h_i == a^{-2m_i}·g_i·b^{2m_{i+1}} equations
+pub proof fn lemma_parity_kill(...)                // caps + evenness ==> all m_i == 0
+pub proof fn theorem_m3_positivity() ensures positivity(blinker_rules(), 4)
+```
+Care points recorded: (i) `lemma_blinker_transport` is the only Tietze-shaped lemma — build it
+as two `lemma_fin_equiv_to_pred`-style directional homs (`base_swap::lemma_same_group_iff`
+pattern) rather than general Tietze machinery; (ii) `lemma_britton_compensations` mirrors the
+`lemma_pred_to_limit` pinch-cascade structure — same induction skeleton, already exercised;
+(iii) the whole module needs NOTHING new from the substrate.
+
+**Auditor closure probe (Phase 2), the algorithm pinned:** eliminate tree-states symbolically
+(each state defined once → substitution); abelianize surviving relators into an integer matrix;
+SNF; apply V.2's triage. Plus Law 1 per-rule scan, cycle-basis net relators via the VERIFIED
+`reduction::normal_form`, Law 4′ (state/anchor letter present in each net relator), Law 6 flag
+check. Output: presentation + machine-checkable certificate structure
+`AuditCert { law1: ..., cycles: Seq<(CycleId, Word)>, snf_flags: ... }` with the correctness
+theorem `audit_ok(rules) ==> laws_hold(rules)` as the module's headline.
+
+## V.4 Where every remaining unknown now stands (final)
+
+| Item | Status at session close |
+|---|---|
+| M8a builder core | eliminated, clean, proven classes (IV.2′) |
+| M8a unshield | MECHANISM DELETED — export-through-wall, proven classes (V.1) |
+| M8a full composite | transcription + mechanical closure check |
+| M8b subst-comparator | one paper session, M4-class expected |
+| Shuttle-builder | REFUTED (a²=1) — permanently out |
+| Completion divergence | RETIRED (parser subsumes confluence) |
+| Poison triage | H₁/SNF probe, calibrated (V.2) |
+| Phase 0 + M3 pilot | code-level skeletons written (V.3) |
+| Boolean completeness | engineering, measures pinned |
+| RCL | case-complete plan (III.2), calculus pinned |
+| Unified single-loop theorem | open, valuable, non-blocking |
