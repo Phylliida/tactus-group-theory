@@ -555,3 +555,19 @@ theorem `audit_ok(rules) ==> laws_hold(rules)` as the module's headline.
 | Boolean completeness | engineering, measures pinned |
 | RCL | case-complete plan (III.2), calculus pinned |
 | Unified single-loop theorem | open, valuable, non-blocking |
+
+## V.5 The auditor prototype EXISTS and validates (tools/semantic_audit.py)
+
+Python seed of the Phase-2 verified auditor, written and run at session close. Implements: Law 1
+per-rule check; **the refined Law 4′ check** — maximal Tietze elimination of states (randomized
+over 40 elimination orders, worst case taken) + CYCLIC reduction, flagging any data-only
+survivor; H₁ data-lattice extraction (INFO-level). Validation corpus = all sixteen systems of
+2026-07-03. **First run: ALL EXPECTATIONS MET** — poisons caught exactly as hand-derived
+(boolean collapse; pump `hg=1` as survivor `-g.-h`; laundering `||=1` as `st.st`; shuttle's
+`a`-torsion in wall-conjugated survivor form), all eleven sound systems clean, and the known-
+benign H₁ false-positive patterns (blinker `a−b`, doubler `−a`, BS(2,3) `−a`, font `a◦−D+D̂`)
+reported at INFO severity exactly per the V.2 calibration. The refined survivor-check is hereby
+validated as the primary mechanical discriminator on the entire corpus; H₁ stays informational.
+Natural Python successors (no tactus needed): the schema EXPANDER for boolean-group-rules-v1
+(feeding this auditor the literal ~450 rules), the Boolean machine SIMULATOR (completeness
+fuzzing on random formulas vs sorted-ANF), and a bounded group-consequence fuzzer.
