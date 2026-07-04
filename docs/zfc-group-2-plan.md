@@ -397,3 +397,42 @@ only the benign data-adjacency collisions above exist.
    engineering; surfaces mechanically when the expander exists.
 5. ~~Completion-divergence~~ RETIRED (IV.3). ~~Yard-builder soundness~~ FIXED (IV.1).
 6. (Other arc) carrier-not-fp NF-2b (class-valuation retraction) — unchanged, low-risk, specced.
+
+## IV.2′ CORRECTION AND RESOLUTION (M8a parser session, same night)
+
+**Correction: the shuttle-builder is POISON — IV.2's "no data-only relators" was wrong.**
+IV.2 derived the individual relations correctly but did not combine them. Combining:
+the walk rules give `[a, L̂⁻¹L] = 1`, and the closing relation gives `L̂a⁻¹L̂⁻¹ = LaL⁻¹`,
+i.e. `(L⁻¹L̂)a(L⁻¹L̂)⁻¹ = a⁻¹` — conjugation by `v = L⁻¹L̂` inverts `a` while ALSO commuting
+with it. Hence **`a² = 1`**: a data-only torsion relator; soundness dead. Root cause, now
+understood structurally: **a cycle's minted letter-count must be recorded in unbounded anchored
+material, never in bounded state/wall-flavor bits** — the shuttle stores one bit of flavor while
+minting unboundedly, and the walk-commutations launder the difference into torsion. The shuttle
+design is withdrawn; IV.1's font-copier is now the mandatory builder, not merely recommended.
+(Meta-lesson for the Laws: "eliminate ALL states and take the CONSEQUENCE CLOSURE of the
+surviving relations" — relation-listing without combination is not an audit. The auditor tool
+must implement the closure check, e.g. via a solvable-quotient probe: abelianize with letter
+weights, and check small quotients for forced torsion.)
+
+**Resolution: the font-copier core, fully eliminated and clean.** Minimal system (font `F a F′`,
+deposit walls `D/D̂`, states h→d→d₁→c→c₂, rules: `hF=Fd`, `da=aa•d₁`, `a•d₁=c`, `cF′=F′c`,
+`cD=a◦D̂c₂`, `cD̂=a◦Dc₂`, `F′c₂=c₂F′`, `ac₂=c₂a`, `Fc₂=hF`). Full state elimination:
+`d = F⁻¹hF`, `c = a⁻¹da` (the `a•` cancels — it survives as a FREE generator, i.e. an
+unforgeable marker, M6-style), `c₂ = d`; consequence closure yields `c = d` and the complete
+surviving presentation
+
+> `G′ = ⟨ a, a•, a◦, F, F′, D, D̂, d | [d,a], [d,F′], dDd⁻¹ = a◦D̂, dD̂d⁻¹ = a◦D ⟩`
+
+— an **HNN extension over a FREE base** with mixed identity-associations (`a, F′` — M1 class)
+and mint-with-motion associations (`D ↦ a◦D̂, D̂ ↦ a◦D` — M5(a) class, distinct-letter images,
+flavor-alternating). **No data-only consequences** (this time checked by closure: every surviving
+relation carries `d`; the base is free on the data letters). The M8a-core positivity claim is
+therefore an instance of the PROVEN ladder classes (M5(a) head-caps + M6 markers + IV.3's
+benign two-head collisions), with the syllable bookkeeping to be written out — estimated one
+short session, no new mechanism expected. Remaining for full M8a: compose with verify+unshield
+(the builder feeding the shield is now on proven ground; the unshield composite is the open
+half).
+
+**Risk register delta:** shuttle-builder REMOVED from the design space (refuted, not just
+deprecated); M8a-core reduced to proven classes; M8a-full = unshield composite only; the
+auditor spec gains the consequence-closure check (mandatory, per the meta-lesson).
