@@ -607,7 +607,64 @@ in itself, and the Proof Factory tutorial world.
 
 ---
 
-## 6. Literature anchors
+## 6. The Probe 0 opcode audit (v1 — design-level, 2026-07-03)
+
+Target: alphabet = structural letters `{X(⊕), M(∧), 1, 0, P, |}` + state/guard chunks; encoding
+`f(σ) = code(E[σ̂])` (E = wrapper with WORK zone + empty SCRATCH zone; atoms in stroke form);
+R = the families below. Canonical form: sorted ANF. Completeness = every code Thue-connected to
+its canonical code (normalize; Thue symmetry makes "both reach canon" suffice). Soundness = Laws
+0–5 audit + junction classification + per-junction mechanisms (licensed by §4.9(c)).
+
+### 6.1 Two architecture corollaries derived from the Laws
+
+- **No generic eraser.** `e·x = e` per letter forces `x = 1` (Law 2). Erasure exists ONLY as
+  (i) uncompute-by-reversal (Thue symmetry makes builder rules erasers for free) and
+  (ii) structured duplicate-pair cancellation (F7 below) whose every configuration remains a
+  formula `≡`-equal to the whole.
+- **The featured audit catch:** the constant-absorption schema as a naked rule `M1A ↔ A` is
+  ILLEGAL (suffix-shared ⟹ collapsed relator `M·1`, i.e. `M = 1⁻¹` — Boolean-collapse-adjacent
+  poison). The SAME semantic content as a guarded sweep step `s·M·1 = s′` (delete the unit-wrap
+  in passing, state moves on) is legal, hygienic, and cycle-safe. One schema, two encodings,
+  opposite verdicts — the audit discipline is not optional.
+
+### 6.2 Opcode families, laws-check, junction classification
+
+| Family | Content | Rule shape | Ladder type | Junction splitting | Verdict |
+|---|---|---|---|---|---|
+| F1 guard motion | states slide through structural letters | `qX = Xq` | M1 | ℤ²/central factors | ✅ |
+| F2 sweep heads | read/translate steps | `qx = yq′` | M2–M4 | HNN, cap-friendly | ✅ |
+| F3 couriers | monomial transport, sorting swaps | `qx = p`, `pw = wp` | M6 | free product + centrality | ✅ |
+| F4 comparators | stroke-count zigzag (atom index compare) | blinker pairs + transducing turns | M3/M4 | HNN, parity caps + defect flow | ✅ (Law 3 at turns) |
+| F5 copiers | subtree duplication into scratch | doubling walks | M5(b)/M7(a) | BS(1,k) junctions | ✅ (BS cleared) |
+| F6 mint/retire | zone management | `q = gq′`-with-motion | M5(a) | unequal-length HNN | ✅ (Law 4) |
+| F7 dual-erase | `M⊕M → 0`, `x∧x → x` dedup | two-track lockstep consumption | M7(b)-shaped | multi-HNN, synchronized | ⚠ per-junction OK by §4.9(c); **micro-witness design open** |
+| F8 anchors | finitely many closed constant rules | concrete, guard-padded | — (leaves) | none (no cycles) | ✅ (Law 1 padding required) |
+| F9 phase turns | sweep hand-offs | `qW = rW′`, `W ≠ W′` | — | tree edges | ✅ (Law 3) |
+
+Cycle check (Law 0): state graph = phase sweeps + per-family loops; every cycle's net effect is
+an intended macro (transport, compare-consume, copy, unit-deletion, zone growth) — no net-trivial
+cycles, no stationary mints, by construction of the sweep discipline. **No data-data rules are
+used anywhere** (every rule carries a state) ⟹ the Garside-shaped M8 class is avoided outright.
+Completion-divergence (the other M8 class): unknown until the concrete rule list exists — audit
+item for v2.
+
+### 6.3 Open engineering (the honest gaps)
+
+1. **F7 micro-witnesses:** lockstep dual-erase must keep every intermediate configuration a
+   genuine formula ≡-equal to the whole (wrap the duplicate pair as one `⊕`-summand `≡ 0`, consume
+   outside-in). The design pattern exists; the concrete windows are not yet written.
+2. **Chunk realization layer:** states-as-transparent-chunks (comma-free code of `X·code(C_q)`
+   blocks) — Law 1's cross-relator clause lives here; needs the concrete chunk assignment.
+3. **Completeness proof:** that the machine actually normalizes every code (sweep termination,
+   phase ordering) — standard machine-engineering, nothing conceptually open.
+4. **Size estimate** (ties to the minimality discussion): ~30–60 states, order 10²–low-10³ rules
+   for "the group of Boolean logic" v1 — before any optimization pass.
+
+**Audit verdict v1: no soundness obstruction anywhere in the design; every junction type maps to
+a proven ladder mechanism; the remaining work is construction, not theory** — with F7's
+micro-witnesses the one spot where construction and theory still touch.
+
+## 7. Literature anchors
 
 Nearest neighbors (none answering the question): Adjan/Remmers cycle-free semigroup-in-group
 embeddings; special monoids (Adjan, Makanin); Squier's homological finiteness obstructions (the
@@ -619,7 +676,7 @@ scaffolding this program attempts to shed. The Miller-carrier H₂ theorem (sibl
 naive carrier fails for homological reasons; nothing in the literature we know addresses finite
 *semantic* bases.
 
-## 7. Open problems
+## 8. Open problems
 
 1. Head-cap positivity conjecture (§5.1) — prove for M4–M6 shapes; find the general statement.
 2. Does SOME finite semantic basis exist for full propositional equivalence (Probe 0)?
