@@ -331,4 +331,226 @@ pub proof fn lemma_nf_exists(u: Word)
     }
 }
 
+// ═══ PART C — no-cancellation readback: sub injective on no-bq′ words ═══
+use crate::reduction::{is_reduced, has_cancellation_at, reduces_to, freely_equivalent,
+    lemma_reduced_reduces_to_self};
+use crate::homomorphism::{apply_hom, apply_hom_symbol};
+
+pub open spec fn sub_img(j: nat) -> Word {
+    if j == 0 { seq![Symbol::Gen(0)] }
+    else if j == 1 { seq![Symbol::Gen(1)] }
+    else if j == 2 { seq![Symbol::Gen(2)] }
+    else { seq![Symbol::Inv(1), Symbol::Gen(2), Symbol::Gen(0)] }
+}
+
+pub proof fn lemma_sub_sym(j: nat)
+    requires j < 4,
+    ensures apply_hom_symbol(sub_hom(), Symbol::Gen(j)) == sub_img(j),
+{
+    assert(sub_hom().generator_images[0] =~= seq![Symbol::Gen(0)]);
+    assert(sub_hom().generator_images[1] =~= seq![Symbol::Gen(1)]);
+    assert(sub_hom().generator_images[2] =~= seq![Symbol::Gen(2)]);
+    assert(sub_hom().generator_images[3] =~= seq![Symbol::Inv(1), Symbol::Gen(2), Symbol::Gen(0)]);
+    assert(apply_hom_symbol(sub_hom(), Symbol::Gen(j)) == sub_hom().generator_images[j as int]);
+}
+
+pub proof fn lemma_sub_cons(w: Word)
+    requires w.len() > 0,
+    ensures apply_hom(sub_hom(), w) =~=
+        apply_hom_symbol(sub_hom(), w[0]) + apply_hom(sub_hom(), w.drop_first()),
+{ assert(w.first() == w[0]); }
+
+pub proof fn lemma_no_bq_tail(w: Word)
+    requires no_bq(w), w.len() > 0,
+    ensures no_bq(w.drop_first()),
+{ }
+
+pub proof fn lemma_reduced_concat(a: Word, b: Word)
+    requires is_reduced(a), is_reduced(b),
+        a.len() == 0 || b.len() == 0 || !is_inverse_pair(a[a.len() - 1], b[0]),
+    ensures is_reduced(a + b),
+{
+    assert forall|i: int| 0 <= i < (a + b).len() - 1 implies !has_cancellation_at(a + b, i) by {
+        if i + 1 < a.len() {
+            assert((a + b)[i] == a[i] && (a + b)[i + 1] == a[i + 1]);
+            assert(!has_cancellation_at(a, i));
+        } else if i >= a.len() {
+            assert((a + b)[i] == b[i - a.len()] && (a + b)[i + 1] == b[i + 1 - a.len()]);
+            assert(!has_cancellation_at(b, i - a.len()));
+        } else {
+            assert((a + b)[i] == a[a.len() - 1] && (a + b)[i + 1] == b[0]);
+        }
+    }
+}
+
+pub proof fn lemma_sub_img_reduced(j: nat)
+    requires j < 4,
+    ensures is_reduced(sub_img(j)),
+{ assert forall|i: int| 0 <= i < sub_img(j).len() - 1 implies !has_cancellation_at(sub_img(j), i) by { } }
+
+// the seam: last(sub_img(j)) & first(sub_img(k)) are NOT an inverse pair unless (j,k)=(1,3)=`bq′`
+pub proof fn lemma_sub_seam(j: nat, k: nat)
+    requires j < 4, k < 4, !(j == 1 && k == 3),
+    ensures !is_inverse_pair(sub_img(j)[sub_img(j).len() - 1], sub_img(k)[0]),
+{
+    // last(sub_img(j)) ∈ {Gen0(j=0),Gen1(j=1),Gen2(j=2),Gen0(j=3)} ; first(sub_img(k)) ∈ {Gen0,Gen1,Gen2,Inv1}
+    let lj = sub_img(j)[sub_img(j).len() - 1];
+    let fk = sub_img(k)[0];
+    if k < 3 {
+        assert(fk == Symbol::Gen(k));   // a Gen — never the inverse of a Gen
+    } else {
+        // k == 3, so j != 1 ; fk = Inv1, inverse pair needs lj == Gen1 ⟺ j == 1
+        assert(fk == Symbol::Inv(1));
+        assert(lj != Symbol::Gen(1));
+    }
+}
+
+// sub(w) reduced for a no-bq′ positive valid word
+pub proof fn lemma_sub_reduced(w: Word)
+    requires positive_word(w), word_valid(w, 4), no_bq(w),
+    ensures is_reduced(apply_hom(sub_hom(), w))
+    decreases w.len()
+{
+    if w.len() == 0 {
+        assert(apply_hom(sub_hom(), w) =~= empty_word());
+    } else {
+        lemma_positive_gen(w, 0);
+        let j = choose|j: nat| w[0] == Symbol::Gen(j);
+        assert(symbol_valid(w[0], 4));
+        let rest = w.drop_first();
+        lemma_sub_cons(w);
+        lemma_sub_sym(j);
+        lemma_sub_img_reduced(j);
+        lemma_pos_sub2(w, 1, w.len() as int); assert(rest =~= w.subrange(1, w.len() as int));
+        lemma_wv_sub(w, 1, w.len() as int, 4);
+        lemma_no_bq_tail(w);
+        lemma_sub_reduced(rest);
+        if rest.len() > 0 {
+            lemma_positive_gen(rest, 0);
+            let k = choose|k: nat| rest[0] == Symbol::Gen(k);
+            assert(symbol_valid(rest[0], 4));
+            lemma_sub_cons(rest); lemma_sub_sym(k);
+            assert(apply_hom(sub_hom(), rest)[0] == sub_img(k)[0]);
+            // no_bq(w): w[0]=Gen1 && w[1]=Gen3 excluded ; w[1]==rest[0]
+            assert(w[1] == rest[0]);
+            assert(!(j == 1 && k == 3));
+            lemma_sub_seam(j, k);
+        }
+        lemma_reduced_concat(apply_hom_symbol(sub_hom(), w[0]), apply_hom(sub_hom(), rest));
+    }
+}
+
+// nonempty valid word ⟹ nonempty sub-image
+pub proof fn lemma_sub_nonempty(w: Word)
+    requires w.len() > 0, word_valid(w, 4), positive_word(w),
+    ensures apply_hom(sub_hom(), w).len() > 0,
+{
+    lemma_positive_gen(w, 0);
+    let j = choose|j: nat| w[0] == Symbol::Gen(j);
+    assert(symbol_valid(w[0], 4));
+    lemma_sub_cons(w); lemma_sub_sym(j);
+    assert(sub_img(j).len() > 0);
+}
+
+// first symbols of the four letters are distinct ⟹ sub-image head determines the letter
+pub proof fn lemma_sub_first_inj(jx: nat, jy: nat)
+    requires jx < 4, jy < 4, sub_img(jx)[0] == sub_img(jy)[0],
+    ensures jx == jy,
+{ }
+
+// THE READBACK: sub injective on no-bq′ positive valid words
+pub proof fn lemma_sub_injective(x: Word, y: Word)
+    requires
+        positive_word(x), positive_word(y), word_valid(x, 4), word_valid(y, 4),
+        no_bq(x), no_bq(y),
+        apply_hom(sub_hom(), x) == apply_hom(sub_hom(), y),
+    ensures x == y
+    decreases x.len() + y.len()
+{
+    if x.len() == 0 {
+        if y.len() > 0 { lemma_sub_nonempty(y); assert(apply_hom(sub_hom(), x) =~= empty_word()); }
+        assert(x =~= y);
+    } else if y.len() == 0 {
+        lemma_sub_nonempty(x); assert(apply_hom(sub_hom(), y) =~= empty_word());
+        assert(x =~= y);
+    } else {
+        lemma_positive_gen(x, 0); lemma_positive_gen(y, 0);
+        let jx = choose|j: nat| x[0] == Symbol::Gen(j);
+        let jy = choose|j: nat| y[0] == Symbol::Gen(j);
+        assert(symbol_valid(x[0], 4)); assert(symbol_valid(y[0], 4));
+        lemma_sub_cons(x); lemma_sub_cons(y);
+        lemma_sub_sym(jx); lemma_sub_sym(jy);
+        // heads: S(x)[0]==sub_img(jx)[0], S(y)[0]==sub_img(jy)[0]
+        assert(apply_hom(sub_hom(), x)[0] == sub_img(jx)[0]);
+        assert(apply_hom(sub_hom(), y)[0] == sub_img(jy)[0]);
+        lemma_sub_first_inj(jx, jy);   // ⟹ jx == jy ⟹ x[0]==y[0]
+        assert(x[0] == y[0]);
+        // drop the common prefix sub_img(jx): S(x.drop_first())==S(y.drop_first())
+        let xr = x.drop_first(); let yr = y.drop_first();
+        assert(apply_hom(sub_hom(), x) =~= sub_img(jx) + apply_hom(sub_hom(), xr));
+        assert(apply_hom(sub_hom(), y) =~= sub_img(jx) + apply_hom(sub_hom(), yr));
+        assert(apply_hom(sub_hom(), xr) =~= apply_hom(sub_hom(), x).subrange(sub_img(jx).len() as int, apply_hom(sub_hom(), x).len() as int));
+        assert(apply_hom(sub_hom(), yr) =~= apply_hom(sub_hom(), y).subrange(sub_img(jx).len() as int, apply_hom(sub_hom(), y).len() as int));
+        assert(apply_hom(sub_hom(), xr) == apply_hom(sub_hom(), yr));
+        lemma_pos_sub2(x, 1, x.len() as int); assert(xr =~= x.subrange(1, x.len() as int));
+        lemma_pos_sub2(y, 1, y.len() as int); assert(yr =~= y.subrange(1, y.len() as int));
+        lemma_wv_sub(x, 1, x.len() as int, 4); lemma_wv_sub(y, 1, y.len() as int, 4);
+        lemma_no_bq_tail(x); lemma_no_bq_tail(y);
+        lemma_sub_injective(xr, yr);
+        assert(seq![x[0]] + xr =~= x); assert(seq![y[0]] + yr =~= y);
+    }
+}
+
+// ═══ ASSEMBLE M2 POSITIVITY ═══
+pub proof fn lemma_m2_forward(u: Word, v: Word)
+    requires
+        positive_word(u), positive_word(v), word_valid(u, 4), word_valid(v, 4),
+        equiv_in_presentation(rules_pres(m2_rules(), 4), u, v),
+    ensures thue_equiv(m2_rules(), u, v)
+{
+    use crate::higman_operations::{free_group, lemma_free_group_valid};
+    use crate::homomorphism::lemma_apply_hom_word_valid;
+    use crate::presentation_lemmas::lemma_freely_equivalent_implies_equiv;
+    use crate::presentation::{lemma_equiv_symmetric, lemma_equiv_transitive};
+    use crate::free_word_problem::lemma_free_group_equiv_freely_equivalent;
+    let su = apply_hom(sub_hom(), u); let sv = apply_hom(sub_hom(), v);
+    lemma_sub_valid(); lemma_free_group_valid(3);
+    lemma_nf_exists(u); lemma_nf_exists(v);
+    let nu = choose|w: Word| positive_word(w) && word_valid(w, 4) && no_bq(w) && thue_equiv(m2_rules(), u, w);
+    let nv = choose|w: Word| positive_word(w) && word_valid(w, 4) && no_bq(w) && thue_equiv(m2_rules(), v, w);
+    let snu = apply_hom(sub_hom(), nu); let snv = apply_hom(sub_hom(), nv);
+    lemma_m2_backward(u, nu); lemma_m2_backward(v, nv);
+    lemma_group_implies_sub_equal(u, nu);   // freely_eq(su, snu)
+    lemma_group_implies_sub_equal(u, v);    // freely_eq(su, sv)
+    lemma_group_implies_sub_equal(v, nv);   // freely_eq(sv, snv)
+    lemma_apply_hom_word_valid(sub_hom(), u); lemma_apply_hom_word_valid(sub_hom(), v);
+    lemma_apply_hom_word_valid(sub_hom(), nu); lemma_apply_hom_word_valid(sub_hom(), nv);
+    lemma_freely_equivalent_implies_equiv(free_group(3), su, snu);
+    lemma_freely_equivalent_implies_equiv(free_group(3), su, sv);
+    lemma_freely_equivalent_implies_equiv(free_group(3), sv, snv);
+    lemma_equiv_symmetric(free_group(3), su, snu);            // equiv(snu, su)
+    lemma_equiv_transitive(free_group(3), snu, su, sv);       // equiv(snu, sv)
+    lemma_equiv_transitive(free_group(3), snu, sv, snv);      // equiv(snu, snv)
+    lemma_free_group_equiv_freely_equivalent(3, snu, snv);   // freely_eq(snu, snv)
+    lemma_sub_reduced(nu); lemma_sub_reduced(nv);
+    let w = choose|w: Word| reduces_to(snu, w) && reduces_to(snv, w);
+    lemma_reduced_reduces_to_self(snu, w); lemma_reduced_reduces_to_self(snv, w);  // snu == snv
+    lemma_sub_injective(nu, nv);                             // nu == nv
+    assert(thue_equiv(m2_rules(), u, nv));                   // thue(u,nu) + nu==nv
+    lemma_thue_symmetric(m2_rules(), v, nv);                // thue(nv, v)
+    lemma_thue_trans(m2_rules(), u, nv, v);                 // thue(u, v)
+}
+
+pub proof fn lemma_m2_positivity()
+    ensures positivity(m2_rules(), 4)
+{
+    assert forall|u: Word, v: Word|
+        positive_word(u) && positive_word(v) && word_valid(u, 4) && word_valid(v, 4)
+        implies (#[trigger] equiv_in_presentation(rules_pres(m2_rules(), 4), u, v)
+            <==> thue_equiv(m2_rules(), u, v)) by {
+        if equiv_in_presentation(rules_pres(m2_rules(), 4), u, v) { lemma_m2_forward(u, v); }
+        if thue_equiv(m2_rules(), u, v) { lemma_m2_backward(u, v); }
+    }
+}
+
 } // verus!
