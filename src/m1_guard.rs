@@ -667,4 +667,28 @@ pub proof fn m1_dit_bubble(gw: Word, nw: Word)
     lemma_dit_assemble(gw, nw, run, rest);
 }
 
+// ═══ PART C — assemble M1 positivity ═══
+pub proof fn lemma_m1_forward(u: Word, v: Word)
+    requires
+        positive_word(u), positive_word(v), word_valid(u, 4), word_valid(v, 4),
+        equiv_in_presentation(rules_pres(m1_rules(), 4), u, v),
+    ensures thue_equiv(m1_rules(), u, v)
+{
+    lemma_group_implies_same_deletes(u, v);
+    lemma_deletes_imply_thue(u, v);
+}
+
+// THE HEADLINE: M1 (guard motion) is positivity-sound — first M-ladder rung fully verified.
+pub proof fn lemma_m1_positivity()
+    ensures positivity(m1_rules(), 4)
+{
+    assert forall|u: Word, v: Word|
+        positive_word(u) && positive_word(v) && word_valid(u, 4) && word_valid(v, 4)
+        implies (#[trigger] equiv_in_presentation(rules_pres(m1_rules(), 4), u, v)
+            <==> thue_equiv(m1_rules(), u, v)) by {
+        if equiv_in_presentation(rules_pres(m1_rules(), 4), u, v) { lemma_m1_forward(u, v); }
+        if thue_equiv(m1_rules(), u, v) { lemma_m1_backward(u, v); }
+    }
+}
+
 } // verus!
