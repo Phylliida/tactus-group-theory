@@ -60,15 +60,21 @@ Three cases on (has-state-letters u?, has-state-letters v?):
     (via `lemma_p_reduced_initial_no_collapse`, made pub). [does q·sub(u)·q too — redo for the qq form]
   * B2 ✅ `lemma_sub_syls_count` (34/0): `act_syls(sub(u)·q).len() == stable_count` (via
     `lemma_no_collapse_gives_m`, made pub). ⟹ #state(u)=#state(v).
-  * B3 [BIG] EXPLICIT act_syls: define `nf_syls(u): Seq<Syllable>` = the expected gap sequence, prove
-    `act_syls(q·sub(u)·q) =~= nf_syls(u)` by induction on u tracking (h, syls) through `textbook_psi_p`
-    PREPEND (no collapse ⟹ always prepend {is_left:false, rep:b_rcoset_rep(gap)}). Couples to b_rcoset_rep.
-  * B4 [CRUX, cleaner] PARITY without shortlex-min: rep(g1)=rep(g2) ⟹ [`lemma_b_rcoset_rep_invariant`]
-    `same_b_rcoset(g1,g2)` ⟹ g1·g2⁻¹∈⟨a²⟩ (freely = a^{2k}). Then "both nf gaps (a-head∈{0,1}) + same
-    ⟨a²⟩-coset ⟹ equal": a^{2k}·g2=g1 free + heads∈{0,1} ⟹ k=0 ⟹ g1=g2. PURE free-group + head-count
-    (NO shortlex-min — avoids proving b_rcoset_rep(g)=g). Self-contained, bankable.
-  * B5 [BIG] gap-parsing injectivity: `nf_syls` injective on nf u — parse gaps (a-prefix/b⁻¹-suffix
-    encode q' vs q; blocks encode a,b) back to u. Combinatorial.
+  * B4 ✅ DONE (38/0) `lemma_parity_head_cap`: two reduced no-a⁻¹ words g1,g2, a-head≤1, g1≡a^{2k}·g2
+    ⟹ g1=g2. k>0 blows a-head≥2 (`lemma_prepend_gen0`+`lemma_reduced_unique`); k<0 sign-flip; k=0 direct.
+  * B3 [BIG, DE-RISKED] EXPLICIT act_syls: define `nf_syls(u): Seq<Syllable>` = the gap sequence, prove
+    `act_syls(q·sub(u)·q) =~= nf_syls(u)` by induction on u tracking (h,syls) through `textbook_psi_p`
+    PREPEND (no-collapse ⟹ always prepend {is_left:false, rep:b_rcoset_rep(gap)}). **FOUNDATION =
+    `b_rcoset_rep(nf gap)=gap`** (⟹ carry `phi_inv(b_rcoset_h)`=ε, clean syllables). FEASIBLE: lex
+    `symbol_to_column(Gen i)=2i < 2i+1=Inv i` ⟹ head-1 tie a·rest<a⁻¹·rest ⟹ positive wins; head-0
+    unique min-len. But NO crate helper — must prove from scratch: (i) same_b_rcoset(gap,gap) trivial;
+    (ii) `b_rcoset_min_len(afp,gap)==gap.len()` = geodesic-in-coset (no word in ⟨a²⟩·gap shorter — the
+    ONE delicate piece, a length bound over all k: |reduced(a^{2k}·gap)|≥|gap|, tie only at k=±1,h=1);
+    (iii) lex-min = gap; (iv) uniqueness via `lemma_word_lex_rank_base_injective`. Then rep=gap ⟹ B3.
+  * B5 [BIG] gap-parsing injectivity: from act_syls equal + rep=gap + `lemma_b_rcoset_rep_invariant`,
+    get per-gap `same_b_rcoset(gap_i(u),gap_i(v))` ⟹ [B4] gap_i(u)=gap_i(v) ⟹ [parse a-prefix/b⁻¹-suffix
+    ↔ q'/q, blocks ↔ a,b] u=v. Or simpler: rep=gap ⟹ act_syls literally = [gaps] ⟹ sub(u)=sub(v) as
+    WORDS ⟹ u=v (sub prefix-injective on symbols). Combinatorial.
   * ASSEMBLE: readback dispatcher (base ✓ / no_mixed ✓ / B3–B5) ⟹ `lemma_m3_readback` ⟹ ⟹ direction.
   NOTE: B1/B2 used sub(u)·q; the assembly wants q·sub(u)·q — re-establish no-collapse/count for that form.
 
