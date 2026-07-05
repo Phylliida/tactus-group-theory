@@ -183,4 +183,88 @@ pub proof fn lemma_qa2_equiv_b2()
     crate::presentation::lemma_equiv_transitive(hp, rhs, lhs, b2);   // rhs ≡ b2 = goal
 }
 
+// reduces_to ε via 3 cancellations
+proof fn m3_reduces3(w0: Word, i0: int, w1: Word, i1: int, w2: Word, i2: int)
+    requires
+        crate::reduction::has_cancellation_at(w0, i0), w1 == crate::reduction::reduce_at(w0, i0),
+        crate::reduction::has_cancellation_at(w1, i1), w2 == crate::reduction::reduce_at(w1, i1),
+        crate::reduction::has_cancellation_at(w2, i2), crate::reduction::reduce_at(w2, i2) == empty_word(),
+    ensures crate::reduction::reduces_to(w0, empty_word())
+{
+    use crate::reduction::*;
+    assert(reduces_one_step(w2, empty_word())) by { assert(has_cancellation_at(w2, i2) && empty_word() == reduce_at(w2, i2)); }
+    assert(reduces_in_steps(w2, empty_word(), 1)) by { assert(reduces_one_step(w2, empty_word()) && reduces_in_steps(empty_word(), empty_word(), 0)); }
+    assert(reduces_one_step(w1, w2)) by { assert(has_cancellation_at(w1, i1) && w2 == reduce_at(w1, i1)); }
+    assert(reduces_in_steps(w1, empty_word(), 2)) by { assert(reduces_one_step(w1, w2) && reduces_in_steps(w2, empty_word(), 1)); }
+    assert(reduces_one_step(w0, w1)) by { assert(has_cancellation_at(w0, i0) && w1 == reduce_at(w0, i0)); }
+    assert(reduces_in_steps(w0, empty_word(), 3)) by { assert(reduces_one_step(w0, w1) && reduces_in_steps(w1, empty_word(), 2)); }
+    assert(reduces_to(w0, empty_word())) by { assert(reduces_in_steps(w0, empty_word(), 3)); }
+}
+
+pub proof fn lemma_sub_valid()
+    ensures crate::homomorphism::is_valid_homomorphism(sub_hom()),
+{
+    use crate::homomorphism::*;
+    use crate::presentation_lemmas::{lemma_reduces_to_equiv, lemma_equiv_concat_left, lemma_equiv_concat_right};
+    use crate::presentation::lemma_equiv_transitive;
+    let h = sub_hom();
+    let hp = crate::hnn::hnn_presentation(m3_data());
+    lemma_m3_pres_valid();
+    lemma_m3_data_valid();
+    crate::britton_infra::lemma_hnn_presentation_valid(m3_data());
+    assert forall|i: int| 0 <= i < h.generator_images.len()
+        implies word_valid(#[trigger] h.generator_images[i], 3) by { assert(word_valid(h.generator_images[i], 3)); }
+    assert forall|i: int| 0 <= i < h.source.relators.len()
+        implies equiv_in_presentation(hp, apply_hom(h, #[trigger] h.source.relators[i]), empty_word()) by {
+        if i == 0 {
+            assert(thue_relator(m3_rules()[0]) =~= seq![Symbol::Gen(2), Symbol::Gen(0), Symbol::Inv(3), Symbol::Inv(1)]) by (compute);
+            assert(h.source.relators[0] =~= seq![Symbol::Gen(2), Symbol::Gen(0), Symbol::Inv(3), Symbol::Inv(1)]);
+            let img = seq![Symbol::Gen(2), Symbol::Gen(0), Symbol::Inv(0), Symbol::Inv(2), Symbol::Gen(1), Symbol::Inv(1)];
+            assert(apply_hom(sub_hom(), seq![Symbol::Gen(2), Symbol::Gen(0), Symbol::Inv(3), Symbol::Inv(1)]) =~= img) by (compute);
+            let w1 = seq![Symbol::Gen(2), Symbol::Inv(2), Symbol::Gen(1), Symbol::Inv(1)];
+            let w2 = seq![Symbol::Gen(1), Symbol::Inv(1)];
+            assert(crate::reduction::has_cancellation_at(img, 1));
+            assert(w1 == crate::reduction::reduce_at(img, 1)) by { assert(w1 =~= crate::reduction::reduce_at(img, 1)); }
+            assert(crate::reduction::has_cancellation_at(w1, 0));
+            assert(w2 == crate::reduction::reduce_at(w1, 0)) by { assert(w2 =~= crate::reduction::reduce_at(w1, 0)); }
+            assert(crate::reduction::has_cancellation_at(w2, 0));
+            assert(crate::reduction::reduce_at(w2, 0) == empty_word()) by { assert(crate::reduction::reduce_at(w2, 0) =~= empty_word()); }
+            m3_reduces3(img, 1, w1, 0, w2, 0);
+            lemma_reduces_to_equiv(hp, img, empty_word());
+        } else {
+            assert(thue_relator(m3_rules()[1]) =~= seq![Symbol::Gen(3), Symbol::Gen(0), Symbol::Inv(2), Symbol::Inv(1)]) by (compute);
+            assert(h.source.relators[1] =~= seq![Symbol::Gen(3), Symbol::Gen(0), Symbol::Inv(2), Symbol::Inv(1)]);
+            let img2 = seq![Symbol::Inv(1), Symbol::Gen(2), Symbol::Gen(0), Symbol::Gen(0), Symbol::Inv(2), Symbol::Inv(1)];
+            assert(apply_hom(sub_hom(), seq![Symbol::Gen(3), Symbol::Gen(0), Symbol::Inv(2), Symbol::Inv(1)]) =~= img2) by (compute);
+            let qa2q = seq![Symbol::Gen(2), Symbol::Gen(0), Symbol::Gen(0), Symbol::Inv(2)];
+            let b2 = seq![Symbol::Gen(1), Symbol::Gen(1)];
+            let bi = seq![Symbol::Inv(1)];
+            lemma_qa2_equiv_b2();                                  // qa2q ≡ b2
+            lemma_equiv_concat_right(hp, bi, qa2q, b2);            // bi·qa2q ≡ bi·b2
+            lemma_equiv_concat_left(hp, concat(bi, qa2q), concat(bi, b2), bi);   // (bi·qa2q)·bi ≡ (bi·b2)·bi
+            assert(concat(concat(bi, qa2q), bi) =~= img2);
+            let bb = concat(concat(bi, b2), bi);
+            assert(bb =~= seq![Symbol::Inv(1), Symbol::Gen(1), Symbol::Gen(1), Symbol::Inv(1)]);
+            let bb1 = seq![Symbol::Gen(1), Symbol::Inv(1)];
+            assert(crate::reduction::has_cancellation_at(bb, 0));
+            assert(bb1 == crate::reduction::reduce_at(bb, 0)) by { assert(bb1 =~= crate::reduction::reduce_at(bb, 0)); }
+            assert(crate::reduction::has_cancellation_at(bb1, 0));
+            assert(crate::reduction::reduce_at(bb1, 0) == empty_word()) by { assert(crate::reduction::reduce_at(bb1, 0) =~= empty_word()); }
+            m3_reduces2(bb, 0, bb1, 0, empty_word());
+            lemma_reduces_to_equiv(hp, bb, empty_word());
+            lemma_equiv_transitive(hp, img2, bb, empty_word());
+        }
+    }
+}
+
+// ── group-equal ⟹ sub-images equal in the HNN group ──
+pub proof fn lemma_group_to_hnn(u: Word, v: Word)
+    requires equiv_in_presentation(rules_pres(m3_rules(), 4), u, v),
+    ensures equiv_in_presentation(crate::hnn::hnn_presentation(m3_data()),
+        crate::homomorphism::apply_hom(sub_hom(), u), crate::homomorphism::apply_hom(sub_hom(), v)),
+{
+    lemma_sub_valid();
+    crate::homomorphism::lemma_hom_preserves_equiv(sub_hom(), u, v);
+}
+
 } // verus!
