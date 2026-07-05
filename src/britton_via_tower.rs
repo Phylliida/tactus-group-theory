@@ -5381,7 +5381,7 @@ pub open spec fn textbook_no_collapse(
 }
 
 ///  When no collapse happens, textbook_act_hnn adds exactly stable_count syllables.
-proof fn lemma_no_collapse_gives_m(
+pub proof fn lemma_no_collapse_gives_m(
     data: HNNData, w: Word, h: Word, syls: Seq<Syllable>,
 )
     requires
@@ -5850,7 +5850,7 @@ proof fn lemma_psi_p_inv_h_valid(data: HNNData, h: Word)
 }
 
 ///  Entry point: p-reduced word from (ε, []) has no collapse.
-proof fn lemma_p_reduced_initial_no_collapse(data: HNNData, w: Word)
+pub proof fn lemma_p_reduced_initial_no_collapse(data: HNNData, w: Word)
     requires
         hnn_data_valid(data),
         !has_pinch(data, w),

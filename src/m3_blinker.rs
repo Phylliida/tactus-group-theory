@@ -775,4 +775,36 @@ pub proof fn lemma_syls_preserved(data: crate::hnn::HNNData, w1: Word, w2: Word)
     lemma_deriv_syls(data, d.steps, w1, w2);
 }
 
+// ═══ Readback brick 1: sub(u)·q is p-reduced ⟹ the action never COLLAPSES ═══
+// (all stable letters are Gen2 ⟹ no pinch ⟹ no collapse; syllables read off cleanly)
+pub proof fn lemma_sub_no_collapse(u: Word)
+    requires positive_word(u), word_valid(u, 4),
+    ensures crate::britton_via_tower::textbook_no_collapse(
+        m3_data(),
+        concat(crate::homomorphism::apply_hom(sub_hom(), u), seq![Symbol::Gen(2)]),
+        empty_word(), Seq::<crate::normal_form_afp_textbook::Syllable>::empty()),
+{
+    use crate::homomorphism::*;
+    let su = apply_hom(sub_hom(), u);
+    let w = concat(su, seq![Symbol::Gen(2)]);
+    lemma_m3_data_valid();
+    lemma_sub_valid();
+    // no Inv2 in w ⟹ no pinch
+    lemma_sub_no_inv2(u);
+    assert(no_sym(seq![Symbol::Gen(2)], Symbol::Inv(2))) by {
+        assert(seq![Symbol::Gen(2)] =~= seq![Symbol::Gen(2)] + empty_word());
+        lemma_no_sym_cons(Symbol::Gen(2), empty_word(), Symbol::Inv(2));
+    }
+    lemma_no_sym_concat(su, seq![Symbol::Gen(2)], Symbol::Inv(2));
+    lemma_no_inv2_no_pinch(w);
+    // word_valid(w, 3)
+    lemma_apply_hom_word_valid(sub_hom(), u);
+    assert(word_valid(w, 3)) by {
+        assert forall|i: int| 0 <= i < w.len() implies symbol_valid(#[trigger] w[i], 3) by {
+            if i < su.len() { assert(w[i] == su[i]); } else { assert(w[i] == Symbol::Gen(2)); }
+        }
+    }
+    crate::britton_via_tower::lemma_p_reduced_initial_no_collapse(m3_data(), w);
+}
+
 } // verus!
