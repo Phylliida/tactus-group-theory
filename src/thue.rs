@@ -200,4 +200,154 @@ pub proof fn lemma_thue_implies_group(rules: Seq<ThueRule>, n: nat, u: Word, v: 
     lemma_thue_chain_equiv(rules, n, ws);
 }
 
+
+// ── Thue congruence primitives (refl / single / trans / prepend) ──
+pub proof fn lemma_thue_refl(rules: Seq<ThueRule>, u: Word)
+    ensures thue_equiv(rules, u, u)
+{
+    assert(thue_chain(rules, seq![u]));
+    assert(seq![u].first() == u && seq![u].last() == u);
+}
+
+pub proof fn lemma_thue_single(rules: Seq<ThueRule>, u: Word, v: Word)
+    requires thue_step(rules, u, v),
+    ensures thue_equiv(rules, u, v)
+{
+    let ws = seq![u, v];
+    assert(ws[0] == u && ws[1] == v);
+    assert(thue_chain(rules, ws)) by {
+        assert(ws.drop_first() =~= seq![v]);
+        assert(thue_chain(rules, seq![v]));
+    }
+    assert(ws.first() == u && ws.last() == v);
+}
+
+// chain concatenation: join at the shared endpoint
+pub proof fn lemma_thue_chain_concat(rules: Seq<ThueRule>, ws1: Seq<Word>, ws2: Seq<Word>)
+    requires
+        ws1.len() >= 1, ws2.len() >= 1,
+        thue_chain(rules, ws1), thue_chain(rules, ws2),
+        ws1.last() == ws2.first(),
+    ensures
+        thue_chain(rules, ws1 + ws2.drop_first()),
+        (ws1 + ws2.drop_first()).first() == ws1.first(),
+        (ws1 + ws2.drop_first()).last() == ws2.last(),
+    decreases ws1.len()
+{
+    if ws1.len() == 1 {
+        assert(ws1 + ws2.drop_first() =~= ws2);
+    } else {
+        assert(thue_step(rules, ws1[0], ws1[1]));
+        lemma_thue_chain_concat(rules, ws1.drop_first(), ws2);
+        assert((ws1 + ws2.drop_first()).drop_first() =~= ws1.drop_first() + ws2.drop_first());
+        assert((ws1 + ws2.drop_first())[0] == ws1[0]);
+        assert((ws1 + ws2.drop_first())[1] == ws1[1]);
+    }
+}
+
+pub proof fn lemma_thue_trans(rules: Seq<ThueRule>, u: Word, m: Word, v: Word)
+    requires thue_equiv(rules, u, m), thue_equiv(rules, m, v),
+    ensures thue_equiv(rules, u, v)
+{
+    let ws1 = choose|ws: Seq<Word>| ws.len() >= 1 && ws.first() == u && ws.last() == m && thue_chain(rules, ws);
+    let ws2 = choose|ws: Seq<Word>| ws.len() >= 1 && ws.first() == m && ws.last() == v && thue_chain(rules, ws);
+    lemma_thue_chain_concat(rules, ws1, ws2);
+    let ws = ws1 + ws2.drop_first();
+    assert(ws.len() >= 1 && ws.first() == u && ws.last() == v && thue_chain(rules, ws));
+}
+
+// prepend one letter to every word in a step / chain
+pub proof fn lemma_thue_step_prepend(rules: Seq<ThueRule>, s: Symbol, a: Word, b: Word)
+    requires thue_step(rules, a, b),
+    ensures thue_step(rules, seq![s] + a, seq![s] + b)
+{
+    let (r, pos, fwd) = choose|r: int, pos: int, fwd: bool|
+        0 <= r < rules.len() && thue_step_at(rules[r], a, b, pos, fwd);
+    let l = if fwd { rules[r].lhs } else { rules[r].rhs };
+    let rr = if fwd { rules[r].rhs } else { rules[r].lhs };
+    let a2 = seq![s] + a;
+    let b2 = seq![s] + b;
+    assert(thue_step_at(rules[r], a2, b2, pos + 1, fwd)) by {
+        assert(a2.subrange(pos + 1, pos + 1 + l.len() as int) =~= a.subrange(pos, pos + l.len() as int));
+        assert(b2 =~= a2.subrange(0, pos + 1) + rr + a2.subrange(pos + 1 + l.len() as int, a2.len() as int));
+    }
+}
+
+pub open spec fn prepend_all(s: Symbol, ws: Seq<Word>) -> Seq<Word> {
+    Seq::new(ws.len(), |i: int| seq![s] + ws[i])
+}
+
+pub proof fn lemma_thue_chain_prepend(rules: Seq<ThueRule>, s: Symbol, ws: Seq<Word>)
+    requires ws.len() >= 1, thue_chain(rules, ws),
+    ensures
+        thue_chain(rules, prepend_all(s, ws)),
+        prepend_all(s, ws).first() == seq![s] + ws.first(),
+        prepend_all(s, ws).last() == seq![s] + ws.last(),
+    decreases ws.len()
+{
+    if ws.len() > 1 {
+        assert(thue_step(rules, ws[0], ws[1]));
+        lemma_thue_step_prepend(rules, s, ws[0], ws[1]);
+        lemma_thue_chain_prepend(rules, s, ws.drop_first());
+        assert(prepend_all(s, ws).drop_first() =~= prepend_all(s, ws.drop_first()));
+        assert(prepend_all(s, ws)[0] == seq![s] + ws[0]);
+        assert(prepend_all(s, ws)[1] == seq![s] + ws[1]);
+    }
+}
+
+pub proof fn lemma_thue_prepend(rules: Seq<ThueRule>, s: Symbol, u: Word, v: Word)
+    requires thue_equiv(rules, u, v),
+    ensures thue_equiv(rules, seq![s] + u, seq![s] + v)
+{
+    let ws = choose|ws: Seq<Word>| ws.len() >= 1 && ws.first() == u && ws.last() == v && thue_chain(rules, ws);
+    lemma_thue_chain_prepend(rules, s, ws);
+    let ws2 = prepend_all(s, ws);
+    assert(ws2.len() >= 1 && ws2.first() == seq![s] + u && ws2.last() == seq![s] + v && thue_chain(rules, ws2));
+}
+
+// ── symmetry: a Thue step reverses, so thue_equiv is symmetric ──
+pub proof fn lemma_thue_step_sym(rules: Seq<ThueRule>, a: Word, b: Word)
+    requires thue_step(rules, a, b),
+    ensures thue_step(rules, b, a)
+{
+    let (r, pos, fwd) = choose|r: int, pos: int, fwd: bool|
+        0 <= r < rules.len() && thue_step_at(rules[r], a, b, pos, fwd);
+    let l = if fwd { rules[r].lhs } else { rules[r].rhs };
+    let rr = if fwd { rules[r].rhs } else { rules[r].lhs };
+    assert(thue_step_at(rules[r], b, a, pos, !fwd)) by {
+        assert(b =~= a.subrange(0, pos) + rr + a.subrange(pos + l.len() as int, a.len() as int));
+        assert(b.subrange(pos, pos + rr.len() as int) =~= rr);
+        assert(a =~= b.subrange(0, pos) + l + b.subrange(pos + rr.len() as int, b.len() as int));
+    }
+}
+
+pub proof fn lemma_thue_chain_sym(rules: Seq<ThueRule>, ws: Seq<Word>)
+    requires ws.len() >= 1, thue_chain(rules, ws),
+    ensures thue_equiv(rules, ws.last(), ws.first())
+    decreases ws.len()
+{
+    if ws.len() == 1 {
+        assert(ws.first() == ws.last());
+        lemma_thue_refl(rules, ws.first());
+    } else {
+        assert(thue_step(rules, ws[0], ws[1]));
+        let tail = ws.drop_first();
+        assert(thue_chain(rules, tail));
+        lemma_thue_chain_sym(rules, tail);
+        assert(tail.last() == ws.last() && tail.first() == ws[1]);
+        lemma_thue_step_sym(rules, ws[0], ws[1]);
+        lemma_thue_single(rules, ws[1], ws[0]);
+        lemma_thue_trans(rules, ws.last(), ws[1], ws[0]);
+        assert(ws[0] == ws.first());
+    }
+}
+
+pub proof fn lemma_thue_symmetric(rules: Seq<ThueRule>, u: Word, v: Word)
+    requires thue_equiv(rules, u, v),
+    ensures thue_equiv(rules, v, u)
+{
+    let ws = choose|ws: Seq<Word>| ws.len() >= 1 && ws.first() == u && ws.last() == v && thue_chain(rules, ws);
+    lemma_thue_chain_sym(rules, ws);
+}
+
 } // verus!
