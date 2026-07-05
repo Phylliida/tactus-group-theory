@@ -563,3 +563,6 @@ pub mod thue;
 
 // m1_guard: M-ladder rung M1 (guard motion) positivity — first M-ladder rung formalized.
 pub mod m1_guard;
+
+// m2_translate: M-ladder rung M2 (read/translate) positivity — Tietze-free + no-cancellation readback.
+pub mod m2_translate;
