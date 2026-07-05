@@ -7,6 +7,37 @@ Do **not** use `assume`/`admit`/`external_body`. Full end-to-end proof required.
 
 ---
 
+## 0. YOUR TASK (read this first)
+
+**Prove exactly one lemma — `lemma_b_rcoset_rep_eq_gap` — end-to-end in Verus, and nothing else.**
+
+Concretely, I am asking you to:
+1. **Write and fully verify** the proof body of `lemma_b_rcoset_rep_eq_gap` (statement in §1). It must
+   verify with `./check.sh --verify-module m3_blinker` (plus whichever module hosts it) reporting
+   **`0 errors`**, using **no `assume`, no `admit`, no `#[verifier::external_body]`, no `#[verifier::exec_allows_no_decreases_clause]`-style escape hatches** — a genuine end-to-end proof.
+2. You **may** add small helper `proof fn`/`spec fn` lemmas, and you **may** make at most these
+   supporting items `pub`: `lemma_word_lex_rank_base_injective` (`normal_form_afp_textbook.rs:72`), and
+   any other existing private lemma in the `b_rcoset`/reduction machinery you genuinely need. Note any
+   `pub` you flip. Do **not** weaken or change any existing lemma's statement.
+3. You **choose** the proof route — the **parity route (§5, §8) is recommended** (reuses the already-
+   proven `lemma_parity_head_cap`); the direct `min_len`/`min_lex` route (§4) is the fallback. Either is
+   fine as long as it verifies honestly.
+4. **Do NOT prove or modify anything upstream/downstream.** Everything in §2 (the M3 word problem, the
+   `act_syls` induction "B3", the parsing "B5") is **background only** — it explains *why* the lemma
+   matters. Your deliverable is this single lemma; the rest is already handled or handled elsewhere.
+
+**Definition of done / what to report back:** the final verifying source (the lemma + any helpers),
+the host module, the exact `./check.sh --verify-module …` command(s) you ran and their
+`N verified, 0 errors` output line, and a list of any `pub` flips you made. If you get **stuck**, report
+the smallest failing sub-goal with the exact Verus/Lean error and what you tried — do not paper over it.
+
+**If the lemma statement itself needs a tweak** to be provable (e.g. an extra hypothesis that the nf
+gaps genuinely satisfy — they are `word_valid(_,2)`, reduced, `no_sym(_,Inv0)`, `lead(_,0)≤1`, and the
+AFP is `tower_afp_data(m3_data(),0)` which is valid), flag it explicitly and explain why, rather than
+silently changing it — the caller (`B3`) must be able to supply the hypotheses.
+
+---
+
 ## 1. The one lemma we need
 
 Prove (target location: `src/m3_blinker.rs`, or `src/normal_form_afp_textbook.rs` if you need
