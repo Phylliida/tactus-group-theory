@@ -822,4 +822,123 @@ pub proof fn lemma_sub_syls_count(u: Word)
         Seq::<crate::normal_form_afp_textbook::Syllable>::empty());
 }
 
+// ═══ Readback brick B4: the PARITY head-cap (pure free-group) ═══
+// reduced-form uniqueness: equiv in free group + both reduced ⟹ literally equal
+pub proof fn lemma_reduced_unique(g1: Word, g2: Word)
+    requires
+        word_valid(g1, 2), word_valid(g2, 2),
+        crate::reduction::is_reduced(g1), crate::reduction::is_reduced(g2),
+        equiv_in_presentation(crate::higman_operations::free_group(2), g1, g2),
+    ensures g1 =~= g2
+{
+    use crate::reduction::*;
+    crate::higman_operations::lemma_free_group_valid(2);
+    crate::free_word_problem::lemma_free_group_equiv_freely_equivalent(2, g1, g2);
+    let w = choose|w: Word| reduces_to(g1, w) && reduces_to(g2, w);
+    lemma_reduced_reduces_to_self(g1, w);
+    lemma_reduced_reduces_to_self(g2, w);
+}
+
+// word_valid of a Gen(0) power
+pub proof fn lemma_gen0_pow_valid(n: nat)
+    ensures word_valid(crate::machine_group::symbol_power(Symbol::Gen(0), n), 2)
+{
+    let ap = crate::machine_group::symbol_power(Symbol::Gen(0), n);
+    assert forall|i: int| 0 <= i < ap.len() implies symbol_valid(#[trigger] ap[i], 2) by { assert(ap[i] == Symbol::Gen(0)); }
+}
+
+// prepending a^n (n≥2) to a reduced word (whose head ≠ a⁻¹) stays reduced with a-head ≥ 2
+pub proof fn lemma_prepend_gen0(g: Word, n: nat)
+    requires n >= 2, crate::reduction::is_reduced(g), (g.len() > 0 ==> g[0] != Symbol::Inv(0)),
+    ensures
+        crate::reduction::is_reduced(concat(crate::machine_group::symbol_power(Symbol::Gen(0), n), g)),
+        crate::m1_guard::lead(concat(crate::machine_group::symbol_power(Symbol::Gen(0), n), g), 0) >= 2,
+{
+    use crate::reduction::*;
+    let ap = crate::machine_group::symbol_power(Symbol::Gen(0), n);
+    let w = concat(ap, g);
+    assert(forall|i: int| 0 <= i < ap.len() ==> ap[i] == Symbol::Gen(0));
+    // ap reduced (all Gen0, no inverse pair)
+    assert(is_reduced(ap)) by {
+        assert forall|i: int| !has_cancellation_at(ap, i) by {
+            if 0 <= i < ap.len() - 1 { assert(ap[i] == Symbol::Gen(0) && ap[i + 1] == Symbol::Gen(0)); }
+        }
+    }
+    // junction ok: ap.last() = Gen0, g[0] != Inv0
+    assert((ap.len() > 0 && g.len() > 0) ==> !is_inverse_pair(ap[ap.len() - 1], g[0])) by {
+        if ap.len() > 0 && g.len() > 0 { assert(ap[ap.len() - 1] == Symbol::Gen(0)); }
+    }
+    crate::machine_group::lemma_concat_reduced(ap, g);
+    // lead ≥ 2:  w[0]=w[1]=Gen0
+    assert(w[0] == Symbol::Gen(0)) by { assert(w[0] == ap[0]); }
+    assert(w.drop_first()[0] == Symbol::Gen(0)) by { assert(w.drop_first()[0] == w[1]); assert(w[1] == ap[1]); }
+    assert(crate::m1_guard::lead(w.drop_first(), 0) >= 1);
+    assert(crate::m1_guard::lead(w, 0) == 1 + crate::m1_guard::lead(w.drop_first(), 0));
+}
+
+// THE PARITY HEAD-CAP: two nf gaps in the same ⟨a²⟩-coset (g1 ≡ a^{2k}·g2), both a-head ≤ 1
+// and no a⁻¹, are EQUAL.  (k≠0 blows the a-head past 1 on one side.)
+pub proof fn lemma_parity_head_cap(g1: Word, g2: Word, k: int)
+    requires
+        word_valid(g1, 2), word_valid(g2, 2),
+        crate::reduction::is_reduced(g1), crate::reduction::is_reduced(g2),
+        no_sym(g1, Symbol::Inv(0)), no_sym(g2, Symbol::Inv(0)),
+        crate::m1_guard::lead(g1, 0) <= 1, crate::m1_guard::lead(g2, 0) <= 1,
+        equiv_in_presentation(crate::higman_operations::free_group(2), g1,
+            concat(crate::machine_group::signed_power(0, 2 * k), g2)),
+    ensures g1 =~= g2
+{
+    use crate::machine_group::*;
+    use crate::presentation_lemmas::*;
+    use crate::presentation::{lemma_equiv_transitive, lemma_equiv_symmetric};
+    let fg = crate::higman_operations::free_group(2);
+    crate::higman_operations::lemma_free_group_valid(2);
+    let sp = signed_power(0, 2 * k);
+    let w = concat(sp, g2);
+    if k == 0 {
+        assert(sp =~= empty_word());
+        assert(w =~= g2);
+        lemma_reduced_unique(g1, g2);
+    } else if k > 0 {
+        let n: nat = (2 * k) as nat;
+        assert(sp =~= symbol_power(Symbol::Gen(0), n));
+        lemma_no_sym_index(g2, Symbol::Inv(0));
+        lemma_prepend_gen0(g2, n);
+        lemma_gen0_pow_valid(n);
+        assert(word_valid(w, 2)) by {
+            assert forall|i: int| 0 <= i < w.len() implies symbol_valid(#[trigger] w[i], 2) by {
+                if i < sp.len() { assert(w[i] == sp[i]); } else { assert(w[i] == g2[i - sp.len()]); }
+            }
+        }
+        lemma_reduced_unique(g1, w);   // g1 =~= w ⟹ lead(g1,0)=lead(w,0) ≥ 2, contra ≤ 1
+        assert(false);
+    } else {
+        // k < 0: rearrange equiv(g1, a^{2k}·g2) → equiv(g2, a^{-2k}·g1), then symmetric to k>0
+        let neg: int = -2 * k;   // ≥ 2
+        let spn = signed_power(0, neg);
+        lemma_no_sym_index(g1, Symbol::Inv(0));
+        // left-multiply by spn:  equiv(spn·g1, spn·(sp·g2))
+        lemma_equiv_concat_right(fg, spn, g1, w);
+        assert(concat(spn, w) =~= concat(concat(spn, sp), g2));
+        // spn·sp ≡ a^{neg+2k}=a^0=ε
+        lemma_signed_power_add(fg, 0, neg, 2 * k);
+        assert(signed_power(0, neg + 2 * k) =~= empty_word());
+        lemma_equiv_concat_left(fg, concat(spn, sp), empty_word(), g2);   // (spn·sp)·g2 ≡ ε·g2
+        assert(concat(empty_word(), g2) =~= g2);
+        lemma_equiv_transitive(fg, concat(spn, g1), concat(concat(spn, sp), g2), g2);
+        lemma_equiv_symmetric(fg, concat(spn, g1), g2);   // equiv(g2, spn·g1)
+        // spn = a^{neg}, neg ≥ 2
+        assert(spn =~= symbol_power(Symbol::Gen(0), neg as nat));
+        lemma_prepend_gen0(g1, neg as nat);
+        lemma_gen0_pow_valid(neg as nat);
+        assert(word_valid(concat(spn, g1), 2)) by {
+            assert forall|i: int| 0 <= i < concat(spn, g1).len() implies symbol_valid(#[trigger] concat(spn, g1)[i], 2) by {
+                if i < spn.len() { assert(concat(spn, g1)[i] == spn[i]); } else { assert(concat(spn, g1)[i] == g1[i - spn.len()]); }
+            }
+        }
+        lemma_reduced_unique(g2, concat(spn, g1));   // g2 =~= a^{neg}·g1 ⟹ lead(g2,0) ≥ 2, contra
+        assert(false);
+    }
+}
+
 } // verus!
