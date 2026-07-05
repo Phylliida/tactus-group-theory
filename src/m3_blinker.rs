@@ -1108,4 +1108,264 @@ proof fn lemma_min_coset_word_reduced(data: crate::amalgamated_free_product::Ama
     }
 }
 
+// ═══ B3 foundation — Stage B (head decomposition, factor powers, carrier shift, MAIN) ═══
+proof fn lemma_symbol_power_cons(x: Symbol, n: nat)
+    ensures crate::machine_group::symbol_power(x, (n + 1) as nat)
+        =~= seq![x] + crate::machine_group::symbol_power(x, n),
+{
+    let a = crate::machine_group::symbol_power(x, (n + 1) as nat);
+    let b = seq![x] + crate::machine_group::symbol_power(x, n);
+    assert(a.len() == b.len());
+    assert forall|i: int| 0 <= i < a.len() implies a[i] == b[i] by {
+        assert(a[i] == x);
+        if i >= 1 { assert(b[i] == crate::machine_group::symbol_power(x, n)[i - 1]); }
+    }
+}
+
+// H8: signed head decomposition of a reduced word
+proof fn lemma_signed_head_decompose(w: Word)
+    requires word_valid(w, 2), crate::reduction::is_reduced(w),
+    ensures exists|m: int, s: Word| head_decomp_ok(w, m, s),
+    decreases w.len(),
+{
+    use crate::machine_group::*;
+    if w.len() == 0 {
+        assert(signed_power(0, 0) =~= empty_word());
+        assert(w =~= signed_power(0, 0) + empty_word());
+        assert(head_decomp_ok(w, 0, empty_word()));
+    } else if w[0] == Symbol::Gen(0) || w[0] == Symbol::Inv(0) {
+        let rest = w.drop_first();
+        lemma_suffix_reduced(w);
+        assert(word_valid(rest, 2)) by {
+            assert forall|i: int| 0 <= i < rest.len() implies symbol_valid(#[trigger] rest[i], 2) by { assert(rest[i] == w[i + 1]); }
+        }
+        lemma_signed_head_decompose(rest);
+        let (m1, s1) = choose|m1: int, s1: Word| head_decomp_ok(rest, m1, s1);
+        assert(rest == signed_power(0, m1) + s1);
+        if w[0] == Symbol::Gen(0) {
+            if m1 < 0 {
+                assert(signed_power(0, m1) == symbol_power(Symbol::Inv(0), (-m1) as nat));
+                assert(signed_power(0, m1)[0] == Symbol::Inv(0));
+                assert(rest[0] == Symbol::Inv(0));
+                assert(w[1] == Symbol::Inv(0));
+                assert(crate::reduction::has_cancellation_at(w, 0));
+                assert(false);
+            }
+            lemma_symbol_power_cons(Symbol::Gen(0), m1 as nat);
+            assert(signed_power(0, m1 + 1) =~= seq![Symbol::Gen(0)] + signed_power(0, m1));
+            assert(w =~= seq![Symbol::Gen(0)] + rest);
+            assert(w =~= signed_power(0, m1 + 1) + s1);
+            assert(head_decomp_ok(w, m1 + 1, s1));
+        } else {
+            if m1 > 0 {
+                assert(signed_power(0, m1) == symbol_power(Symbol::Gen(0), m1 as nat));
+                assert(signed_power(0, m1)[0] == Symbol::Gen(0));
+                assert(rest[0] == Symbol::Gen(0));
+                assert(w[1] == Symbol::Gen(0));
+                assert(crate::reduction::has_cancellation_at(w, 0));
+                assert(false);
+            }
+            lemma_symbol_power_cons(Symbol::Inv(0), (-m1) as nat);
+            assert(signed_power(0, m1 - 1) =~= seq![Symbol::Inv(0)] + signed_power(0, m1));
+            assert(w =~= seq![Symbol::Inv(0)] + rest);
+            assert(w =~= signed_power(0, m1 - 1) + s1);
+            assert(head_decomp_ok(w, m1 - 1, s1));
+        }
+    } else {
+        assert(signed_power(0, 0) =~= empty_word());
+        assert(w =~= signed_power(0, 0) + w);
+        assert(head_decomp_ok(w, 0, w));
+    }
+}
+
+// H9: a product of a²/a⁻² factors ≡ a^{2k}
+proof fn lemma_a2_factors_signed_power(factors: Seq<Word>)
+    requires crate::benign::factors_from_generators(seq![seq![Symbol::Gen(0), Symbol::Gen(0)]], factors),
+    ensures
+        word_valid(crate::benign::concat_all(factors), 2),
+        exists|k: int| equiv_in_presentation(crate::higman_operations::free_group(2),
+            crate::benign::concat_all(factors), #[trigger] crate::machine_group::signed_power(0, 2 * k)),
+    decreases factors.len(),
+{
+    use crate::machine_group::*;
+    use crate::benign::*;
+    let fg = crate::higman_operations::free_group(2);
+    crate::higman_operations::lemma_free_group_valid(2);
+    if factors.len() == 0 {
+        assert(concat_all(factors) =~= empty_word());
+        assert(word_valid(concat_all(factors), 2));
+        assert(signed_power(0, 2 * 0int) =~= empty_word());
+        crate::presentation::lemma_equiv_refl(fg, empty_word());
+    } else {
+        let rest = factors.drop_first();
+        assert(factors_from_generators(seq![seq![Symbol::Gen(0), Symbol::Gen(0)]], rest)) by {
+            assert forall|j: int| 0 <= j < rest.len() implies is_generator_or_inverse(seq![seq![Symbol::Gen(0), Symbol::Gen(0)]], #[trigger] rest[j]) by { assert(rest[j] == factors[j + 1]); }
+        }
+        lemma_a2_factors_signed_power(rest);
+        let k1 = choose|k1: int| equiv_in_presentation(fg, concat_all(rest), #[trigger] signed_power(0, 2 * k1));
+        assert(is_generator_or_inverse(seq![seq![Symbol::Gen(0), Symbol::Gen(0)]], factors[0]));
+        assert(concat_all(factors) == concat(factors.first(), concat_all(rest)));
+        assert(factors.first() == factors[0]);
+        // factors[0] is a² or a⁻²
+        assert(inverse_word(seq![Symbol::Gen(0), Symbol::Gen(0)]) =~= seq![Symbol::Inv(0), Symbol::Inv(0)]) by (compute);
+        let ex: int = if factors[0] == seq![Symbol::Gen(0), Symbol::Gen(0)] { 2 } else { -2 };
+        assert(factors[0] =~= signed_power(0, ex));
+        assert(word_valid(factors[0], 2));
+        assert(word_valid(concat_all(factors), 2)) by {
+            assert forall|i: int| 0 <= i < concat_all(factors).len() implies symbol_valid(#[trigger] concat_all(factors)[i], 2) by {
+                if i < factors[0].len() { assert(concat_all(factors)[i] == factors[0][i]); }
+                else { assert(concat_all(factors)[i] == concat_all(rest)[i - factors[0].len()]); }
+            }
+        }
+        // congruence + signed_power_add:  a^ex · a^{2k1} ≡ a^{ex+2k1}
+        crate::presentation_lemmas::lemma_equiv_concat_right(fg, factors[0], concat_all(rest), signed_power(0, 2 * k1));
+        lemma_signed_power_add(fg, 0, ex, 2 * k1);
+        assert(concat(factors[0], signed_power(0, 2 * k1)) =~= signed_power(0, ex) + signed_power(0, 2 * k1));
+        crate::presentation::lemma_equiv_transitive(fg, concat_all(factors),
+            concat(factors[0], signed_power(0, 2 * k1)), signed_power(0, ex + 2 * k1));
+        assert(ex + 2 * k1 == 2 * (if factors[0] == seq![Symbol::Gen(0), Symbol::Gen(0)] { 1 + k1 } else { -1 + k1 }));
+    }
+}
+
+// H10: a^{2k} ≡ g·rep⁻¹  ⟹  g ≡ a^{2k}·rep
+proof fn lemma_shift_carrier(g: Word, rep: Word, k: int)
+    requires
+        word_valid(g, 2), word_valid(rep, 2),
+        equiv_in_presentation(crate::higman_operations::free_group(2),
+            crate::machine_group::signed_power(0, 2 * k), concat(g, inverse_word(rep))),
+    ensures equiv_in_presentation(crate::higman_operations::free_group(2),
+        g, concat(crate::machine_group::signed_power(0, 2 * k), rep)),
+{
+    use crate::machine_group::*;
+    use crate::presentation::*;
+    use crate::presentation_lemmas::*;
+    let fg = crate::higman_operations::free_group(2);
+    crate::higman_operations::lemma_free_group_valid(2);
+    crate::word::lemma_inverse_word_valid(rep, 2);
+    let sp = signed_power(0, 2 * k);
+    // a^{2k}·rep ≡ (g·rep⁻¹)·rep
+    lemma_equiv_concat_left(fg, sp, concat(g, inverse_word(rep)), rep);
+    // rep⁻¹·rep ≡ ε ⟹ g·(rep⁻¹·rep) ≡ g·ε
+    lemma_word_inverse_left(fg, rep);
+    lemma_equiv_concat_right(fg, g, concat(inverse_word(rep), rep), empty_word());
+    assert(concat(concat(g, inverse_word(rep)), rep) =~= concat(g, concat(inverse_word(rep), rep)));
+    assert(concat(g, empty_word()) =~= g);
+    // g ≡ g·(rep⁻¹rep)
+    lemma_equiv_symmetric(fg, concat(g, concat(inverse_word(rep), rep)), concat(g, empty_word()));
+    // (g·rep⁻¹)·rep ≡ a^{2k}·rep
+    lemma_equiv_symmetric(fg, concat(sp, rep), concat(concat(g, inverse_word(rep)), rep));
+    // g ≡ g·(rep⁻¹rep) = (g·rep⁻¹)·rep ≡ a^{2k}·rep
+    lemma_equiv_transitive(fg, g, concat(g, concat(inverse_word(rep), rep)), concat(sp, rep));
+}
+
+// ═══════════════════ THE LEMMA ═══════════════════
+pub proof fn lemma_b_rcoset_rep_eq_gap(g: Word)
+    requires
+        word_valid(g, 2),
+        crate::reduction::is_reduced(g),
+        no_sym(g, Symbol::Inv(0)),
+        crate::m1_guard::lead(g, 0) <= 1,
+    ensures crate::normal_form_afp_textbook::b_rcoset_rep(m3_afp(), g) =~= g,
+{
+    use crate::machine_group::*;
+    use crate::normal_form_afp_textbook::*;
+    let fg = crate::higman_operations::free_group(2);
+    lemma_m3_afp_valid();
+    let data = m3_afp();
+    // rep + min facts
+    let rep = b_rcoset_rep(data, g);
+    lemma_b_rcoset_rep_props(data, g);
+    lemma_b_rcoset_rep_satisfiable(data, g);
+    let ml = b_rcoset_min_len(data, g);
+    lemma_same_b_rcoset_refl(data, g);
+    // ml ≤ |g|
+    if g.len() < ml {
+        lemma_no_shorter_below(data, g, ml, g.len());
+        assert(has_b_rcoset_word_of_len(data, g, g.len()));
+        assert(false);
+    }
+    // rep reduced, decompose rep = a^m·s
+    lemma_min_coset_word_reduced(data, g, rep);
+    lemma_signed_head_decompose(rep);
+    let (m, s) = choose|m: int, s: Word| head_decomp_ok(rep, m, s);
+    // extract k with g ≡ a^{2k}·rep
+    assert(same_b_rcoset(data, g, rep));
+    crate::word::lemma_inverse_word_valid(rep, 2);
+    assert(crate::normal_form_amalgamated::in_right_subgroup(data, concat(g, inverse_word(rep))));
+    let factors = choose|f: Seq<Word>|
+        crate::benign::factors_from_generators(b_words(data), f)
+        && equiv_in_presentation(data.p2, crate::benign::concat_all(f), concat(g, inverse_word(rep)));
+    assert(b_words(data) =~= seq![seq![Symbol::Gen(0), Symbol::Gen(0)]]);
+    lemma_a2_factors_signed_power(factors);
+    let k = choose|k: int| equiv_in_presentation(fg, crate::benign::concat_all(factors), #[trigger] signed_power(0, 2 * k));
+    // a^{2k} ≡ concat_all(factors) ≡ g·rep⁻¹
+    crate::presentation::lemma_equiv_symmetric(fg, crate::benign::concat_all(factors), signed_power(0, 2 * k));
+    crate::presentation::lemma_equiv_transitive(fg, signed_power(0, 2 * k), crate::benign::concat_all(factors), concat(g, inverse_word(rep)));
+    lemma_shift_carrier(g, rep, k);   // g ≡ a^{2k}·rep
+    // g ≡ a^{2k}·(a^m·s) = a^{2k+m}·s
+    let j = 2 * k + m;
+    assert(concat(signed_power(0, 2 * k), rep) =~= concat(signed_power(0, 2 * k), signed_power(0, m)) + s);
+    lemma_signed_power_add(fg, 0, 2 * k, m);
+    crate::presentation_lemmas::lemma_equiv_concat_left(fg, concat(signed_power(0, 2 * k), signed_power(0, m)), signed_power(0, j), s);
+    assert(concat(signed_power(0, j), s) == signed_power(0, j) + s);
+    crate::presentation::lemma_equiv_transitive(fg, g, concat(signed_power(0, 2 * k), rep), signed_power(0, j) + s);
+    // g == a^j·s literally
+    lemma_signed_power_concat_reduced(j, s);
+    lemma_reduced_unique(g, signed_power(0, j) + s);
+    assert(g =~= signed_power(0, j) + s);
+    assert(g.len() == abs_int(j) + s.len());
+    // 0 ≤ j ≤ 1
+    if j < 0 {
+        assert(signed_power(0, j) == symbol_power(Symbol::Inv(0), (-j) as nat));
+        assert(g[0] == Symbol::Inv(0));
+        lemma_no_sym_index(g, Symbol::Inv(0));
+        assert(false);
+    }
+    if j >= 2 {
+        assert(s.len() > 0 ==> s[0] != Symbol::Inv(0));
+        lemma_prepend_gen0(s, j as nat);
+        assert(signed_power(0, j) =~= symbol_power(Symbol::Gen(0), j as nat));
+        assert(crate::m1_guard::lead(g, 0) >= 2);
+        assert(false);
+    }
+    // |m| ≤ j   (rep len = |m|+|s| = ml ≤ |g| = j+|s|)
+    assert(abs_int(m) <= j);
+    // kill m == -1 via min-lex
+    if m == -1 {
+        assert(j == 1);
+        assert(g.len() == ml);
+        let rr = word_lex_rank_base(rep, 5);
+        let rg = word_lex_rank_base(g, 5);
+        assert(has_b_rcoset_word_of_len_rank(data, g, ml, rr));
+        assert(is_min_b_rcoset_lex(data, g, ml, b_rcoset_min_lex(data, g)));
+        assert(rr == b_rcoset_min_lex(data, g));
+        assert(signed_power(0, 1) =~= seq![Symbol::Gen(0)]);
+        assert(signed_power(0, -1) =~= seq![Symbol::Inv(0)]);
+        assert(g =~= seq![Symbol::Gen(0)] + s);
+        assert(rep =~= seq![Symbol::Inv(0)] + s);
+        lemma_rank_head(g, s, Symbol::Gen(0));
+        lemma_rank_head(rep, s, Symbol::Inv(0));
+        assert(crate::todd_coxeter::symbol_to_column(Symbol::Gen(0)) == 0);
+        assert(crate::todd_coxeter::symbol_to_column(Symbol::Inv(0)) == 1);
+        assert(rg < rr);
+        assert(has_b_rcoset_word_of_len_rank(data, g, ml, rg));
+        lemma_no_smaller_lex_below(data, g, ml, b_rcoset_min_lex(data, g), rg);
+        assert(false);
+    }
+    // parity: j - m = 2k even, m ∈ {0,1}, j ∈ {0,1}  ⟹  m == j  ⟹  rep = a^m·s = a^j·s = g
+    assert(m == j);
+    assert(rep =~= g);
+}
+
+// H4-mirror for lex (the one min-existence helper the main lemma still needs)
+proof fn lemma_no_smaller_lex_below(data: crate::amalgamated_free_product::AmalgamatedData, g: Word, l: nat, r: nat, r2: nat)
+    requires
+        crate::normal_form_afp_textbook::no_smaller_b_rcoset_lex(data, g, l, r),
+        r2 < r,
+    ensures !crate::normal_form_afp_textbook::has_b_rcoset_word_of_len_rank(data, g, l, r2),
+    decreases r,
+{
+    if r2 < (r - 1) as nat { lemma_no_smaller_lex_below(data, g, l, (r - 1) as nat, r2); }
+}
+
 } // verus!
