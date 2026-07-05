@@ -71,4 +71,57 @@ pub proof fn lemma_m1_backward(u: Word, v: Word)
     lemma_thue_implies_group(m1_rules(), 4, u, v);
 }
 
+// ── delete_x: remove all Gen(x) letters — the projection at the word level ──
+pub open spec fn delete_x(w: Word, x: nat) -> Word
+    decreases w.len()
+{
+    if w.len() == 0 {
+        empty_word()
+    } else if w[0] == Symbol::Gen(x) {
+        delete_x(w.drop_first(), x)
+    } else {
+        seq![w[0]] + delete_x(w.drop_first(), x)
+    }
+}
+
+pub proof fn lemma_delete_concat(a: Word, b: Word, x: nat)
+    ensures delete_x(concat(a, b), x) =~= concat(delete_x(a, x), delete_x(b, x))
+    decreases a.len()
+{
+    if a.len() == 0 {
+        assert(concat(a, b) =~= b);
+        assert(delete_x(a, x) =~= empty_word());
+    } else {
+        lemma_delete_concat(a.drop_first(), b, x);
+        assert(concat(a, b).drop_first() =~= concat(a.drop_first(), b));
+        assert(concat(a, b)[0] == a[0]);
+    }
+}
+
+// delete_x is idempotent-flavored: it never contains Gen(x)
+pub proof fn lemma_delete_removes(w: Word, x: nat)
+    ensures forall|i: int| 0 <= i < delete_x(w, x).len() ==> #[trigger] delete_x(w, x)[i] != Symbol::Gen(x)
+    decreases w.len()
+{
+    if w.len() > 0 {
+        lemma_delete_removes(w.drop_first(), x);
+        if w[0] != Symbol::Gen(x) {
+            assert(delete_x(w, x) =~= seq![w[0]] + delete_x(w.drop_first(), x));
+        }
+    }
+}
+
+// positive words are freely reduced (only Gen letters, no adjacent inverse pairs)
+pub proof fn lemma_positive_reduced(w: Word)
+    requires positive_word(w)
+    ensures crate::reduction::is_reduced(w)
+{
+    assert forall|i: int| 0 <= i < w.len() - 1 implies
+        !crate::reduction::has_cancellation_at(w, i) by {
+        let j0 = choose|j: nat| w[i] == Symbol::Gen(j);
+        let j1 = choose|j: nat| w[i + 1] == Symbol::Gen(j);
+        // both Gen ⟹ not an inverse pair
+    }
+}
+
 } // verus!
