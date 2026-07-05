@@ -102,6 +102,24 @@ Three cases on (has-state-letters u?, has-state-letters v?):
   reduced gaps by re-inserting b·b⁻¹ where nf-ness demands, or a direct induction on u). B4/rep=gap give
   "reduced gaps of u,v match" from act_syls equality; the NEW piece is nf-word↦reduced-gaps injective.
   * B5 [was oversimplified — see subtlety]: prefix-code idea FAILS because reduced gaps ≠ raw sub(u).
+
+  ── THE FIX (validated; crux ✅ 56/0) ──
+  Insight: the ONLY free cancellation in sub is `sub(b)·sub(q')=b·b⁻¹` (checked ALL sub-image boundaries),
+  and it is EXACTLY the Thue rule `qa↔bq'`. So free-reduction of sub = firing `bq'→qa` Thue moves.
+  * FIX-CRUX ✅ `lemma_bq_qa_thue` (56/0): `x·bq'·y ~thue x·qa·y` (rule 0 backward, via thue_step_at + lemma_thue_single).
+  * FIX ARCHITECTURE (clean induction, TODO): define `fr_gaps(u)` = free-reduced gaps of q·sub(u)·q
+    (= the b_rcoset_rep syllables since nf u ⟹ a-head≤1 so a²-reduction trivial), `decode(gs)` = read
+    positive word from a reduced-gap sequence, `nbq(u)` = #occurrences of "bq'" in u.
+    - `lemma_u_thue_decode`: `u ~thue decode(fr_gaps(u))` by induction on `nbq(u)`:
+        · nbq=0 ⟹ sub(u) reduced ⟹ fr_gaps(u)=raw gaps ⟹ decode=u (refl).
+        · nbq>0 ⟹ fire one bq'→qa (lemma_bq_qa_thue) → u'; nbq(u')<nbq(u) (firing removes 1, creates 0);
+          fr_gaps(u')=fr_gaps(u) (bq'→qa preserves the free-reduced form of sub); IH ⟹ u'~thue decode(fr_gaps(u))
+          ⟹ u~thue decode(fr_gaps(u)).
+    - `lemma_act_syls_fr_gaps`: `act_syls(q·sub(u)·q) = gap_syls(fr_gaps(u))` — via `decode(fr_gaps(u))=:ū`
+      bq'-free ⟹ sub(ū) reduced ⟹ ū-gaps nf ⟹ q·sub(ū)·q=gap_word(ū-gaps); sub(u)≡sub(ū) (thue⟹group)
+      ⟹ act_syls(q sub u q)=act_syls(q sub ū q)=gap_syls(ū-gaps) [W-induction ✅].
+    - ASSEMBLE (`lemma_m3_readback`): act_syls(u)=act_syls(v) ⟹ fr_gaps(u)=fr_gaps(v) ⟹ decode equal ⟹
+      u~thue decode=decode~thue v ⟹ u~thue v ⟹ [both Thue-nf] u=v. Then dispatcher + R3.
   * ASSEMBLE: readback dispatcher (base ✓ / no_mixed ✓ / B3–B5) ⟹ `lemma_m3_readback` ⟹ ⟹ direction.
   NOTE: B1/B2 used sub(u)·q; the assembly wants q·sub(u)·q — re-establish no-collapse/count for that form.
 
