@@ -34,11 +34,10 @@ u,v nf + positive + word_valid(u,4)/(v,4) + `equiv(hp, sub(u), sub(v))` ⟹ `u==
 `stable_count(sub(u)) + stable_count(sub(v))` (= #state-letters(u)+#state-letters(v)).
 Three cases on (has-state-letters u?, has-state-letters v?):
 - **(no, no)** — ✅ DONE = `lemma_m3_base` (15/0). sub=identity on {a,b}, britton_lemma_unconditional.
-- **(yes,no) / (no,yes)** — CONTRADICTION [moderate]: w = sub(u)·sub(v)⁻¹ ≡ ε has a stable letter ⟹
-  `britton_lemma_full` ⟹ `has_pinch`. But sub(u) is positive (only Gen2, no Inv2) and sub(v)⁻¹ (v a
-  base word) has NO stable letter ⟹ all stable letters of w are Gen2 (same sign) ⟹ no adjacent-
-  OPPOSITE pair ⟹ ¬has_pinch. Contradiction ⟹ ex-falso u==v. Needs: `sub(positive)` has no Inv2;
-  `sub(base word)` has no Gen2/Inv2; `all-same-sign ⟹ ¬has_pinch` (from has_pinch_at needing w[i]≠w[j]).
+- **(yes,no) / (no,yes)** — ✅ DONE = `lemma_m3_no_mixed` (30/0). w all-same-sign stable ⟹ ¬has_pinch
+  contradicts britton_lemma_full ⟹ ex falso. Bricks (banked, reusable for case 3): `no_sym`/`has_gen2`
+  recursive preds + cons-unfolds, `lemma_sub_no_inv2`, `lemma_sub_has_gen2`, `lemma_no_inv2_no_pinch`
+  (all-same-sign ⟹ no pinch), `lemma_has_gen2_stable`, `lemma_wv2_no_stable`.
 - **(yes,yes)** — THE PINCH CASCADE [THE HARD CORE, parity head-cap]: w = sub(u)·sub(v)⁻¹ has Gen2's
   (from sub(u)) then Inv2's (from sub(v)⁻¹). `britton_lemma_full` ⟹ pinch, which must be at the
   junction (last Gen2 of sub(u), first Inv2 of sub(v)⁻¹) with base-word-between ∈ B=⟨a²⟩ = the
