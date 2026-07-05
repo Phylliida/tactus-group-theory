@@ -1491,7 +1491,7 @@ proof fn lemma_no_smaller_h_lex_transfer(
 
 ///  Extract all four choose properties from b_rcoset_h.
 ///  Mirrors lemma_left_h_part_full_props for the B-side.
-proof fn lemma_b_rcoset_h_full_props(
+pub proof fn lemma_b_rcoset_h_full_props(
     data: AmalgamatedData, g: Word, h_witness: Word,
 )
     requires
@@ -1824,6 +1824,40 @@ pub proof fn lemma_identity_state_canonical(data: AmalgamatedData)
     lemma_b_rcoset_h_identity(data);
 
     //  Syllable conditions: vacuously true for empty syls
+}
+
+///  Carry-vanishing: if g is its own right-B-coset rep, then b_rcoset_h(g) = ε.
+///  (target = g·rep⁻¹ = g·g⁻¹ ≡ ε, so ε is the length-0 h-witness.)
+pub proof fn lemma_b_rcoset_h_eps_when_rep_eq(data: AmalgamatedData, g: Word)
+    requires
+        amalgamated_data_valid(data),
+        word_valid(g, data.p2.num_generators),
+        b_rcoset_rep(data, g) =~= g,
+    ensures
+        b_rcoset_h(data, g) =~= empty_word(),
+{
+    let e = empty_word();
+    let k = k_size(data);
+    let p2 = data.p2;
+    reveal(presentation_valid);
+    let rep = b_rcoset_rep(data, g);
+    let target = concat(g, inverse_word(rep));
+    assert(inverse_word(rep) =~= inverse_word(g));
+    assert(target =~= concat(g, inverse_word(g)));
+    crate::word::lemma_inverse_word_valid(g, p2.num_generators);
+    crate::presentation_lemmas::lemma_word_inverse_right(p2, g);
+    crate::presentation::lemma_equiv_symmetric(p2, concat(g, inverse_word(g)), e);
+    assert(word_valid(e, k)) by { assert(e.len() == 0); }
+    assert(apply_embedding(b_words(data), e) =~= e);
+    assert(equiv_in_presentation(p2, apply_embedding(b_words(data), e), target));
+    assert(has_right_h_witness_of_len(data, target, 0nat));
+    let pred = |l: nat| has_right_h_witness_of_len(data, target, l);
+    assert(pred(0nat));
+    assert(no_pred_below(pred, 0nat));
+    let l = b_rcoset_h_min_len(data, g);
+    lemma_no_pred_below_forces_zero(pred, l);
+    lemma_b_rcoset_h_full_props(data, g, e);
+    assert(b_rcoset_h(data, g).len() == 0);
 }
 
 ///  Inserting a word at a position preserves the action if the word acts trivially
