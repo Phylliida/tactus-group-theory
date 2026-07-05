@@ -1548,4 +1548,86 @@ pub proof fn lemma_u_thue_ffnf(u: Word)
     }
 }
 
+// ═══ B3 fix Phase 2a: ffnf is bq'-free ═══
+pub open spec fn no_bq(w: Word) -> bool
+    decreases w.len()
+{
+    w.len() < 2 || (!(w[0] == Symbol::Gen(1) && w[1] == Symbol::Gen(3)) && no_bq(w.drop_first()))
+}
+
+pub proof fn lemma_ffnf_nonempty(w: Word)
+    requires w.len() > 0,
+    ensures ffnf(w).len() > 0,
+{
+    if w.len() >= 2 && w[0] == Symbol::Gen(1) && w[1] == Symbol::Gen(3) {
+        assert(ffnf(w) =~= seq![Symbol::Gen(2), Symbol::Gen(0)] + ffnf(w.subrange(2, w.len() as int)));
+    } else {
+        assert(ffnf(w) =~= seq![w[0]] + ffnf(w.drop_first()));
+    }
+}
+
+pub proof fn lemma_ffnf_first(w: Word)
+    requires w.len() > 0,
+    ensures ffnf(w)[0] == Symbol::Gen(2) || ffnf(w)[0] == w[0],
+{
+    if w.len() >= 2 && w[0] == Symbol::Gen(1) && w[1] == Symbol::Gen(3) {
+        assert(ffnf(w) =~= seq![Symbol::Gen(2), Symbol::Gen(0)] + ffnf(w.subrange(2, w.len() as int)));
+    } else {
+        assert(ffnf(w) =~= seq![w[0]] + ffnf(w.drop_first()));
+    }
+}
+
+// prepend one symbol preserving no_bq
+pub proof fn lemma_no_bq_cons(s: Symbol, w: Word)
+    requires no_bq(w), !(s == Symbol::Gen(1) && w.len() > 0 && w[0] == Symbol::Gen(3)),
+    ensures no_bq(seq![s] + w),
+{
+    let sw = seq![s] + w;
+    assert(sw.drop_first() =~= w);
+    if sw.len() >= 2 { assert(sw[0] == s && sw[1] == w[0]); }
+}
+
+// prepend two non-bq-forming symbols (used for the [q,a] case)
+pub proof fn lemma_no_bq_cons2(a: Symbol, b: Symbol, w: Word)
+    requires no_bq(w), a != Symbol::Gen(1) || b != Symbol::Gen(3),
+        !(b == Symbol::Gen(1) && w.len() > 0 && w[0] == Symbol::Gen(3)),
+    ensures no_bq(seq![a, b] + w),
+{
+    lemma_no_bq_cons(b, w);                       // no_bq([b]+w)
+    assert(seq![b] + w =~= (seq![a, b] + w).drop_first());
+    let abw = seq![a, b] + w;
+    assert(abw[0] == a && abw[1] == b);
+    assert(abw.drop_first() =~= seq![b] + w);
+}
+
+pub proof fn lemma_ffnf_no_bq(u: Word)
+    ensures no_bq(ffnf(u)),
+    decreases u.len(),
+{
+    if u.len() == 0 {
+        assert(ffnf(u) =~= empty_word());
+    } else if u.len() >= 2 && u[0] == Symbol::Gen(1) && u[1] == Symbol::Gen(3) {
+        let rest = u.subrange(2, u.len() as int);
+        lemma_ffnf_no_bq(rest);
+        let fr = ffnf(rest);
+        assert(ffnf(u) =~= seq![Symbol::Gen(2), Symbol::Gen(0)] + fr);
+        // [q,a]: a=Gen2≠Gen1 ⟹ first-pair ok; b=Gen0≠Gen1 ⟹ junction ok regardless of fr[0]
+        lemma_no_bq_cons2(Symbol::Gen(2), Symbol::Gen(0), fr);
+    } else {
+        let rest = u.drop_first();
+        lemma_ffnf_no_bq(rest);
+        let fr = ffnf(rest);
+        assert(ffnf(u) =~= seq![u[0]] + fr);
+        // junction u[0]·fr[0]: if u[0]=Gen1 then u[1]≠Gen3 (else-case), rest[0]=u[1]≠Gen3,
+        //   ffnf_first ⟹ fr[0]∈{Gen2,rest[0]}, both ≠Gen3.
+        if u[0] == Symbol::Gen(1) && fr.len() > 0 && fr[0] == Symbol::Gen(3) {
+            lemma_ffnf_nonempty(rest);
+            lemma_ffnf_first(rest);
+            assert(rest[0] == u[1]);
+            assert(false);
+        }
+        lemma_no_bq_cons(u[0], fr);
+    }
+}
+
 } // verus!
