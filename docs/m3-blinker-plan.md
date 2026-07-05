@@ -111,6 +111,21 @@ Three cases on (has-state-letters u?, has-state-letters v?):
   * P1 ✅ (59/0): `ffnf` (fire all bq'→qa, L-to-R, decreases |u|), `lemma_thue_prepend_word`, `lemma_u_thue_ffnf` (u ~thue ffnf(u)).
   * P2a ✅ (65/0): `no_bq` pred + `lemma_ffnf_nonempty`/`_first` + `lemma_ffnf_no_bq` (ffnf is bq'-free).
   * P2b ✅ (68/0): `lemma_sub_img` (per-image props) + `lemma_sub_first` + `lemma_sub_reduced` (no_bq ⟹ is_reduced(sub(w))).
+  ⚠️⚠️  **SECOND SUBTLETY FOUND (P3, blocks the act_syls(.1) approach) — 2026-07-05:**
+  `act_syls(w) = textbook_act_hnn(w,ε,[]).1` drops the `.0` accumulator `h`. The LEADING base part of a
+  word (before its first stable letter) lands in `h`, NOT in the syllables. e.g. NF(sub("aaq"))=(a²,[{false,ε}]),
+  NF(sub("q"))=(ε,[{false,ε}]) — SAME syllables, DIFFERENT words/group-elements. So `act_syls` is NOT
+  injective on nf words, and `lemma_syls_preserved` (preserves .1 ONLY) is INSUFFICIENT for the readback.
+  Adding leading/trailing q's does NOT help: a leading gap with a-head≥2 (e.g. "aa") triggers an a²→b²
+  conversion whose b² lands in `.0` (dropped) while the syllable becomes {false,ε} — same information loss.
+  **FIX = compare the FULL normal form `(h, syls) = textbook_act_hnn(sub(u),ε,[])` (NO added q's):**
+  h = leading base P_0 (faithful — accumulates AFTER all q's, no conversion), syls = the AFTER-q gaps
+  (a-head≤1 from nf: no qa/q'a). Structural: sub(ffnf u) = base_run(sub) · gap_word(after-q gaps);
+  NF = (base_run, gap_syls(after-q gaps)) via composition ✅ + act_base ✅ + W-induction ✅. NEEDS a NEW
+  **h-preservation lemma** (`textbook_act_hnn(w1,ε,[]).0 =~= .0(w2)` under group-equiv) — extend
+  lemma_deriv_syls to the full output, OR a "Britton NF is a complete invariant" lemma. The MATH is fine
+  (sub is a group iso, positivity holds); this is a proof-strategy course-correction. The after-q-gap
+  a-head≤1 (below) is STILL needed for the syls part.
   * P3 [TODO] ffnf gaps nf: `no_qpa`(no q'a)+`no_qaa` preserved through ffnf (junction args like no_bq) ⟹
     gaps of q·sub(ffnf u)·q have a-head≤1 (+ reduced from P2b, no-Inv0 trivial) ⟹ nf_gap.
   * P4 [TODO] structural: `split_q(W)` (split q-word at Gen2's) + `gap_word∘split_q = id` for q-words ⟹
