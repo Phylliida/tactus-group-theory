@@ -1783,4 +1783,117 @@ pub proof fn lemma_gap_word_split(W: Word)
     }
 }
 
+// ═══ B3 fix P3a: ffnf preserves no_q'a and produces no_qaa (from u nf: no_qa, no_q'a) ═══
+pub open spec fn no_qa(w: Word) -> bool   // no "q a" = [Gen2, Gen0]
+    decreases w.len()
+{ w.len() < 2 || (!(w[0] == Symbol::Gen(2) && w[1] == Symbol::Gen(0)) && no_qa(w.drop_first())) }
+pub open spec fn no_qpa(w: Word) -> bool  // no "q' a" = [Gen3, Gen0]
+    decreases w.len()
+{ w.len() < 2 || (!(w[0] == Symbol::Gen(3) && w[1] == Symbol::Gen(0)) && no_qpa(w.drop_first())) }
+pub open spec fn no_qaa(w: Word) -> bool  // no "q a a" = [Gen2, Gen0, Gen0]
+    decreases w.len()
+{ w.len() < 3 || (!(w[0] == Symbol::Gen(2) && w[1] == Symbol::Gen(0) && w[2] == Symbol::Gen(0)) && no_qaa(w.drop_first())) }
+
+pub proof fn lemma_ffnf_no_qpa(u: Word)
+    requires no_qpa(u),
+    ensures no_qpa(ffnf(u)),
+    decreases u.len(),
+{
+    if u.len() == 0 {
+        assert(ffnf(u) =~= empty_word());
+    } else if u.len() >= 2 && u[0] == Symbol::Gen(1) && u[1] == Symbol::Gen(3) {
+        let rest = u.subrange(2, u.len() as int);
+        assert(u.drop_first() =~= seq![Symbol::Gen(3)] + rest);
+        assert(u.drop_first().drop_first() =~= rest);
+        assert(no_qpa(u.drop_first()));
+        assert(no_qpa(rest));
+        lemma_ffnf_no_qpa(rest);
+        let fr = ffnf(rest);
+        assert(ffnf(u) =~= seq![Symbol::Gen(2), Symbol::Gen(0)] + fr);
+        lemma_no_qpa_cons2(Symbol::Gen(2), Symbol::Gen(0), fr);
+    } else {
+        let rest = u.drop_first();
+        assert(no_qpa(rest));
+        lemma_ffnf_no_qpa(rest);
+        let fr = ffnf(rest);
+        assert(ffnf(u) =~= seq![u[0]] + fr);
+        if u[0] == Symbol::Gen(3) && fr.len() > 0 && fr[0] == Symbol::Gen(0) {
+            lemma_ffnf_nonempty(rest);
+            lemma_ffnf_first(rest);
+            assert(rest[0] == u[1]);
+            assert(false);
+        }
+        lemma_no_qpa_cons(u[0], fr);
+    }
+}
+pub proof fn lemma_no_qpa_cons(s: Symbol, w: Word)
+    requires no_qpa(w), !(s == Symbol::Gen(3) && w.len() > 0 && w[0] == Symbol::Gen(0)),
+    ensures no_qpa(seq![s] + w),
+{ let sw = seq![s] + w; assert(sw.drop_first() =~= w); if sw.len() >= 2 { assert(sw[0] == s && sw[1] == w[0]); } }
+pub proof fn lemma_no_qpa_cons2(a: Symbol, b: Symbol, w: Word)
+    requires no_qpa(w), a != Symbol::Gen(3), !(b == Symbol::Gen(3) && w.len() > 0 && w[0] == Symbol::Gen(0)),
+    ensures no_qpa(seq![a, b] + w),
+{
+    lemma_no_qpa_cons(b, w);
+    let abw = seq![a, b] + w;
+    assert(abw[0] == a && abw[1] == b);
+    assert(abw.drop_first() =~= seq![b] + w);
+}
+
+pub proof fn lemma_ffnf_no_qaa(u: Word)
+    requires no_qa(u), no_qpa(u),
+    ensures no_qaa(ffnf(u)),
+    decreases u.len(),
+{
+    if u.len() == 0 {
+        assert(ffnf(u) =~= empty_word());
+    } else if u.len() >= 2 && u[0] == Symbol::Gen(1) && u[1] == Symbol::Gen(3) {
+        let rest = u.subrange(2, u.len() as int);
+        assert(u.drop_first() =~= seq![Symbol::Gen(3)] + rest);
+        assert(u.drop_first().drop_first() =~= rest);
+        assert(no_qa(u.drop_first()));
+        assert(no_qpa(u.drop_first()));
+        assert(no_qa(rest) && no_qpa(rest));
+        lemma_ffnf_no_qaa(rest);
+        let fr = ffnf(rest);
+        assert(ffnf(u) =~= seq![Symbol::Gen(2), Symbol::Gen(0)] + fr);
+        // triple (Gen2,Gen0,fr[0]): need fr[0]≠Gen0. rest[0]=u[2]≠Gen0 (no_qpa(u): q' not followed by a).
+        if fr.len() > 0 && fr[0] == Symbol::Gen(0) {
+            assert(rest.len() > 0) by { if rest.len() == 0 { assert(ffnf(rest) =~= empty_word()); } }
+            assert(rest[0] == u[2]);
+            assert(u[2] != Symbol::Gen(0));   // from no_qpa(u.drop_first()): q'=u[1] not followed by u[2]=a
+            lemma_ffnf_first(rest);
+            assert(false);
+        }
+        lemma_no_qaa_cons2(Symbol::Gen(2), Symbol::Gen(0), fr);
+    } else {
+        let rest = u.drop_first();
+        assert(no_qa(rest) && no_qpa(rest));
+        lemma_ffnf_no_qaa(rest);
+        let fr = ffnf(rest);
+        assert(ffnf(u) =~= seq![u[0]] + fr);
+        if u[0] == Symbol::Gen(2) && fr.len() > 0 && fr[0] == Symbol::Gen(0) {
+            lemma_ffnf_nonempty(rest);
+            lemma_ffnf_first(rest);
+            assert(rest[0] == u[1]);
+            assert(false);
+        }
+        lemma_no_qaa_cons(u[0], fr);
+    }
+}
+pub proof fn lemma_no_qaa_cons(s: Symbol, w: Word)
+    requires no_qaa(w), !(s == Symbol::Gen(2) && w.len() >= 2 && w[0] == Symbol::Gen(0) && w[1] == Symbol::Gen(0)),
+    ensures no_qaa(seq![s] + w),
+{ let sw = seq![s] + w; assert(sw.drop_first() =~= w); if sw.len() >= 3 { assert(sw[0] == s && sw[1] == w[0] && sw[2] == w[1]); } }
+pub proof fn lemma_no_qaa_cons2(a: Symbol, b: Symbol, w: Word)
+    requires no_qaa(w), !(a == Symbol::Gen(2) && b == Symbol::Gen(0) && w.len() > 0 && w[0] == Symbol::Gen(0)),
+        !(b == Symbol::Gen(2) && w.len() >= 2 && w[0] == Symbol::Gen(0) && w[1] == Symbol::Gen(0)),
+    ensures no_qaa(seq![a, b] + w),
+{
+    lemma_no_qaa_cons(b, w);
+    let abw = seq![a, b] + w;
+    if abw.len() >= 3 { assert(abw[0] == a && abw[1] == b && abw[2] == w[0]); }
+    assert(abw.drop_first() =~= seq![b] + w);
+}
+
 } // verus!
