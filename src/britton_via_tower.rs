@@ -4650,6 +4650,49 @@ pub open spec fn textbook_act_hnn(
     }
 }
 
+//  Composition: the action processes right-to-left, so act(w1·w2) = act(w1) applied
+//  to the state produced by act(w2).  Key structural tool for reading off syllables.
+pub proof fn lemma_act_compose(data: HNNData, w1: Word, w2: Word, h: Word, syls: Seq<Syllable>)
+    ensures
+        textbook_act_hnn(data, concat(w1, w2), h, syls)
+            == textbook_act_hnn(data, w1,
+                 textbook_act_hnn(data, w2, h, syls).0,
+                 textbook_act_hnn(data, w2, h, syls).1),
+    decreases w2.len(),
+{
+    if w2.len() == 0 {
+        assert(concat(w1, w2) =~= w1);
+    } else {
+        let ng = data.base.num_generators;
+        let s = w2.last();
+        let cw = concat(w1, w2);
+        assert(cw.last() == s);
+        assert(cw.drop_last() =~= concat(w1, w2.drop_last()));
+        if s == Symbol::Gen(ng) {
+            let (hn, sn) = textbook_psi_p(data, h, syls);
+            assert(textbook_act_hnn(data, cw, h, syls)
+                == textbook_act_hnn(data, concat(w1, w2.drop_last()), hn, sn));
+            assert(textbook_act_hnn(data, w2, h, syls)
+                == textbook_act_hnn(data, w2.drop_last(), hn, sn));
+            lemma_act_compose(data, w1, w2.drop_last(), hn, sn);
+        } else if s == Symbol::Inv(ng) {
+            let (hn, sn) = textbook_psi_p_inv(data, h, syls);
+            assert(textbook_act_hnn(data, cw, h, syls)
+                == textbook_act_hnn(data, concat(w1, w2.drop_last()), hn, sn));
+            assert(textbook_act_hnn(data, w2, h, syls)
+                == textbook_act_hnn(data, w2.drop_last(), hn, sn));
+            lemma_act_compose(data, w1, w2.drop_last(), hn, sn);
+        } else {
+            let new_h = concat(Seq::new(1, |_i: int| s), h);
+            assert(textbook_act_hnn(data, cw, h, syls)
+                == textbook_act_hnn(data, concat(w1, w2.drop_last()), new_h, syls));
+            assert(textbook_act_hnn(data, w2, h, syls)
+                == textbook_act_hnn(data, w2.drop_last(), new_h, syls));
+            lemma_act_compose(data, w1, w2.drop_last(), new_h, syls);
+        }
+    }
+}
+
 //  --- Y.4: HNN word segment decomposition ---
 //  The textbook's p-expression: g₀·p^{ε₁}·g₁·p^{ε₂}·...·p^{εₘ}·gₘ
 //  We formalize this by extracting segments from the flat word.
