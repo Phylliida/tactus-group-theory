@@ -79,10 +79,15 @@ Three cases on (has-state-letters u?, has-state-letters v?):
     (ii) `b_rcoset_min_len(afp,gap)==gap.len()` = geodesic-in-coset (no word in ⟨a²⟩·gap shorter — the
     ONE delicate piece, a length bound over all k: |reduced(a^{2k}·gap)|≥|gap|, tie only at k=±1,h=1);
     (iii) lex-min = gap; (iv) uniqueness via `lemma_word_lex_rank_base_injective`. Then rep=gap ⟹ B3.
-  * B5 [BIG] gap-parsing injectivity: from act_syls equal + rep=gap + `lemma_b_rcoset_rep_invariant`,
-    get per-gap `same_b_rcoset(gap_i(u),gap_i(v))` ⟹ [B4] gap_i(u)=gap_i(v) ⟹ [parse a-prefix/b⁻¹-suffix
-    ↔ q'/q, blocks ↔ a,b] u=v. Or simpler: rep=gap ⟹ act_syls literally = [gaps] ⟹ sub(u)=sub(v) as
-    WORDS ⟹ u=v (sub prefix-injective on symbols). Combinatorial.
+  * B3-CARRY [needed by B3 induction]: `b_rcoset_h(m3_afp(), g) =~= ε` when `b_rcoset_rep(g)=g` (nf gap).
+    Because target=g·rep⁻¹=g·g⁻¹≡ε ⟹ h=ε is the min-len (0) witness. ANOTHER min-len shortlex argument
+    (same flavor as rep=gap; there's `lemma_b_rcoset_h_identity`: b_rcoset_h(ε)=ε, and satisfiable/props
+    private helpers at :1494/:1728). ⟹ carry `phi_inv_h = apply_embedding(a_words, b_rcoset_h(g)) = ε`.
+  * B5 ✅ SIMPLIFIED (prefix-code, NOT parsing): rep=gap + no-collapse ⟹ `act_syls(q·sub(u)·q)` is the
+    literal gap sequence; gaps + all-stable-Gen2 ⟹ the word `q·sub(u)·q` is reconstructed uniquely ⟹
+    `sub(u)=sub(v)` as WORDS. Then `sub` is a PREFIX CODE (images [Gen0],[Gen1],[Gen2],[Inv1,Gen2,Gen0]
+    are prefix-distinguishable — only q' starts with Inv1) ⟹ sub literal-injective ⟹ u=v. Clean, no
+    a-prefix/b⁻¹-suffix parsing needed.
   * ASSEMBLE: readback dispatcher (base ✓ / no_mixed ✓ / B3–B5) ⟹ `lemma_m3_readback` ⟹ ⟹ direction.
   NOTE: B1/B2 used sub(u)·q; the assembly wants q·sub(u)·q — re-establish no-collapse/count for that form.
 
