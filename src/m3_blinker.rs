@@ -390,4 +390,90 @@ pub proof fn lemma_m3_iso()
     }
 }
 
+// ═══ R2 base case — u,v with NO state letters (over {a,b}) ═══
+// sub is the identity on base words {a,b}
+pub proof fn lemma_sub_on_base(u: Word)
+    requires word_valid(u, 2),
+    ensures crate::homomorphism::apply_hom(sub_hom(), u) =~= u,
+    decreases u.len()
+{
+    use crate::homomorphism::*;
+    if u.len() > 0 {
+        let s = u[0];
+        let rest = u.drop_first();
+        assert(symbol_valid(s, 2));
+        assert(word_valid(rest, 2)) by {
+            assert forall|i: int| 0 <= i < rest.len() implies symbol_valid(#[trigger] rest[i], 2) by { assert(rest[i] == u[i + 1]); }
+        }
+        lemma_sub_on_base(rest);
+        assert(apply_hom(sub_hom(), u) =~= apply_hom_symbol(sub_hom(), s) + apply_hom(sub_hom(), rest)) by { assert(u.first() == s); }
+        assert(apply_hom_symbol(sub_hom(), s) =~= seq![s]) by {
+            if s == Symbol::Gen(0) {
+                assert(sub_hom().generator_images[0] =~= seq![Symbol::Gen(0)]);
+            } else if s == Symbol::Gen(1) {
+                assert(sub_hom().generator_images[1] =~= seq![Symbol::Gen(1)]);
+            } else if s == Symbol::Inv(0) {
+                assert(sub_hom().generator_images[0] =~= seq![Symbol::Gen(0)]);
+                assert(inverse_word(seq![Symbol::Gen(0)]) =~= seq![Symbol::Inv(0)]) by (compute);
+            } else {
+                assert(s == Symbol::Inv(1));
+                assert(sub_hom().generator_images[1] =~= seq![Symbol::Gen(1)]);
+                assert(inverse_word(seq![Symbol::Gen(1)]) =~= seq![Symbol::Inv(1)]) by (compute);
+            }
+        }
+        assert(seq![s] + rest =~= u);
+    }
+}
+
+// BASE CASE: state-letter-free positive words equal in HNN ⟹ literally equal
+pub proof fn lemma_m3_base(u: Word, v: Word)
+    requires
+        positive_word(u), positive_word(v), word_valid(u, 2), word_valid(v, 2),
+        equiv_in_presentation(crate::hnn::hnn_presentation(m3_data()),
+            crate::homomorphism::apply_hom(sub_hom(), u), crate::homomorphism::apply_hom(sub_hom(), v)),
+    ensures u == v
+{
+    use crate::hnn::*;
+    use crate::presentation_lemmas::*;
+    use crate::presentation::{lemma_equiv_transitive, lemma_equiv_symmetric};
+    let hp = hnn_presentation(m3_data());
+    let fg = crate::higman_operations::free_group(2);
+    lemma_m3_data_valid(); lemma_m3_iso();
+    crate::britton_infra::lemma_hnn_presentation_valid(m3_data());
+    crate::higman_operations::lemma_free_group_valid(2);
+    lemma_sub_on_base(u); lemma_sub_on_base(v);
+    // sub(u)=~=u, sub(v)=~=v ⟹ equiv(hp, u, v)
+    assert(equiv_in_presentation(hp, u, v));
+    // u·v⁻¹ ≡ ε in hp
+    lemma_inverse_word_valid(v, 2);
+    let uvi = concat(u, inverse_word(v));
+    lemma_equiv_concat_left(hp, u, v, inverse_word(v));       // u·v⁻¹ ≡ v·v⁻¹
+    lemma_word_inverse_right(hp, v);                          // v·v⁻¹ ≡ ε
+    lemma_equiv_transitive(hp, uvi, concat(v, inverse_word(v)), empty_word());
+    // word_valid(u·v⁻¹, 2)
+    assert(word_valid(uvi, 2)) by {
+        assert forall|i: int| 0 <= i < uvi.len() implies symbol_valid(#[trigger] uvi[i], 2) by {
+            if i < u.len() { assert(uvi[i] == u[i]); } else { assert(uvi[i] == inverse_word(v)[i - u.len()]); }
+        }
+    }
+    // Britton base embedding ⟹ equiv(free_group(2), u·v⁻¹, ε)
+    crate::britton_via_tower::britton_lemma_unconditional(m3_data(), uvi);
+    // (u·v⁻¹)·v ≡ ε·v = v  AND  (u·v⁻¹)·v =~= u·(v⁻¹·v) ≡ u·ε ≡ u  ⟹  u ≡ v
+    lemma_equiv_concat_left(fg, uvi, empty_word(), v);        // (u·v⁻¹)·v ≡ ε·v
+    assert(concat(empty_word(), v) =~= v);
+    lemma_word_inverse_left(fg, v);                          // v⁻¹·v ≡ ε
+    lemma_equiv_concat_right(fg, u, concat(inverse_word(v), v), empty_word());  // u·(v⁻¹·v) ≡ u·ε
+    assert(concat(u, empty_word()) =~= u);
+    assert(concat(uvi, v) =~= concat(u, concat(inverse_word(v), v)));            // assoc
+    // chain: u ≡ u·(v⁻¹·v) = (u·v⁻¹)·v ≡ v
+    lemma_equiv_symmetric(fg, concat(u, concat(inverse_word(v), v)), u);         // u ≡ u·(v⁻¹·v)
+    lemma_equiv_transitive(fg, u, concat(uvi, v), v);
+    // freely_equivalent ⟹ u==v (positive ⟹ reduced)
+    crate::free_word_problem::lemma_free_group_equiv_freely_equivalent(2, u, v);
+    crate::m1_guard::lemma_positive_reduced(u); crate::m1_guard::lemma_positive_reduced(v);
+    let w = choose|w: Word| crate::reduction::reduces_to(u, w) && crate::reduction::reduces_to(v, w);
+    crate::reduction::lemma_reduced_reduces_to_self(u, w);
+    crate::reduction::lemma_reduced_reduces_to_self(v, w);
+}
+
 } // verus!
