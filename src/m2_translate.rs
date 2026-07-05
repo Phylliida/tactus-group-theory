@@ -151,4 +151,184 @@ pub proof fn lemma_group_implies_sub_equal(u: Word, v: Word)
         apply_hom(sub_hom(), u), apply_hom(sub_hom(), v));
 }
 
+// ═══ PART B — normal form: every positive word is thue-equiv to a no-bq′ word ═══
+// no_bq(w): w has no `bq′` substring  (b=Gen1, q′=Gen3).
+pub open spec fn no_bq(w: Word) -> bool
+    decreases w.len()
+{
+    w.len() <= 1 || (!(w[0] == Symbol::Gen(1) && w[1] == Symbol::Gen(3)) && no_bq(w.drop_first()))
+}
+
+pub open spec fn count_gen(w: Word, x: nat) -> nat
+    decreases w.len()
+{
+    if w.len() == 0 { 0 }
+    else { (if w[0] == Symbol::Gen(x) { 1nat } else { 0nat }) + count_gen(w.drop_first(), x) }
+}
+
+pub proof fn lemma_count_concat(a: Word, b: Word, x: nat)
+    ensures count_gen(a + b, x) == count_gen(a, x) + count_gen(b, x)
+    decreases a.len()
+{
+    if a.len() == 0 { assert(a + b =~= b); }
+    else {
+        lemma_count_concat(a.drop_first(), b, x);
+        assert((a + b).drop_first() =~= a.drop_first() + b);
+        assert((a + b)[0] == a[0]);
+    }
+}
+
+pub proof fn lemma_count_cons(t: Symbol, rest: Word, x: nat)
+    ensures count_gen(seq![t] + rest, x) == (if t == Symbol::Gen(x) { 1nat } else { 0nat }) + count_gen(rest, x)
+{
+    assert((seq![t] + rest)[0] == t);
+    assert((seq![t] + rest).drop_first() =~= rest);
+}
+
+// find a bq′ occurrence in a non-normal word
+pub proof fn lemma_find_bq(w: Word)
+    requires !no_bq(w),
+    ensures exists|p: int| 0 <= p < w.len() - 1
+        && #[trigger] w[p] == Symbol::Gen(1) && w[p + 1] == Symbol::Gen(3)
+    decreases w.len()
+{
+    if !(w[0] == Symbol::Gen(1) && w[1] == Symbol::Gen(3)) {
+        let df = w.drop_first();
+        lemma_find_bq(df);
+        let p0 = choose|p: int| 0 <= p < df.len() - 1
+            && #[trigger] df[p] == Symbol::Gen(1) && df[p + 1] == Symbol::Gen(3);
+        assert(w[p0 + 1] == df[p0]);
+        assert(w[p0 + 2] == df[p0 + 1]);
+    }
+}
+
+pub proof fn lemma_pos_sub2(w: Word, a: int, b: int)  // positive subrange (local, recursive)
+    requires positive_word(w), 0 <= a <= b <= w.len(),
+    ensures positive_word(w.subrange(a, b))
+    decreases b - a
+{
+    let sub = w.subrange(a, b);
+    if sub.len() > 0 {
+        lemma_positive_gen(w, a);
+        assert(sub[0] == w[a]);
+        lemma_pos_sub2(w, a + 1, b);
+        assert(sub.drop_first() =~= w.subrange(a + 1, b));
+    }
+}
+
+pub proof fn lemma_pos_cat2(a: Word, b: Word)  // positive concat (local, recursive)
+    requires positive_word(a), positive_word(b),
+    ensures positive_word(a + b)
+    decreases a.len()
+{
+    if a.len() == 0 { assert(a + b =~= b); }
+    else {
+        lemma_positive_gen(a, 0);
+        assert((a + b)[0] == a[0]);
+        lemma_pos_cat2(a.drop_first(), b);
+        assert((a + b).drop_first() =~= a.drop_first() + b);
+    }
+}
+
+// word_valid subrange/concat (used by nf construction)
+pub proof fn lemma_wv_sub(w: Word, a: int, b: int, n: nat)
+    requires word_valid(w, n), 0 <= a <= b <= w.len(),
+    ensures word_valid(w.subrange(a, b), n),
+{
+    assert forall|i: int| 0 <= i < w.subrange(a, b).len() implies symbol_valid(#[trigger] w.subrange(a, b)[i], n) by { assert(w.subrange(a, b)[i] == w[a + i]); }
+}
+pub proof fn lemma_wv_cat(a: Word, b: Word, n: nat)
+    requires word_valid(a, n), word_valid(b, n),
+    ensures word_valid(a + b, n),
+{
+    assert forall|i: int| 0 <= i < (a + b).len() implies symbol_valid(#[trigger] (a + b)[i], n) by {
+        if i < a.len() { assert((a + b)[i] == a[i]); } else { assert((a + b)[i] == b[i - a.len()]); }
+    }
+}
+
+// positive_word of a 2-literal + singleton helper
+pub proof fn lemma_positive_singleton(t: Symbol)
+    requires symbol_is_gen(t),
+    ensures positive_word(seq![t]),
+{
+    assert(seq![t][0] == t);
+    assert(seq![t].drop_first() =~= empty_word());
+    assert(positive_word(empty_word()));
+}
+
+pub open spec fn m2_step_word(u: Word, p: int) -> Word {
+    u.subrange(0, p) + seq![Symbol::Gen(2), Symbol::Gen(0)] + u.subrange(p + 2, u.len() as int)
+}
+
+// the heavy rewrite construction, extracted so nf_exists stays under the heartbeat budget
+pub proof fn lemma_m2_step(u: Word, p: int)
+    requires
+        positive_word(u), word_valid(u, 4),
+        0 <= p < u.len() - 1, u[p] == Symbol::Gen(1), u[p + 1] == Symbol::Gen(3),
+    ensures
+        positive_word(m2_step_word(u, p)), word_valid(m2_step_word(u, p), 4),
+        thue_step(m2_rules(), u, m2_step_word(u, p)),
+        count_gen(m2_step_word(u, p), 3) < count_gen(u, 3),
+{
+    let pre = u.subrange(0, p);
+    let post = u.subrange(p + 2, u.len() as int);
+    let mid2 = seq![Symbol::Gen(2), Symbol::Gen(0)];
+    let up = m2_step_word(u, p);
+    // thue step (bwd: l=rhs=bq′, rr=lhs=qa)
+    assert(thue_step(m2_rules(), u, up)) by {
+        assert(thue_step_at(m2_rules()[0], u, up, p, false)) by {
+            assert(u.subrange(p, p + 2) =~= seq![Symbol::Gen(1), Symbol::Gen(3)]);
+            assert(up =~= u.subrange(0, p) + mid2 + u.subrange(p + 2, u.len() as int));
+        }
+    }
+    // positivity + validity of up
+    lemma_pos_sub2(u, 0, p); lemma_pos_sub2(u, p + 2, u.len() as int);
+    lemma_wv_sub(u, 0, p, 4); lemma_wv_sub(u, p + 2, u.len() as int, 4);
+    lemma_positive_singleton(Symbol::Gen(2)); lemma_positive_singleton(Symbol::Gen(0));
+    assert(mid2 =~= seq![Symbol::Gen(2)] + seq![Symbol::Gen(0)]);
+    lemma_pos_cat2(seq![Symbol::Gen(2)], seq![Symbol::Gen(0)]);
+    lemma_pos_cat2(pre, mid2); lemma_pos_cat2(pre + mid2, post);
+    assert(word_valid(mid2, 4));
+    lemma_wv_cat(pre, mid2, 4); lemma_wv_cat(pre + mid2, post, 4);
+    // count decreases by 1
+    assert(u =~= pre + seq![Symbol::Gen(1), Symbol::Gen(3)] + post);
+    assert(count_gen(mid2, 3) == 0) by {
+        assert(mid2 =~= seq![Symbol::Gen(2)] + seq![Symbol::Gen(0)]);
+        lemma_count_cons(Symbol::Gen(2), seq![Symbol::Gen(0)], 3);
+        assert(seq![Symbol::Gen(0)] =~= seq![Symbol::Gen(0)] + empty_word());
+        lemma_count_cons(Symbol::Gen(0), empty_word(), 3);
+    }
+    assert(count_gen(seq![Symbol::Gen(1), Symbol::Gen(3)], 3) == 1) by {
+        assert(seq![Symbol::Gen(1), Symbol::Gen(3)] =~= seq![Symbol::Gen(1)] + seq![Symbol::Gen(3)]);
+        lemma_count_cons(Symbol::Gen(1), seq![Symbol::Gen(3)], 3);
+        assert(seq![Symbol::Gen(3)] =~= seq![Symbol::Gen(3)] + empty_word());
+        lemma_count_cons(Symbol::Gen(3), empty_word(), 3);
+    }
+    lemma_count_concat(pre + mid2, post, 3);
+    lemma_count_concat(pre, mid2, 3);
+    lemma_count_concat(pre + seq![Symbol::Gen(1), Symbol::Gen(3)], post, 3);
+    lemma_count_concat(pre, seq![Symbol::Gen(1), Symbol::Gen(3)], 3);
+}
+
+// nf existence: positive valid u ⟹ ∃ no-bq′ positive valid w′ with thue_equiv(u, w′)
+pub proof fn lemma_nf_exists(u: Word)
+    requires positive_word(u), word_valid(u, 4),
+    ensures exists|w2: Word| positive_word(w2) && word_valid(w2, 4) && no_bq(w2) && thue_equiv(m2_rules(), u, w2)
+    decreases count_gen(u, 3)
+{
+    if no_bq(u) {
+        lemma_thue_refl(m2_rules(), u);
+        assert(positive_word(u) && word_valid(u, 4) && no_bq(u) && thue_equiv(m2_rules(), u, u));
+    } else {
+        lemma_find_bq(u);
+        let p = choose|p: int| 0 <= p < u.len() - 1 && #[trigger] u[p] == Symbol::Gen(1) && u[p + 1] == Symbol::Gen(3);
+        let up = m2_step_word(u, p);
+        lemma_m2_step(u, p);
+        lemma_thue_single(m2_rules(), u, up);
+        lemma_nf_exists(up);
+        let w2 = choose|w2: Word| positive_word(w2) && word_valid(w2, 4) && no_bq(w2) && thue_equiv(m2_rules(), up, w2);
+        lemma_thue_trans(m2_rules(), u, up, w2);
+    }
+}
+
 } // verus!
