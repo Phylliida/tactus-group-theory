@@ -118,6 +118,14 @@ Three cases on (has-state-letters u?, has-state-letters v?):
   injective on nf words, and `lemma_syls_preserved` (preserves .1 ONLY) is INSUFFICIENT for the readback.
   Adding leading/trailing q's does NOT help: a leading gap with a-head≥2 (e.g. "aa") triggers an a²→b²
   conversion whose b² lands in `.0` (dropped) while the syllable becomes {false,ε} — same information loss.
+  ✅✅ **RESOLVED (fresh head, 2026-07-05) — RIGHT-CANCELLATION avoids h-preservation entirely:**
+  No need to preserve `.0`! Structural: `sub(ffnf u) = P₀ᵘ · G` where `G = gap_word(after-q gaps)` and
+  `base_run(sub(ffnf u)) = P₀ᵘ`. syls-preservation (have) ⟹ gaps equal ⟹ `Gᵘ = Gᵛ =: G` (literal words).
+  Then `sub(ffnf u)≡sub(ffnf v)` ⟹ `P₀ᵘ·G ≡ P₀ᵛ·G` ⟹ [right-cancel G] `P₀ᵘ ≡ P₀ᵛ` ⟹ [both reduced base
+  words, base embeds freely] `P₀ᵘ = P₀ᵛ` ⟹ `sub(ffnf u) = sub(ffnf v)` (LITERAL) ⟹ [sub prefix-code]
+  `ffnf u = ffnf v` ⟹ `u = v`. The leading base is handled by the group cancellation, NOT by a preservation
+  lemma. Only `lemma_syls_preserved` (.1, have) + rep=gap + W-induction (have) are needed for the syls half.
+  Superseded plan (kept for context):
   **FIX = compare the FULL normal form `(h, syls) = textbook_act_hnn(sub(u),ε,[])` (NO added q's):**
   h = leading base P_0 (faithful — accumulates AFTER all q's, no conversion), syls = the AFTER-q gaps
   (a-head≤1 from nf: no qa/q'a). Structural: sub(ffnf u) = base_run(sub) · gap_word(after-q gaps);
