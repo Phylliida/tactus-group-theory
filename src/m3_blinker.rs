@@ -476,4 +476,263 @@ pub proof fn lemma_m3_base(u: Word, v: Word)
     crate::reduction::lemma_reduced_reduces_to_self(v, w);
 }
 
+// ═══ R2 case 2 — "mixed" (one has state letters, the other doesn't) is IMPOSSIBLE ═══
+// recursive symbol predicates (Lean-friendly)
+pub open spec fn no_sym(w: Word, t: Symbol) -> bool
+    decreases w.len()
+{ w.len() == 0 || (w[0] != t && no_sym(w.drop_first(), t)) }
+
+pub open spec fn has_gen2(w: Word) -> bool
+    decreases w.len()
+{ w.len() > 0 && (w[0] == Symbol::Gen(2) || has_gen2(w.drop_first())) }
+
+pub proof fn lemma_no_sym_cons(t0: Symbol, rest: Word, t: Symbol)
+    ensures no_sym(seq![t0] + rest, t) == (t0 != t && no_sym(rest, t))
+{ assert((seq![t0] + rest)[0] == t0); assert((seq![t0] + rest).drop_first() =~= rest); }
+
+pub proof fn lemma_has_gen2_cons(t0: Symbol, rest: Word)
+    ensures has_gen2(seq![t0] + rest) == (t0 == Symbol::Gen(2) || has_gen2(rest))
+{ assert((seq![t0] + rest)[0] == t0); assert((seq![t0] + rest).drop_first() =~= rest); }
+
+// no_sym holds for any image of a valid generator w.r.t. Inv(2)
+pub proof fn lemma_img_no_inv2(img: Word)
+    requires img =~= seq![Symbol::Gen(0)] || img =~= seq![Symbol::Gen(1)] || img =~= seq![Symbol::Gen(2)]
+        || img =~= seq![Symbol::Inv(1), Symbol::Gen(2), Symbol::Gen(0)],
+    ensures no_sym(img, Symbol::Inv(2))
+{
+    assert(no_sym(empty_word(), Symbol::Inv(2)));
+    lemma_no_sym_cons(Symbol::Gen(0), empty_word(), Symbol::Inv(2));
+    lemma_no_sym_cons(Symbol::Gen(1), empty_word(), Symbol::Inv(2));
+    lemma_no_sym_cons(Symbol::Gen(2), empty_word(), Symbol::Inv(2));
+    lemma_no_sym_cons(Symbol::Gen(0), empty_word(), Symbol::Inv(2));
+    lemma_no_sym_cons(Symbol::Gen(2), seq![Symbol::Gen(0)], Symbol::Inv(2));
+    lemma_no_sym_cons(Symbol::Inv(1), seq![Symbol::Gen(2), Symbol::Gen(0)], Symbol::Inv(2));
+    assert(seq![Symbol::Gen(0)] =~= seq![Symbol::Gen(0)] + empty_word());
+    assert(seq![Symbol::Gen(1)] =~= seq![Symbol::Gen(1)] + empty_word());
+    assert(seq![Symbol::Gen(2)] =~= seq![Symbol::Gen(2)] + empty_word());
+    assert(seq![Symbol::Gen(2), Symbol::Gen(0)] =~= seq![Symbol::Gen(2)] + seq![Symbol::Gen(0)]);
+    assert(seq![Symbol::Inv(1), Symbol::Gen(2), Symbol::Gen(0)] =~= seq![Symbol::Inv(1)] + seq![Symbol::Gen(2), Symbol::Gen(0)]);
+}
+
+pub proof fn lemma_no_sym_concat(a: Word, b: Word, t: Symbol)
+    ensures no_sym(a + b, t) == (no_sym(a, t) && no_sym(b, t))
+    decreases a.len()
+{
+    if a.len() == 0 { assert(a + b =~= b); }
+    else {
+        assert((a + b)[0] == a[0]);
+        assert((a + b).drop_first() =~= a.drop_first() + b);
+        lemma_no_sym_concat(a.drop_first(), b, t);
+    }
+}
+
+pub proof fn lemma_has_gen2_concat_right(a: Word, b: Word)
+    requires has_gen2(b),
+    ensures has_gen2(a + b)
+    decreases a.len()
+{
+    if a.len() == 0 { assert(a + b =~= b); }
+    else {
+        assert((a + b)[0] == a[0]);
+        assert((a + b).drop_first() =~= a.drop_first() + b);
+        lemma_has_gen2_concat_right(a.drop_first(), b);
+    }
+}
+
+// word_valid over 2 ⟹ no Gen2 and no Inv2
+pub proof fn lemma_wv2_no_stable(w: Word)
+    requires word_valid(w, 2),
+    ensures no_sym(w, Symbol::Gen(2)), no_sym(w, Symbol::Inv(2))
+    decreases w.len()
+{
+    if w.len() > 0 {
+        assert(symbol_valid(w[0], 2));
+        assert(word_valid(w.drop_first(), 2)) by {
+            assert forall|i: int| 0 <= i < w.drop_first().len() implies symbol_valid(#[trigger] w.drop_first()[i], 2) by { assert(w.drop_first()[i] == w[i + 1]); }
+        }
+        lemma_wv2_no_stable(w.drop_first());
+    }
+}
+
+// sub of a positive valid word has no Inv2
+pub proof fn lemma_sub_no_inv2(u: Word)
+    requires positive_word(u), word_valid(u, 4),
+    ensures no_sym(crate::homomorphism::apply_hom(sub_hom(), u), Symbol::Inv(2))
+    decreases u.len()
+{
+    use crate::homomorphism::*;
+    if u.len() > 0 {
+        let s = u[0];
+        let rest = u.drop_first();
+        lemma_positive_gen(u, 0);
+        assert(symbol_valid(s, 4));
+        let j = choose|j: nat| s == Symbol::Gen(j);
+        assert(positive_word(rest)); assert(word_valid(rest, 4)) by {
+            assert forall|i: int| 0 <= i < rest.len() implies symbol_valid(#[trigger] rest[i], 4) by { assert(rest[i] == u[i + 1]); }
+        }
+        lemma_sub_no_inv2(rest);
+        assert(apply_hom(sub_hom(), u) =~= apply_hom_symbol(sub_hom(), s) + apply_hom(sub_hom(), rest)) by { assert(u.first() == s); }
+        // apply_hom_symbol(sub, Gen(j)) = images[j], none contain Inv2  (j<4)
+        assert(apply_hom_symbol(sub_hom(), s) == sub_hom().generator_images[j as int]);
+        assert(sub_hom().generator_images[0] =~= seq![Symbol::Gen(0)]);
+        assert(sub_hom().generator_images[1] =~= seq![Symbol::Gen(1)]);
+        assert(sub_hom().generator_images[2] =~= seq![Symbol::Gen(2)]);
+        assert(sub_hom().generator_images[3] =~= seq![Symbol::Inv(1), Symbol::Gen(2), Symbol::Gen(0)]);
+        lemma_img_no_inv2(apply_hom_symbol(sub_hom(), s));
+        lemma_no_sym_concat(apply_hom_symbol(sub_hom(), s), apply_hom(sub_hom(), rest), Symbol::Inv(2));
+    }
+}
+
+// sub of a word containing a state letter (Gen2/Gen3) has a Gen2
+pub proof fn lemma_sub_has_gen2(u: Word)
+    requires positive_word(u), word_valid(u, 4), !word_valid(u, 2),
+    ensures has_gen2(crate::homomorphism::apply_hom(sub_hom(), u))
+    decreases u.len()
+{
+    use crate::homomorphism::*;
+    // u nonempty; find a state letter
+    assert(u.len() > 0);
+    let s = u[0];
+    let rest = u.drop_first();
+    lemma_positive_gen(u, 0);
+    let j = choose|j: nat| s == Symbol::Gen(j);
+    assert(apply_hom(sub_hom(), u) =~= apply_hom_symbol(sub_hom(), s) + apply_hom(sub_hom(), rest)) by { assert(u.first() == s); }
+    if j == 2 {
+        assert(apply_hom_symbol(sub_hom(), s) =~= seq![Symbol::Gen(2)]);
+        assert(seq![Symbol::Gen(2)] =~= seq![Symbol::Gen(2)] + empty_word());
+        lemma_has_gen2_cons(Symbol::Gen(2), empty_word());
+        lemma_has_gen2_concat_right_flip(apply_hom_symbol(sub_hom(), s), apply_hom(sub_hom(), rest));
+    } else if j == 3 {
+        assert(apply_hom_symbol(sub_hom(), s) =~= seq![Symbol::Inv(1), Symbol::Gen(2), Symbol::Gen(0)]);
+        assert(seq![Symbol::Gen(2), Symbol::Gen(0)] =~= seq![Symbol::Gen(2)] + seq![Symbol::Gen(0)]);
+        lemma_has_gen2_cons(Symbol::Gen(2), seq![Symbol::Gen(0)]);
+        assert(seq![Symbol::Inv(1), Symbol::Gen(2), Symbol::Gen(0)] =~= seq![Symbol::Inv(1)] + seq![Symbol::Gen(2), Symbol::Gen(0)]);
+        lemma_has_gen2_cons(Symbol::Inv(1), seq![Symbol::Gen(2), Symbol::Gen(0)]);
+        lemma_has_gen2_concat_right_flip(apply_hom_symbol(sub_hom(), s), apply_hom(sub_hom(), rest));
+    } else {
+        // s is a wall (Gen0/Gen1); the state letter is in rest
+        assert(symbol_valid(s, 2));
+        assert(positive_word(rest)); assert(word_valid(rest, 4)) by {
+            assert forall|i: int| 0 <= i < rest.len() implies symbol_valid(#[trigger] rest[i], 4) by { assert(rest[i] == u[i + 1]); }
+        }
+        assert(!word_valid(rest, 2)) by {
+            assert(exists|p: int| 0 <= p < u.len() && !symbol_valid(#[trigger] u[p], 2));
+            let p = choose|p: int| 0 <= p < u.len() && !symbol_valid(u[p], 2);
+            assert(symbol_valid(s, 2));   // s is a wall (j != 2,3 and j < 4)
+            assert(p != 0);
+            assert(rest[p - 1] == u[p]);
+            assert(!symbol_valid(rest[p - 1], 2));
+        }
+        lemma_sub_has_gen2(rest);
+        lemma_has_gen2_concat_right(apply_hom_symbol(sub_hom(), s), apply_hom(sub_hom(), rest));
+    }
+}
+
+// prefix version of has_gen2 (Gen2 in the LEFT part)
+pub proof fn lemma_has_gen2_concat_right_flip(a: Word, b: Word)
+    requires has_gen2(a),
+    ensures has_gen2(a + b)
+    decreases a.len()
+{
+    if a.len() > 0 {
+        assert((a + b)[0] == a[0]);
+        assert((a + b).drop_first() =~= a.drop_first() + b);
+        if a[0] != Symbol::Gen(2) { lemma_has_gen2_concat_right_flip(a.drop_first(), b); }
+    }
+}
+
+// no Inv2 ⟹ no pinch (all stable letters are Gen2, no adjacent-opposite pair)
+pub proof fn lemma_no_inv2_no_pinch(w: Word)
+    requires no_sym(w, Symbol::Inv(2)),
+    ensures !crate::britton_via_tower::has_pinch(m3_data(), w)
+{
+    use crate::britton_via_tower::*;
+    lemma_no_sym_index(w, Symbol::Inv(2));
+    assert forall|i: int, j: int| !has_pinch_at(m3_data(), w, i, j) by {
+        if has_adjacent_opposite_at(m3_data(), w, i, j) {
+            // w[i], w[j] both stable, w[i] != w[j] ; no Inv2 ⟹ both Gen2 ⟹ contradiction
+            assert(is_stable(m3_data(), w[i]) && is_stable(m3_data(), w[j]));
+            assert(w[i] != Symbol::Inv(2) && w[j] != Symbol::Inv(2));
+        }
+    }
+}
+
+// no_sym gives pointwise inequality
+pub proof fn lemma_no_sym_index(w: Word, t: Symbol)
+    requires no_sym(w, t),
+    ensures forall|i: int| 0 <= i < w.len() ==> #[trigger] w[i] != t
+    decreases w.len()
+{
+    if w.len() > 0 {
+        lemma_no_sym_index(w.drop_first(), t);
+        assert forall|i: int| 0 <= i < w.len() implies #[trigger] w[i] != t by {
+            if i > 0 { assert(w[i] == w.drop_first()[i - 1]); }
+        }
+    }
+}
+
+pub proof fn lemma_has_gen2_stable(w: Word)
+    requires has_gen2(w),
+    ensures crate::britton_via_tower::has_stable_letter(m3_data(), w)
+    decreases w.len()
+{
+    use crate::britton_via_tower::*;
+    if w[0] == Symbol::Gen(2) {
+        assert(is_stable(m3_data(), w[0]));
+    } else {
+        lemma_has_gen2_stable(w.drop_first());
+        let i0 = choose|i: int| 0 <= i < w.drop_first().len() && is_stable(m3_data(), w.drop_first()[i]);
+        assert(w[i0 + 1] == w.drop_first()[i0]);
+    }
+}
+
+// THE MIXED CASE IS IMPOSSIBLE
+pub proof fn lemma_m3_no_mixed(u: Word, v: Word)
+    requires
+        positive_word(u), positive_word(v), word_valid(u, 4), word_valid(v, 4),
+        !word_valid(u, 2), word_valid(v, 2),
+        equiv_in_presentation(crate::hnn::hnn_presentation(m3_data()),
+            crate::homomorphism::apply_hom(sub_hom(), u), crate::homomorphism::apply_hom(sub_hom(), v)),
+    ensures false
+{
+    use crate::hnn::*;
+    use crate::homomorphism::*;
+    use crate::presentation_lemmas::*;
+    use crate::presentation::lemma_equiv_transitive;
+    let hp = hnn_presentation(m3_data());
+    let su = apply_hom(sub_hom(), u);
+    let sv = apply_hom(sub_hom(), v);
+    let w = concat(su, inverse_word(sv));
+    lemma_m3_data_valid(); lemma_m3_iso();
+    crate::britton_infra::lemma_hnn_presentation_valid(m3_data());
+    lemma_sub_valid();
+    // w ≡ ε
+    lemma_apply_hom_word_valid(sub_hom(), u); lemma_apply_hom_word_valid(sub_hom(), v);
+    lemma_inverse_word_valid(sv, 3);
+    lemma_equiv_concat_left(hp, su, sv, inverse_word(sv));   // su·sv⁻¹ ≡ sv·sv⁻¹
+    lemma_word_inverse_right(hp, sv);
+    lemma_equiv_transitive(hp, w, concat(sv, inverse_word(sv)), empty_word());
+    // word_valid(w, 3)
+    assert(word_valid(w, 3)) by {
+        assert forall|i: int| 0 <= i < w.len() implies symbol_valid(#[trigger] w[i], 3) by {
+            if i < su.len() { assert(w[i] == su[i]); } else { assert(w[i] == inverse_word(sv)[i - su.len()]); }
+        }
+    }
+    // has_stable_letter(w): su has Gen2
+    lemma_sub_has_gen2(u);
+    lemma_has_gen2_concat_right_flip(su, inverse_word(sv));   // has_gen2(w)
+    lemma_has_gen2_stable(w);
+    // no Inv2 in w: su has none, sv⁻¹ has none (sv=v base ⟹ inverse over {Inv0,Inv1})
+    lemma_sub_no_inv2(u);
+    lemma_sub_on_base(v);                                     // sv =~= v
+    lemma_wv2_no_stable(v);
+    lemma_inverse_word_valid(v, 2);
+    lemma_wv2_no_stable(inverse_word(v));                    // inverse_word(v) no Inv2
+    assert(inverse_word(sv) =~= inverse_word(v));
+    lemma_no_sym_concat(su, inverse_word(sv), Symbol::Inv(2));   // no_sym(w, Inv2)
+    lemma_no_inv2_no_pinch(w);
+    // britton_full ⟹ has_pinch ⟹ contradiction
+    crate::britton_via_tower::britton_lemma_full(m3_data(), w);
+}
+
 } // verus!
