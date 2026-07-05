@@ -61,8 +61,8 @@ formalization campaign: **`zfc-group-2-plan.md`**. ZFC layer spec: **`nbg-machin
 |---|---|---|
 | `src/carrier_not_fp.rs` | 31/0 | Miller carrier not-f.p. — **NF-1 + NF-A core** (refutation conditional only on the escape hypothesis) |
 | `src/m0_token.rs` | 25/0 | **M0 COMPLETE, both directions** — the token quotient `G_T ≅ free_group(4)` via ψ (soundness = hom-transport; completeness = retraction) |
-| `src/thue.rs` | 6/0 | **Phase 0** — Thue congruence, `positivity` spec (Law P), the bridge (Thue⟹group) |
-| `src/m1_guard.rs` | 7/0 | **M1 in progress** — defs + validity + ⟸ half + `delete_x` infra |
+| `src/thue.rs` | 18/0 | **Phase 0** — Thue congruence, `positivity` spec (Law P), the bridge (Thue⟹group), + congruence primitives (refl/single/trans/symmetric/prepend) |
+| `src/m1_guard.rs` | 34/0 | **M1 COMPLETE** — `positivity(m1_rules,4)` both directions, first M-ladder rung. ⟹ via two-projection route (kill_n/kill_g → same deletes → combinatorial peel induction), no free-product NF |
 
 ## What is DESIGNED + AUDITED + RUNNING (Python, not yet formalized)
 
@@ -82,7 +82,7 @@ formalization campaign: **`zfc-group-2-plan.md`**. ZFC layer spec: **`nbg-machin
 Phase 0  thue.rs .......................... ✅ DONE
 M0  token layer (G_T ≅ free) .............. ✅ DONE  (base case of positivity)
 Phase 1  M-ladder rungs (each = positivity(rules,n)):
-   M1 guard-motion ........................ 🔨 IN PROGRESS  (⟸ done; ⟹ = docs/m1-positivity-plan.md)
+   M1 guard-motion ........................ ✅ DONE (m1_guard.rs 34/0, two-projection route)
    M2 translate · M3 blinker · M5 doubler · M6 courier · M7 junction-decoupling (the CROWN)
    → each: define rules, prove ⟹ (mechanism from §4), ⟸ is free from thue.rs
 Phase 2  the VERIFIED auditor ............. Laws 0–6 as spec fns; port tools/semantic_audit.py to exec
