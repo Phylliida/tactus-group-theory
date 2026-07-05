@@ -107,6 +107,21 @@ Three cases on (has-state-letters u?, has-state-letters v?):
   Insight: the ONLY free cancellation in sub is `sub(b)·sub(q')=b·b⁻¹` (checked ALL sub-image boundaries),
   and it is EXACTLY the Thue rule `qa↔bq'`. So free-reduction of sub = firing `bq'→qa` Thue moves.
   * FIX-CRUX ✅ `lemma_bq_qa_thue` (56/0): `x·bq'·y ~thue x·qa·y` (rule 0 backward, via thue_step_at + lemma_thue_single).
+  ── FIX ASSEMBLY PROGRESS (m3 at 68/0) ──
+  * P1 ✅ (59/0): `ffnf` (fire all bq'→qa, L-to-R, decreases |u|), `lemma_thue_prepend_word`, `lemma_u_thue_ffnf` (u ~thue ffnf(u)).
+  * P2a ✅ (65/0): `no_bq` pred + `lemma_ffnf_nonempty`/`_first` + `lemma_ffnf_no_bq` (ffnf is bq'-free).
+  * P2b ✅ (68/0): `lemma_sub_img` (per-image props) + `lemma_sub_first` + `lemma_sub_reduced` (no_bq ⟹ is_reduced(sub(w))).
+  * P3 [TODO] ffnf gaps nf: `no_qpa`(no q'a)+`no_qaa` preserved through ffnf (junction args like no_bq) ⟹
+    gaps of q·sub(ffnf u)·q have a-head≤1 (+ reduced from P2b, no-Inv0 trivial) ⟹ nf_gap.
+  * P4 [TODO] structural: `split_q(W)` (split q-word at Gen2's) + `gap_word∘split_q = id` for q-words ⟹
+    q·sub(ffnf u)·q = gap_word(gaps(ffnf u)).
+  * P5 [TODO] connect: act_syls(q·sub(u)·q) = act_syls(q·sub(ffnf u)·q) [sub(u)≡sub(ffnf u) via u~thue ffnf u]
+    = gap_syls(gaps(ffnf u)) [W-induction ✅ lemma_act_gap_word].
+  * P6 [TODO] injectivity: act_syls(u)=act_syls(v) ⟹ gaps(ffnf u)=gaps(ffnf v) ⟹ [gap_word inj / split_q]
+    q·sub(ffnf u)·q = q·sub(ffnf v)·q ⟹ sub(ffnf u)=sub(ffnf v) ⟹ [sub PREFIX CODE] ffnf u=ffnf v ⟹
+    u~thue ffnf u=ffnf v~thue v ⟹ u~thue v ⟹ [both Thue-nf] u=v.
+  * P7 [TODO] dispatcher (base ✓/no_mixed ✓/P6) → lemma_m3_readback → R3 (Thue-nf reduce + positivity iff).
+  (OLD abstract sketch below, superseded by the ffnf-based P1-P7:)
   * FIX ARCHITECTURE (clean induction, TODO): define `fr_gaps(u)` = free-reduced gaps of q·sub(u)·q
     (= the b_rcoset_rep syllables since nf u ⟹ a-head≤1 so a²-reduction trivial), `decode(gs)` = read
     positive word from a reduced-gap sequence, `nbq(u)` = #occurrences of "bq'" in u.
