@@ -735,4 +735,44 @@ pub proof fn lemma_m3_no_mixed(u: Word, v: Word)
     crate::britton_via_tower::britton_lemma_full(m3_data(), w);
 }
 
+// ═══ R2 case 3 via ACT_SYLS (the shortcut) — act_syls is a group invariant ═══
+// generalize lemma_derivation_preserves_syls to an arbitrary target (only the base case differs)
+pub proof fn lemma_deriv_syls(data: crate::hnn::HNNData, steps: Seq<crate::presentation::DerivationStep>, w: Word, w2: Word)
+    requires
+        crate::hnn::hnn_data_valid(data),
+        crate::hnn::hnn_associations_isomorphic(data),
+        word_valid(w, crate::hnn::hnn_presentation(data).num_generators),
+        derivation_produces(crate::hnn::hnn_presentation(data), steps, w) == Some(w2),
+    ensures crate::machine_group::act_syls(data, w) =~= crate::machine_group::act_syls(data, w2),
+    decreases steps.len()
+{
+    let hp = crate::hnn::hnn_presentation(data);
+    if steps.len() == 0 {
+        assert(derivation_produces(hp, steps, w) == Some(w));   // ⟹ w2 == w
+    } else {
+        let step = steps.first();
+        assert(apply_step(hp, w, step).is_some());              // else produces == None ≠ Some(w2)
+        let w_next = apply_step(hp, w, step).unwrap();
+        assert(derivation_produces(hp, steps.drop_first(), w_next) == Some(w2));
+        crate::britton_infra::lemma_step_preserves_word_valid(data, w, step);
+        lemma_deriv_syls(data, steps.drop_first(), w_next, w2);
+        crate::britton_via_tower::lemma_single_step_preserves_syls(data, w, step);
+    }
+}
+
+// act_syls is preserved by group equivalence (the two-word Britton normal-form invariance)
+pub proof fn lemma_syls_preserved(data: crate::hnn::HNNData, w1: Word, w2: Word)
+    requires
+        crate::hnn::hnn_data_valid(data),
+        crate::hnn::hnn_associations_isomorphic(data),
+        word_valid(w1, crate::hnn::hnn_presentation(data).num_generators),
+        equiv_in_presentation(crate::hnn::hnn_presentation(data), w1, w2),
+    ensures crate::machine_group::act_syls(data, w1) =~= crate::machine_group::act_syls(data, w2),
+{
+    let hp = crate::hnn::hnn_presentation(data);
+    let d = choose|d: crate::presentation::Derivation| derivation_valid(hp, d, w1, w2);
+    assert(derivation_produces(hp, d.steps, w1) == Some(w2));
+    lemma_deriv_syls(data, d.steps, w1, w2);
+}
+
 } // verus!
