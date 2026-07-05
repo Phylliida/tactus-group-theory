@@ -815,7 +815,7 @@ pub proof fn lemma_reduces_to_reduced_unique(w: Word, r: Word)
 }
 
 ///  A reduced word can only reduce to itself.
-proof fn lemma_reduced_reduces_to_self(w: Word, w2: Word)
+pub proof fn lemma_reduced_reduces_to_self(w: Word, w2: Word)
     requires
         is_reduced(w),
         reduces_to(w, w2),
