@@ -10372,7 +10372,7 @@ proof fn lemma_scan_b_rcoset_lex(
 }
 
 ///  Right-B-coset rep satisfiability.
-proof fn lemma_b_rcoset_rep_satisfiable(data: AmalgamatedData, g: Word)
+pub proof fn lemma_b_rcoset_rep_satisfiable(data: AmalgamatedData, g: Word)
     requires
         amalgamated_data_valid(data),
         word_valid(g, data.p2.num_generators),
