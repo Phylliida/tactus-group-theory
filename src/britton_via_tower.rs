@@ -8576,7 +8576,7 @@ proof fn lemma_relator_delete_preserves(
 /// Per-step preservation: a single derivation step preserves .1 of the action from (ε, []).
 /// Uses lemma_trivial_middle_preserves_syls after identifying prefix/middle/suffix
 /// and proving the middle acts trivially via Tiers 0-2.
-proof fn lemma_single_step_preserves_syls(
+pub proof fn lemma_single_step_preserves_syls(
     data: HNNData,
     w: Word,
     step: DerivationStep,
