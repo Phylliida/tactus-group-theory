@@ -28,6 +28,27 @@ relator cond vacuous) + `lemma_apply_hom_concat` (local) + `lemma_swap_emb` (ind
 facts as hypotheses). GOTCHA (cost a hang): `by(compute)` HANGS on let-bound args — compute on LITERALS.
 
 ### Step R2 — the Britton engine   [THE BIG ONE — bespoke, largest M-ladder piece]
+
+**REFINED induction structure (worked out at the 15/0 checkpoint).** `lemma_m3_readback(u,v)`:
+u,v nf + positive + word_valid(u,4)/(v,4) + `equiv(hp, sub(u), sub(v))` ⟹ `u==v`. Strong induction on
+`stable_count(sub(u)) + stable_count(sub(v))` (= #state-letters(u)+#state-letters(v)).
+Three cases on (has-state-letters u?, has-state-letters v?):
+- **(no, no)** — ✅ DONE = `lemma_m3_base` (15/0). sub=identity on {a,b}, britton_lemma_unconditional.
+- **(yes,no) / (no,yes)** — CONTRADICTION [moderate]: w = sub(u)·sub(v)⁻¹ ≡ ε has a stable letter ⟹
+  `britton_lemma_full` ⟹ `has_pinch`. But sub(u) is positive (only Gen2, no Inv2) and sub(v)⁻¹ (v a
+  base word) has NO stable letter ⟹ all stable letters of w are Gen2 (same sign) ⟹ no adjacent-
+  OPPOSITE pair ⟹ ¬has_pinch. Contradiction ⟹ ex-falso u==v. Needs: `sub(positive)` has no Inv2;
+  `sub(base word)` has no Gen2/Inv2; `all-same-sign ⟹ ¬has_pinch` (from has_pinch_at needing w[i]≠w[j]).
+- **(yes,yes)** — THE PINCH CASCADE [THE HARD CORE, parity head-cap]: w = sub(u)·sub(v)⁻¹ has Gen2's
+  (from sub(u)) then Inv2's (from sub(v)⁻¹). `britton_lemma_full` ⟹ pinch, which must be at the
+  junction (last Gen2 of sub(u), first Inv2 of sub(v)⁻¹) with base-word-between ∈ B=⟨a²⟩ = the
+  compensation a^{2mₖ}. Peel the two q's + the compensation (Britton reduction), recurse on the
+  smaller instance; thread the parity head-cap: nf ⟹ each syllable a-head ∈{0,1}, even shift −2mᵢ
+  exits {0,1} ⟹ all mᵢ=0 ⟹ syllables literally equal ⟹ readback. **This is the genuinely new math**
+  — HNN normal-form uniqueness specialized to M3. May need syllable-decomposition infra (net-a-exp
+  per gap) or a bespoke induction peeling one junction pinch at a time.
+
+Original prose (semantic-finite-basis §4.3):
 Two banked engines (britton_via_tower.rs, both need only R1's iso condition):
 - `britton_lemma_full(data, w)`: `w≡ε` + `has_stable_letter` ⟹ `has_pinch(data, w)`.
 - `britton_lemma_unconditional(data, w)`: `w≡ε` + w over base gens ⟹ `w≡ε in base` (BASE EMBEDDING).
