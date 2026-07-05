@@ -1711,4 +1711,76 @@ pub proof fn lemma_sub_reduced(w: Word)
     }
 }
 
+// ═══ B3 fix Phase 4a: base_run / split_q / gap_word∘split_q = id (general q-word structure) ═══
+pub open spec fn base_run(W: Word) -> Word   // longest Gen2-free prefix
+    decreases W.len()
+{
+    if W.len() == 0 || W[0] == Symbol::Gen(2) { empty_word() }
+    else { seq![W[0]] + base_run(W.drop_first()) }
+}
+pub open spec fn drop_base_run(W: Word) -> Word   // W with base_run removed (starts with Gen2 or empty)
+    decreases W.len()
+{
+    if W.len() == 0 || W[0] == Symbol::Gen(2) { W }
+    else { drop_base_run(W.drop_first()) }
+}
+pub proof fn lemma_drop_base_run_len(W: Word)
+    ensures drop_base_run(W).len() <= W.len(),
+    decreases W.len(),
+{ if W.len() != 0 && W[0] != Symbol::Gen(2) { lemma_drop_base_run_len(W.drop_first()); } }
+
+pub open spec fn split_q(W: Word) -> Seq<Word>   // gaps after each Gen2 (for W starting with Gen2)
+    decreases W.len()
+    via split_q_decreases
+{
+    if W.len() == 0 || W[0] != Symbol::Gen(2) { seq![] }
+    else {
+        let after = W.drop_first();
+        seq![base_run(after)] + split_q(drop_base_run(after))
+    }
+}
+#[via_fn]
+proof fn split_q_decreases(W: Word) {
+    if W.len() != 0 && W[0] == Symbol::Gen(2) { lemma_drop_base_run_len(W.drop_first()); }
+}
+
+pub proof fn lemma_base_drop_reconstruct(W: Word)
+    ensures W =~= base_run(W) + drop_base_run(W),
+    decreases W.len(),
+{
+    if W.len() != 0 && W[0] != Symbol::Gen(2) {
+        lemma_base_drop_reconstruct(W.drop_first());
+        assert(base_run(W) =~= seq![W[0]] + base_run(W.drop_first()));
+        assert(W =~= seq![W[0]] + W.drop_first());
+    }
+}
+pub proof fn lemma_drop_base_run_head(W: Word)
+    ensures drop_base_run(W).len() == 0 || drop_base_run(W)[0] == Symbol::Gen(2),
+    decreases W.len(),
+{ if W.len() != 0 && W[0] != Symbol::Gen(2) { lemma_drop_base_run_head(W.drop_first()); } }
+
+pub proof fn lemma_gap_word_split(W: Word)
+    requires W.len() == 0 || W[0] == Symbol::Gen(2),
+    ensures gap_word(split_q(W)) =~= W,
+    decreases W.len(),
+{
+    if W.len() == 0 {
+        assert(split_q(W) =~= Seq::<Word>::empty());
+    } else {
+        let after = W.drop_first();
+        let g0 = base_run(after);
+        let tail = drop_base_run(after);
+        lemma_drop_base_run_len(after);
+        lemma_drop_base_run_head(after);
+        lemma_base_drop_reconstruct(after);        // after = g0 + tail
+        lemma_gap_word_split(tail);                // gap_word(split_q(tail)) =~= tail
+        assert(split_q(W) =~= seq![g0] + split_q(tail));
+        let gs = seq![g0] + split_q(tail);
+        assert(gs.len() > 0 && gs[0] == g0 && gs.drop_first() =~= split_q(tail));
+        assert(gap_word(gs) =~= concat(seq![Symbol::Gen(2)], concat(gs[0], gap_word(gs.drop_first()))));
+        assert(gap_word(split_q(W)) =~= gap_word(gs));
+        assert(W =~= seq![Symbol::Gen(2)] + after);
+    }
+}
+
 } // verus!
