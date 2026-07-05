@@ -807,4 +807,19 @@ pub proof fn lemma_sub_no_collapse(u: Word)
     crate::britton_via_tower::lemma_p_reduced_initial_no_collapse(m3_data(), w);
 }
 
+// ═══ Readback brick 2: syllable count = stable_count (no collapse) ═══
+pub proof fn lemma_sub_syls_count(u: Word)
+    requires positive_word(u), word_valid(u, 4),
+    ensures crate::machine_group::act_syls(m3_data(),
+        concat(crate::homomorphism::apply_hom(sub_hom(), u), seq![Symbol::Gen(2)])).len()
+        == crate::britton_via_tower::stable_count(m3_data(),
+            concat(crate::homomorphism::apply_hom(sub_hom(), u), seq![Symbol::Gen(2)])),
+{
+    let w = concat(crate::homomorphism::apply_hom(sub_hom(), u), seq![Symbol::Gen(2)]);
+    lemma_m3_data_valid();
+    lemma_sub_no_collapse(u);
+    crate::britton_via_tower::lemma_no_collapse_gives_m(m3_data(), w, empty_word(),
+        Seq::<crate::normal_form_afp_textbook::Syllable>::empty());
+}
+
 } // verus!
