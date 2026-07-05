@@ -30,9 +30,32 @@ pub open spec fn rules_pres(rules: Seq<ThueRule>, n: nat) -> Presentation {
     }
 }
 
+pub open spec fn symbol_is_gen(s: Symbol) -> bool {
+    match s { Symbol::Gen(_) => true, Symbol::Inv(_) => false }
+}
+
 // A positive word: only Gen letters (no formal inverses) — the code words of a machine.
-pub open spec fn positive_word(w: Word) -> bool {
-    forall|i: int| 0 <= i < w.len() ==> exists|j: nat| #[trigger] w[i] == Symbol::Gen(j)
+// RECURSIVE (not a `forall`): under the Lean backend, proving the quantified body does not
+// fold back into a named quantified open spec fn, but a recursive one folds reliably.
+pub open spec fn positive_word(w: Word) -> bool
+    decreases w.len()
+{
+    w.len() == 0 || (symbol_is_gen(w[0]) && positive_word(w.drop_first()))
+}
+
+// bridge: element access — the i-th letter of a positive word is a generator.
+pub proof fn lemma_positive_gen(w: Word, i: int)
+    requires positive_word(w), 0 <= i < w.len(),
+    ensures symbol_is_gen(w[i]), exists|j: nat| #[trigger] w[i] == Symbol::Gen(j)
+    decreases i
+{
+    if i == 0 {
+        assert(symbol_is_gen(w[0]));
+        match w[0] { Symbol::Gen(k) => { assert(w[0] == Symbol::Gen(k)); }, Symbol::Inv(_) => {} }
+    } else {
+        lemma_positive_gen(w.drop_first(), i - 1);
+        assert(w[i] == w.drop_first()[i - 1]);
+    }
 }
 
 // ── the core algebraic lemma: a rule's two sides are group-equal ──
