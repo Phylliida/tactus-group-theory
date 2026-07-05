@@ -1400,4 +1400,69 @@ pub proof fn lemma_psi_p_nf_gap(h: Word, syls: Seq<crate::normal_form_afp_textbo
         =~= Seq::new(1, |_i: int| Syllable { is_left: false, rep: h }));
 }
 
+// ═══ B3 crux: act_syls(gap_word(gs)) = gap_syls(gs) for nf gaps ═══
+pub open spec fn nf_gap(g: Word) -> bool {
+    word_valid(g, 2) && crate::reduction::is_reduced(g)
+        && no_sym(g, Symbol::Inv(0)) && crate::m1_guard::lead(g, 0) <= 1
+}
+pub open spec fn gap_word(gs: Seq<Word>) -> Word
+    decreases gs.len()
+{
+    if gs.len() == 0 { empty_word() }
+    else { concat(seq![Symbol::Gen(2)], concat(gs.first(), gap_word(gs.drop_first()))) }
+}
+pub open spec fn gap_syls(gs: Seq<Word>) -> Seq<crate::normal_form_afp_textbook::Syllable> {
+    Seq::new(gs.len(), |i: int| crate::normal_form_afp_textbook::Syllable { is_left: false, rep: gs[i] })
+}
+
+pub proof fn lemma_act_gap_word(gs: Seq<Word>)
+    requires forall|i: int| 0 <= i < gs.len() ==> nf_gap(#[trigger] gs[i]),
+    ensures crate::britton_via_tower::textbook_act_hnn(m3_data(), gap_word(gs), empty_word(),
+        Seq::<crate::normal_form_afp_textbook::Syllable>::empty()) == (empty_word(), gap_syls(gs)),
+    decreases gs.len(),
+{
+    use crate::britton_via_tower::*;
+    use crate::normal_form_afp_textbook::Syllable;
+    let md = m3_data();
+    let e = empty_word();
+    let esyl = Seq::<Syllable>::empty();
+    if gs.len() == 0 {
+        assert(gap_word(gs) =~= e);
+        assert(gap_syls(gs) =~= esyl);
+    } else {
+        let g0 = gs.first();
+        let rest = gs.drop_first();
+        assert(nf_gap(g0));
+        assert(forall|i: int| 0 <= i < rest.len() ==> nf_gap(#[trigger] rest[i])) by {
+            assert forall|i: int| 0 <= i < rest.len() implies nf_gap(#[trigger] rest[i]) by { assert(rest[i] == gs[i + 1]); }
+        }
+        lemma_act_gap_word(rest);                          // act(gap_word(rest),ε,[]) == (ε, gap_syls(rest))
+        // gap_word(gs) = ([q]·g0) · gap_word(rest)
+        assert(gap_word(gs) =~= concat(concat(seq![Symbol::Gen(2)], g0), gap_word(rest)));
+        lemma_act_compose(md, concat(seq![Symbol::Gen(2)], g0), gap_word(rest), e, esyl);
+        // inner processes gap_word(rest) → (ε, gap_syls(rest)); then process [q]·g0 on that
+        lemma_act_compose(md, seq![Symbol::Gen(2)], g0, e, gap_syls(rest));
+        // act(g0, ε, gap_syls(rest)) = (g0, gap_syls(rest))   [g0 is a base word]
+        assert(md.base.num_generators == 2) by { crate::higman_operations::lemma_free_group_valid(2); }
+        assert(forall|i: int| 0 <= i < g0.len() ==> !is_stable(md, #[trigger] g0[i])) by {
+            assert forall|i: int| 0 <= i < g0.len() implies !is_stable(md, #[trigger] g0[i]) by { assert(symbol_valid(g0[i], 2)); }
+        }
+        lemma_act_base(md, g0, e, gap_syls(rest));
+        assert(concat(g0, e) =~= g0);
+        // act([q], g0, gap_syls(rest)) = psi_p(g0, gap_syls(rest))
+        let q1 = seq![Symbol::Gen(2)];
+        assert(q1.last() == Symbol::Gen(md.base.num_generators));
+        let (hn, sn) = textbook_psi_p(md, g0, gap_syls(rest));
+        assert(q1.drop_last() =~= e);
+        assert(textbook_act_hnn(md, q1.drop_last(), hn, sn) == (hn, sn));
+        assert(textbook_act_hnn(md, q1, g0, gap_syls(rest))
+            == textbook_psi_p(md, g0, gap_syls(rest)));
+        assert(gap_syls(rest).len() == 0 || !gap_syls(rest).first().is_left) by {
+            if gap_syls(rest).len() > 0 { assert(gap_syls(rest).first() == gap_syls(rest)[0]); }
+        }
+        lemma_psi_p_nf_gap(g0, gap_syls(rest));            // = (ε, {false,g0}::gap_syls(rest))
+        assert(Seq::new(1, |_i: int| Syllable { is_left: false, rep: g0 }) + gap_syls(rest) =~= gap_syls(gs));
+    }
+}
+
 } // verus!
