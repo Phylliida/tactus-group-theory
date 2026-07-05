@@ -1368,4 +1368,36 @@ proof fn lemma_no_smaller_lex_below(data: crate::amalgamated_free_product::Amalg
     if r2 < (r - 1) as nat { lemma_no_smaller_lex_below(data, g, l, (r - 1) as nat, r2); }
 }
 
+// ═══ B3 step: processing one q on a nf-gap accumulator prepends {false,gap}, carry vanishes ═══
+pub proof fn lemma_psi_p_nf_gap(h: Word, syls: Seq<crate::normal_form_afp_textbook::Syllable>)
+    requires
+        word_valid(h, 2),
+        crate::reduction::is_reduced(h),
+        no_sym(h, Symbol::Inv(0)),
+        crate::m1_guard::lead(h, 0) <= 1,
+        syls.len() == 0 || !syls.first().is_left,
+    ensures
+        crate::britton_via_tower::textbook_psi_p(m3_data(), h, syls)
+            == (empty_word(),
+                Seq::new(1, |_i: int| crate::normal_form_afp_textbook::Syllable { is_left: false, rep: h }) + syls),
+{
+    use crate::normal_form_afp_textbook::*;
+    let afp = crate::tower::tower_afp_data(m3_data(), 0);
+    lemma_m3_afp_valid();
+    assert(afp == m3_afp());
+    lemma_b_rcoset_rep_eq_gap(h);                        // b_rcoset_rep(afp, h) =~= h
+    let rep = b_rcoset_rep(afp, h);
+    assert(rep == h);
+    lemma_b_rcoset_h_eps_when_rep_eq(afp, h);            // b_rcoset_h(afp, h) =~= ε
+    let h_id = b_rcoset_h(afp, h);
+    assert(h_id == empty_word());
+    let phi_inv_h = crate::benign::apply_embedding(a_words(afp), h_id);
+    assert(phi_inv_h =~= empty_word());
+    // no collapse: either rep=h≠ε, or h=ε and !syls.first().is_left
+    assert(!(rep =~= empty_word() && syls.len() > 0 && syls.first().is_left));
+    // PREPEND branch
+    assert(Seq::new(1, |_i: int| Syllable { is_left: false, rep: rep })
+        =~= Seq::new(1, |_i: int| Syllable { is_left: false, rep: h }));
+}
+
 } // verus!
