@@ -556,3 +556,7 @@ pub mod carrier_not_fp;
 // equiv_in_presentation(token_pres), ψ as a HomomorphismData into free_group(4). Encoding +
 // validity; M0-soundness = lemma_hom_preserves_equiv (agent's hand-rolled closures dissolve).
 pub mod m0_token;
+
+// thue: Thue-rewriting congruence + positivity spec (Law P), Phase 0 of the ZFC-group
+// formalization campaign. Bridge = Thue-rewriting ⟹ group equality (easy direction).
+pub mod thue;
