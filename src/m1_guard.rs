@@ -118,6 +118,8 @@ pub proof fn lemma_positive_reduced(w: Word)
 {
     assert forall|i: int| 0 <= i < w.len() - 1 implies
         !crate::reduction::has_cancellation_at(w, i) by {
+        lemma_positive_gen(w, i);
+        lemma_positive_gen(w, i + 1);
         let j0 = choose|j: nat| w[i] == Symbol::Gen(j);
         let j1 = choose|j: nat| w[i + 1] == Symbol::Gen(j);
         // both Gen ⟹ not an inverse pair
@@ -180,17 +182,14 @@ pub proof fn lemma_applyhom_kill_eq_delete(x: nat, u: Word)
     if u.len() > 0 {
         let s = u.first();
         let rest = u.drop_first();
-        assert(positive_word(rest)) by {
-            assert forall|i: int| 0 <= i < rest.len() implies exists|j: nat| #[trigger] rest[i] == Symbol::Gen(j) by {
-                assert(rest[i] == u[i + 1]);
-            }
-        }
+        assert(positive_word(rest));   // = positive_word(u.drop_first()), by recursive def of positive_word(u)
         assert(word_valid(rest, 4)) by {
             assert forall|i: int| 0 <= i < rest.len() implies symbol_valid(#[trigger] rest[i], 4) by {
                 assert(rest[i] == u[i + 1]);
             }
         }
         lemma_applyhom_kill_eq_delete(x, rest);
+        lemma_positive_gen(u, 0);
         let j = choose|j: nat| u[0] == Symbol::Gen(j);
         assert(u[0] == Symbol::Gen(j));
         assert(apply_hom_symbol(kill_hom(x), Symbol::Gen(j)) =~= kill_hom(x).generator_images[j as int]);
@@ -198,14 +197,20 @@ pub proof fn lemma_applyhom_kill_eq_delete(x: nat, u: Word)
 }
 
 pub proof fn lemma_delete_positive(u: Word, x: nat)
-    ensures positive_word(u) ==> positive_word(delete_x(u, x))
-        && (word_valid(u, 4) ==> word_valid(delete_x(u, x), 4)),
+    requires positive_word(u),
+    ensures positive_word(delete_x(u, x)),
     decreases u.len(),
 {
     if u.len() > 0 {
+        assert(positive_word(u.drop_first()));    // recursive def of positive_word(u)
         lemma_delete_positive(u.drop_first(), x);
-        if u[0] != Symbol::Gen(x) {
+        if u[0] == Symbol::Gen(x) {
+            assert(delete_x(u, x) =~= delete_x(u.drop_first(), x));
+        } else {
+            lemma_positive_gen(u, 0);             // symbol_is_gen(u[0])
             assert(delete_x(u, x) =~= seq![u[0]] + delete_x(u.drop_first(), x));
+            assert((seq![u[0]] + delete_x(u.drop_first(), x))[0] == u[0]);
+            assert((seq![u[0]] + delete_x(u.drop_first(), x)).drop_first() =~= delete_x(u.drop_first(), x));
         }
     }
 }
@@ -363,6 +368,303 @@ pub proof fn lemma_bubble_n(run: Word, rest: Word)
         lemma_thue_trans(m1_rules(), run + n + rest,
             seq![Symbol::Gen(2), Symbol::Gen(3)] + x, seq![Symbol::Gen(3), Symbol::Gen(2)] + x);
     }
+}
+
+// ── delete_x cons unfold + prefix cancellation ──
+pub proof fn lemma_delete_cons(s: Symbol, rest: Word, x: nat)
+    ensures delete_x(seq![s] + rest, x) =~=
+        (if s == Symbol::Gen(x) { delete_x(rest, x) } else { seq![s] + delete_x(rest, x) })
+{
+    assert((seq![s] + rest)[0] == s);
+    assert((seq![s] + rest).drop_first() =~= rest);
+}
+
+pub proof fn lemma_cons_cancel(s: Symbol, a: Word, b: Word)
+    requires seq![s] + a == seq![s] + b,
+    ensures a == b
+{
+    assert((seq![s] + a).drop_first() =~= a);
+    assert((seq![s] + b).drop_first() =~= b);
+}
+
+pub proof fn lemma_delete_all(w: Word, x: nat)
+    requires forall|i: int| 0 <= i < w.len() ==> #[trigger] w[i] == Symbol::Gen(x),
+    ensures delete_x(w, x) == empty_word()
+    decreases w.len()
+{
+    if w.len() > 0 {
+        assert forall|i: int| 0 <= i < w.drop_first().len() implies #[trigger] w.drop_first()[i] == Symbol::Gen(x) by { assert(w.drop_first()[i] == w[i + 1]); }
+        lemma_delete_all(w.drop_first(), x);
+    }
+    assert(delete_x(w, x) =~= empty_word());
+}
+
+pub proof fn lemma_delete_none(w: Word, x: nat)
+    requires forall|i: int| 0 <= i < w.len() ==> #[trigger] w[i] != Symbol::Gen(x),
+    ensures delete_x(w, x) == w
+    decreases w.len()
+{
+    if w.len() > 0 {
+        assert forall|i: int| 0 <= i < w.drop_first().len() implies #[trigger] w.drop_first()[i] != Symbol::Gen(x) by { assert(w.drop_first()[i] == w[i + 1]); }
+        lemma_delete_none(w.drop_first(), x);
+        assert(delete_x(w, x) =~= seq![w[0]] + delete_x(w.drop_first(), x));
+        assert(seq![w[0]] + w.drop_first() =~= w);
+    }
+    assert(delete_x(w, x) =~= w);
+}
+
+pub proof fn lemma_pos_subrange(w: Word, a: int, b: int)
+    requires positive_word(w), 0 <= a <= b <= w.len(),
+    ensures positive_word(w.subrange(a, b)),
+    decreases b - a
+{
+    let sub = w.subrange(a, b);
+    if sub.len() > 0 {
+        lemma_positive_gen(w, a);
+        assert(sub[0] == w[a]);
+        lemma_pos_subrange(w, a + 1, b);
+        assert(sub.drop_first() =~= w.subrange(a + 1, b));
+    }
+}
+
+pub proof fn lemma_wv_subrange(w: Word, a: int, b: int, n: nat)
+    requires word_valid(w, n), 0 <= a <= b <= w.len(),
+    ensures word_valid(w.subrange(a, b), n),
+{
+    assert forall|i: int| 0 <= i < w.subrange(a, b).len() implies
+        symbol_valid(#[trigger] w.subrange(a, b)[i], n) by { assert(w.subrange(a, b)[i] == w[a + i]); }
+}
+
+pub proof fn lemma_wv_concat(a: Word, b: Word, n: nat)
+    requires word_valid(a, n), word_valid(b, n),
+    ensures word_valid(a + b, n),
+{
+    assert forall|i: int| 0 <= i < (a + b).len() implies symbol_valid(#[trigger] (a + b)[i], n) by {
+        if i < a.len() { assert((a + b)[i] == a[i]); } else { assert((a + b)[i] == b[i - a.len()]); }
+    }
+}
+
+pub proof fn lemma_pos_concat(a: Word, b: Word)
+    requires positive_word(a), positive_word(b),
+    ensures positive_word(a + b),
+    decreases a.len()
+{
+    if a.len() == 0 {
+        assert(a + b =~= b);
+    } else {
+        lemma_positive_gen(a, 0);
+        assert((a + b)[0] == a[0]);
+        lemma_pos_concat(a.drop_first(), b);
+        assert((a + b).drop_first() =~= a.drop_first() + b);
+    }
+}
+
+pub proof fn lemma_tail_delete_match(u: Word, v: Word, x: nat)
+    requires u.len() > 0, v.len() > 0, u[0] == v[0], delete_x(u, x) == delete_x(v, x),
+    ensures delete_x(u.drop_first(), x) == delete_x(v.drop_first(), x)
+{
+    lemma_delete_cons(u[0], u.drop_first(), x);
+    lemma_delete_cons(v[0], v.drop_first(), x);
+    assert(u =~= seq![u[0]] + u.drop_first());
+    assert(v =~= seq![v[0]] + v.drop_first());
+    if u[0] != Symbol::Gen(x) {
+        assert(delete_x(u, x) =~= seq![u[0]] + delete_x(u.drop_first(), x));
+        assert(delete_x(v, x) =~= seq![u[0]] + delete_x(v.drop_first(), x));
+        lemma_cons_cancel(u[0], delete_x(u.drop_first(), x), delete_x(v.drop_first(), x));
+    }
+}
+
+pub proof fn lemma_empty_deletes_empty(w: Word)
+    requires positive_word(w), delete_x(w, 3) == empty_word(), delete_x(w, 2) == empty_word(),
+    ensures w == empty_word()
+{
+    if w.len() > 0 {
+        lemma_positive_gen(w, 0);
+        let j = choose|j: nat| w[0] == Symbol::Gen(j);
+        assert(w =~= seq![w[0]] + w.drop_first());
+        lemma_delete_cons(w[0], w.drop_first(), 3);
+        lemma_delete_cons(w[0], w.drop_first(), 2);
+        if j == 3 { assert(delete_x(w, 2) =~= seq![w[0]] + delete_x(w.drop_first(), 2)); }
+        else { assert(delete_x(w, 3) =~= seq![w[0]] + delete_x(w.drop_first(), 3)); }
+    }
+}
+
+pub proof fn lemma_wall_forces(u: Word, v: Word)
+    requires
+        positive_word(u), positive_word(v), u.len() > 0, v.len() > 0,
+        delete_x(u, 3) == delete_x(v, 3), delete_x(u, 2) == delete_x(v, 2),
+        u[0] == Symbol::Gen(0) || u[0] == Symbol::Gen(1),
+    ensures v[0] == u[0]
+{
+    lemma_delete_cons(u[0], u.drop_first(), 3);
+    lemma_delete_cons(u[0], u.drop_first(), 2);
+    lemma_delete_cons(v[0], v.drop_first(), 3);
+    lemma_delete_cons(v[0], v.drop_first(), 2);
+    assert(delete_x(u, 3) =~= seq![u[0]] + delete_x(u.drop_first(), 3));
+    assert(delete_x(u, 2) =~= seq![u[0]] + delete_x(u.drop_first(), 2));
+    assert(delete_x(v, 3)[0] == u[0]);
+    assert(delete_x(v, 2)[0] == u[0]);
+    if v[0] == Symbol::Gen(3) {
+        assert(delete_x(v, 2) =~= seq![v[0]] + delete_x(v.drop_first(), 2));
+        assert(false);
+    } else if v[0] == Symbol::Gen(2) {
+        assert(delete_x(v, 3) =~= seq![v[0]] + delete_x(v.drop_first(), 3));
+        assert(false);
+    } else {
+        assert(delete_x(v, 3) =~= seq![v[0]] + delete_x(v.drop_first(), 3));
+    }
+}
+
+// first non-Gen(x) letter is at position lead(w,x) and equals delete_x(w,x)[0]
+pub proof fn lemma_first_nonx(w: Word, x: nat)
+    requires delete_x(w, x).len() > 0,
+    ensures lead(w, x) < w.len(), w[lead(w, x) as int] == delete_x(w, x)[0]
+    decreases w.len()
+{
+    if w.len() > 0 {
+        if w[0] == Symbol::Gen(x) {
+            assert(delete_x(w, x) =~= delete_x(w.drop_first(), x));
+            lemma_first_nonx(w.drop_first(), x);
+            assert(w[lead(w, x) as int] == w.drop_first()[lead(w.drop_first(), x) as int]);
+        } else {
+            assert(delete_x(w, x) =~= seq![w[0]] + delete_x(w.drop_first(), x));
+        }
+    }
+}
+
+// bubble-case delete match: gw=g-led (gw[0]=g), nw=run·g·rest (run all n), deletes match
+//   ⟹ delete(gw.drop_first) == delete(run+rest) for both x.
+pub proof fn m1_bubble_delete_match(gw: Word, nw: Word, run: Word, rest: Word)
+    requires
+        gw.len() > 0, gw[0] == Symbol::Gen(2),
+        forall|i: int| 0 <= i < run.len() ==> #[trigger] run[i] == Symbol::Gen(3),
+        nw =~= run + seq![Symbol::Gen(2)] + rest,
+        delete_x(gw, 3) == delete_x(nw, 3), delete_x(gw, 2) == delete_x(nw, 2),
+    ensures
+        delete_x(gw.drop_first(), 3) == delete_x(run + rest, 3),
+        delete_x(gw.drop_first(), 2) == delete_x(run + rest, 2),
+{
+    let G2 = seq![Symbol::Gen(2)];
+    let a = gw.drop_first();
+    assert(gw =~= G2 + a);
+    lemma_delete_cons(Symbol::Gen(2), a, 3);
+    lemma_delete_cons(Symbol::Gen(2), a, 2);
+    assert(delete_x(gw, 3) =~= G2 + delete_x(a, 3));
+    assert(delete_x(gw, 2) =~= delete_x(a, 2));
+    assert(nw =~= run + (G2 + rest));
+    lemma_delete_all(run, 3);
+    lemma_delete_none(run, 2);
+    lemma_delete_concat(run, G2 + rest, 3);
+    lemma_delete_concat(run, G2 + rest, 2);
+    lemma_delete_cons(Symbol::Gen(2), rest, 3);
+    lemma_delete_cons(Symbol::Gen(2), rest, 2);
+    lemma_delete_concat(run, rest, 3);
+    lemma_delete_concat(run, rest, 2);
+    assert(delete_x(nw, 3) =~= G2 + delete_x(rest, 3));
+    assert(delete_x(nw, 2) =~= run + delete_x(rest, 2));
+    lemma_cons_cancel(Symbol::Gen(2), delete_x(a, 3), delete_x(rest, 3));
+    assert(delete_x(run + rest, 3) =~= delete_x(rest, 3));
+    assert(delete_x(run + rest, 2) =~= run + delete_x(rest, 2));
+}
+
+// non-recursive assembly: g-led ~ n-led given the recursion result on the tails
+pub proof fn lemma_dit_assemble(gw: Word, nw: Word, run: Word, rest: Word)
+    requires
+        gw.len() > 0, gw[0] == Symbol::Gen(2),
+        forall|i: int| 0 <= i < run.len() ==> #[trigger] run[i] == Symbol::Gen(3),
+        nw =~= run + seq![Symbol::Gen(2)] + rest,
+        thue_equiv(m1_rules(), gw.drop_first(), run + rest),
+    ensures thue_equiv(m1_rules(), gw, nw)
+{
+    let G2 = seq![Symbol::Gen(2)];
+    lemma_thue_prepend(m1_rules(), Symbol::Gen(2), gw.drop_first(), run + rest);
+    assert(G2 + gw.drop_first() =~= gw);
+    assert(G2 + (run + rest) =~= G2 + run + rest);
+    lemma_bubble_g(run, rest);                    // run·g·rest ~ g·run·rest
+    assert(run + G2 + rest =~= nw);
+    lemma_thue_symmetric(m1_rules(), nw, G2 + run + rest);
+    lemma_thue_trans(m1_rules(), gw, G2 + run + rest, nw);
+}
+
+// ═══ THE COMBINATORIAL CORE (slim: base + peel + dispatch to helpers) ═══
+pub proof fn lemma_deletes_imply_thue(u: Word, v: Word)
+    requires
+        positive_word(u), positive_word(v), word_valid(u, 4), word_valid(v, 4),
+        delete_x(u, 3) == delete_x(v, 3), delete_x(u, 2) == delete_x(v, 2),
+    ensures thue_equiv(m1_rules(), u, v)
+    decreases u.len() + v.len(), 1nat
+{
+    let G2 = seq![Symbol::Gen(2)];
+    if u.len() == 0 {
+        assert(delete_x(u, 3) =~= empty_word());
+        assert(delete_x(u, 2) =~= empty_word());
+        lemma_empty_deletes_empty(v);
+        assert(u =~= v);
+        lemma_thue_refl(m1_rules(), u);
+    } else if v.len() == 0 {
+        assert(delete_x(v, 3) =~= empty_word());
+        assert(delete_x(v, 2) =~= empty_word());
+        lemma_empty_deletes_empty(u);
+        assert(u =~= v);
+        lemma_thue_refl(m1_rules(), u);
+    } else if u[0] == v[0] {
+        lemma_tail_delete_match(u, v, 3);
+        lemma_tail_delete_match(u, v, 2);
+        lemma_pos_subrange(u, 1, u.len() as int); lemma_pos_subrange(v, 1, v.len() as int);
+        lemma_wv_subrange(u, 1, u.len() as int, 4); lemma_wv_subrange(v, 1, v.len() as int, 4);
+        assert(u.drop_first() =~= u.subrange(1, u.len() as int));
+        assert(v.drop_first() =~= v.subrange(1, v.len() as int));
+        lemma_deletes_imply_thue(u.drop_first(), v.drop_first());
+        lemma_thue_prepend(m1_rules(), u[0], u.drop_first(), v.drop_first());
+        assert(seq![u[0]] + u.drop_first() =~= u);
+        assert(seq![v[0]] + v.drop_first() =~= v);
+    } else {
+        if u[0] == Symbol::Gen(0) || u[0] == Symbol::Gen(1) { lemma_wall_forces(u, v); }
+        if v[0] == Symbol::Gen(0) || v[0] == Symbol::Gen(1) { lemma_wall_forces(v, u); }
+        assert(u[0] == Symbol::Gen(2) || u[0] == Symbol::Gen(3));
+        assert(v[0] == Symbol::Gen(2) || v[0] == Symbol::Gen(3));
+        if u[0] == Symbol::Gen(2) {
+            m1_dit_bubble(u, v);
+        } else {
+            m1_dit_bubble(v, u);
+            lemma_thue_symmetric(m1_rules(), v, u);
+        }
+    }
+}
+
+// bubble dispatch: gw is g-led, nw is n-led (both nonempty, valid, positive, deletes match).
+// Recurses into lemma_deletes_imply_thue on strictly smaller (mutual recursion).
+pub proof fn m1_dit_bubble(gw: Word, nw: Word)
+    requires
+        positive_word(gw), positive_word(nw), word_valid(gw, 4), word_valid(nw, 4),
+        gw.len() > 0, nw.len() > 0, gw[0] == Symbol::Gen(2), nw[0] == Symbol::Gen(3),
+        delete_x(gw, 3) == delete_x(nw, 3), delete_x(gw, 2) == delete_x(nw, 2),
+    ensures thue_equiv(m1_rules(), gw, nw)
+    decreases gw.len() + nw.len(), 0nat
+{
+    let G2 = seq![Symbol::Gen(2)];
+    // delete_x(gw,3)[0] = g  ⟹  first non-n of nw is g
+    lemma_delete_cons(gw[0], gw.drop_first(), 3);
+    assert(delete_x(gw, 3) =~= G2 + delete_x(gw.drop_first(), 3));
+    assert(delete_x(nw, 3).len() > 0 && delete_x(nw, 3)[0] == Symbol::Gen(2));
+    lemma_first_nonx(nw, 3);
+    let k = lead(nw, 3) as int;
+    lemma_lead_run(nw, 3);
+    let run = nw.subrange(0, k);
+    let rest = nw.subrange(k + 1, nw.len() as int);
+    assert(nw[k] == Symbol::Gen(2));
+    assert(nw =~= run + G2 + rest);
+    assert((run + rest).len() == nw.len() - 1) by {
+        assert(run.len() == k); assert(rest.len() == nw.len() - k - 1);
+    }
+    lemma_pos_subrange(nw, 0, k); lemma_pos_subrange(nw, k + 1, nw.len() as int);
+    lemma_wv_subrange(nw, 0, k, 4); lemma_wv_subrange(nw, k + 1, nw.len() as int, 4);
+    lemma_pos_concat(run, rest); lemma_wv_concat(run, rest, 4);
+    lemma_pos_subrange(gw, 1, gw.len() as int); lemma_wv_subrange(gw, 1, gw.len() as int, 4);
+    assert(gw.drop_first() =~= gw.subrange(1, gw.len() as int));
+    m1_bubble_delete_match(gw, nw, run, rest);
+    lemma_deletes_imply_thue(gw.drop_first(), run + rest);     // smaller: (|gw|-1)+(|nw|-1)
+    lemma_dit_assemble(gw, nw, run, rest);
 }
 
 } // verus!
