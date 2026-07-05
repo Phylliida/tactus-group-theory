@@ -1630,4 +1630,85 @@ pub proof fn lemma_ffnf_no_bq(u: Word)
     }
 }
 
+// ═══ B3 fix Phase 2b: no_bq ⟹ sub reduced (only cancellation is b·b⁻¹ at bq') ═══
+pub proof fn lemma_sub_img(s: Symbol)
+    requires s == Symbol::Gen(0) || s == Symbol::Gen(1) || s == Symbol::Gen(2) || s == Symbol::Gen(3),
+    ensures
+        crate::reduction::is_reduced(apply_hom_symbol(sub_hom(), s)),
+        apply_hom_symbol(sub_hom(), s).len() > 0,
+        apply_hom_symbol(sub_hom(), s).last() == Symbol::Gen(0)
+            || apply_hom_symbol(sub_hom(), s).last() == Symbol::Gen(1)
+            || apply_hom_symbol(sub_hom(), s).last() == Symbol::Gen(2),
+        apply_hom_symbol(sub_hom(), s).last() == Symbol::Gen(1) ==> s == Symbol::Gen(1),
+        apply_hom_symbol(sub_hom(), s).first() == Symbol::Gen(0)
+            || apply_hom_symbol(sub_hom(), s).first() == Symbol::Gen(1)
+            || apply_hom_symbol(sub_hom(), s).first() == Symbol::Gen(2)
+            || apply_hom_symbol(sub_hom(), s).first() == Symbol::Inv(1),
+        apply_hom_symbol(sub_hom(), s).first() == Symbol::Inv(1) ==> s == Symbol::Gen(3),
+{
+    use crate::reduction::*;
+    use crate::homomorphism::*;
+    assert(sub_hom().generator_images[0] =~= seq![Symbol::Gen(0)]);
+    assert(sub_hom().generator_images[1] =~= seq![Symbol::Gen(1)]);
+    assert(sub_hom().generator_images[2] =~= seq![Symbol::Gen(2)]);
+    assert(sub_hom().generator_images[3] =~= seq![Symbol::Inv(1), Symbol::Gen(2), Symbol::Gen(0)]);
+    let img = apply_hom_symbol(sub_hom(), s);
+    assert(!has_cancellation(img)) by {
+        assert forall|i: int| !has_cancellation_at(img, i) by {}
+    }
+}
+
+// apply_hom(sub, w).first() = sub_img(w[0]).first() for nonempty w
+pub proof fn lemma_sub_first(w: Word)
+    requires w.len() > 0,
+        w[0] == Symbol::Gen(0) || w[0] == Symbol::Gen(1) || w[0] == Symbol::Gen(2) || w[0] == Symbol::Gen(3),
+    ensures apply_hom(sub_hom(), w).len() > 0,
+        apply_hom(sub_hom(), w).first() == apply_hom_symbol(sub_hom(), w[0]).first(),
+{
+    use crate::homomorphism::*;
+    lemma_sub_img(w[0]);
+    assert(apply_hom(sub_hom(), w) =~= concat(apply_hom_symbol(sub_hom(), w[0]), apply_hom(sub_hom(), w.drop_first())));
+    assert(w.first() == w[0]);
+}
+
+pub proof fn lemma_sub_reduced(w: Word)
+    requires no_bq(w), positive_word(w), word_valid(w, 4),
+    ensures crate::reduction::is_reduced(apply_hom(sub_hom(), w)),
+    decreases w.len(),
+{
+    use crate::reduction::*;
+    use crate::homomorphism::*;
+    let sub = sub_hom();
+    if w.len() == 0 {
+        assert(apply_hom(sub, w) =~= empty_word());
+    } else {
+        let rest = w.drop_first();
+        let img = apply_hom_symbol(sub, w[0]);
+        assert(apply_hom(sub, w) =~= concat(img, apply_hom(sub, rest)));
+        assert(positive_word(rest));
+        assert(word_valid(rest, 4)) by { assert forall|i: int| 0 <= i < rest.len() implies symbol_valid(#[trigger] rest[i], 4) by { assert(rest[i] == w[i + 1]); } }
+        assert(no_bq(rest)) by { if w.len() >= 2 { assert(rest =~= w.drop_first()); } }
+        assert(symbol_is_gen(w[0]) && symbol_valid(w[0], 4));
+        lemma_sub_img(w[0]);
+        lemma_sub_reduced(rest);
+        // boundary non-cancellation
+        assert((img.len() > 0 && apply_hom(sub, rest).len() > 0)
+            ==> !is_inverse_pair(img[img.len() - 1], apply_hom(sub, rest)[0])) by {
+            if img.len() > 0 && apply_hom(sub, rest).len() > 0 {
+                lemma_sub_first(rest);
+                lemma_sub_img(rest[0]);
+                // img.last() ∈ {Gen0,Gen1,Gen2}; rest_first ∈ {Gen0,Gen1,Gen2,Inv1}
+                // is_inverse_pair ⟺ last=Gen1 & rest_first=Inv1 ⟺ w[0]=Gen1 & rest[0]=Gen3
+                assert(rest[0] == w[1]);
+                if is_inverse_pair(img[img.len() - 1], apply_hom(sub, rest)[0]) {
+                    assert(apply_hom(sub, rest)[0] == inverse_symbol(img[img.len() - 1]));
+                    assert(w[0] == Symbol::Gen(1) && w[1] == Symbol::Gen(3));
+                    assert(false);
+                }
+            }
+        }
+        crate::machine_group::lemma_concat_reduced(img, apply_hom(sub, rest));
+    }
+}
+
 } // verus!
