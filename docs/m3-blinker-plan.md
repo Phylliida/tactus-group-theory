@@ -20,15 +20,12 @@ q, associated subgroups `⟨a²⟩→⟨b²⟩`. Not free ⟹ neither M1 (two-pr
 
 ## REMAINING ⟹  (group-equal positive u,v ⟹ thue-equal)
 
-### Step R1 — discharge `hnn_associations_isomorphic(m3_data())`   [moderate, self-contained]
-Needed to invoke `britton_lemma_full` / `britton_lemma_unconditional` (they auto-discharge the whole
-tower_textbook_chain from THIS single condition — see the agent survey). Statement:
-`∀ w valid over 1 gen: apply_embedding([b²],w) ≡ ε in F(a,b) ⟺ apply_embedding([a²],w) ≡ ε`.
-Both sides ⟺ `netexp(w)=0`: `apply_embedding([b²],w)` is a word over {Gen1,Inv1} = b^{2·netexp(w)},
-which is `≡ε` in free_group(2) ⟺ `2·netexp=0` ⟺ `netexp=0`; symmetric for a². Build a
-per-generator net-exponent spec fn + its free-reduction invariance (or reuse abelianization.rs /
-free_word_problem `lemma_free_group_equiv_freely_equivalent` + single-generator-power-nontrivial).
-Check machine_group.rs `gexp`/`lemma_x_pow_y_pow_trivial` and abelianization.rs first.
+### Step R1 — discharge `hnn_associations_isomorphic(m3_data())`   ✅ DONE (13/0)
+`lemma_m3_iso` — proven NOT via exponent counting but via the **a↔b swap automorphism**: swap: F(a,b)→
+F(a,b) (a↦b,b↦a), `swap(A-emb w)=B-emb w`, and homs preserve `≡ε` both ways (swap is an involution) ⟹
+the iff directly, no exponent-converse needed. Bricks: `swap_hom` + `lemma_swap_valid` (free base ⟹
+relator cond vacuous) + `lemma_apply_hom_concat` (local) + `lemma_swap_emb` (induction, per-symbol swap
+facts as hypotheses). GOTCHA (cost a hang): `by(compute)` HANGS on let-bound args — compute on LITERALS.
 
 ### Step R2 — the Britton engine   [THE BIG ONE — bespoke, largest M-ladder piece]
 Two banked engines (britton_via_tower.rs, both need only R1's iso condition):
