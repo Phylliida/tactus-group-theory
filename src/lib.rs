@@ -560,3 +560,6 @@ pub mod m0_token;
 // thue: Thue-rewriting congruence + positivity spec (Law P), Phase 0 of the ZFC-group
 // formalization campaign. Bridge = Thue-rewriting ⟹ group equality (easy direction).
 pub mod thue;
+
+// m1_guard: M-ladder rung M1 (guard motion) positivity — first M-ladder rung formalized.
+pub mod m1_guard;
