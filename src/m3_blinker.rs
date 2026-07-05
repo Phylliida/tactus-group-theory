@@ -1896,4 +1896,142 @@ pub proof fn lemma_no_qaa_cons2(a: Symbol, b: Symbol, w: Word)
     assert(abw.drop_first() =~= seq![b] + w);
 }
 
+// ═══ B3 fix P3b: no_qaa + no_qpa ⟹ no [Gen2,Gen0,Gen0] in sub(w) ═══
+pub open spec fn no_sub3(W: Word) -> bool   // no [Gen2, Gen0, Gen0]
+    decreases W.len()
+{ W.len() < 3 || (!(W[0] == Symbol::Gen(2) && W[1] == Symbol::Gen(0) && W[2] == Symbol::Gen(0)) && no_sub3(W.drop_first())) }
+
+pub proof fn lemma_no_sub3_concat(A: Word, B: Word)
+    requires
+        no_sub3(A), no_sub3(B),
+        A.len() >= 1 && B.len() >= 2 ==> !(A[A.len() - 1] == Symbol::Gen(2) && B[0] == Symbol::Gen(0) && B[1] == Symbol::Gen(0)),
+        A.len() >= 2 && B.len() >= 1 ==> !(A[A.len() - 2] == Symbol::Gen(2) && A[A.len() - 1] == Symbol::Gen(0) && B[0] == Symbol::Gen(0)),
+    ensures no_sub3(A + B),
+    decreases A.len(),
+{
+    if A.len() == 0 {
+        assert(A + B =~= B);
+    } else {
+        let AB = A + B;
+        assert(AB.drop_first() =~= A.drop_first() + B);
+        // head triple
+        if AB.len() >= 3 {
+            if A.len() >= 3 {
+                assert(AB[0] == A[0] && AB[1] == A[1] && AB[2] == A[2]);
+            } else if A.len() == 2 {
+                assert(AB[0] == A[0] && AB[1] == A[1] && AB[2] == B[0]);
+            } else {
+                assert(AB[0] == A[0] && AB[1] == B[0] && AB[2] == B[1]);
+            }
+        }
+        // recurse on A.drop_first()
+        let A2 = A.drop_first();
+        if A2.len() >= 1 && A2[A2.len() - 1] == Symbol::Gen(2) {} // trigger A2.last()==A.last()
+        assert(A2.len() >= 1 ==> A2[A2.len() - 1] == A[A.len() - 1]);
+        assert(A2.len() >= 2 ==> A2[A2.len() - 2] == A[A.len() - 2]);
+        lemma_no_sub3_concat(A2, B);
+    }
+}
+
+// sub image: reduced/first/last already via lemma_sub_img; need first==Gen0 ⟺ s==Gen0
+pub proof fn lemma_sub_img_first0(s: Symbol)
+    requires s == Symbol::Gen(0) || s == Symbol::Gen(1) || s == Symbol::Gen(2) || s == Symbol::Gen(3),
+    ensures apply_hom_symbol(sub_hom(), s).first() == Symbol::Gen(0) <==> s == Symbol::Gen(0),
+{
+    use crate::homomorphism::*;
+    assert(sub_hom().generator_images[0] =~= seq![Symbol::Gen(0)]);
+    assert(sub_hom().generator_images[1] =~= seq![Symbol::Gen(1)]);
+    assert(sub_hom().generator_images[2] =~= seq![Symbol::Gen(2)]);
+    assert(sub_hom().generator_images[3] =~= seq![Symbol::Inv(1), Symbol::Gen(2), Symbol::Gen(0)]);
+}
+
+pub proof fn lemma_sub_no_sub3(w: Word)
+    requires no_qaa(w), no_qpa(w), positive_word(w), word_valid(w, 4),
+    ensures no_sub3(apply_hom(sub_hom(), w)),
+    decreases w.len(),
+{
+    use crate::homomorphism::*;
+    let sub = sub_hom();
+    if w.len() == 0 {
+        assert(apply_hom(sub, w) =~= empty_word());
+    } else {
+        let rest = w.drop_first();
+        let A = apply_hom_symbol(sub, w[0]);
+        let B = apply_hom(sub, rest);
+        assert(apply_hom(sub, w) =~= A + B);
+        assert(no_qaa(rest) && no_qpa(rest));
+        assert(positive_word(rest));
+        assert(word_valid(rest, 4)) by { assert forall|i: int| 0 <= i < rest.len() implies symbol_valid(#[trigger] rest[i], 4) by { assert(rest[i] == w[i + 1]); } }
+        lemma_sub_no_sub3(rest);                 // no_sub3(B)
+        assert(symbol_is_gen(w[0]) && symbol_valid(w[0], 4));
+        assert(w[0] == Symbol::Gen(0) || w[0] == Symbol::Gen(1) || w[0] == Symbol::Gen(2) || w[0] == Symbol::Gen(3));
+        lemma_sub_img(w[0]);                     // A reduced, first/last
+        assert(no_sub3(A)) by {                  // A is a short image, no [Gen2,Gen0,Gen0]
+            assert(sub.generator_images[0] =~= seq![Symbol::Gen(0)]);
+            assert(sub.generator_images[1] =~= seq![Symbol::Gen(1)]);
+            assert(sub.generator_images[2] =~= seq![Symbol::Gen(2)]);
+            assert(sub.generator_images[3] =~= seq![Symbol::Inv(1), Symbol::Gen(2), Symbol::Gen(0)]);
+            if w[0] == Symbol::Gen(3) {
+                assert(A =~= seq![Symbol::Inv(1), Symbol::Gen(2), Symbol::Gen(0)]);
+                assert(A.len() == 3 && A[0] == Symbol::Inv(1));
+                assert(A.drop_first() =~= seq![Symbol::Gen(2), Symbol::Gen(0)]);
+                assert(A.drop_first().len() == 2);
+                assert(no_sub3(A.drop_first()));
+                assert(no_sub3(A));
+            }
+            else {
+                if w[0] == Symbol::Gen(0) { assert(A =~= seq![Symbol::Gen(0)]); }
+                else if w[0] == Symbol::Gen(1) { assert(A =~= seq![Symbol::Gen(1)]); }
+                else { assert(A =~= seq![Symbol::Gen(2)]); }
+                assert(A.len() < 3); assert(no_sub3(A));
+            }
+        }
+        // boundary conditions
+        assert(A.len() >= 1 && B.len() >= 2 ==> !(A[A.len() - 1] == Symbol::Gen(2) && B[0] == Symbol::Gen(0) && B[1] == Symbol::Gen(0))) by {
+            if A.len() >= 1 && B.len() >= 2 && A[A.len() - 1] == Symbol::Gen(2) {
+                // A.last()==Gen2 ⟹ w[0]==q; B[0]=B[1]=Gen0 ⟹ rest[0]=rest[1]=a ⟹ qaa
+                assert(w[0] == Symbol::Gen(2));
+                lemma_sub_first(rest);
+                lemma_sub_img_first0(rest[0]);
+                if B[0] == Symbol::Gen(0) && B[1] == Symbol::Gen(0) {
+                    assert(rest[0] == Symbol::Gen(0));           // a
+                    // B = sub(a) + sub(rest.drop) = [Gen0] + ...; B[1]=sub(rest.drop)[0]
+                    assert(apply_hom_symbol(sub, rest[0]) =~= seq![Symbol::Gen(0)]);
+                    assert(B =~= seq![Symbol::Gen(0)] + apply_hom(sub, rest.drop_first()));
+                    assert(rest.drop_first().len() > 0) by { if rest.drop_first().len() == 0 { assert(apply_hom(sub, rest.drop_first()) =~= empty_word()); } }
+                    assert(rest.len() >= 1);
+                    assert(rest.drop_first().len() == rest.len() - 1);
+                    assert(rest.len() >= 2);
+                    assert(rest.drop_first()[0] == rest[1]);
+                    assert(rest[1] == w[2]);
+                    lemma_positive_gen(w, 2);
+                    assert(symbol_is_gen(rest[1]) && symbol_valid(rest[1], 4));
+                    lemma_sub_first(rest.drop_first());
+                    lemma_sub_img_first0(rest.drop_first()[0]);
+                    assert(rest.drop_first()[0] == Symbol::Gen(0));
+                    assert(rest[1] == rest.drop_first()[0]);
+                    // w[0]=q, rest[0]=a, rest[1]=a ⟹ qaa
+                    assert(w[1] == rest[0] && w[2] == rest[1]);
+                    assert(false);
+                }
+            }
+        }
+        assert(A.len() >= 2 && B.len() >= 1 ==> !(A[A.len() - 2] == Symbol::Gen(2) && A[A.len() - 1] == Symbol::Gen(0) && B[0] == Symbol::Gen(0))) by {
+            if A.len() >= 2 && B.len() >= 1 && A[A.len() - 2] == Symbol::Gen(2) && A[A.len() - 1] == Symbol::Gen(0) {
+                // A has len>=2 with [..,Gen2,Gen0] ⟹ A = sub(q') ⟹ w[0]=q'; B[0]=Gen0 ⟹ rest[0]=a ⟹ q'a
+                assert(A =~= seq![Symbol::Inv(1), Symbol::Gen(2), Symbol::Gen(0)]);
+                assert(w[0] == Symbol::Gen(3));
+                if B[0] == Symbol::Gen(0) {
+                    lemma_sub_first(rest);
+                    lemma_sub_img_first0(rest[0]);
+                    assert(rest[0] == Symbol::Gen(0));
+                    assert(w[1] == rest[0]);
+                    assert(false);
+                }
+            }
+        }
+        lemma_no_sub3_concat(A, B);
+    }
+}
+
 } // verus!
