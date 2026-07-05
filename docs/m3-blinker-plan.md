@@ -134,6 +134,24 @@ Three cases on (has-state-letters u?, has-state-letters v?):
   lemma_deriv_syls to the full output, OR a "Britton NF is a complete invariant" lemma. The MATH is fine
   (sub is a group iso, positivity holds); this is a proof-strategy course-correction. The after-q-gap
   a-head≤1 (below) is STILL needed for the syls part.
+  ── ASSEMBLY PROGRESS (m3 at 88/0), route = RIGHT-CANCELLATION (no h-preservation) ──
+  * P3a ✅ (84/0): no_qa/no_qpa/no_qaa preds + lemma_ffnf_no_qpa + lemma_ffnf_no_qaa (ffnf props from u nf).
+  * P3b ✅ (88/0): no_sub3 pred + lemma_no_sub3_concat + lemma_sub_no_sub3 (no_qaa+no_qpa ⟹ no [Gen2,Gen0,Gen0] in sub).
+  * P4a ✅ (75/0): base_run/drop_base_run/split_q + lemma_gap_word_split (gap_word∘split_q=id).
+  * P3c [TODO — NEXT] gaps nf: from no_sub3(sub(ffnf u)) [P3b via P3a] + is_reduced(sub(ffnf u)) [P2b] +
+    sub-images-no-Inv0, prove `forall i: nf_gap(split_q(drop_base_run(sub(ffnf u)))[i])`. Needs small
+    preservation helpers (reduced-prefix/suffix, no_sub3/no_Inv0/word_valid preserved under drop_first/
+    drop_base_run/base_run) + lead(base_run(after),0)≤1 from no_sub3 head. ~6-8 mechanical lemmas.
+  * P5 [TODO] connect: sub(ffnf u) = base_run · gap_word(gaps) [lemma_base_drop_reconstruct + gap_word_split];
+    textbook_act_hnn(sub(ffnf u),ε,[]) = (base_run, gap_syls(gaps)) via lemma_act_compose ✅ + lemma_act_base ✅
+    + lemma_act_gap_word ✅. So act_syls(sub(ffnf u)) = gap_syls(gaps).
+  * P6 [TODO] injectivity: sub(u)≡sub(v) ⟹ sub(ffnf u)≡sub(ffnf v) [u~thue ffnf u, P1] ⟹ act_syls equal
+    [lemma_syls_preserved] ⟹ gap_syls(gaps u)=gap_syls(gaps v) ⟹ gaps equal ⟹ gap_word(gaps) equal =: G.
+    Then sub(ffnf u)=P0u·G, sub(ffnf v)=P0v·G; sub(ffnf u)≡sub(ffnf v) ⟹ P0u·G≡P0v·G ⟹ [right-cancel]
+    P0u≡P0v ⟹ [reduced base words] P0u=P0v ⟹ sub(ffnf u)=sub(ffnf v) ⟹ [sub PREFIX CODE] ffnf u=ffnf v
+    ⟹ u~thue v ⟹ [Thue-nf] u=v.  (Need: right-cancel lemma, sub prefix-injective, base-word faithful.)
+  * P7 [TODO] dispatcher (base ✓/no_mixed ✓/P6) + R3 (Thue-nf reduce → positivity iff).
+  (Superseded early sketch:)
   * P3 [TODO] ffnf gaps nf: `no_qpa`(no q'a)+`no_qaa` preserved through ffnf (junction args like no_bq) ⟹
     gaps of q·sub(ffnf u)·q have a-head≤1 (+ reduced from P2b, no-Inv0 trivial) ⟹ nf_gap.
   * P4 [TODO] structural: `split_q(W)` (split q-word at Gen2's) + `gap_word∘split_q = id` for q-words ⟹
