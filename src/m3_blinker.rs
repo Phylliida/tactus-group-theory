@@ -1465,4 +1465,32 @@ pub proof fn lemma_act_gap_word(gs: Seq<Word>)
     }
 }
 
+// ═══ B3 fix: firing bq'→qa is a Thue move (= the b·b⁻¹ free-reduction in sub) ═══
+// m3_rules()[0]: qa (lhs) = bq' (rhs). So replacing bq'→qa is rule 0 backward.
+pub proof fn lemma_bq_qa_thue(x: Word, y: Word)
+    ensures thue_equiv(m3_rules(),
+        concat(x, concat(seq![Symbol::Gen(1), Symbol::Gen(3)], y)),
+        concat(x, concat(seq![Symbol::Gen(2), Symbol::Gen(0)], y))),
+{
+    let bq = seq![Symbol::Gen(1), Symbol::Gen(3)];   // bq' = rules[0].rhs
+    let qa = seq![Symbol::Gen(2), Symbol::Gen(0)];   // qa  = rules[0].lhs
+    let u = concat(x, concat(bq, y));
+    let v = concat(x, concat(qa, y));
+    let pos = x.len() as int;
+    assert(u =~= x + bq + y);
+    assert(v =~= x + qa + y);
+    assert(m3_rules()[0].rhs =~= bq);
+    assert(m3_rules()[0].lhs =~= qa);
+    assert(u.subrange(0, pos) =~= x);
+    assert(u.subrange(pos, pos + 2) =~= bq);
+    assert(u.subrange(pos + 2, u.len() as int) =~= y);
+    assert(thue_step_at(m3_rules()[0], u, v, pos, false)) by {
+        assert(u.subrange(pos, pos + m3_rules()[0].rhs.len() as int) =~= m3_rules()[0].rhs);
+        assert(v =~= u.subrange(0, pos) + m3_rules()[0].lhs
+            + u.subrange(pos + m3_rules()[0].rhs.len() as int, u.len() as int));
+    }
+    assert(thue_step(m3_rules(), u, v)) by { assert(thue_step_at(m3_rules()[0], u, v, pos, false)); }
+    lemma_thue_single(m3_rules(), u, v);
+}
+
 } // verus!
