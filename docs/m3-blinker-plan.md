@@ -83,11 +83,25 @@ Three cases on (has-state-letters u?, has-state-letters v?):
     Because target=g·rep⁻¹=g·g⁻¹≡ε ⟹ h=ε is the min-len (0) witness. ANOTHER min-len shortlex argument
     (same flavor as rep=gap; there's `lemma_b_rcoset_h_identity`: b_rcoset_h(ε)=ε, and satisfiable/props
     private helpers at :1494/:1728). ⟹ carry `phi_inv_h = apply_embedding(a_words, b_rcoset_h(g)) = ε`.
-  * B5 ✅ SIMPLIFIED (prefix-code, NOT parsing): rep=gap + no-collapse ⟹ `act_syls(q·sub(u)·q)` is the
-    literal gap sequence; gaps + all-stable-Gen2 ⟹ the word `q·sub(u)·q` is reconstructed uniquely ⟹
-    `sub(u)=sub(v)` as WORDS. Then `sub` is a PREFIX CODE (images [Gen0],[Gen1],[Gen2],[Inv1,Gen2,Gen0]
-    are prefix-distinguishable — only q' starts with Inv1) ⟹ sub literal-injective ⟹ u=v. Clean, no
-    a-prefix/b⁻¹-suffix parsing needed.
+  * B3-ACT-SYLS ✅ MACHINERY DONE (55/0): `lemma_act_compose` (britton_via_tower, act(w1·w2)=act(w1,act(w2))),
+    `lemma_act_base` (base words accumulate), `lemma_psi_p_nf_gap` (one q on nf-gap → {false,gap}::syls),
+    `lemma_act_gap_word` (act(gap_word(gs),ε,[])=(ε,gap_syls(gs)) for nf gaps). Computes act_syls of any
+    reduced-gap-interleaved word. `nf_gap`/`gap_word`/`gap_syls` defined.
+
+  ⚠️  **CRITICAL SUBTLETY FOUND (blocks the simple B5; the ORIGINAL DOC GLOSSED THIS):**
+  Gaps of `sub(nf u)` are **NOT freely reduced**. `sub(q')=[Inv1,Gen2,Gen0]=b⁻¹qa`, so `u=bq'` ⟹
+  `sub(bq')=[Gen1,Inv1,Gen2,Gen0]=b·b⁻¹·q·a` — the gap `b·b⁻¹` cancels. And the reduction **loses the
+  q'/q marker**: `q·sub(bq')·q` and `q·sub(qa)·q` have the SAME reduced gaps `[ε,a,ε]`. Injectivity
+  still HOLDS (only `bq'` is nf; `qa` is not — `qa→bq'`), but recovering u needs **nf-disambiguation**,
+  NOT `gap_word∘split`. Worse, the nf orientation is forced: standard nf (no qa/q'a) gives a-head≤1
+  (needed for parity B4) but allows `bq'` (non-reduced gaps); reverse nf (no bq'/bq) gives reduced gaps
+  but a-head≤2 (parity B4 fails). NO orientation gives both. So `act_syls(q·sub(u)·q)` = the REDUCED
+  gaps (Britton nf), and the remaining obligation is exactly: **the map (nf word u) ↦ (reduced-gap
+  sequence) is INJECTIVE** — equivalently, no two distinct nf words share a Britton normal form. This is
+  the genuine remaining content; needs a fresh argument (likely: reconstruct the unique nf word from
+  reduced gaps by re-inserting b·b⁻¹ where nf-ness demands, or a direct induction on u). B4/rep=gap give
+  "reduced gaps of u,v match" from act_syls equality; the NEW piece is nf-word↦reduced-gaps injective.
+  * B5 [was oversimplified — see subtlety]: prefix-code idea FAILS because reduced gaps ≠ raw sub(u).
   * ASSEMBLE: readback dispatcher (base ✓ / no_mixed ✓ / B3–B5) ⟹ `lemma_m3_readback` ⟹ ⟹ direction.
   NOTE: B1/B2 used sub(u)·q; the assembly wants q·sub(u)·q — re-establish no-collapse/count for that form.
 
