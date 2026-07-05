@@ -248,4 +248,121 @@ pub proof fn lemma_group_implies_same_deletes(u: Word, v: Word)
     lemma_kill_gives_same_delete(2, u, v);
 }
 
+// ═══ PART B — combinatorial completeness: same deletes ⟹ thue_equiv ═══
+// leading-run splitter + the two bubble lemmas (move a letter to the front of a run).
+
+pub open spec fn lead(w: Word, x: nat) -> nat
+    decreases w.len()
+{
+    if w.len() > 0 && w[0] == Symbol::Gen(x) { (1 + lead(w.drop_first(), x)) as nat } else { 0 }
+}
+
+pub proof fn lemma_lead_run(w: Word, x: nat)
+    ensures
+        lead(w, x) <= w.len(),
+        forall|i: int| 0 <= i < lead(w, x) ==> #[trigger] w[i] == Symbol::Gen(x),
+        lead(w, x) < w.len() ==> w[lead(w, x) as int] != Symbol::Gen(x),
+    decreases w.len()
+{
+    if w.len() > 0 && w[0] == Symbol::Gen(x) {
+        lemma_lead_run(w.drop_first(), x);
+        assert forall|i: int| 0 <= i < lead(w, x) implies #[trigger] w[i] == Symbol::Gen(x) by {
+            if i > 0 { assert(w[i] == w.drop_first()[i - 1]); }
+        }
+        if lead(w, x) < w.len() {
+            assert(w[lead(w, x) as int] == w.drop_first()[lead(w, x) as int - 1]);
+        }
+    }
+}
+
+// bubble a g to the front of a run of n's:  n^k · g · rest  ~  g · n^k · rest
+pub proof fn lemma_bubble_g(run: Word, rest: Word)
+    requires forall|i: int| 0 <= i < run.len() ==> #[trigger] run[i] == Symbol::Gen(3),
+    ensures thue_equiv(m1_rules(),
+        run + seq![Symbol::Gen(2)] + rest, seq![Symbol::Gen(2)] + run + rest),
+    decreases run.len()
+{
+    let g = seq![Symbol::Gen(2)];
+    if run.len() == 0 {
+        assert(run + g + rest =~= g + rest);
+        assert(g + run + rest =~= g + rest);
+        lemma_thue_refl(m1_rules(), g + rest);
+    } else {
+        let run2 = run.drop_first();
+        assert(run[0] == Symbol::Gen(3));
+        assert forall|i: int| 0 <= i < run2.len() implies #[trigger] run2[i] == Symbol::Gen(3) by {
+            assert(run2[i] == run[i + 1]);
+        }
+        lemma_bubble_g(run2, rest);                       // run2·g·rest ~ g·run2·rest
+        lemma_thue_prepend(m1_rules(), Symbol::Gen(3), run2 + g + rest, g + run2 + rest);
+        // [Gen3]·(run2·g·rest) = run·g·rest ; [Gen3]·(g·run2·rest) = [Gen3,Gen2]·run2·rest
+        assert(seq![Symbol::Gen(3)] + (run2 + g + rest) =~= run + g + rest);
+        let x = run2 + rest;
+        assert(seq![Symbol::Gen(3)] + (g + run2 + rest)
+            =~= seq![Symbol::Gen(3), Symbol::Gen(2)] + x);
+        // swap [Gen3,Gen2]·x ~ [Gen2,Gen3]·x  (ng → gn, bwd step at pos 0)
+        assert(thue_step(m1_rules(), seq![Symbol::Gen(3), Symbol::Gen(2)] + x,
+                                      seq![Symbol::Gen(2), Symbol::Gen(3)] + x)) by {
+            assert(thue_step_at(m1_rules()[0], seq![Symbol::Gen(3), Symbol::Gen(2)] + x,
+                                                seq![Symbol::Gen(2), Symbol::Gen(3)] + x, 0, false)) by {
+                assert((seq![Symbol::Gen(3), Symbol::Gen(2)] + x).subrange(0, 2) =~= seq![Symbol::Gen(3), Symbol::Gen(2)]);
+                assert(seq![Symbol::Gen(2), Symbol::Gen(3)] + x
+                    =~= (seq![Symbol::Gen(3), Symbol::Gen(2)] + x).subrange(0, 0)
+                        + seq![Symbol::Gen(2), Symbol::Gen(3)]
+                        + (seq![Symbol::Gen(3), Symbol::Gen(2)] + x).subrange(2, (2 + x.len()) as int));
+            }
+        }
+        lemma_thue_single(m1_rules(), seq![Symbol::Gen(3), Symbol::Gen(2)] + x,
+                                       seq![Symbol::Gen(2), Symbol::Gen(3)] + x);
+        assert(seq![Symbol::Gen(2), Symbol::Gen(3)] + x =~= g + run + rest);
+        // chain: run·g·rest ~ [Gen3,Gen2]·x ~ [Gen2,Gen3]·x = g·run·rest
+        lemma_thue_trans(m1_rules(), run + g + rest,
+            seq![Symbol::Gen(3), Symbol::Gen(2)] + x, seq![Symbol::Gen(2), Symbol::Gen(3)] + x);
+    }
+}
+
+// mirror: bubble an n to the front of a run of g's:  g^k · n · rest  ~  n · g^k · rest
+pub proof fn lemma_bubble_n(run: Word, rest: Word)
+    requires forall|i: int| 0 <= i < run.len() ==> #[trigger] run[i] == Symbol::Gen(2),
+    ensures thue_equiv(m1_rules(),
+        run + seq![Symbol::Gen(3)] + rest, seq![Symbol::Gen(3)] + run + rest),
+    decreases run.len()
+{
+    let n = seq![Symbol::Gen(3)];
+    if run.len() == 0 {
+        assert(run + n + rest =~= n + rest);
+        assert(n + run + rest =~= n + rest);
+        lemma_thue_refl(m1_rules(), n + rest);
+    } else {
+        let run2 = run.drop_first();
+        assert(run[0] == Symbol::Gen(2));
+        assert forall|i: int| 0 <= i < run2.len() implies #[trigger] run2[i] == Symbol::Gen(2) by {
+            assert(run2[i] == run[i + 1]);
+        }
+        lemma_bubble_n(run2, rest);
+        lemma_thue_prepend(m1_rules(), Symbol::Gen(2), run2 + n + rest, n + run2 + rest);
+        assert(seq![Symbol::Gen(2)] + (run2 + n + rest) =~= run + n + rest);
+        let x = run2 + rest;
+        assert(seq![Symbol::Gen(2)] + (n + run2 + rest)
+            =~= seq![Symbol::Gen(2), Symbol::Gen(3)] + x);
+        // swap [Gen2,Gen3]·x ~ [Gen3,Gen2]·x  (gn → ng, FWD step at pos 0)
+        assert(thue_step(m1_rules(), seq![Symbol::Gen(2), Symbol::Gen(3)] + x,
+                                      seq![Symbol::Gen(3), Symbol::Gen(2)] + x)) by {
+            assert(thue_step_at(m1_rules()[0], seq![Symbol::Gen(2), Symbol::Gen(3)] + x,
+                                                seq![Symbol::Gen(3), Symbol::Gen(2)] + x, 0, true)) by {
+                assert((seq![Symbol::Gen(2), Symbol::Gen(3)] + x).subrange(0, 2) =~= seq![Symbol::Gen(2), Symbol::Gen(3)]);
+                assert(seq![Symbol::Gen(3), Symbol::Gen(2)] + x
+                    =~= (seq![Symbol::Gen(2), Symbol::Gen(3)] + x).subrange(0, 0)
+                        + seq![Symbol::Gen(3), Symbol::Gen(2)]
+                        + (seq![Symbol::Gen(2), Symbol::Gen(3)] + x).subrange(2, (2 + x.len()) as int));
+            }
+        }
+        lemma_thue_single(m1_rules(), seq![Symbol::Gen(2), Symbol::Gen(3)] + x,
+                                       seq![Symbol::Gen(3), Symbol::Gen(2)] + x);
+        assert(seq![Symbol::Gen(3), Symbol::Gen(2)] + x =~= n + run + rest);
+        lemma_thue_trans(m1_rules(), run + n + rest,
+            seq![Symbol::Gen(2), Symbol::Gen(3)] + x, seq![Symbol::Gen(3), Symbol::Gen(2)] + x);
+    }
+}
+
 } // verus!
