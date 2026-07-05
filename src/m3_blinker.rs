@@ -941,4 +941,171 @@ pub proof fn lemma_parity_head_cap(g1: Word, g2: Word, k: int)
     }
 }
 
+// ═══ B3 foundation: b_rcoset_rep(nf gap) = gap — Stage A (coset/reduction helpers) ═══
+pub open spec fn m3_afp() -> crate::amalgamated_free_product::AmalgamatedData {
+    crate::tower::tower_afp_data(m3_data(), 0)
+}
+pub open spec fn abs_int(m: int) -> int { if m >= 0 { m } else { -m } }
+pub open spec fn head_decomp_ok(w: Word, m: int, s: Word) -> bool {
+    &&& w == crate::machine_group::signed_power(0, m) + s
+    &&& word_valid(s, 2)
+    &&& crate::reduction::is_reduced(s)
+    &&& (s.len() > 0 ==> s[0] != Symbol::Gen(0) && s[0] != Symbol::Inv(0))
+    &&& w.len() == abs_int(m) + s.len()
+}
+
+proof fn lemma_m3_afp_valid()
+    ensures
+        crate::amalgamated_free_product::amalgamated_data_valid(m3_afp()),
+        crate::presentation::presentation_valid(m3_afp().p2),
+        m3_afp().p2 == crate::higman_operations::free_group(2),
+        m3_afp().p2.num_generators == 2,
+        crate::normal_form_afp_textbook::b_words(m3_afp()) =~= seq![seq![Symbol::Gen(0), Symbol::Gen(0)]],
+{
+    reveal(crate::presentation::presentation_valid);
+    lemma_m3_data_valid();
+    crate::tower::lemma_tower_afp_data_valid(m3_data(), 0);
+    crate::higman_operations::lemma_free_group_valid(2);
+    assert(m3_afp().p2 == m3_data().base);
+    assert(m3_afp().identifications[0].1 =~= seq![Symbol::Gen(0), Symbol::Gen(0)]);
+}
+
+// H1: monotone extraction from no_shorter
+proof fn lemma_no_shorter_below(data: crate::amalgamated_free_product::AmalgamatedData, g: Word, l: nat, l2: nat)
+    requires
+        crate::normal_form_afp_textbook::no_shorter_b_rcoset_word(data, g, l),
+        l2 < l,
+    ensures !crate::normal_form_afp_textbook::has_b_rcoset_word_of_len(data, g, l2),
+    decreases l,
+{
+    if l2 < (l - 1) as nat { lemma_no_shorter_below(data, g, (l - 1) as nat, l2); }
+}
+
+// suffix of reduced is reduced
+proof fn lemma_suffix_reduced(w: Word)
+    requires crate::reduction::is_reduced(w), w.len() > 0,
+    ensures crate::reduction::is_reduced(w.drop_first()),
+{
+    use crate::reduction::*;
+    let d = w.drop_first();
+    assert(d.len() == w.len() - 1);
+    assert(!has_cancellation(d)) by {
+        assert forall|i: int| !has_cancellation_at(d, i) by {
+            if 0 <= i < d.len() - 1 {
+                assert(d[i] == w[i + 1]);
+                assert(d[i + 1] == w[i + 2]);
+                assert(!has_cancellation_at(w, i + 1));
+            }
+        }
+    }
+}
+
+// H12: one-step lex-rank unfold for a headed word
+proof fn lemma_rank_head(w: Word, s: Word, sym: Symbol)
+    requires w =~= seq![sym] + s,
+    ensures crate::normal_form_afp_textbook::word_lex_rank_base(w, 5)
+        == crate::todd_coxeter::symbol_to_column(sym)
+         + 5 * crate::normal_form_afp_textbook::word_lex_rank_base(s, 5),
+{
+    assert(w.len() == 1 + s.len());
+    assert(w.first() == sym);
+    assert(w.drop_first() =~= s);
+}
+
+// H11: a^j · s reduced when s reduced and doesn't start with a±
+proof fn lemma_signed_power_concat_reduced(j: int, s: Word)
+    requires
+        crate::reduction::is_reduced(s),
+        s.len() > 0 ==> s[0] != Symbol::Gen(0) && s[0] != Symbol::Inv(0),
+    ensures crate::reduction::is_reduced(crate::machine_group::signed_power(0, j) + s),
+{
+    use crate::reduction::*;
+    let sp = crate::machine_group::signed_power(0, j);
+    assert(forall|i: int| 0 <= i < sp.len() ==> (sp[i] == Symbol::Gen(0) || sp[i] == Symbol::Inv(0)));
+    assert(is_reduced(sp)) by {
+        assert forall|i: int| !has_cancellation_at(sp, i) by {
+            if 0 <= i < sp.len() - 1 { assert(sp[i] == sp[i + 1]); }
+        }
+    }
+    if sp.len() > 0 && s.len() > 0 {
+        assert(sp[sp.len() - 1] == Symbol::Gen(0) || sp[sp.len() - 1] == Symbol::Inv(0));
+        assert(!is_inverse_pair(sp[sp.len() - 1], s[0]));
+    }
+    crate::machine_group::lemma_concat_reduced(sp, s);
+}
+
+// H5: same_b_rcoset reflexive
+proof fn lemma_same_b_rcoset_refl(data: crate::amalgamated_free_product::AmalgamatedData, g: Word)
+    requires
+        crate::amalgamated_free_product::amalgamated_data_valid(data),
+        crate::presentation::presentation_valid(data.p2),
+        word_valid(g, data.p2.num_generators),
+    ensures crate::normal_form_afp_textbook::same_b_rcoset(data, g, g),
+{
+    crate::word::lemma_inverse_word_valid(g, data.p2.num_generators);
+    crate::presentation_lemmas::lemma_word_inverse_right(data.p2, g);
+    crate::benign::lemma_identity_in_generated_subgroup(data.p2, crate::normal_form_afp_textbook::b_words(data));
+    crate::presentation::lemma_equiv_symmetric(data.p2, concat(g, inverse_word(g)), empty_word());
+    crate::normal_form_afp_textbook::lemma_in_subgroup_equiv(data.p2,
+        crate::normal_form_afp_textbook::b_words(data), empty_word(), concat(g, inverse_word(g)));
+}
+
+// H6: same_b_rcoset respects equiv on the 2nd arg
+proof fn lemma_same_b_rcoset_respects_equiv(data: crate::amalgamated_free_product::AmalgamatedData, g: Word, w1: Word, w2: Word)
+    requires
+        crate::amalgamated_free_product::amalgamated_data_valid(data),
+        crate::presentation::presentation_valid(data.p2),
+        word_valid(g, data.p2.num_generators),
+        word_valid(w1, data.p2.num_generators),
+        word_valid(w2, data.p2.num_generators),
+        crate::normal_form_afp_textbook::same_b_rcoset(data, g, w1),
+        equiv_in_presentation(data.p2, w1, w2),
+    ensures crate::normal_form_afp_textbook::same_b_rcoset(data, g, w2),
+{
+    crate::normal_form_afp_textbook::lemma_equiv_inverse(data.p2, w1, w2);
+    crate::word::lemma_inverse_word_valid(w1, data.p2.num_generators);
+    crate::word::lemma_inverse_word_valid(w2, data.p2.num_generators);
+    crate::presentation_lemmas::lemma_equiv_concat_right(data.p2, g, inverse_word(w1), inverse_word(w2));
+    crate::normal_form_afp_textbook::lemma_in_subgroup_equiv(data.p2,
+        crate::normal_form_afp_textbook::b_words(data),
+        concat(g, inverse_word(w1)), concat(g, inverse_word(w2)));
+}
+
+// H7: a min-length coset word is freely reduced
+proof fn lemma_min_coset_word_reduced(data: crate::amalgamated_free_product::AmalgamatedData, g: Word, rep: Word)
+    requires
+        crate::amalgamated_free_product::amalgamated_data_valid(data),
+        crate::presentation::presentation_valid(data.p2),
+        data.p2.num_generators == 2,
+        word_valid(g, 2), word_valid(rep, 2),
+        crate::normal_form_afp_textbook::same_b_rcoset(data, g, rep),
+        rep.len() == crate::normal_form_afp_textbook::b_rcoset_min_len(data, g),
+        crate::normal_form_afp_textbook::is_min_b_rcoset_len(data, g,
+            crate::normal_form_afp_textbook::b_rcoset_min_len(data, g)),
+    ensures crate::reduction::is_reduced(rep),
+{
+    use crate::reduction::*;
+    if !is_reduced(rep) {
+        assert(has_cancellation(rep));
+        let i = choose|i: int| has_cancellation_at(rep, i);
+        let rep2 = reduce_at(rep, i);
+        lemma_reduce_at_len(rep, i);
+        lemma_reduce_at_elements(rep, i);
+        assert(reduces_one_step(rep, rep2));
+        assert(reduces_in_steps(rep2, rep2, 0));
+        assert(reduces_in_steps(rep, rep2, 1));
+        assert(reduces_to(rep, rep2));
+        assert(word_valid(rep2, 2)) by {
+            assert forall|k: int| 0 <= k < rep2.len() implies symbol_valid(#[trigger] rep2[k], 2) by {
+                if k < i { assert(rep2[k] == rep[k]); } else { assert(rep2[k] == rep[k + 2]); }
+            }
+        }
+        crate::presentation_lemmas::lemma_reduces_to_equiv(data.p2, rep, rep2);
+        lemma_same_b_rcoset_respects_equiv(data, g, rep, rep2);
+        assert(crate::normal_form_afp_textbook::has_b_rcoset_word_of_len(data, g, rep2.len()));
+        lemma_no_shorter_below(data, g, crate::normal_form_afp_textbook::b_rcoset_min_len(data, g), rep2.len());
+        assert(false);
+    }
+}
+
 } // verus!
