@@ -4650,6 +4650,28 @@ pub open spec fn textbook_act_hnn(
     }
 }
 
+//  Base words (no stable letters) just accumulate into the leading coefficient h.
+pub proof fn lemma_act_base(data: HNNData, w: Word, h: Word, syls: Seq<Syllable>)
+    requires forall|i: int| 0 <= i < w.len() ==> !is_stable(data, #[trigger] w[i]),
+    ensures textbook_act_hnn(data, w, h, syls) == (concat(w, h), syls),
+    decreases w.len(),
+{
+    let ng = data.base.num_generators;
+    if w.len() == 0 {
+        assert(concat(w, h) =~= h);
+    } else {
+        let s = w.last();
+        assert(!is_stable(data, s));
+        assert(s != Symbol::Gen(ng) && s != Symbol::Inv(ng));
+        let new_h = concat(Seq::new(1, |_i: int| s), h);
+        assert(forall|i: int| 0 <= i < w.drop_last().len() ==> !is_stable(data, #[trigger] w.drop_last()[i])) by {
+            assert forall|i: int| 0 <= i < w.drop_last().len() implies !is_stable(data, #[trigger] w.drop_last()[i]) by { assert(w.drop_last()[i] == w[i]); }
+        }
+        lemma_act_base(data, w.drop_last(), new_h, syls);
+        assert(concat(w.drop_last(), new_h) =~= concat(w, h));
+    }
+}
+
 //  Composition: the action processes right-to-left, so act(w1·w2) = act(w1) applied
 //  to the state produced by act(w2).  Key structural tool for reading off syllables.
 pub proof fn lemma_act_compose(data: HNNData, w1: Word, w2: Word, h: Word, syls: Seq<Syllable>)
