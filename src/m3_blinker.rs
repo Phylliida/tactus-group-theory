@@ -267,4 +267,127 @@ pub proof fn lemma_group_to_hnn(u: Word, v: Word)
     crate::homomorphism::lemma_hom_preserves_equiv(sub_hom(), u, v);
 }
 
+// ═══ R1 — discharge hnn_associations_isomorphic(m3_data()) via the a↔b swap automorphism ═══
+// swap: F(a,b) → F(a,b), a↦b, b↦a (an involution). swap(b²)=a², so swap(A-emb(w))=B-emb(w).
+pub open spec fn swap_hom() -> crate::homomorphism::HomomorphismData {
+    crate::homomorphism::HomomorphismData {
+        source: crate::higman_operations::free_group(2),
+        target: crate::higman_operations::free_group(2),
+        generator_images: seq![ seq![Symbol::Gen(1)], seq![Symbol::Gen(0)] ],
+    }
+}
+
+pub proof fn lemma_swap_valid()
+    ensures crate::homomorphism::is_valid_homomorphism(swap_hom())
+{
+    use crate::homomorphism::*;
+    crate::higman_operations::lemma_free_group_valid(2);
+    let h = swap_hom();
+    assert forall|i: int| 0 <= i < h.generator_images.len()
+        implies word_valid(#[trigger] h.generator_images[i], 2) by { assert(word_valid(h.generator_images[i], 2)); }
+    // free_group(2) has no relators ⟹ relator condition vacuous
+    assert(h.source.relators.len() == 0);
+}
+
+// apply_hom distributes over concat (local helper)
+pub proof fn lemma_apply_hom_concat(h: crate::homomorphism::HomomorphismData, a: Word, b: Word)
+    ensures crate::homomorphism::apply_hom(h, a + b) =~=
+        crate::homomorphism::apply_hom(h, a) + crate::homomorphism::apply_hom(h, b)
+    decreases a.len()
+{
+    use crate::homomorphism::*;
+    if a.len() == 0 {
+        assert(a + b =~= b);
+    } else {
+        assert((a + b)[0] == a[0]);
+        assert((a + b).first() == a.first());
+        assert((a + b).drop_first() =~= a.drop_first() + b);
+        lemma_apply_hom_concat(h, a.drop_first(), b);
+    }
+}
+
+// swap∘(embed by src) = embed by tgt, given the per-generator swap facts.
+pub proof fn lemma_swap_emb(src: Word, tgt: Word, w: Word)
+    requires
+        word_valid(w, 1),
+        crate::homomorphism::apply_hom(swap_hom(), src) =~= tgt,
+        crate::homomorphism::apply_hom(swap_hom(), inverse_word(src)) =~= inverse_word(tgt),
+    ensures crate::homomorphism::apply_hom(swap_hom(), crate::benign::apply_embedding(seq![src], w))
+        =~= crate::benign::apply_embedding(seq![tgt], w)
+    decreases w.len()
+{
+    use crate::homomorphism::*;
+    use crate::benign::*;
+    if w.len() > 0 {
+        let s = w[0];
+        let rest = w.drop_first();
+        assert(symbol_valid(s, 1));   // s ∈ {Gen0, Inv0}
+        assert(word_valid(rest, 1)) by {
+            assert forall|i: int| 0 <= i < rest.len() implies symbol_valid(#[trigger] rest[i], 1) by { assert(rest[i] == w[i + 1]); }
+        }
+        // apply_embedding(seq![src], w) = apply_embedding_symbol(seq![src], s) + apply_embedding(seq![src], rest)
+        assert(apply_embedding(seq![src], w) =~= apply_embedding_symbol(seq![src], s) + apply_embedding(seq![src], rest)) by {
+            assert(w.first() == s);
+        }
+        lemma_apply_hom_concat(swap_hom(), apply_embedding_symbol(seq![src], s), apply_embedding(seq![src], rest));
+        lemma_swap_emb(src, tgt, rest);
+        // per-symbol: apply_hom(swap, apply_embedding_symbol(seq![src],s)) = apply_embedding_symbol(seq![tgt],s)
+        if s == Symbol::Gen(0) {
+            assert(apply_embedding_symbol(seq![src], s) == src);
+            assert(apply_embedding_symbol(seq![tgt], s) == tgt);
+        } else {
+            assert(s == Symbol::Inv(0));
+            assert(apply_embedding_symbol(seq![src], s) == inverse_word(src));
+            assert(apply_embedding_symbol(seq![tgt], s) == inverse_word(tgt));
+        }
+        assert(apply_embedding(seq![tgt], w) =~= apply_embedding_symbol(seq![tgt], s) + apply_embedding(seq![tgt], rest)) by {
+            assert(w.first() == s);
+        }
+    }
+}
+
+pub proof fn lemma_m3_iso()
+    ensures crate::hnn::hnn_associations_isomorphic(m3_data())
+{
+    use crate::homomorphism::*;
+    use crate::benign::*;
+    let fg = crate::higman_operations::free_group(2);
+    let b2 = seq![Symbol::Gen(1), Symbol::Gen(1)];
+    let a2 = seq![Symbol::Gen(0), Symbol::Gen(0)];
+    let a_words = Seq::new(1, |i: int| m3_data().associations[i].0);
+    let b_words = Seq::new(1, |i: int| m3_data().associations[i].1);
+    assert(a_words =~= seq![b2]);
+    assert(b_words =~= seq![a2]);
+    crate::higman_operations::lemma_free_group_valid(2);
+    lemma_swap_valid();
+    // per-generator swap facts — compute on LITERALS only (compute HANGS on let-bound b2/a2)
+    assert(apply_hom(swap_hom(), seq![Symbol::Gen(1), Symbol::Gen(1)]) =~= seq![Symbol::Gen(0), Symbol::Gen(0)]) by (compute);
+    assert(apply_hom(swap_hom(), seq![Symbol::Gen(0), Symbol::Gen(0)]) =~= seq![Symbol::Gen(1), Symbol::Gen(1)]) by (compute);
+    assert(inverse_word(seq![Symbol::Gen(1), Symbol::Gen(1)]) =~= seq![Symbol::Inv(1), Symbol::Inv(1)]) by (compute);
+    assert(inverse_word(seq![Symbol::Gen(0), Symbol::Gen(0)]) =~= seq![Symbol::Inv(0), Symbol::Inv(0)]) by (compute);
+    assert(apply_hom(swap_hom(), seq![Symbol::Inv(1), Symbol::Inv(1)]) =~= seq![Symbol::Inv(0), Symbol::Inv(0)]) by (compute);
+    assert(apply_hom(swap_hom(), seq![Symbol::Inv(0), Symbol::Inv(0)]) =~= seq![Symbol::Inv(1), Symbol::Inv(1)]) by (compute);
+    // connect to the let-bound forms (b2 == seq![Gen1,Gen1], a2 == seq![Gen0,Gen0])
+    assert(apply_hom(swap_hom(), b2) =~= a2);
+    assert(apply_hom(swap_hom(), a2) =~= b2);
+    assert(apply_hom(swap_hom(), inverse_word(b2)) =~= inverse_word(a2));
+    assert(apply_hom(swap_hom(), inverse_word(a2)) =~= inverse_word(b2));
+    assert forall|w: Word| word_valid(w, 1) implies
+        (equiv_in_presentation(fg, apply_embedding(a_words, w), empty_word())
+         <==> equiv_in_presentation(fg, apply_embedding(b_words, w), empty_word())) by {
+        assert(apply_embedding(a_words, w) =~= apply_embedding(seq![b2], w));
+        assert(apply_embedding(b_words, w) =~= apply_embedding(seq![a2], w));
+        if equiv_in_presentation(fg, apply_embedding(seq![b2], w), empty_word()) {
+            lemma_hom_preserves_equiv(swap_hom(), apply_embedding(seq![b2], w), empty_word());
+            lemma_swap_emb(b2, a2, w);
+            assert(apply_hom(swap_hom(), empty_word()) =~= empty_word());
+        }
+        if equiv_in_presentation(fg, apply_embedding(seq![a2], w), empty_word()) {
+            lemma_hom_preserves_equiv(swap_hom(), apply_embedding(seq![a2], w), empty_word());
+            lemma_swap_emb(a2, b2, w);
+            assert(apply_hom(swap_hom(), empty_word()) =~= empty_word());
+        }
+    }
+}
+
 } // verus!
