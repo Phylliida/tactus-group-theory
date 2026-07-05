@@ -124,4 +124,128 @@ pub proof fn lemma_positive_reduced(w: Word)
     }
 }
 
+// ═══ PART A — group-equal ⟹ same delete_n AND same delete_g (two projections) ═══
+// kill_hom(x): rules_pres → free_group(4), Gen(x) ↦ ε, others fixed.  x∈{2,3} (g,n).
+
+pub open spec fn kill_hom(x: nat) -> crate::homomorphism::HomomorphismData {
+    crate::homomorphism::HomomorphismData {
+        source: rules_pres(m1_rules(), 4),
+        target: crate::higman_operations::free_group(4),
+        generator_images: Seq::new(4, |i: int|
+            if i == x { empty_word() } else { seq![Symbol::Gen(i as nat)] }),
+    }
+}
+
+pub proof fn lemma_kill_valid(x: nat)
+    requires x == 2 || x == 3,
+    ensures crate::homomorphism::is_valid_homomorphism(kill_hom(x)),
+{
+    use crate::homomorphism::*;
+    use crate::higman_operations::{free_group, lemma_free_group_valid};
+    let h = kill_hom(x);
+    lemma_m1_pres_valid();
+    lemma_free_group_valid(4);
+    assert forall|i: int| 0 <= i < h.generator_images.len()
+        implies word_valid(#[trigger] h.generator_images[i], 4) by {
+        assert(word_valid(h.generator_images[i], 4));
+    }
+    assert forall|i: int| 0 <= i < h.source.relators.len()
+        implies equiv_in_presentation(h.target, apply_hom(h, #[trigger] h.source.relators[i]), empty_word()) by {
+        // relators[0] = thue_relator(gn=ng) = [Gen2,Gen3,Inv2,Inv3]
+        assert(thue_relator(m1_rules()[0]) =~= seq![Symbol::Gen(2), Symbol::Gen(3), Symbol::Inv(2), Symbol::Inv(3)]) by (compute);
+        assert(h.source.relators[0] =~= seq![Symbol::Gen(2), Symbol::Gen(3), Symbol::Inv(2), Symbol::Inv(3)]);
+        if x == 3 {
+            assert(apply_hom(kill_hom(3), seq![Symbol::Gen(2), Symbol::Gen(3), Symbol::Inv(2), Symbol::Inv(3)])
+                =~= seq![Symbol::Gen(2), Symbol::Inv(2)]) by (compute);
+            crate::presentation_lemmas::lemma_word_inverse_right(free_group(4), seq![Symbol::Gen(2)]);
+            assert(inverse_word(seq![Symbol::Gen(2)]) =~= seq![Symbol::Inv(2)]) by (compute);
+            assert(concat(seq![Symbol::Gen(2)], inverse_word(seq![Symbol::Gen(2)])) =~= seq![Symbol::Gen(2), Symbol::Inv(2)]);
+        } else {
+            assert(apply_hom(kill_hom(2), seq![Symbol::Gen(2), Symbol::Gen(3), Symbol::Inv(2), Symbol::Inv(3)])
+                =~= seq![Symbol::Gen(3), Symbol::Inv(3)]) by (compute);
+            crate::presentation_lemmas::lemma_word_inverse_right(free_group(4), seq![Symbol::Gen(3)]);
+            assert(inverse_word(seq![Symbol::Gen(3)]) =~= seq![Symbol::Inv(3)]) by (compute);
+            assert(concat(seq![Symbol::Gen(3)], inverse_word(seq![Symbol::Gen(3)])) =~= seq![Symbol::Gen(3), Symbol::Inv(3)]);
+        }
+    }
+}
+
+// apply_hom(kill_hom(x), u) = delete_x(u, x) on positive words.
+pub proof fn lemma_applyhom_kill_eq_delete(x: nat, u: Word)
+    requires positive_word(u), word_valid(u, 4),
+    ensures crate::homomorphism::apply_hom(kill_hom(x), u) =~= delete_x(u, x),
+    decreases u.len(),
+{
+    use crate::homomorphism::*;
+    if u.len() > 0 {
+        let s = u.first();
+        let rest = u.drop_first();
+        assert(positive_word(rest)) by {
+            assert forall|i: int| 0 <= i < rest.len() implies exists|j: nat| #[trigger] rest[i] == Symbol::Gen(j) by {
+                assert(rest[i] == u[i + 1]);
+            }
+        }
+        assert(word_valid(rest, 4)) by {
+            assert forall|i: int| 0 <= i < rest.len() implies symbol_valid(#[trigger] rest[i], 4) by {
+                assert(rest[i] == u[i + 1]);
+            }
+        }
+        lemma_applyhom_kill_eq_delete(x, rest);
+        let j = choose|j: nat| u[0] == Symbol::Gen(j);
+        assert(u[0] == Symbol::Gen(j));
+        assert(apply_hom_symbol(kill_hom(x), Symbol::Gen(j)) =~= kill_hom(x).generator_images[j as int]);
+    }
+}
+
+pub proof fn lemma_delete_positive(u: Word, x: nat)
+    ensures positive_word(u) ==> positive_word(delete_x(u, x))
+        && (word_valid(u, 4) ==> word_valid(delete_x(u, x), 4)),
+    decreases u.len(),
+{
+    if u.len() > 0 {
+        lemma_delete_positive(u.drop_first(), x);
+        if u[0] != Symbol::Gen(x) {
+            assert(delete_x(u, x) =~= seq![u[0]] + delete_x(u.drop_first(), x));
+        }
+    }
+}
+
+// group-equal ⟹ same delete_n (x=3) and same delete_g (x=2).  Per-x helper:
+pub proof fn lemma_kill_gives_same_delete(x: nat, u: Word, v: Word)
+    requires
+        x == 2 || x == 3,
+        positive_word(u), positive_word(v), word_valid(u, 4), word_valid(v, 4),
+        equiv_in_presentation(rules_pres(m1_rules(), 4), u, v),
+    ensures delete_x(u, x) == delete_x(v, x),
+{
+    use crate::homomorphism::*;
+    use crate::higman_operations::free_group;
+    lemma_kill_valid(x);
+    lemma_hom_preserves_equiv(kill_hom(x), u, v);
+    lemma_applyhom_kill_eq_delete(x, u);
+    lemma_applyhom_kill_eq_delete(x, v);
+    // equiv(free4, delete_x(u,x), delete_x(v,x))
+    crate::free_word_problem::lemma_free_group_equiv_freely_equivalent(4, delete_x(u, x), delete_x(v, x));
+    let du = delete_x(u, x);
+    let dv = delete_x(v, x);
+    lemma_delete_positive(u, x);
+    lemma_delete_positive(v, x);
+    lemma_positive_reduced(du);
+    lemma_positive_reduced(dv);
+    // freely_equivalent(du,dv) + both reduced ⟹ du == dv
+    let w = choose|w: Word| crate::reduction::reduces_to(du, w) && crate::reduction::reduces_to(dv, w);
+    crate::reduction::lemma_reduced_reduces_to_self(du, w);
+    crate::reduction::lemma_reduced_reduces_to_self(dv, w);
+}
+
+pub proof fn lemma_group_implies_same_deletes(u: Word, v: Word)
+    requires
+        positive_word(u), positive_word(v), word_valid(u, 4), word_valid(v, 4),
+        equiv_in_presentation(rules_pres(m1_rules(), 4), u, v),
+    ensures delete_x(u, 3) == delete_x(v, 3), delete_x(u, 2) == delete_x(v, 2),
+{
+    lemma_kill_gives_same_delete(3, u, v);
+    lemma_kill_gives_same_delete(2, u, v);
+}
+
 } // verus!
