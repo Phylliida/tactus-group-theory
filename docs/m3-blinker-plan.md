@@ -51,7 +51,28 @@ Three cases on (has-state-letters u?, has-state-letters v?):
   literal list of gap-reps; (b) `b_rcoset_rep(nf gap)=gap` — THIS is where the parity head-cap now
   lives (coset rep reduces a-exp mod ⟨a²⟩; nf caps head at {0,1} ⟹ already reduced); (c) the gap +
   is_left sequence determines u (state seq from εᵢ heads, blocks from gaps). Deep but BOUNDED — wants
-  a fresh focused study of the b_rcoset_rep internals. Old pinch-cascade prose (superseded):
+  a fresh focused study of the b_rcoset_rep internals.
+
+  ── READBACK BRICKS (live, post-roll; m3 at 34/0) ──
+  Use `w_u = [Gen2] + sub(u) + [Gen2]` (q·sub(u)·q) so BOTH end gaps + the accumulator become syllables
+  (.0 → ε). `w_u ≡ w_v` from sub(u)≡sub(v) + congruence.
+  * B1 ✅ `lemma_sub_no_collapse` (33/0): sub(u)·q has no Inv2 ⟹ !has_pinch ⟹ `textbook_no_collapse`
+    (via `lemma_p_reduced_initial_no_collapse`, made pub). [does q·sub(u)·q too — redo for the qq form]
+  * B2 ✅ `lemma_sub_syls_count` (34/0): `act_syls(sub(u)·q).len() == stable_count` (via
+    `lemma_no_collapse_gives_m`, made pub). ⟹ #state(u)=#state(v).
+  * B3 [BIG] EXPLICIT act_syls: define `nf_syls(u): Seq<Syllable>` = the expected gap sequence, prove
+    `act_syls(q·sub(u)·q) =~= nf_syls(u)` by induction on u tracking (h, syls) through `textbook_psi_p`
+    PREPEND (no collapse ⟹ always prepend {is_left:false, rep:b_rcoset_rep(gap)}). Couples to b_rcoset_rep.
+  * B4 [CRUX, cleaner] PARITY without shortlex-min: rep(g1)=rep(g2) ⟹ [`lemma_b_rcoset_rep_invariant`]
+    `same_b_rcoset(g1,g2)` ⟹ g1·g2⁻¹∈⟨a²⟩ (freely = a^{2k}). Then "both nf gaps (a-head∈{0,1}) + same
+    ⟨a²⟩-coset ⟹ equal": a^{2k}·g2=g1 free + heads∈{0,1} ⟹ k=0 ⟹ g1=g2. PURE free-group + head-count
+    (NO shortlex-min — avoids proving b_rcoset_rep(g)=g). Self-contained, bankable.
+  * B5 [BIG] gap-parsing injectivity: `nf_syls` injective on nf u — parse gaps (a-prefix/b⁻¹-suffix
+    encode q' vs q; blocks encode a,b) back to u. Combinatorial.
+  * ASSEMBLE: readback dispatcher (base ✓ / no_mixed ✓ / B3–B5) ⟹ `lemma_m3_readback` ⟹ ⟹ direction.
+  NOTE: B1/B2 used sub(u)·q; the assembly wants q·sub(u)·q — re-establish no-collapse/count for that form.
+
+  Old pinch-cascade prose (superseded):
 
   Superseded raw-Britton description:
   (from sub(u)) then Inv2's (from sub(v)⁻¹). `britton_lemma_full` ⟹ pinch, which must be at the
