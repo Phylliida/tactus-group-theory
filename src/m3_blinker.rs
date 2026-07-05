@@ -1493,4 +1493,59 @@ pub proof fn lemma_bq_qa_thue(x: Word, y: Word)
     lemma_thue_single(m3_rules(), u, v);
 }
 
+// ═══ B3 fix Phase 1: ffnf (fire all bq'→qa, left-to-right) + u ~thue ffnf(u) ═══
+pub open spec fn ffnf(u: Word) -> Word
+    decreases u.len()
+{
+    if u.len() == 0 { empty_word() }
+    else if u.len() >= 2 && u[0] == Symbol::Gen(1) && u[1] == Symbol::Gen(3) {
+        seq![Symbol::Gen(2), Symbol::Gen(0)] + ffnf(u.subrange(2, u.len() as int))
+    } else {
+        seq![u[0]] + ffnf(u.drop_first())
+    }
+}
+
+// word-level Thue congruence: prepend a whole word
+pub proof fn lemma_thue_prepend_word(x: Word, u: Word, v: Word)
+    requires thue_equiv(m3_rules(), u, v),
+    ensures thue_equiv(m3_rules(), x + u, x + v),
+    decreases x.len(),
+{
+    if x.len() == 0 {
+        assert(x + u =~= u); assert(x + v =~= v);
+    } else {
+        lemma_thue_prepend_word(x.drop_first(), u, v);
+        lemma_thue_prepend(m3_rules(), x[0], x.drop_first() + u, x.drop_first() + v);
+        assert(x + u =~= seq![x[0]] + (x.drop_first() + u));
+        assert(x + v =~= seq![x[0]] + (x.drop_first() + v));
+    }
+}
+
+pub proof fn lemma_u_thue_ffnf(u: Word)
+    ensures thue_equiv(m3_rules(), u, ffnf(u)),
+    decreases u.len(),
+{
+    if u.len() == 0 {
+        assert(ffnf(u) =~= u);
+        lemma_thue_refl(m3_rules(), u);
+    } else if u.len() >= 2 && u[0] == Symbol::Gen(1) && u[1] == Symbol::Gen(3) {
+        let rest = u.subrange(2, u.len() as int);
+        let qa = seq![Symbol::Gen(2), Symbol::Gen(0)];
+        lemma_bq_qa_thue(empty_word(), rest);   // ε·bq'·rest ~thue ε·qa·rest
+        assert(u =~= seq![Symbol::Gen(1), Symbol::Gen(3)] + rest);
+        assert(concat(empty_word(), concat(seq![Symbol::Gen(1), Symbol::Gen(3)], rest)) =~= u);
+        assert(concat(empty_word(), concat(qa, rest)) =~= qa + rest);
+        lemma_u_thue_ffnf(rest);
+        lemma_thue_prepend_word(qa, rest, ffnf(rest));
+        assert(ffnf(u) =~= qa + ffnf(rest));
+        lemma_thue_trans(m3_rules(), u, qa + rest, ffnf(u));
+    } else {
+        let rest = u.drop_first();
+        lemma_u_thue_ffnf(rest);
+        lemma_thue_prepend(m3_rules(), u[0], rest, ffnf(rest));
+        assert(u =~= seq![u[0]] + rest);
+        assert(ffnf(u) =~= seq![u[0]] + ffnf(rest));
+    }
+}
+
 } // verus!
