@@ -38,7 +38,22 @@ Three cases on (has-state-letters u?, has-state-letters v?):
   contradicts britton_lemma_full ⟹ ex falso. Bricks (banked, reusable for case 3): `no_sym`/`has_gen2`
   recursive preds + cons-unfolds, `lemma_sub_no_inv2`, `lemma_sub_has_gen2`, `lemma_no_inv2_no_pinch`
   (all-same-sign ⟹ no pinch), `lemma_has_gen2_stable`, `lemma_wv2_no_stable`.
-- **(yes,yes)** — THE PINCH CASCADE [THE HARD CORE, parity head-cap]: w = sub(u)·sub(v)⁻¹ has Gen2's
+- **(yes,yes)** — ✅✅ CONCEPTUAL CRUX SOLVED via `act_syls` SHORTCUT (32/0, the user knew the crate
+  had it). The pinch cascade is REPLACED by **Britton normal-form invariance**: `act_syls(data,w)` (=
+  `textbook_act_hnn(data,w,ε,[]).1`, the canonical syllable sequence) is a GROUP INVARIANT. Bricks:
+  `lemma_deriv_syls` (generalize `lemma_derivation_preserves_syls` to arbitrary target) +
+  `lemma_syls_preserved` (equiv ⟹ act_syls equal). Made `lemma_single_step_preserves_syls` pub.
+  **REMAINING = THE READBACK** (the only piece of case 3 left): `sub(u)≡sub(v)` ⟹ [preservation, on
+  `sub(u)·q` so the LAST gap becomes a syllable too] `act_syls(sub(u)·q) =~= act_syls(sub(v)·q)` ⟹
+  [readback] `u==v`. The readback = `act_syls∘(sub·q)` injective on nf words. Dives into the AFP
+  coset machinery (`textbook_psi_p` → `b_rcoset_rep`/`a_rcoset_rep` of `tower_afp_data(data,0)`): show
+  (a) nf ⟹ no COLLAPSE in the action (cf. `lemma_p_reduced_initial_no_collapse`) ⟹ act_syls is the
+  literal list of gap-reps; (b) `b_rcoset_rep(nf gap)=gap` — THIS is where the parity head-cap now
+  lives (coset rep reduces a-exp mod ⟨a²⟩; nf caps head at {0,1} ⟹ already reduced); (c) the gap +
+  is_left sequence determines u (state seq from εᵢ heads, blocks from gaps). Deep but BOUNDED — wants
+  a fresh focused study of the b_rcoset_rep internals. Old pinch-cascade prose (superseded):
+
+  Superseded raw-Britton description:
   (from sub(u)) then Inv2's (from sub(v)⁻¹). `britton_lemma_full` ⟹ pinch, which must be at the
   junction (last Gen2 of sub(u), first Inv2 of sub(v)⁻¹) with base-word-between ∈ B=⟨a²⟩ = the
   compensation a^{2mₖ}. Peel the two q's + the compensation (Britton reduction), recurse on the
