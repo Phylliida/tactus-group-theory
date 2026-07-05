@@ -566,3 +566,6 @@ pub mod m1_guard;
 
 // m2_translate: M-ladder rung M2 (read/translate) positivity — Tietze-free + no-cancellation readback.
 pub mod m2_translate;
+
+// m3_blinker: M-ladder rung M3 (THE BLINKER) positivity — HNN extension ⟨a,b,q|qa²q⁻¹=b²⟩, Britton's lemma + parity head-cap.
+pub mod m3_blinker;
