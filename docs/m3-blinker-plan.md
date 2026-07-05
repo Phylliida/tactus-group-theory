@@ -62,7 +62,15 @@ Three cases on (has-state-letters u?, has-state-letters v?):
     `lemma_no_collapse_gives_m`, made pub). ⟹ #state(u)=#state(v).
   * B4 ✅ DONE (38/0) `lemma_parity_head_cap`: two reduced no-a⁻¹ words g1,g2, a-head≤1, g1≡a^{2k}·g2
     ⟹ g1=g2. k>0 blows a-head≥2 (`lemma_prepend_gen0`+`lemma_reduced_unique`); k<0 sign-flip; k=0 direct.
-  * B3 [BIG, DE-RISKED] EXPLICIT act_syls: define `nf_syls(u): Seq<Syllable>` = the gap sequence, prove
+  * B3-FOUNDATION ✅ DONE (52/0) `lemma_b_rcoset_rep_eq_gap`: `b_rcoset_rep(m3_afp(), g) =~= g` for g
+    reduced + `no_sym(_,Inv0)` + `lead(_,0)≤1`. The delicate geodesic-coset lemma — proven end-to-end
+    via the prover-agent's route (rep from `lemma_b_rcoset_rep_props`+`_satisfiable`[made pub] → reduced
+    (min-len) → decompose `rep=a^m·s` → `g≡a^{2k}·rep=a^j·s` reduced ⟹ literal `g=a^j·s` → hyps force
+    `0≤j≤1`, `|m|≤j` → `m=-1` killed by min-lex (Gen0<Inv0) → parity `j-m=2k` even ⟹ `m=j` ⟹ `rep=g`).
+    Helpers (all in m3_blinker.rs): m3_afp, no_shorter_below, no_smaller_lex_below, suffix_reduced,
+    rank_head, signed_power_concat_reduced, same_b_rcoset refl/respects_equiv, min_coset_word_reduced,
+    signed_head_decompose, symbol_power_cons, a2_factors_signed_power, shift_carrier. ⟹ carries vanish.
+  * B3 [remaining] EXPLICIT act_syls: define `nf_syls(u): Seq<Syllable>` = the gap sequence, prove
     `act_syls(q·sub(u)·q) =~= nf_syls(u)` by induction on u tracking (h,syls) through `textbook_psi_p`
     PREPEND (no-collapse ⟹ always prepend {is_left:false, rep:b_rcoset_rep(gap)}). **FOUNDATION =
     `b_rcoset_rep(nf gap)=gap`** (⟹ carry `phi_inv(b_rcoset_h)`=ε, clean syllables). FEASIBLE: lex
