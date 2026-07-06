@@ -2476,4 +2476,124 @@ pub proof fn lemma_sub_injective(w1: Word, w2: Word)
     }
 }
 
+// ═══ B3 fix P6c: nf readback (split into helpers to stay under rlimit) ═══
+// per-word setup: properties of sub(ffnf w) for a Thue-nf w
+pub proof fn lemma_sfu_setup(w: Word)
+    requires no_qa(w), no_qpa(w), positive_word(w), word_valid(w, 4),
+    ensures
+        positive_word(ffnf(w)), word_valid(ffnf(w), 4),
+        crate::reduction::is_reduced(apply_hom(sub_hom(), ffnf(w))),
+        no_sym(apply_hom(sub_hom(), ffnf(w)), Symbol::Inv(0)),
+        no_sub3(apply_hom(sub_hom(), ffnf(w))),
+        sub_alpha(apply_hom(sub_hom(), ffnf(w))),
+        word_valid(apply_hom(sub_hom(), ffnf(w)), crate::hnn::hnn_presentation(m3_data()).num_generators),
+        apply_hom(sub_hom(), ffnf(w)) =~= concat(base_run(apply_hom(sub_hom(), ffnf(w))),
+            gap_word(split_q(drop_base_run(apply_hom(sub_hom(), ffnf(w)))))),
+        crate::machine_group::act_syls(m3_data(), apply_hom(sub_hom(), ffnf(w)))
+            =~= gap_syls(split_q(drop_base_run(apply_hom(sub_hom(), ffnf(w))))),
+        crate::reduction::is_reduced(base_run(apply_hom(sub_hom(), ffnf(w)))),
+        word_valid(base_run(apply_hom(sub_hom(), ffnf(w))), 2),
+{
+    use crate::homomorphism::*;
+    let sub = sub_hom();
+    let fw = ffnf(w);
+    let sfw = apply_hom(sub, fw);
+    lemma_m3_data_valid();
+    crate::britton_infra::lemma_hnn_presentation_valid(m3_data());
+    lemma_ffnf_positive(w); lemma_ffnf_valid(w); lemma_ffnf_no_bq(w); lemma_ffnf_no_qpa(w); lemma_ffnf_no_qaa(w);
+    lemma_sub_reduced(fw); lemma_sub_no_sub3(fw); lemma_sub_alpha(fw); lemma_no_inv0_from_alpha(sfw);
+    lemma_sub_valid();
+    assert(sub.source == rules_pres(m3_rules(), 4));
+    assert(rules_pres(m3_rules(), 4).num_generators == 4);
+    assert(sub.target == crate::hnn::hnn_presentation(m3_data()));
+    lemma_apply_hom_word_valid(sub, fw);
+    lemma_act_syls_split(sfw);
+    lemma_base_drop_reconstruct(sfw); lemma_drop_base_run_head(sfw); lemma_gap_word_split(drop_base_run(sfw));
+    lemma_reduced_base_run(sfw); lemma_base_run_no_gen2(sfw); lemma_sub_alpha_base_run(sfw); lemma_word_valid2(base_run(sfw));
+}
+
+// right-cancel g then base-word faithfulness: a·g ≡ b·g (reduced base a,b) ⟹ a = b
+pub proof fn lemma_right_cancel_p0(a: Word, b: Word, g: Word)
+    requires word_valid(a, 2), word_valid(b, 2), word_valid(g, 3),
+        crate::reduction::is_reduced(a), crate::reduction::is_reduced(b),
+        equiv_in_presentation(crate::hnn::hnn_presentation(m3_data()), concat(a, g), concat(b, g)),
+    ensures a =~= b,
+{
+    use crate::hnn::*;
+    use crate::presentation_lemmas::*;
+    use crate::presentation::{lemma_equiv_transitive, lemma_equiv_symmetric};
+    let hp = hnn_presentation(m3_data());
+    lemma_m3_data_valid(); lemma_m3_iso();
+    crate::britton_infra::lemma_hnn_presentation_valid(m3_data());
+    crate::higman_operations::lemma_free_group_valid(2);
+    crate::word::lemma_inverse_word_valid(g, 3);
+    lemma_equiv_concat_left(hp, concat(a, g), concat(b, g), inverse_word(g));
+    lemma_word_inverse_right(hp, g);
+    lemma_equiv_concat_right(hp, a, concat(g, inverse_word(g)), empty_word());
+    assert(concat(a, empty_word()) =~= a);
+    assert(concat(concat(a, g), inverse_word(g)) =~= concat(a, concat(g, inverse_word(g))));
+    lemma_equiv_concat_right(hp, b, concat(g, inverse_word(g)), empty_word());
+    assert(concat(b, empty_word()) =~= b);
+    assert(concat(concat(b, g), inverse_word(g)) =~= concat(b, concat(g, inverse_word(g))));
+    lemma_equiv_symmetric(hp, concat(a, concat(g, inverse_word(g))), a);
+    lemma_equiv_transitive(hp, a, concat(concat(a, g), inverse_word(g)), concat(concat(b, g), inverse_word(g)));
+    lemma_equiv_transitive(hp, a, concat(concat(b, g), inverse_word(g)), b);
+    lemma_base_reduced_unique_hnn(a, b);
+}
+
+pub proof fn lemma_m3_nf_readback(u: Word, v: Word)
+    requires
+        no_qa(u), no_qpa(u), no_qa(v), no_qpa(v),
+        positive_word(u), positive_word(v), word_valid(u, 4), word_valid(v, 4),
+        equiv_in_presentation(rules_pres(m3_rules(), 4), u, v),
+    ensures thue_equiv(m3_rules(), u, v),
+{
+    use crate::homomorphism::*;
+    use crate::hnn::*;
+    use crate::presentation::{lemma_equiv_transitive, lemma_equiv_symmetric};
+    let hp = hnn_presentation(m3_data());
+    let sub = sub_hom();
+    let fu = ffnf(u); let fv = ffnf(v);
+    let su = apply_hom(sub, u); let sv = apply_hom(sub, v);
+    let sfu = apply_hom(sub, fu); let sfv = apply_hom(sub, fv);
+    lemma_m3_data_valid(); lemma_m3_iso();
+    crate::britton_infra::lemma_hnn_presentation_valid(m3_data());
+    lemma_sfu_setup(u); lemma_sfu_setup(v);
+    // equiv_hnn(sfu, sfv)
+    lemma_group_to_hnn(u, v);
+    lemma_u_thue_ffnf(u); lemma_m3_backward(u, fu); lemma_group_to_hnn(u, fu);
+    lemma_u_thue_ffnf(v); lemma_m3_backward(v, fv); lemma_group_to_hnn(v, fv);
+    lemma_sub_valid();
+    assert(sub.source == rules_pres(m3_rules(), 4));
+    assert(rules_pres(m3_rules(), 4).num_generators == 4);
+    assert(sub.target == hp);
+    lemma_apply_hom_word_valid(sub, u); lemma_apply_hom_word_valid(sub, v);
+    lemma_equiv_symmetric(hp, su, sfu);
+    lemma_equiv_transitive(hp, sfu, su, sv);
+    lemma_equiv_transitive(hp, sfu, sv, sfv);
+    // act_syls equal ⟹ gaps equal
+    lemma_syls_preserved(m3_data(), sfu, sfv);
+    let gaps_u = split_q(drop_base_run(sfu));
+    let gaps_v = split_q(drop_base_run(sfv));
+    lemma_gap_syls_inj(gaps_u, gaps_v);
+    // sfu = p0u + g, sfv = p0v + g
+    let p0u = base_run(sfu); let p0v = base_run(sfv);
+    let g = gap_word(gaps_u);
+    assert(gap_word(gaps_u) =~= gap_word(gaps_v));
+    assert(sfu =~= concat(p0u, g));
+    assert(sfv =~= concat(p0v, g));
+    assert(word_valid(g, 3)) by {
+        assert forall|i: int| 0 <= i < g.len() implies symbol_valid(#[trigger] g[i], 3) by {
+            assert(sfu[p0u.len() + i] == g[i]);
+        }
+    }
+    // right-cancel ⟹ p0u = p0v ⟹ sfu = sfv ⟹ fu = fv
+    lemma_right_cancel_p0(p0u, p0v, g);
+    assert(sfu =~= sfv);
+    lemma_sub_injective(fu, fv);
+    // thue: u ~thue fu = fv ~thue v
+    lemma_thue_symmetric(m3_rules(), v, fv);
+    lemma_thue_trans(m3_rules(), u, fu, v);
+}
+
 } // verus!
