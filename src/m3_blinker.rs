@@ -2373,4 +2373,107 @@ pub proof fn lemma_gap_syls_inj(gs1: Seq<Word>, gs2: Seq<Word>)
     }
 }
 
+// ═══ B3 fix P6b: base-word faithfulness (reduced) + sub prefix-code injectivity ═══
+pub proof fn lemma_base_reduced_unique_hnn(g1: Word, g2: Word)
+    requires word_valid(g1, 2), word_valid(g2, 2),
+        crate::reduction::is_reduced(g1), crate::reduction::is_reduced(g2),
+        equiv_in_presentation(crate::hnn::hnn_presentation(m3_data()), g1, g2),
+    ensures g1 =~= g2,
+{
+    use crate::hnn::*;
+    use crate::presentation_lemmas::*;
+    use crate::presentation::{lemma_equiv_transitive, lemma_equiv_symmetric};
+    let hp = hnn_presentation(m3_data());
+    let fg = crate::higman_operations::free_group(2);
+    lemma_m3_data_valid(); lemma_m3_iso();
+    crate::britton_infra::lemma_hnn_presentation_valid(m3_data());
+    crate::higman_operations::lemma_free_group_valid(2);
+    crate::word::lemma_inverse_word_valid(g2, 2);
+    let uvi = concat(g1, inverse_word(g2));
+    lemma_equiv_concat_left(hp, g1, g2, inverse_word(g2));
+    assert(equiv_in_presentation(hp, uvi, concat(g2, inverse_word(g2))));
+    lemma_word_inverse_right(hp, g2);
+    lemma_equiv_transitive(hp, uvi, concat(g2, inverse_word(g2)), empty_word());
+    assert(word_valid(uvi, 2)) by {
+        assert forall|i: int| 0 <= i < uvi.len() implies symbol_valid(#[trigger] uvi[i], 2) by {
+            if i < g1.len() { assert(uvi[i] == g1[i]); } else { assert(uvi[i] == inverse_word(g2)[i - g1.len()]); }
+        }
+    }
+    crate::britton_via_tower::britton_lemma_unconditional(m3_data(), uvi);
+    lemma_equiv_concat_left(fg, uvi, empty_word(), g2);
+    assert(concat(empty_word(), g2) =~= g2);
+    lemma_word_inverse_left(fg, g2);
+    lemma_equiv_concat_right(fg, g1, concat(inverse_word(g2), g2), empty_word());
+    assert(concat(g1, empty_word()) =~= g1);
+    assert(concat(uvi, g2) =~= concat(g1, concat(inverse_word(g2), g2)));
+    lemma_equiv_symmetric(fg, concat(g1, concat(inverse_word(g2), g2)), g1);
+    lemma_equiv_transitive(fg, g1, concat(uvi, g2), g2);
+    lemma_reduced_unique(g1, g2);
+}
+
+pub proof fn lemma_sub_first_decode(s1: Symbol, s2: Symbol)
+    requires (s1 == Symbol::Gen(0) || s1 == Symbol::Gen(1) || s1 == Symbol::Gen(2) || s1 == Symbol::Gen(3)),
+        (s2 == Symbol::Gen(0) || s2 == Symbol::Gen(1) || s2 == Symbol::Gen(2) || s2 == Symbol::Gen(3)),
+        crate::homomorphism::apply_hom_symbol(sub_hom(), s1).first() == crate::homomorphism::apply_hom_symbol(sub_hom(), s2).first(),
+    ensures s1 == s2,
+{
+    use crate::homomorphism::*;
+    assert(sub_hom().generator_images[0] =~= seq![Symbol::Gen(0)]);
+    assert(sub_hom().generator_images[1] =~= seq![Symbol::Gen(1)]);
+    assert(sub_hom().generator_images[2] =~= seq![Symbol::Gen(2)]);
+    assert(sub_hom().generator_images[3] =~= seq![Symbol::Inv(1), Symbol::Gen(2), Symbol::Gen(0)]);
+}
+
+pub proof fn lemma_sub_injective(w1: Word, w2: Word)
+    requires positive_word(w1), positive_word(w2), word_valid(w1, 4), word_valid(w2, 4),
+        crate::homomorphism::apply_hom(sub_hom(), w1) =~= crate::homomorphism::apply_hom(sub_hom(), w2),
+    ensures w1 =~= w2,
+    decreases w1.len(),
+{
+    use crate::homomorphism::*;
+    let sub = sub_hom();
+    if w1.len() == 0 {
+        assert(apply_hom(sub, w1) =~= empty_word());
+        if w2.len() > 0 {
+            assert(symbol_is_gen(w2[0]) && symbol_valid(w2[0], 4));
+            assert(w2[0] == Symbol::Gen(0) || w2[0] == Symbol::Gen(1) || w2[0] == Symbol::Gen(2) || w2[0] == Symbol::Gen(3));
+            lemma_sub_img(w2[0]);
+            assert(apply_hom(sub, w2) =~= apply_hom_symbol(sub, w2[0]) + apply_hom(sub, w2.drop_first()));
+            assert(apply_hom(sub, w2).len() > 0);
+        }
+    } else {
+        assert(symbol_is_gen(w1[0]) && symbol_valid(w1[0], 4));
+        assert(w1[0] == Symbol::Gen(0) || w1[0] == Symbol::Gen(1) || w1[0] == Symbol::Gen(2) || w1[0] == Symbol::Gen(3));
+        lemma_sub_img(w1[0]);
+        let a1 = apply_hom_symbol(sub, w1[0]);
+        assert(apply_hom(sub, w1) =~= a1 + apply_hom(sub, w1.drop_first()));
+        assert(apply_hom(sub, w1).len() > 0);
+        assert(w2.len() > 0) by { if w2.len() == 0 { assert(apply_hom(sub, w2) =~= empty_word()); } }
+        assert(symbol_is_gen(w2[0]) && symbol_valid(w2[0], 4));
+        assert(w2[0] == Symbol::Gen(0) || w2[0] == Symbol::Gen(1) || w2[0] == Symbol::Gen(2) || w2[0] == Symbol::Gen(3));
+        lemma_sub_img(w2[0]);
+        let a2 = apply_hom_symbol(sub, w2[0]);
+        assert(apply_hom(sub, w2) =~= a2 + apply_hom(sub, w2.drop_first()));
+        // first symbols equal ⟹ w1[0]==w2[0]
+        assert(apply_hom(sub, w1)[0] == a1[0] && apply_hom(sub, w2)[0] == a2[0]);
+        assert(a1.first() == a2.first());
+        lemma_sub_first_decode(w1[0], w2[0]);
+        assert(w1[0] == w2[0]);
+        assert(a1 =~= a2);
+        // strip common prefix a1 ⟹ sub(rest1) = sub(rest2)
+        assert(apply_hom(sub, w1.drop_first()) =~= apply_hom(sub, w2.drop_first())) by {
+            let x = apply_hom(sub, w1.drop_first());
+            let y = apply_hom(sub, w2.drop_first());
+            assert((a1 + x).len() == (a2 + y).len());
+            assert forall|i: int| 0 <= i < x.len() implies x[i] == y[i] by {
+                assert((a1 + x)[a1.len() + i] == x[i]);
+                assert((a2 + y)[a2.len() + i] == y[i]);
+            }
+        }
+        lemma_sub_injective(w1.drop_first(), w2.drop_first());
+        assert(w1 =~= seq![w1[0]] + w1.drop_first());
+        assert(w2 =~= seq![w2[0]] + w2.drop_first());
+    }
+}
+
 } // verus!
