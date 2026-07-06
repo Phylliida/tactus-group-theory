@@ -758,6 +758,216 @@ pub proof fn lemma_binv_bapow(t: int)
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// Shape foundation: length, head-letter, reducedness, positivity of the power words.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+pub proof fn lemma_abpow_len(t: int)
+    ensures abpow(t).len() == 2 * (if t >= 0 { t } else { -t }),
+    decreases (if t >= 0 { t } else { -t }),
+{
+    if t == 0 {
+    } else if t > 0 {
+        lemma_abpow_len(t - 1);
+        assert(abpow(t) =~= seq![Symbol::Gen(0), Symbol::Gen(1)] + abpow(t - 1));
+    } else {
+        lemma_abpow_len(t + 1);
+        assert(abpow(t) =~= seq![Symbol::Inv(1), Symbol::Inv(0)] + abpow(t + 1));
+    }
+}
+
+pub proof fn lemma_abpow_head(t: int)
+    ensures
+        t > 0 ==> abpow(t).len() > 0 && abpow(t)[0] == Symbol::Gen(0),
+        t < 0 ==> abpow(t).len() > 0 && abpow(t)[0] == Symbol::Inv(1),
+{
+    if t > 0 {
+        lemma_abpow_len(t);
+        assert(abpow(t) =~= seq![Symbol::Gen(0), Symbol::Gen(1)] + abpow(t - 1));
+    } else if t < 0 {
+        lemma_abpow_len(t);
+        assert(abpow(t) =~= seq![Symbol::Inv(1), Symbol::Inv(0)] + abpow(t + 1));
+    }
+}
+
+pub proof fn lemma_abpow_reduced(t: int)
+    ensures crate::reduction::is_reduced(abpow(t)),
+    decreases (if t >= 0 { t } else { -t }),
+{
+    use crate::reduction::*;
+    if t == 0 {
+        assert(abpow(0) =~= empty_word());
+    } else if t > 0 {
+        lemma_abpow_reduced(t - 1);
+        lemma_abpow_len(t - 1);
+        let tail = abpow(t - 1);
+        assert(abpow(t) =~= seq![Symbol::Gen(0), Symbol::Gen(1)] + tail);
+        assert forall|i: int| !has_cancellation_at(abpow(t), i) by {
+            let w = abpow(t);
+            if has_cancellation_at(w, i) {
+                if i == 0 {
+                    assert(w[0] == Symbol::Gen(0) && w[1] == Symbol::Gen(1));
+                    assert(!is_inverse_pair(Symbol::Gen(0), Symbol::Gen(1)));
+                } else if i == 1 {
+                    assert(tail.len() > 0);
+                    assert(t - 1 > 0);
+                    lemma_abpow_head(t - 1);
+                    assert(w[1] == Symbol::Gen(1) && w[2] == tail[0] && tail[0] == Symbol::Gen(0));
+                    assert(!is_inverse_pair(Symbol::Gen(1), Symbol::Gen(0)));
+                } else {
+                    assert(w[i] == tail[i - 2] && w[i + 1] == tail[i - 1]);
+                    assert(has_cancellation_at(tail, i - 2));
+                    assert(has_cancellation(tail));
+                }
+                assert(false);
+            }
+        }
+    } else {
+        lemma_abpow_reduced(t + 1);
+        lemma_abpow_len(t + 1);
+        let tail = abpow(t + 1);
+        assert(abpow(t) =~= seq![Symbol::Inv(1), Symbol::Inv(0)] + tail);
+        assert forall|i: int| !has_cancellation_at(abpow(t), i) by {
+            let w = abpow(t);
+            if has_cancellation_at(w, i) {
+                if i == 0 {
+                    assert(w[0] == Symbol::Inv(1) && w[1] == Symbol::Inv(0));
+                    assert(!is_inverse_pair(Symbol::Inv(1), Symbol::Inv(0)));
+                } else if i == 1 {
+                    assert(tail.len() > 0);
+                    assert(t + 1 < 0);
+                    lemma_abpow_head(t + 1);
+                    assert(w[1] == Symbol::Inv(0) && w[2] == tail[0] && tail[0] == Symbol::Inv(1));
+                    assert(!is_inverse_pair(Symbol::Inv(0), Symbol::Inv(1)));
+                } else {
+                    assert(w[i] == tail[i - 2] && w[i + 1] == tail[i - 1]);
+                    assert(has_cancellation_at(tail, i - 2));
+                    assert(has_cancellation(tail));
+                }
+                assert(false);
+            }
+        }
+    }
+}
+
+pub proof fn lemma_abpow_pos(t: int)
+    requires t >= 0,
+    ensures positive_word(abpow(t)),
+    decreases t,
+{
+    if t == 0 {
+        assert(abpow(0) =~= empty_word());
+    } else {
+        lemma_abpow_pos(t - 1);
+        crate::m3_blinker::lemma_positive_cons(Symbol::Gen(1), abpow(t - 1));
+        crate::m3_blinker::lemma_positive_cons(Symbol::Gen(0), seq![Symbol::Gen(1)] + abpow(t - 1));
+        assert(seq![Symbol::Gen(0)] + (seq![Symbol::Gen(1)] + abpow(t - 1)) =~= abpow(t));
+    }
+}
+
+pub proof fn lemma_bapow_len(t: int)
+    ensures bapow(t).len() == 2 * (if t >= 0 { t } else { -t }),
+    decreases (if t >= 0 { t } else { -t }),
+{
+    if t == 0 {
+    } else if t > 0 {
+        lemma_bapow_len(t - 1);
+        assert(bapow(t) =~= seq![Symbol::Gen(1), Symbol::Gen(0)] + bapow(t - 1));
+    } else {
+        lemma_bapow_len(t + 1);
+        assert(bapow(t) =~= seq![Symbol::Inv(0), Symbol::Inv(1)] + bapow(t + 1));
+    }
+}
+
+pub proof fn lemma_bapow_head(t: int)
+    ensures
+        t > 0 ==> bapow(t).len() > 0 && bapow(t)[0] == Symbol::Gen(1),
+        t < 0 ==> bapow(t).len() > 0 && bapow(t)[0] == Symbol::Inv(0),
+{
+    if t > 0 {
+        lemma_bapow_len(t);
+        assert(bapow(t) =~= seq![Symbol::Gen(1), Symbol::Gen(0)] + bapow(t - 1));
+    } else if t < 0 {
+        lemma_bapow_len(t);
+        assert(bapow(t) =~= seq![Symbol::Inv(0), Symbol::Inv(1)] + bapow(t + 1));
+    }
+}
+
+pub proof fn lemma_bapow_reduced(t: int)
+    ensures crate::reduction::is_reduced(bapow(t)),
+    decreases (if t >= 0 { t } else { -t }),
+{
+    use crate::reduction::*;
+    if t == 0 {
+        assert(bapow(0) =~= empty_word());
+    } else if t > 0 {
+        lemma_bapow_reduced(t - 1);
+        lemma_bapow_len(t - 1);
+        let tail = bapow(t - 1);
+        assert(bapow(t) =~= seq![Symbol::Gen(1), Symbol::Gen(0)] + tail);
+        assert forall|i: int| !has_cancellation_at(bapow(t), i) by {
+            let w = bapow(t);
+            if has_cancellation_at(w, i) {
+                if i == 0 {
+                    assert(w[0] == Symbol::Gen(1) && w[1] == Symbol::Gen(0));
+                    assert(!is_inverse_pair(Symbol::Gen(1), Symbol::Gen(0)));
+                } else if i == 1 {
+                    assert(tail.len() > 0);
+                    assert(t - 1 > 0);
+                    lemma_bapow_head(t - 1);
+                    assert(w[1] == Symbol::Gen(0) && w[2] == tail[0] && tail[0] == Symbol::Gen(1));
+                    assert(!is_inverse_pair(Symbol::Gen(0), Symbol::Gen(1)));
+                } else {
+                    assert(w[i] == tail[i - 2] && w[i + 1] == tail[i - 1]);
+                    assert(has_cancellation_at(tail, i - 2));
+                    assert(has_cancellation(tail));
+                }
+                assert(false);
+            }
+        }
+    } else {
+        lemma_bapow_reduced(t + 1);
+        lemma_bapow_len(t + 1);
+        let tail = bapow(t + 1);
+        assert(bapow(t) =~= seq![Symbol::Inv(0), Symbol::Inv(1)] + tail);
+        assert forall|i: int| !has_cancellation_at(bapow(t), i) by {
+            let w = bapow(t);
+            if has_cancellation_at(w, i) {
+                if i == 0 {
+                    assert(w[0] == Symbol::Inv(0) && w[1] == Symbol::Inv(1));
+                    assert(!is_inverse_pair(Symbol::Inv(0), Symbol::Inv(1)));
+                } else if i == 1 {
+                    assert(tail.len() > 0);
+                    assert(t + 1 < 0);
+                    lemma_bapow_head(t + 1);
+                    assert(w[1] == Symbol::Inv(1) && w[2] == tail[0] && tail[0] == Symbol::Inv(0));
+                    assert(!is_inverse_pair(Symbol::Inv(1), Symbol::Inv(0)));
+                } else {
+                    assert(w[i] == tail[i - 2] && w[i + 1] == tail[i - 1]);
+                    assert(has_cancellation_at(tail, i - 2));
+                    assert(has_cancellation(tail));
+                }
+                assert(false);
+            }
+        }
+    }
+}
+
+pub proof fn lemma_bapow_pos(t: int)
+    requires t >= 0,
+    ensures positive_word(bapow(t)),
+    decreases t,
+{
+    if t == 0 {
+        assert(bapow(0) =~= empty_word());
+    } else {
+        lemma_bapow_pos(t - 1);
+        crate::m3_blinker::lemma_positive_cons(Symbol::Gen(0), bapow(t - 1));
+        crate::m3_blinker::lemma_positive_cons(Symbol::Gen(1), seq![Symbol::Gen(0)] + bapow(t - 1));
+        assert(seq![Symbol::Gen(1)] + (seq![Symbol::Gen(0)] + bapow(t - 1)) =~= bapow(t));
+    }
+}
+
 // ── K2 (conj_binv): b⁻¹·(ba)^t =_F (ab)^(t-1)·a ──
 pub proof fn lemma_conj_binv(t: int)
     ensures crate::reduction::freely_equivalent(seq![Symbol::Inv(1)] + bapow(t), abpow(t - 1) + seq![Symbol::Gen(0)]),
