@@ -2723,4 +2723,68 @@ pub proof fn lemma_fire_pv(u: Word, i: int)
     lemma_forall_positive(u2);
 }
 
+// ═══ B3 fix P7b: existence of Thue-nf + dispatcher + M3 POSITIVITY ═══
+pub proof fn lemma_exists_nf(u: Word)
+    requires positive_word(u), word_valid(u, 4),
+    ensures exists|u2: Word| thue_equiv(m3_rules(), u, u2) && no_qa(u2) && no_qpa(u2)
+        && positive_word(u2) && word_valid(u2, 4),
+    decreases num_a(u),
+{
+    if has_redex(u) {
+        let i = choose|i: int| is_redex_at(u, i);
+        assert(is_redex_at(u, i));
+        let u2 = fire_at(u, i);
+        lemma_fire_thue(u, i);
+        lemma_fire_num_a(u, i);
+        lemma_fire_pv(u, i);
+        lemma_exists_nf(u2);
+        let u3 = choose|u3: Word| thue_equiv(m3_rules(), u2, u3) && no_qa(u3) && no_qpa(u3)
+            && positive_word(u3) && word_valid(u3, 4);
+        lemma_thue_trans(m3_rules(), u, u2, u3);
+    } else {
+        lemma_no_redex_nf(u);
+        lemma_thue_refl(m3_rules(), u);
+    }
+}
+
+pub proof fn lemma_m3_positivity_fwd(u: Word, v: Word)
+    requires positive_word(u), positive_word(v), word_valid(u, 4), word_valid(v, 4),
+        equiv_in_presentation(rules_pres(m3_rules(), 4), u, v),
+    ensures thue_equiv(m3_rules(), u, v),
+{
+    use crate::presentation::{lemma_equiv_transitive, lemma_equiv_symmetric};
+    let rp = rules_pres(m3_rules(), 4);
+    lemma_m3_pres_valid();
+    lemma_exists_nf(u); lemma_exists_nf(v);
+    let u2 = choose|u2: Word| thue_equiv(m3_rules(), u, u2) && no_qa(u2) && no_qpa(u2)
+        && positive_word(u2) && word_valid(u2, 4);
+    let v2 = choose|v2: Word| thue_equiv(m3_rules(), v, v2) && no_qa(v2) && no_qpa(v2)
+        && positive_word(v2) && word_valid(v2, 4);
+    // equiv_rp(u2, v2): u2 ~thue u ~rp v ~thue v2
+    lemma_m3_backward(u, u2); lemma_m3_backward(v, v2);
+    lemma_equiv_symmetric(rp, u, u2);
+    lemma_equiv_transitive(rp, u2, u, v);
+    lemma_equiv_transitive(rp, u2, v, v2);
+    lemma_m3_nf_readback(u2, v2);                      // thue_equiv(u2, v2)
+    lemma_thue_symmetric(m3_rules(), v, v2);           // thue_equiv(v2, v)
+    lemma_thue_trans(m3_rules(), u, u2, v2);
+    lemma_thue_trans(m3_rules(), u, v2, v);
+}
+
+pub proof fn lemma_m3_positivity()
+    ensures positivity(m3_rules(), 4),
+{
+    assert forall|u: Word, v: Word|
+        positive_word(u) && positive_word(v) && word_valid(u, 4) && word_valid(v, 4)
+        implies (#[trigger] equiv_in_presentation(rules_pres(m3_rules(), 4), u, v)
+            <==> thue_equiv(m3_rules(), u, v)) by {
+        if equiv_in_presentation(rules_pres(m3_rules(), 4), u, v) {
+            lemma_m3_positivity_fwd(u, v);
+        }
+        if thue_equiv(m3_rules(), u, v) {
+            lemma_m3_backward(u, v);
+        }
+    }
+}
+
 } // verus!
