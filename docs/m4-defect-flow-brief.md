@@ -275,3 +275,46 @@ Produce a **resumable, brick-by-brick plan** for `lemma_m4_positivity`, in the s
 
 Please also flag any place where you think the paper argument in §4 has a gap or an unstated assumption —
 we would rather find it now than mid-proof.
+
+---
+
+## 8. CATALOG findings (reuse map — added after scanning `docs/CATALOG.md`)
+
+**⭐ Key de-risking fact.** The Britton/coset engine is **fully data-parametrized**, not hardcoded to
+M3's subgroups: `a_words(data)`/`b_words(data)` (`normal_form_afp_textbook.rs:27,32`) read the associated
+subgroups from `data.identifications`, and `textbook_act_hnn(data, …)` / `act_syls(data, …)` /
+`b_rcoset_rep(data, …)` all take the data. So M4's `⟨ab⟩→⟨ba⟩` flows through the **entire** normal-form
+engine automatically. **M4 = reuse the engine, write a new readback analysis.** The engine will correctly
+*compute* the `⟨ba⟩`-coset reps; the defect-flow argument is about *what those reps are*.
+
+**(A) Group-side — near-verbatim copies of M3 (swap the association tuple + 2nd-relator word):**
+`m3_rules/m3_data/sub_hom/swap_hom` and `lemma_m3_rules_valid, _pres_valid, m3_backward, m3_data_valid,
+lemma_qa2_equiv_b2` (→ `qab_equiv_ba`), `lemma_sub_valid, group_to_hnn, swap_valid, swap_emb, m3_iso,
+sub_on_base, m3_base` (all in `m3_blinker.rs`, see catalog line 552 for exact `@line`s).
+
+**(B) Generic engine — reuse wholesale, no changes (HNNData/AmalgamatedData-polymorphic):**
+- `britton_via_tower.rs`: `textbook_act_hnn@4627`, `britton_lemma_unconditional@2195`, `britton_lemma_full@8743`,
+  `lemma_act_base@4654`, `lemma_act_compose@4677`, `lemma_single_step_preserves_syls@8644`,
+  `lemma_derivation_preserves_syls@8701`, `lemma_group_cancel_right@6219`, and the `b_rcoset_rep`/`_h`
+  plumbing (`lemma_psi_p_*`, `lemma_b_rcoset_h_*`).
+- `normal_form_afp_textbook.rs`: `a_rcoset_rep@425, b_rcoset_rep@529, same_a_rcoset@354, same_b_rcoset@471,
+  a_rcoset_h@455, b_rcoset_h@603`, `lemma_afp_injectivity_textbook@7941`, + the shortlex coset lemmas.
+- `machine_group.rs`: `act_syls`. `hnn.rs`: `hnn_associations_isomorphic@74, lemma_base_embeds_in_hnn@158,
+  lemma_hnn_conjugation@173`. `base_swap.rs`: `lemma_same_group_iff@433` (the Tietze iso tool).
+- `presentation_lemmas.rs`: `lemma_equiv_concat_left@62/right@166, word_inverse_left@325/right@271` (cancellation).
+- `free_word_problem.rs`: `lemma_free_group_equiv_freely_equivalent`. `m3_blinker.rs` (generic-enough to lift):
+  `lemma_syls_preserved@764, reduced_unique@827, base_reduced_unique_hnn@2377, sub_first_decode@2414,
+  sub_injective@2427` (retarget to `m4_data`).
+
+**(C) Readback — REDESIGN for defect flow (do NOT reuse M3's parity machinery):**
+M3-specific and tied to the `⟨a²⟩` parity head-cap — replace, don't copy: `nf_gap, gap_word, gap_syls,
+split_q, no_qa/no_qpa/no_qaa, no_sub3, sub_alpha, parity_head_cap, lemma_parity_head_cap,
+lemma_b_rcoset_rep_eq_gap` (**the `rep=gap` lemma — M4 needs a defect-flow analog, this is the crux**),
+`lemma_act_gap_word, lemma_act_syls_split, lemma_split_gaps_nf, lemma_m3_nf_readback`. Also
+`ffnf/num_a/is_redex_at/fire_at/exists_nf` — **M4's Thue termination is not `#a`** (rule 2 `q′b→aq` adds an
+`a`); it is "state letters move right," so the nf-reduction measure must change.
+
+**Possibly useful new tool for the global argument:** `abelianization.rs` (`abelianization@38,
+lemma_abelianization_preserves_equiv@348`) — a conserved-quantity invariant could underpin the
+defect-conservation / boundary-discharge step (the doc's `2(a−b)=0` remark hints an abelian invariant is
+in play). Worth the planner's consideration.
