@@ -318,3 +318,19 @@ lemma_b_rcoset_rep_eq_gap` (**the `rep=gap` lemma — M4 needs a defect-flow ana
 lemma_abelianization_preserves_equiv@348`) — a conserved-quantity invariant could underpin the
 defect-conservation / boundary-discharge step (the doc's `2(a−b)=0` remark hints an abelian invariant is
 in play). Worth the planner's consideration.
+
+**Precedents for the defect-CONSERVATION step (from a full CATALOG read).** The defect `mᵢ` argument is a
+"conserved ℤ-quantity that must discharge at the word boundary." The crate already has this exact
+proof-pattern in several places — study them as models for the hardest brick:
+- `conj_free_core.rs`: `asum`/`bsep` are net-exponent invariants with `lemma_asum_inverse_pair_zero@108`,
+  `lemma_reduce_preserves_bsep@391`, `lemma_count1_bsep_invariant@886` (a ℤ-count preserved under free
+  reduction, then used to force a boundary conclusion) — **the closest structural analog**.
+- `machine_group.rs`: `x_exp_sum@4994` + `lemma_x_exp_sum_step_invariant@5133`,
+  `lemma_x_exp_sum_equiv_invariant@5212` (a generator-exponent sum invariant under *group equivalence*).
+- `abelianization.rs`: `lemma_abelianization_preserves_equiv@348` (the clean off-the-shelf ℤⁿ invariant).
+The recommended pattern: define the defect/net-exponent as a `spec fn` on words, prove it's preserved under
+`reduce_at`/single Thue-or-free step (mirror `lemma_reduce_preserves_bsep`), and use it to annihilate the
+defect at the right boundary. **Bottom line of the full catalog read:** the crate splits into two campaigns
+— the traditional Higman/Miller ZFC route (most modules, NOT on M4's path) and the M-ladder Thue-positivity
+route (Area 12 + Areas 1–3, which is all M4 needs). No hidden M4 blocker; the engine is ready, the readback
+is the design.
