@@ -572,3 +572,6 @@ pub mod m3_blinker;
 
 // m4_defect_flow: M-ladder rung M4 (mixed transduction) positivity — HNN extension ⟨a,b,q|q(ab)q⁻¹=ba⟩ (≅ ℤ*ℤ²), defect-flow readback.
 pub mod m4_defect_flow;
+
+// m4_qpow: M4 B8 enabler (2) q·(ab)^e·q⁻¹≡(ba)^e — quarantined (lemma_qpow_conj = Lean verification cliff, being reworked).
+pub mod m4_qpow;

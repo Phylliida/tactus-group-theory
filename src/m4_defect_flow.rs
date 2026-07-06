@@ -1105,4 +1105,11 @@ pub proof fn lemma_cyclic_exp_ba(g: Word)
     lemma_freely_equivalent_trans(g, concat_all(factors), bapow(e));
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// B8 enabler (2): q·(ab)^e·q⁻¹ ≡ (ba)^e  — replace a middle pinch during peeling.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+// B8 enabler (2) [q·(ab)^e·q⁻¹ ≡ (ba)^e] MOVED to src/m4_qpow.rs — lemma_qpow_conj is a
+// verification cliff under the Lean backend; quarantined there so this module stays fast/green.
+
 } // verus!
