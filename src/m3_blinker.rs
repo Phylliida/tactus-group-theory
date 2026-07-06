@@ -2128,4 +2128,105 @@ pub proof fn lemma_all_drop_base(W: Word)
     }
 }
 
+// ═══ B3 fix P3c-2: gaps are nf_gap (main split_gaps_nf) ═══
+pub proof fn lemma_lead_le1(g: Word)
+    requires !(g.len() >= 2 && g[0] == Symbol::Gen(0) && g[1] == Symbol::Gen(0)),
+    ensures crate::m1_guard::lead(g, 0) <= 1,
+{
+    use crate::m1_guard::*;
+    if g.len() > 0 && g[0] == Symbol::Gen(0) {
+        assert(g.drop_first().len() == g.len() - 1);
+        if g.drop_first().len() > 0 && g.drop_first()[0] == Symbol::Gen(0) {
+            assert(g.drop_first()[0] == g[1]);
+            assert(false);
+        }
+        assert(lead(g.drop_first(), 0) == 0);
+    }
+}
+pub proof fn lemma_base_run_no_gen2(W: Word)
+    ensures no_sym(base_run(W), Symbol::Gen(2)),
+    decreases W.len(),
+{
+    if W.len() != 0 && W[0] != Symbol::Gen(2) {
+        lemma_base_run_no_gen2(W.drop_first());
+        assert(base_run(W) =~= seq![W[0]] + base_run(W.drop_first()));
+        lemma_no_sym_cons(W[0], base_run(W.drop_first()), Symbol::Gen(2));
+    }
+}
+pub proof fn lemma_word_valid2(g: Word)
+    requires sub_alpha(g), no_sym(g, Symbol::Gen(2)),
+    ensures word_valid(g, 2),
+    decreases g.len(),
+{
+    if g.len() > 0 {
+        lemma_sub_alpha_drop(g);
+        lemma_no_sym_drop(g, Symbol::Gen(2));
+        lemma_word_valid2(g.drop_first());
+        assert forall|i: int| 0 <= i < g.len() implies symbol_valid(#[trigger] g[i], 2) by {
+            if i == 0 {
+            } else {
+                assert(g[i] == g.drop_first()[i - 1]);
+            }
+        }
+    }
+}
+pub proof fn lemma_lead_g0_le1(W: Word)
+    requires no_sub3(W), W.len() > 0, W[0] == Symbol::Gen(2),
+    ensures crate::m1_guard::lead(base_run(W.drop_first()), 0) <= 1,
+{
+    let after = W.drop_first();
+    let g0 = base_run(after);
+    if g0.len() >= 2 {
+        lemma_base_drop_reconstruct(after);          // after = g0 + drop_base_run(after)
+        assert(after =~= g0 + drop_base_run(after));
+        assert(g0[0] == after[0] && g0[1] == after[1]);
+        assert(after.len() == W.len() - 1);
+        assert(after[0] == W[1] && after[1] == W[2]);
+        assert(W.len() >= 3);
+        assert(!(W[1] == Symbol::Gen(0) && W[2] == Symbol::Gen(0)));   // no_sub3(W) head, W[0]==Gen2
+    }
+    lemma_lead_le1(g0);
+}
+
+pub proof fn lemma_split_gaps_nf(W: Word)
+    requires crate::reduction::is_reduced(W), no_sym(W, Symbol::Inv(0)), no_sub3(W), sub_alpha(W),
+        W.len() == 0 || W[0] == Symbol::Gen(2),
+    ensures forall|i: int| 0 <= i < split_q(W).len() ==> nf_gap(#[trigger] split_q(W)[i]),
+    decreases W.len(),
+{
+    if W.len() == 0 || W[0] != Symbol::Gen(2) {
+        assert(split_q(W) =~= Seq::<Word>::empty());
+    } else {
+        let after = W.drop_first();
+        let g0 = base_run(after);
+        let tail = drop_base_run(after);
+        assert(split_q(W) =~= seq![g0] + split_q(tail));
+        // nf_gap(g0)
+        lemma_reduced_drop(W);
+        lemma_reduced_base_run(after);
+        lemma_no_sym_drop(W, Symbol::Inv(0));
+        lemma_no_sym_base_run(after, Symbol::Inv(0));
+        lemma_sub_alpha_drop(W);
+        lemma_sub_alpha_base_run(after);
+        lemma_base_run_no_gen2(after);
+        lemma_word_valid2(g0);
+        lemma_lead_g0_le1(W);
+        assert(nf_gap(g0));
+        // recurse on tail
+        lemma_no_sub3_drop(W);
+        lemma_all_drop_base(after);                  // reduced/no_sym/no_sub3/sub_alpha(tail)
+        lemma_drop_base_run_head(after);             // tail starts Gen2 or empty
+        lemma_drop_base_run_len(after);              // tail.len() <= after.len() < W.len() (decreases)
+        assert(after.len() == W.len() - 1);
+        lemma_split_gaps_nf(tail);
+        assert forall|i: int| 0 <= i < split_q(W).len() implies nf_gap(#[trigger] split_q(W)[i]) by {
+            if i == 0 {
+                assert(split_q(W)[0] == g0);
+            } else {
+                assert(split_q(W)[i] == split_q(tail)[i - 1]);
+            }
+        }
+    }
+}
+
 } // verus!
