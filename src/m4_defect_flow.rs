@@ -393,4 +393,64 @@ pub proof fn lemma_m4_iso()
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// B6 — the pw (power-word) library: (ab)^t and (ba)^t for t ∈ ℤ, over the HNN base F(a,b).
+// Foundation for the defect-flow readback. Every compensation reduces to comparing these
+// against shape words via free reduction. (K-identities forthcoming.)
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+// (ab)^t : t>0 ↦ (ab)^t = [a b a b …]; t<0 ↦ (b⁻¹a⁻¹)^|t|; t=0 ↦ ε.
+pub open spec fn abpow(t: int) -> Word
+    decreases (if t >= 0 { t } else { -t })
+{
+    if t == 0 { empty_word() }
+    else if t > 0 { seq![Symbol::Gen(0), Symbol::Gen(1)] + abpow(t - 1) }
+    else { seq![Symbol::Inv(1), Symbol::Inv(0)] + abpow(t + 1) }
+}
+
+// (ba)^t : t>0 ↦ (ba)^t = [b a b a …]; t<0 ↦ (a⁻¹b⁻¹)^|t|; t=0 ↦ ε.
+pub open spec fn bapow(t: int) -> Word
+    decreases (if t >= 0 { t } else { -t })
+{
+    if t == 0 { empty_word() }
+    else if t > 0 { seq![Symbol::Gen(1), Symbol::Gen(0)] + bapow(t - 1) }
+    else { seq![Symbol::Inv(0), Symbol::Inv(1)] + bapow(t + 1) }
+}
+
+pub proof fn lemma_abpow_valid(t: int)
+    ensures word_valid(abpow(t), 2)
+    decreases (if t >= 0 { t } else { -t })
+{
+    if t == 0 {
+    } else if t > 0 {
+        lemma_abpow_valid(t - 1);
+        assert(word_valid(seq![Symbol::Gen(0), Symbol::Gen(1)], 2));
+        crate::word::lemma_concat_word_valid(seq![Symbol::Gen(0), Symbol::Gen(1)], abpow(t - 1), 2);
+        assert(concat(seq![Symbol::Gen(0), Symbol::Gen(1)], abpow(t - 1)) =~= abpow(t));
+    } else {
+        lemma_abpow_valid(t + 1);
+        assert(word_valid(seq![Symbol::Inv(1), Symbol::Inv(0)], 2));
+        crate::word::lemma_concat_word_valid(seq![Symbol::Inv(1), Symbol::Inv(0)], abpow(t + 1), 2);
+        assert(concat(seq![Symbol::Inv(1), Symbol::Inv(0)], abpow(t + 1)) =~= abpow(t));
+    }
+}
+
+pub proof fn lemma_bapow_valid(t: int)
+    ensures word_valid(bapow(t), 2)
+    decreases (if t >= 0 { t } else { -t })
+{
+    if t == 0 {
+    } else if t > 0 {
+        lemma_bapow_valid(t - 1);
+        assert(word_valid(seq![Symbol::Gen(1), Symbol::Gen(0)], 2));
+        crate::word::lemma_concat_word_valid(seq![Symbol::Gen(1), Symbol::Gen(0)], bapow(t - 1), 2);
+        assert(concat(seq![Symbol::Gen(1), Symbol::Gen(0)], bapow(t - 1)) =~= bapow(t));
+    } else {
+        lemma_bapow_valid(t + 1);
+        assert(word_valid(seq![Symbol::Inv(0), Symbol::Inv(1)], 2));
+        crate::word::lemma_concat_word_valid(seq![Symbol::Inv(0), Symbol::Inv(1)], bapow(t + 1), 2);
+        assert(concat(seq![Symbol::Inv(0), Symbol::Inv(1)], bapow(t + 1)) =~= bapow(t));
+    }
+}
+
 } // verus!
