@@ -569,3 +569,6 @@ pub mod m2_translate;
 
 // m3_blinker: M-ladder rung M3 (THE BLINKER) positivity — HNN extension ⟨a,b,q|qa²q⁻¹=b²⟩, Britton's lemma + parity head-cap.
 pub mod m3_blinker;
+
+// m4_defect_flow: M-ladder rung M4 (mixed transduction) positivity — HNN extension ⟨a,b,q|q(ab)q⁻¹=ba⟩ (≅ ℤ*ℤ²), defect-flow readback.
+pub mod m4_defect_flow;
