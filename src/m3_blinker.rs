@@ -2265,4 +2265,112 @@ pub proof fn lemma_act_syls_split(W: Word)
     assert(crate::machine_group::act_syls(md, W) == textbook_act_hnn(md, W, e, es).1);
 }
 
+// ═══ B3 fix P6a: sub/ffnf property helpers + gap_syls injective ═══
+pub proof fn lemma_sub_alpha(w: Word)
+    requires positive_word(w), word_valid(w, 4),
+    ensures sub_alpha(apply_hom(sub_hom(), w)),
+    decreases w.len(),
+{
+    use crate::homomorphism::*;
+    let sub = sub_hom();
+    if w.len() > 0 {
+        let rest = w.drop_first();
+        let a = apply_hom_symbol(sub, w[0]);
+        let b = apply_hom(sub, rest);
+        assert(apply_hom(sub, w) =~= a + b);
+        assert(positive_word(rest));
+        assert(word_valid(rest, 4)) by { assert forall|i: int| 0 <= i < rest.len() implies symbol_valid(#[trigger] rest[i], 4) by { assert(rest[i] == w[i + 1]); } }
+        lemma_sub_alpha(rest);
+        assert(symbol_is_gen(w[0]) && symbol_valid(w[0], 4));
+        assert(w[0] == Symbol::Gen(0) || w[0] == Symbol::Gen(1) || w[0] == Symbol::Gen(2) || w[0] == Symbol::Gen(3));
+        assert(sub.generator_images[0] =~= seq![Symbol::Gen(0)]);
+        assert(sub.generator_images[1] =~= seq![Symbol::Gen(1)]);
+        assert(sub.generator_images[2] =~= seq![Symbol::Gen(2)]);
+        assert(sub.generator_images[3] =~= seq![Symbol::Inv(1), Symbol::Gen(2), Symbol::Gen(0)]);
+        assert(sub_alpha(a));
+        assert forall|i: int| 0 <= i < (a + b).len() implies (#[trigger] (a + b)[i] == Symbol::Gen(0) || (a + b)[i] == Symbol::Gen(1) || (a + b)[i] == Symbol::Gen(2) || (a + b)[i] == Symbol::Inv(1)) by {
+            if i < a.len() { assert((a + b)[i] == a[i]); } else { assert((a + b)[i] == b[i - a.len()]); }
+        }
+    }
+}
+pub proof fn lemma_no_inv0_from_alpha(W: Word)
+    requires sub_alpha(W),
+    ensures no_sym(W, Symbol::Inv(0)),
+    decreases W.len(),
+{
+    if W.len() > 0 {
+        lemma_sub_alpha_drop(W);
+        lemma_no_inv0_from_alpha(W.drop_first());
+    }
+}
+pub proof fn lemma_positive_cons(sy: Symbol, w: Word)
+    requires symbol_is_gen(sy), positive_word(w),
+    ensures positive_word(seq![sy] + w),
+{ let sw = seq![sy] + w; assert(sw[0] == sy); assert(sw.drop_first() =~= w); }
+pub proof fn lemma_ffnf_positive(u: Word)
+    requires positive_word(u),
+    ensures positive_word(ffnf(u)),
+    decreases u.len(),
+{
+    if u.len() == 0 {
+    } else if u.len() >= 2 && u[0] == Symbol::Gen(1) && u[1] == Symbol::Gen(3) {
+        let rest = u.subrange(2, u.len() as int);
+        assert(u.drop_first() =~= seq![Symbol::Gen(3)] + rest);
+        assert(u.drop_first().drop_first() =~= rest);
+        assert(positive_word(u.drop_first()));
+        assert(positive_word(rest));
+        lemma_ffnf_positive(rest);
+        assert(ffnf(u) =~= seq![Symbol::Gen(2), Symbol::Gen(0)] + ffnf(rest));
+        lemma_positive_cons(Symbol::Gen(0), ffnf(rest));
+        lemma_positive_cons(Symbol::Gen(2), seq![Symbol::Gen(0)] + ffnf(rest));
+        assert(seq![Symbol::Gen(2)] + (seq![Symbol::Gen(0)] + ffnf(rest)) =~= ffnf(u));
+    } else {
+        let rest = u.drop_first();
+        assert(positive_word(rest));
+        lemma_ffnf_positive(rest);
+        assert(ffnf(u) =~= seq![u[0]] + ffnf(rest));
+        assert(symbol_is_gen(u[0]));
+        lemma_positive_cons(u[0], ffnf(rest));
+    }
+}
+pub proof fn lemma_ffnf_valid(u: Word)
+    requires word_valid(u, 4),
+    ensures word_valid(ffnf(u), 4),
+    decreases u.len(),
+{
+    if u.len() == 0 {
+    } else if u.len() >= 2 && u[0] == Symbol::Gen(1) && u[1] == Symbol::Gen(3) {
+        let rest = u.subrange(2, u.len() as int);
+        assert(word_valid(rest, 4)) by { assert forall|i: int| 0 <= i < rest.len() implies symbol_valid(#[trigger] rest[i], 4) by { assert(rest[i] == u[i + 2]); } }
+        lemma_ffnf_valid(rest);
+        assert(ffnf(u) =~= seq![Symbol::Gen(2), Symbol::Gen(0)] + ffnf(rest));
+        let g = ffnf(u);
+        assert(g[0] == Symbol::Gen(2) && g[1] == Symbol::Gen(0));
+        assert forall|i: int| 0 <= i < g.len() implies symbol_valid(#[trigger] g[i], 4) by {
+            if i == 0 { } else if i == 1 { } else { assert(g[i] == ffnf(rest)[i - 2]); }
+        }
+    } else {
+        let rest = u.drop_first();
+        assert(word_valid(rest, 4)) by { assert forall|i: int| 0 <= i < rest.len() implies symbol_valid(#[trigger] rest[i], 4) by { assert(rest[i] == u[i + 1]); } }
+        lemma_ffnf_valid(rest);
+        assert(ffnf(u) =~= seq![u[0]] + ffnf(rest));
+        let g = ffnf(u);
+        assert forall|i: int| 0 <= i < g.len() implies symbol_valid(#[trigger] g[i], 4) by {
+            if i == 0 { assert(symbol_valid(u[0], 4)); } else { assert(g[i] == ffnf(rest)[i - 1]); }
+        }
+    }
+}
+pub proof fn lemma_gap_syls_inj(gs1: Seq<Word>, gs2: Seq<Word>)
+    requires gap_syls(gs1) =~= gap_syls(gs2),
+    ensures gs1 =~= gs2,
+{
+    assert(gap_syls(gs1).len() == gs1.len() && gap_syls(gs2).len() == gs2.len());
+    assert(gs1.len() == gs2.len());
+    assert forall|i: int| 0 <= i < gs1.len() implies gs1[i] =~= gs2[i] by {
+        assert(gap_syls(gs1)[i] == gap_syls(gs2)[i]);
+        assert(gap_syls(gs1)[i].rep == gs1[i]);
+        assert(gap_syls(gs2)[i].rep == gs2[i]);
+    }
+}
+
 } // verus!
