@@ -2229,4 +2229,40 @@ pub proof fn lemma_split_gaps_nf(W: Word)
     }
 }
 
+// ═══ B3 fix P5: act_syls(W) = gap_syls(gaps) for an nf q-word W ═══
+pub proof fn lemma_act_syls_split(W: Word)
+    requires crate::reduction::is_reduced(W), no_sym(W, Symbol::Inv(0)), no_sub3(W), sub_alpha(W),
+    ensures crate::machine_group::act_syls(m3_data(), W)
+        =~= gap_syls(split_q(drop_base_run(W))),
+{
+    use crate::britton_via_tower::*;
+    use crate::normal_form_afp_textbook::Syllable;
+    let md = m3_data();
+    let e = empty_word();
+    let es = Seq::<Syllable>::empty();
+    let p0 = base_run(W);
+    let rest = drop_base_run(W);
+    let gaps = split_q(rest);
+    lemma_base_drop_reconstruct(W);      // W = p0 + rest
+    lemma_drop_base_run_head(W);         // rest starts Gen2 or empty
+    lemma_gap_word_split(rest);          // gap_word(gaps) = rest
+    lemma_all_drop_base(W);              // reduced/no_sym/no_sub3/sub_alpha(rest)
+    lemma_split_gaps_nf(rest);           // gaps nf
+    lemma_act_gap_word(gaps);            // act(gap_word(gaps),e,es) == (e, gap_syls(gaps))
+    assert(W =~= concat(p0, gap_word(gaps)));
+    lemma_act_compose(md, p0, gap_word(gaps), e, es);
+    // p0 not stable
+    lemma_sub_alpha_base_run(W);
+    lemma_base_run_no_gen2(W);
+    lemma_word_valid2(p0);
+    assert(md.base.num_generators == 2) by { crate::higman_operations::lemma_free_group_valid(2); }
+    assert(forall|i: int| 0 <= i < p0.len() ==> !is_stable(md, #[trigger] p0[i])) by {
+        assert forall|i: int| 0 <= i < p0.len() implies !is_stable(md, #[trigger] p0[i]) by { assert(symbol_valid(p0[i], 2)); }
+    }
+    lemma_act_base(md, p0, e, gap_syls(gaps));   // act(p0, e, gap_syls) == (p0+e, gap_syls)
+    assert(concat(p0, e) =~= p0);
+    // chain: act(W,e,es) == act(p0, e, gap_syls(gaps)) == (p0, gap_syls(gaps)); .1 = gap_syls(gaps)
+    assert(crate::machine_group::act_syls(md, W) == textbook_act_hnn(md, W, e, es).1);
+}
+
 } // verus!
