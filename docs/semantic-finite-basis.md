@@ -197,6 +197,11 @@ So images of irreducibles are reduced as written and parse back uniquely (`b⁻�
 
 ### 4.3 M3 — THE BLINKER (first control loop)
 
+> **✅ FORMALIZED — `src/m3_blinker.rs` 124/0 (2026-07-06).** `lemma_m3_positivity : positivity(m3_rules(), 4)`,
+> both directions. The paper proof below is the route; formalization notes: `ffnf` fires `bq′→qa` (a Thue move) so
+> `sub` is reduced; `rep=gap` (b-coset rep of an nf gap is the gap); `act_syls` = Britton normal form; the leading
+> base is recovered by right-cancellation, base-faithfulness by the banked `britton_lemma_unconditional`.
+
 `R = { qa = bq′, q′a = bq }` — the head toggles state each step. Tietze elimination no longer
 yields a free group; this is the critical test.
 

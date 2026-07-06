@@ -55,7 +55,7 @@ formalization campaign: **`zfc-group-2-plan.md`**. ZFC layer spec: **`nbg-machin
 
 ---
 
-## What is MACHINE-VERIFIED (Verus/tactus, full crate 2862/0)
+## What is MACHINE-VERIFIED (Verus/tactus, full crate 3065/0)
 
 | Module | Status | What |
 |---|---|---|
@@ -64,6 +64,7 @@ formalization campaign: **`zfc-group-2-plan.md`**. ZFC layer spec: **`nbg-machin
 | `src/thue.rs` | 18/0 | **Phase 0** — Thue congruence, `positivity` spec (Law P), the bridge (Thue⟹group), + congruence primitives (refl/single/trans/symmetric/prepend) |
 | `src/m1_guard.rs` | 34/0 | **M1 COMPLETE** — `positivity(m1_rules,4)` both directions, first M-ladder rung. ⟹ via two-projection route (kill_n/kill_g → same deletes → combinatorial peel induction), no free-product NF |
 | `src/m2_translate.rs` | 30/0 | **M2 COMPLETE** — `positivity(m2_rules,4)` (qa=bq′, group F(q,a,b)). ⟹ via no-cancellation readback (sub hom q′↦b⁻¹qa → nf no-bq′ → sub reduced+injective on nf). A *second* positivity technique |
+| `src/m3_blinker.rs` | 124/0 | **M3 COMPLETE (THE BLINKER — first control loop)** — `positivity(m3_rules,4)` (qa=bq′, q′a=bq). ⟹ via HNN Britton readback: Tietze q′=b⁻¹qa → HNN `⟨a,b,q\|qa²q⁻¹=b²⟩`, `act_syls` Britton normal form; `ffnf` (fire bq′→qa, a Thue move) makes `sub` reduced, `rep=gap` (b-coset rep of an nf gap IS the gap), right-cancellation recovers the leading base, base-faithfulness via banked `britton_lemma_unconditional`. A *third* positivity technique |
 
 ## What is DESIGNED + AUDITED + RUNNING (Python, not yet formalized)
 
@@ -85,7 +86,8 @@ M0  token layer (G_T ≅ free) .............. ✅ DONE  (base case of positivity
 Phase 1  M-ladder rungs (each = positivity(rules,n)):
    M1 guard-motion ........................ ✅ DONE (m1_guard.rs 34/0, two-projection route)
    M2 translate ........................... ✅ DONE (m2_translate.rs 30/0, no-cancellation readback)
-   M3 blinker · M5 doubler · M6 courier · M7 junction-decoupling (the CROWN)
+   M3 blinker ............................. ✅ DONE (m3_blinker.rs 124/0, HNN Britton readback route)
+   M5 doubler · M6 courier · M7 junction-decoupling (the CROWN)
    → each: define rules, prove ⟹ (mechanism from §4), ⟸ is free from thue.rs
 Phase 2  the VERIFIED auditor ............. Laws 0–6 as spec fns; port tools/semantic_audit.py to exec
 Phase 3  Boolean group end-to-end ......... expander emits ~450 rules → audit → completeness
@@ -105,7 +107,7 @@ PARALLEL arc: carrier_not_fp — discharge the escape hypothesis (NF-2a refactor
 1. **Finish M1's ⟹** — `docs/m1-positivity-plan.md` Part A (projection homs) then Part B (peel
    induction). ~15–20 lemmas, route pinned. *(recommended after a /roll — fresh context)*
 2. **carrier_not_fp NF-3** — self-contained, PROVEN on paper (contraction induction); good warm-up.
-3. **M2 or M3** — next M-ladder rungs (M3 blinker cashes in the banked `britton_lemma`).
+3. **M5 / M6 / M7** — remaining M-ladder rungs (M1/M2/M3 done). M3's HNN-Britton route is the template for control-loop rungs; M7 junction-decoupling is the CROWN.
 4. **The Phase-2 verified auditor** — ports the 32-system corpus into a machine-checked tool.
 
 ## Honest residuals
