@@ -134,6 +134,15 @@ Three cases on (has-state-letters u?, has-state-letters v?):
   lemma_deriv_syls to the full output, OR a "Britton NF is a complete invariant" lemma. The MATH is fine
   (sub is a group iso, positivity holds); this is a proof-strategy course-correction. The after-q-gap
   a-head≤1 (below) is STILL needed for the syls part.
+  ⭐⭐⭐ **M3 COMPLETE (2026-07-06, m3 at 124/0): `lemma_m3_positivity` PROVES `positivity(m3_rules(),4)`.** ⭐⭐⭐
+  Both directions of the blinker: group-equiv ⟺ Thue-equiv on positive words. Full assembly P1–P7 all green:
+  P1 ffnf+u~thue ffnf, P2a ffnf bq'-free, P2b sub reduced, P4a split_q/gap_word roundtrip, P3a ffnf no_qaa/no_qpa,
+  P3b no [Gen2,Gen0,Gen0] in sub, P3c gaps-nf, P5 act_syls=gap_syls, P6a sub/ffnf helpers, P6b sub-injective +
+  base-faithfulness (via banked britton_lemma_unconditional + lemma_reduced_unique — Danielle's "search first" tip),
+  P6c nf-readback (lemma_sfu_setup + lemma_right_cancel_p0 + orchestrator, split for rlimit), P7a nf-reduction
+  helpers (num_a measure), P7b lemma_exists_nf + dispatcher + lemma_m3_positivity. Two subtleties found+fixed:
+  (1) reduced-gaps≠raw-sub ⟹ ffnf; (2) act_syls drops leading base ⟹ right-cancellation. NEXT = wire into M-ladder.
+
   ── ASSEMBLY PROGRESS (m3 at 88/0), route = RIGHT-CANCELLATION (no h-preservation) ──
   * P3a ✅ (84/0): no_qa/no_qpa/no_qaa preds + lemma_ffnf_no_qpa + lemma_ffnf_no_qaa (ffnf props from u nf).
   * P3b ✅ (88/0): no_sub3 pred + lemma_no_sub3_concat + lemma_sub_no_sub3 (no_qaa+no_qpa ⟹ no [Gen2,Gen0,Gen0] in sub).
