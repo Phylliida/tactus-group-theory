@@ -2034,4 +2034,98 @@ pub proof fn lemma_sub_no_sub3(w: Word)
     }
 }
 
+// ═══ B3 fix P3c-1: preservation helpers (reduced/no_sym/no_sub3/sub_alpha under drop_first, base_run, drop_base_run) ═══
+pub open spec fn sub_alpha(W: Word) -> bool {   // symbols ∈ {Gen0,Gen1,Gen2,Inv1} (the sub image alphabet)
+    forall|i: int| 0 <= i < W.len() ==> (#[trigger] W[i] == Symbol::Gen(0) || W[i] == Symbol::Gen(1)
+        || W[i] == Symbol::Gen(2) || W[i] == Symbol::Inv(1))
+}
+
+// --- reduced ---
+pub proof fn lemma_reduced_drop(W: Word)
+    requires crate::reduction::is_reduced(W), W.len() > 0,
+    ensures crate::reduction::is_reduced(W.drop_first()),
+{
+    use crate::reduction::*;
+    if has_cancellation(W.drop_first()) {
+        assert(W.drop_first().len() == W.len() - 1);
+        let i = choose|i: int| has_cancellation_at(W.drop_first(), i);
+        assert(has_cancellation_at(W.drop_first(), i));
+        assert(W.drop_first()[i] == W[i + 1]);
+        assert(W.drop_first()[i + 1] == W[i + 2]);
+        assert(has_cancellation_at(W, i + 1));
+    }
+}
+pub proof fn lemma_reduced_base_run(W: Word)
+    requires crate::reduction::is_reduced(W),
+    ensures crate::reduction::is_reduced(base_run(W)),
+{
+    use crate::reduction::*;
+    lemma_base_drop_reconstruct(W);   // W = base_run(W) + drop_base_run(W)
+    let b = base_run(W);
+    assert(W =~= b + drop_base_run(W));
+    assert(b.len() <= W.len());
+    if has_cancellation(b) {
+        let i = choose|i: int| has_cancellation_at(b, i);
+        assert(has_cancellation_at(b, i));
+        assert(b[i] == W[i] && b[i + 1] == W[i + 1]);
+        assert(has_cancellation_at(W, i));
+    }
+}
+
+// --- no_sym ---
+pub proof fn lemma_no_sym_drop(W: Word, t: Symbol)
+    requires no_sym(W, t), W.len() > 0,
+    ensures no_sym(W.drop_first(), t),
+{ }
+pub proof fn lemma_no_sym_base_run(W: Word, t: Symbol)
+    requires no_sym(W, t),
+    ensures no_sym(base_run(W), t),
+    decreases W.len(),
+{
+    if W.len() != 0 && W[0] != Symbol::Gen(2) {
+        lemma_no_sym_drop(W, t);
+        lemma_no_sym_base_run(W.drop_first(), t);
+        assert(base_run(W) =~= seq![W[0]] + base_run(W.drop_first()));
+        lemma_no_sym_cons(W[0], base_run(W.drop_first()), t);
+    }
+}
+
+// --- no_sub3 ---
+pub proof fn lemma_no_sub3_drop(W: Word)
+    requires no_sub3(W), W.len() > 0,
+    ensures no_sub3(W.drop_first()),
+{ assert(W.drop_first().len() == W.len() - 1); if W.len() >= 3 {} }
+
+// --- sub_alpha (forall-based: drop_first, base_run trivial via index shift) ---
+pub proof fn lemma_sub_alpha_drop(W: Word)
+    requires sub_alpha(W), W.len() > 0,
+    ensures sub_alpha(W.drop_first()),
+{
+    assert(W.drop_first().len() == W.len() - 1); assert forall|i: int| 0 <= i < W.drop_first().len() implies (#[trigger] W.drop_first()[i] == Symbol::Gen(0) || W.drop_first()[i] == Symbol::Gen(1) || W.drop_first()[i] == Symbol::Gen(2) || W.drop_first()[i] == Symbol::Inv(1)) by { assert(W.drop_first()[i] == W[i + 1]); } }
+pub proof fn lemma_sub_alpha_base_run(W: Word)
+    requires sub_alpha(W),
+    ensures sub_alpha(base_run(W)),
+{
+    lemma_base_drop_reconstruct(W);
+    let b = base_run(W);
+    assert(W =~= b + drop_base_run(W));
+    assert forall|i: int| 0 <= i < b.len() implies (#[trigger] b[i] == Symbol::Gen(0) || b[i] == Symbol::Gen(1) || b[i] == Symbol::Gen(2) || b[i] == Symbol::Inv(1)) by { assert(b[i] == W[i]); }
+}
+
+// --- drop_base_run: iterate drop_first (preserve reduced/no_sym/no_sub3/sub_alpha) ---
+pub proof fn lemma_all_drop_base(W: Word)
+    requires crate::reduction::is_reduced(W), no_sym(W, Symbol::Inv(0)), no_sub3(W), sub_alpha(W),
+    ensures crate::reduction::is_reduced(drop_base_run(W)), no_sym(drop_base_run(W), Symbol::Inv(0)),
+        no_sub3(drop_base_run(W)), sub_alpha(drop_base_run(W)),
+    decreases W.len(),
+{
+    if W.len() != 0 && W[0] != Symbol::Gen(2) {
+        lemma_reduced_drop(W);
+        lemma_no_sym_drop(W, Symbol::Inv(0));
+        lemma_no_sub3_drop(W);
+        lemma_sub_alpha_drop(W);
+        lemma_all_drop_base(W.drop_first());
+    }
+}
+
 } // verus!
