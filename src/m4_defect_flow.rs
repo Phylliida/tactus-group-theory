@@ -98,4 +98,80 @@ pub proof fn lemma_m4_data_valid()
     }
 }
 
+// reduces_to an arbitrary target via 2 cancellations (copy of m3_blinker::m3_reduces2).
+proof fn m4_reduces2(w0: Word, i0: int, w1: Word, i1: int, w2: Word)
+    requires
+        crate::reduction::has_cancellation_at(w0, i0), w1 == crate::reduction::reduce_at(w0, i0),
+        crate::reduction::has_cancellation_at(w1, i1), w2 == crate::reduction::reduce_at(w1, i1),
+    ensures crate::reduction::reduces_to(w0, w2)
+{
+    use crate::reduction::*;
+    assert(reduces_in_steps(w2, w2, 0));
+    assert(reduces_one_step(w1, w2)) by { assert(has_cancellation_at(w1, i1) && w2 == reduce_at(w1, i1)); }
+    assert(reduces_in_steps(w1, w2, 1)) by { assert(reduces_one_step(w1, w2) && reduces_in_steps(w2, w2, 0)); }
+    assert(reduces_one_step(w0, w1)) by { assert(has_cancellation_at(w0, i0) && w1 == reduce_at(w0, i0)); }
+    assert(reduces_in_steps(w0, w2, 2)) by { assert(reduces_one_step(w0, w1) && reduces_in_steps(w1, w2, 1)); }
+    assert(reduces_to(w0, w2)) by { assert(reduces_in_steps(w0, w2, 2)); }
+}
+
+// THE HNN RELATION: q(ab)q⁻¹ ≡ ba  in hnn_presentation(m4_data()).  (M4 analog of lemma_qa2_equiv_b2.)
+pub proof fn lemma_qab_equiv_ba()
+    ensures equiv_in_presentation(crate::hnn::hnn_presentation(m4_data()),
+        seq![Symbol::Gen(2), Symbol::Gen(0), Symbol::Gen(1), Symbol::Inv(2)],  // q(ab)q⁻¹
+        seq![Symbol::Gen(1), Symbol::Gen(0)])                                  // ba
+{
+    use crate::hnn::*;
+    use crate::presentation_lemmas::*;
+    let hp = hnn_presentation(m4_data());
+    let ab = seq![Symbol::Gen(0), Symbol::Gen(1)];
+    let ba = seq![Symbol::Gen(1), Symbol::Gen(0)];
+    let q = seq![Symbol::Gen(2)];
+    let qi = seq![Symbol::Inv(2)];
+    // relator[0] = hnn_relator = q⁻¹·ba·q·(ab)⁻¹ = q⁻¹ ba q b⁻¹a⁻¹ ≡ ε
+    let r = seq![Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(0), Symbol::Gen(2), Symbol::Inv(1), Symbol::Inv(0)];
+    lemma_m4_data_valid();
+    crate::britton_infra::lemma_hnn_presentation_valid(m4_data());
+    assert(hnn_relator(m4_data(), 0) =~= r) by (compute);
+    assert(hp.relators =~= hnn_relators(m4_data()));
+    assert(hp.relators[0] =~= r);
+    lemma_relator_is_identity(hp, 0);       // r ≡ ε
+    // eq1: q⁻¹·ba·q ≡ ab   (right-multiply r by ab, cancel a⁻¹a then b⁻¹b)
+    let qi_ba_q = seq![Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(0), Symbol::Gen(2)];
+    lemma_equiv_concat_left(hp, r, empty_word(), ab);   // r·ab ≡ ε·ab
+    assert(concat(empty_word(), ab) =~= ab);
+    let r_ab = concat(r, ab);
+    assert(r_ab =~= seq![Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(0), Symbol::Gen(2), Symbol::Inv(1), Symbol::Inv(0), Symbol::Gen(0), Symbol::Gen(1)]);
+    // r_ab: idx5=Inv0,idx6=Gen0 cancel → then idx4=Inv1,idx5=Gen1 cancel → qi_ba_q
+    let r_ab_1 = seq![Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(0), Symbol::Gen(2), Symbol::Inv(1), Symbol::Gen(1)];
+    assert(crate::reduction::has_cancellation_at(r_ab, 5));
+    assert(r_ab_1 == crate::reduction::reduce_at(r_ab, 5)) by { assert(r_ab_1 =~= crate::reduction::reduce_at(r_ab, 5)); }
+    assert(crate::reduction::has_cancellation_at(r_ab_1, 4));
+    assert(qi_ba_q == crate::reduction::reduce_at(r_ab_1, 4)) by { assert(qi_ba_q =~= crate::reduction::reduce_at(r_ab_1, 4)); }
+    m4_reduces2(r_ab, 5, r_ab_1, 4, qi_ba_q);
+    lemma_reduces_to_equiv(hp, r_ab, qi_ba_q);
+    assert(word_valid(r_ab, 3));
+    crate::presentation::lemma_equiv_symmetric(hp, r_ab, qi_ba_q);
+    crate::presentation::lemma_equiv_transitive(hp, qi_ba_q, r_ab, ab);   // eq1: qi_ba_q ≡ ab
+    // conjugate eq1 by q: q·(q⁻¹ba q)·q⁻¹ ≡ q·ab·q⁻¹, LHS reduces to ba
+    lemma_equiv_concat_right(hp, q, qi_ba_q, ab);      // q·qi_ba_q ≡ q·ab
+    let q_qi_ba_q = concat(q, qi_ba_q);
+    let q_ab = concat(q, ab);
+    lemma_equiv_concat_left(hp, q_qi_ba_q, q_ab, qi);  // (q·qi_ba_q)·q⁻¹ ≡ (q·ab)·q⁻¹
+    let lhs = concat(q_qi_ba_q, qi);
+    let rhs = concat(q_ab, qi);
+    assert(lhs =~= seq![Symbol::Gen(2), Symbol::Inv(2), Symbol::Gen(1), Symbol::Gen(0), Symbol::Gen(2), Symbol::Inv(2)]);
+    assert(rhs =~= seq![Symbol::Gen(2), Symbol::Gen(0), Symbol::Gen(1), Symbol::Inv(2)]);
+    // lhs: idx0(Gen2,Inv2)→[Gen1,Gen0,Gen2,Inv2] idx2(Gen2,Inv2)→[Gen1,Gen0]=ba
+    let lhs1 = seq![Symbol::Gen(1), Symbol::Gen(0), Symbol::Gen(2), Symbol::Inv(2)];
+    assert(crate::reduction::has_cancellation_at(lhs, 0));
+    assert(lhs1 == crate::reduction::reduce_at(lhs, 0)) by { assert(lhs1 =~= crate::reduction::reduce_at(lhs, 0)); }
+    assert(crate::reduction::has_cancellation_at(lhs1, 2));
+    assert(ba == crate::reduction::reduce_at(lhs1, 2)) by { assert(ba =~= crate::reduction::reduce_at(lhs1, 2)); }
+    m4_reduces2(lhs, 0, lhs1, 2, ba);
+    lemma_reduces_to_equiv(hp, lhs, ba);
+    assert(word_valid(lhs, 3));
+    crate::presentation::lemma_equiv_symmetric(hp, lhs, rhs);        // rhs ≡ lhs
+    crate::presentation::lemma_equiv_transitive(hp, rhs, lhs, ba);   // rhs ≡ ba = goal
+}
+
 } // verus!
