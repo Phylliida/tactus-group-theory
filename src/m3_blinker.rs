@@ -2596,4 +2596,131 @@ pub proof fn lemma_m3_nf_readback(u: Word, v: Word)
     lemma_thue_trans(m3_rules(), u, fu, v);
 }
 
+// ═══ B3 fix P7a: Thue-nf reduction helpers (num_a measure, redex, fire) ═══
+pub open spec fn num_a(w: Word) -> nat
+    decreases w.len()
+{ if w.len() == 0 { 0 } else { (if w[0] == Symbol::Gen(0) { 1nat } else { 0nat }) + num_a(w.drop_first()) } }
+
+pub proof fn lemma_num_a_concat(a: Word, b: Word)
+    ensures num_a(a + b) == num_a(a) + num_a(b),
+    decreases a.len(),
+{
+    if a.len() == 0 { assert(a + b =~= b); }
+    else {
+        assert((a + b).drop_first() =~= a.drop_first() + b);
+        assert((a + b)[0] == a[0]);
+        lemma_num_a_concat(a.drop_first(), b);
+    }
+}
+
+pub open spec fn is_redex_at(w: Word, i: int) -> bool {
+    0 <= i < w.len() - 1 && (w[i] == Symbol::Gen(2) || w[i] == Symbol::Gen(3)) && w[i + 1] == Symbol::Gen(0)
+}
+pub open spec fn has_redex(w: Word) -> bool { exists|i: int| is_redex_at(w, i) }
+pub open spec fn fire_repl(s: Symbol) -> Word {
+    if s == Symbol::Gen(2) { seq![Symbol::Gen(1), Symbol::Gen(3)] } else { seq![Symbol::Gen(1), Symbol::Gen(2)] }
+}
+pub open spec fn fire_at(u: Word, i: int) -> Word {
+    u.subrange(0, i) + fire_repl(u[i]) + u.subrange(i + 2, u.len() as int)
+}
+
+pub proof fn lemma_no_redex_nf(w: Word)
+    requires !has_redex(w),
+    ensures no_qa(w), no_qpa(w),
+    decreases w.len(),
+{
+    if w.len() >= 2 {
+        assert(!is_redex_at(w, 0));
+        assert(!has_redex(w.drop_first())) by {
+            if has_redex(w.drop_first()) {
+                let j = choose|j: int| is_redex_at(w.drop_first(), j);
+                assert(is_redex_at(w.drop_first(), j));
+                assert(w.drop_first()[j] == w[j + 1] && w.drop_first()[j + 1] == w[j + 2]);
+                assert(is_redex_at(w, j + 1));
+            }
+        }
+        lemma_no_redex_nf(w.drop_first());
+    }
+}
+
+pub proof fn lemma_forall_positive(w: Word)
+    requires forall|i: int| 0 <= i < w.len() ==> symbol_is_gen(#[trigger] w[i]),
+    ensures positive_word(w),
+    decreases w.len(),
+{
+    if w.len() > 0 {
+        assert(symbol_is_gen(w[0]));
+        assert forall|i: int| 0 <= i < w.drop_first().len() implies symbol_is_gen(#[trigger] w.drop_first()[i]) by { assert(w.drop_first()[i] == w[i + 1]); }
+        lemma_forall_positive(w.drop_first());
+    }
+}
+
+pub proof fn lemma_fire_thue(u: Word, i: int)
+    requires is_redex_at(u, i),
+    ensures thue_equiv(m3_rules(), u, fire_at(u, i)),
+{
+    let r: int = if u[i] == Symbol::Gen(2) { 0 } else { 1 };
+    let u2 = fire_at(u, i);
+    assert(m3_rules()[r].lhs =~= seq![u[i], Symbol::Gen(0)]);
+    assert(m3_rules()[r].rhs =~= fire_repl(u[i]));
+    assert(thue_step_at(m3_rules()[r], u, u2, i, true)) by {
+        assert(u.subrange(i, i + m3_rules()[r].lhs.len() as int) =~= seq![u[i], Symbol::Gen(0)]);
+        assert(u2 =~= u.subrange(0, i) + m3_rules()[r].rhs + u.subrange(i + m3_rules()[r].lhs.len() as int, u.len() as int));
+    }
+    assert(thue_step(m3_rules(), u, u2)) by { assert(thue_step_at(m3_rules()[r], u, u2, i, true)); }
+    lemma_thue_single(m3_rules(), u, u2);
+}
+
+pub proof fn lemma_fire_num_a(u: Word, i: int)
+    requires is_redex_at(u, i),
+    ensures num_a(fire_at(u, i)) < num_a(u),
+{
+    let A = u.subrange(0, i);
+    let mid = u.subrange(i, i + 2);
+    let B = u.subrange(i + 2, u.len() as int);
+    let repl = fire_repl(u[i]);
+    assert(u =~= A + mid + B);
+    assert(fire_at(u, i) =~= A + repl + B);
+    lemma_num_a_concat(A + mid, B); lemma_num_a_concat(A, mid);
+    lemma_num_a_concat(A + repl, B); lemma_num_a_concat(A, repl);
+    // num_a(mid) = 1  (mid = [u[i], a], u[i] != a)
+    assert(mid =~= seq![u[i], Symbol::Gen(0)]);
+    assert(u[i] != Symbol::Gen(0) && mid[0] == u[i]);
+    let g0 = seq![Symbol::Gen(0)];
+    assert(g0.len() == 1 && g0[0] == Symbol::Gen(0) && g0.drop_first().len() == 0);
+    assert(num_a(g0.drop_first()) == 0);
+    assert(num_a(g0) == 1);
+    assert(mid.drop_first() =~= g0);
+    assert(num_a(mid) == 1);
+    // num_a(repl) = 0  (repl = [b, q'/q], no a)
+    assert(repl[0] != Symbol::Gen(0) && repl[1] != Symbol::Gen(0) && repl.len() == 2);
+    let r1 = seq![repl[1]];
+    assert(r1.len() == 1 && r1[0] != Symbol::Gen(0) && r1.drop_first().len() == 0);
+    assert(num_a(r1.drop_first()) == 0);
+    assert(num_a(r1) == 0);
+    assert(repl.drop_first() =~= r1);
+    assert(num_a(repl) == 0);
+}
+
+pub proof fn lemma_fire_pv(u: Word, i: int)
+    requires is_redex_at(u, i), positive_word(u), word_valid(u, 4),
+    ensures positive_word(fire_at(u, i)), word_valid(fire_at(u, i), 4),
+{
+    let A = u.subrange(0, i);
+    let repl = fire_repl(u[i]);
+    let B = u.subrange(i + 2, u.len() as int);
+    let u2 = fire_at(u, i);
+    assert(u2 =~= A + repl + B);
+    assert forall|k: int| 0 <= k < u2.len() implies (symbol_is_gen(#[trigger] u2[k]) && symbol_valid(u2[k], 4)) by {
+        if k < i {
+            assert(u2[k] == u[k]); lemma_positive_gen(u, k);
+        } else if k < i + 2 {
+            assert(u2[k] == repl[k - i]);
+        } else {
+            assert(u2[k] == u[k]); lemma_positive_gen(u, k);
+        }
+    }
+    lemma_forall_positive(u2);
+}
+
 } // verus!
