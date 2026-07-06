@@ -453,4 +453,211 @@ pub proof fn lemma_bapow_valid(t: int)
     }
 }
 
+// ── freely_equivalent congruence helpers (lift reduces_to congruence) ──
+pub proof fn lemma_fe_from_reduces(x: Word, y: Word)
+    requires crate::reduction::reduces_to(x, y),
+    ensures crate::reduction::freely_equivalent(x, y),
+{
+    crate::reduction::lemma_reduces_to_refl(y);
+    assert(crate::reduction::reduces_to(x, y) && crate::reduction::reduces_to(y, y));
+}
+
+pub proof fn lemma_fe_concat_left(p: Word, x: Word, y: Word)
+    requires crate::reduction::freely_equivalent(x, y),
+    ensures crate::reduction::freely_equivalent(p + x, p + y),
+{
+    use crate::reduction::*;
+    let w = choose|w: Word| reduces_to(x, w) && reduces_to(y, w);
+    lemma_reduces_to_concat_right(p, x, w);   // reduces_to(p+x, p+w)
+    lemma_reduces_to_concat_right(p, y, w);   // reduces_to(p+y, p+w)
+    assert(concat(p, x) =~= p + x);
+    assert(concat(p, y) =~= p + y);
+    assert(concat(p, w) =~= p + w);
+    assert(reduces_to(p + x, p + w) && reduces_to(p + y, p + w));
+}
+
+pub proof fn lemma_fe_concat_right(x: Word, y: Word, s: Word)
+    requires crate::reduction::freely_equivalent(x, y),
+    ensures crate::reduction::freely_equivalent(x + s, y + s),
+{
+    use crate::reduction::*;
+    let w = choose|w: Word| reduces_to(x, w) && reduces_to(y, w);
+    lemma_reduces_to_concat_left(x, w, s);    // reduces_to(x+s, w+s)
+    lemma_reduces_to_concat_left(y, w, s);    // reduces_to(y+s, w+s)
+    assert(concat(x, s) =~= x + s);
+    assert(concat(y, s) =~= y + s);
+    assert(concat(w, s) =~= w + s);
+    assert(reduces_to(x + s, w + s) && reduces_to(y + s, w + s));
+}
+
+// ── prepend atoms: prepending one ab / (ab)⁻¹ block to abpow(t) shifts the exponent ──
+pub proof fn lemma_abpow_prepend_ab(t: int)
+    ensures crate::reduction::reduces_to(seq![Symbol::Gen(0), Symbol::Gen(1)] + abpow(t), abpow(t + 1)),
+{
+    use crate::reduction::*;
+    if t >= 0 {
+        assert(abpow(t + 1) =~= seq![Symbol::Gen(0), Symbol::Gen(1)] + abpow(t));
+        lemma_reduces_to_refl(seq![Symbol::Gen(0), Symbol::Gen(1)] + abpow(t));
+    } else {
+        let tail = abpow(t + 1);
+        assert(abpow(t) =~= seq![Symbol::Inv(1), Symbol::Inv(0)] + tail);
+        let block = seq![Symbol::Gen(0), Symbol::Gen(1), Symbol::Inv(1), Symbol::Inv(0)];
+        assert(seq![Symbol::Gen(0), Symbol::Gen(1)] + abpow(t) =~= block + tail);
+        let block1 = seq![Symbol::Gen(0), Symbol::Inv(0)];
+        assert(has_cancellation_at(block, 1));
+        assert(block1 == reduce_at(block, 1)) by { assert(block1 =~= reduce_at(block, 1)); }
+        assert(has_cancellation_at(block1, 0));
+        assert(reduce_at(block1, 0) == empty_word()) by { assert(reduce_at(block1, 0) =~= empty_word()); }
+        m4_reduces2(block, 1, block1, 0, empty_word());        // reduces_to(block, ε)
+        lemma_reduces_to_concat_left(block, empty_word(), tail);  // reduces_to(block+tail, ε+tail)
+        assert(concat(block, tail) =~= block + tail);
+        assert(concat(empty_word(), tail) =~= tail);
+    }
+}
+
+pub proof fn lemma_abpow_prepend_abinv(t: int)
+    ensures crate::reduction::reduces_to(seq![Symbol::Inv(1), Symbol::Inv(0)] + abpow(t), abpow(t - 1)),
+{
+    use crate::reduction::*;
+    if t <= 0 {
+        assert(abpow(t - 1) =~= seq![Symbol::Inv(1), Symbol::Inv(0)] + abpow(t));
+        lemma_reduces_to_refl(seq![Symbol::Inv(1), Symbol::Inv(0)] + abpow(t));
+    } else {
+        let tail = abpow(t - 1);
+        assert(abpow(t) =~= seq![Symbol::Gen(0), Symbol::Gen(1)] + tail);
+        let block = seq![Symbol::Inv(1), Symbol::Inv(0), Symbol::Gen(0), Symbol::Gen(1)];
+        assert(seq![Symbol::Inv(1), Symbol::Inv(0)] + abpow(t) =~= block + tail);
+        let block1 = seq![Symbol::Inv(1), Symbol::Gen(1)];
+        assert(has_cancellation_at(block, 1));
+        assert(block1 == reduce_at(block, 1)) by { assert(block1 =~= reduce_at(block, 1)); }
+        assert(has_cancellation_at(block1, 0));
+        assert(reduce_at(block1, 0) == empty_word()) by { assert(reduce_at(block1, 0) =~= empty_word()); }
+        m4_reduces2(block, 1, block1, 0, empty_word());
+        lemma_reduces_to_concat_left(block, empty_word(), tail);
+        assert(concat(block, tail) =~= block + tail);
+        assert(concat(empty_word(), tail) =~= tail);
+    }
+}
+
+pub proof fn lemma_bapow_prepend_ba(t: int)
+    ensures crate::reduction::reduces_to(seq![Symbol::Gen(1), Symbol::Gen(0)] + bapow(t), bapow(t + 1)),
+{
+    use crate::reduction::*;
+    if t >= 0 {
+        assert(bapow(t + 1) =~= seq![Symbol::Gen(1), Symbol::Gen(0)] + bapow(t));
+        lemma_reduces_to_refl(seq![Symbol::Gen(1), Symbol::Gen(0)] + bapow(t));
+    } else {
+        let tail = bapow(t + 1);
+        assert(bapow(t) =~= seq![Symbol::Inv(0), Symbol::Inv(1)] + tail);
+        let block = seq![Symbol::Gen(1), Symbol::Gen(0), Symbol::Inv(0), Symbol::Inv(1)];
+        assert(seq![Symbol::Gen(1), Symbol::Gen(0)] + bapow(t) =~= block + tail);
+        let block1 = seq![Symbol::Gen(1), Symbol::Inv(1)];
+        assert(has_cancellation_at(block, 1));
+        assert(block1 == reduce_at(block, 1)) by { assert(block1 =~= reduce_at(block, 1)); }
+        assert(has_cancellation_at(block1, 0));
+        assert(reduce_at(block1, 0) == empty_word()) by { assert(reduce_at(block1, 0) =~= empty_word()); }
+        m4_reduces2(block, 1, block1, 0, empty_word());
+        lemma_reduces_to_concat_left(block, empty_word(), tail);
+        assert(concat(block, tail) =~= block + tail);
+        assert(concat(empty_word(), tail) =~= tail);
+    }
+}
+
+pub proof fn lemma_bapow_prepend_bainv(t: int)
+    ensures crate::reduction::reduces_to(seq![Symbol::Inv(0), Symbol::Inv(1)] + bapow(t), bapow(t - 1)),
+{
+    use crate::reduction::*;
+    if t <= 0 {
+        assert(bapow(t - 1) =~= seq![Symbol::Inv(0), Symbol::Inv(1)] + bapow(t));
+        lemma_reduces_to_refl(seq![Symbol::Inv(0), Symbol::Inv(1)] + bapow(t));
+    } else {
+        let tail = bapow(t - 1);
+        assert(bapow(t) =~= seq![Symbol::Gen(1), Symbol::Gen(0)] + tail);
+        let block = seq![Symbol::Inv(0), Symbol::Inv(1), Symbol::Gen(1), Symbol::Gen(0)];
+        assert(seq![Symbol::Inv(0), Symbol::Inv(1)] + bapow(t) =~= block + tail);
+        let block1 = seq![Symbol::Inv(0), Symbol::Gen(0)];
+        assert(has_cancellation_at(block, 1));
+        assert(block1 == reduce_at(block, 1)) by { assert(block1 =~= reduce_at(block, 1)); }
+        assert(has_cancellation_at(block1, 0));
+        assert(reduce_at(block1, 0) == empty_word()) by { assert(reduce_at(block1, 0) =~= empty_word()); }
+        m4_reduces2(block, 1, block1, 0, empty_word());
+        lemma_reduces_to_concat_left(block, empty_word(), tail);
+        assert(concat(block, tail) =~= block + tail);
+        assert(concat(empty_word(), tail) =~= tail);
+    }
+}
+
+// ── K3: the additive law (ab)^s·(ab)^t reduces to (ab)^(s+t), and same for ba ──
+pub proof fn lemma_abpow_add(s: int, t: int)
+    ensures crate::reduction::reduces_to(abpow(s) + abpow(t), abpow(s + t)),
+    decreases (if s >= 0 { s } else { -s }),
+{
+    use crate::reduction::*;
+    if s == 0 {
+        assert(abpow(s) + abpow(t) =~= abpow(t));
+        assert(abpow(s + t) == abpow(t));
+        lemma_reduces_to_refl(abpow(t));
+    } else if s > 0 {
+        assert(abpow(s) =~= seq![Symbol::Gen(0), Symbol::Gen(1)] + abpow(s - 1));
+        let mid1 = seq![Symbol::Gen(0), Symbol::Gen(1)] + (abpow(s - 1) + abpow(t));
+        let mid2 = seq![Symbol::Gen(0), Symbol::Gen(1)] + abpow(s - 1 + t);
+        assert(abpow(s) + abpow(t) =~= mid1);
+        lemma_abpow_add(s - 1, t);                                                   // abpow(s-1)+abpow(t) →* abpow(s-1+t)
+        lemma_reduces_to_concat_right(seq![Symbol::Gen(0), Symbol::Gen(1)], abpow(s - 1) + abpow(t), abpow(s - 1 + t));
+        assert(concat(seq![Symbol::Gen(0), Symbol::Gen(1)], abpow(s - 1) + abpow(t)) =~= mid1);
+        assert(concat(seq![Symbol::Gen(0), Symbol::Gen(1)], abpow(s - 1 + t)) =~= mid2);
+        lemma_abpow_prepend_ab(s - 1 + t);                                           // mid2 →* abpow(s-1+t+1)
+        assert(abpow(s - 1 + t + 1) == abpow(s + t));
+        lemma_reduces_to_transitive(mid1, mid2, abpow(s + t));
+    } else {
+        assert(abpow(s) =~= seq![Symbol::Inv(1), Symbol::Inv(0)] + abpow(s + 1));
+        let mid1 = seq![Symbol::Inv(1), Symbol::Inv(0)] + (abpow(s + 1) + abpow(t));
+        let mid2 = seq![Symbol::Inv(1), Symbol::Inv(0)] + abpow(s + 1 + t);
+        assert(abpow(s) + abpow(t) =~= mid1);
+        lemma_abpow_add(s + 1, t);
+        lemma_reduces_to_concat_right(seq![Symbol::Inv(1), Symbol::Inv(0)], abpow(s + 1) + abpow(t), abpow(s + 1 + t));
+        assert(concat(seq![Symbol::Inv(1), Symbol::Inv(0)], abpow(s + 1) + abpow(t)) =~= mid1);
+        assert(concat(seq![Symbol::Inv(1), Symbol::Inv(0)], abpow(s + 1 + t)) =~= mid2);
+        lemma_abpow_prepend_abinv(s + 1 + t);
+        assert(abpow(s + 1 + t - 1) == abpow(s + t));
+        lemma_reduces_to_transitive(mid1, mid2, abpow(s + t));
+    }
+}
+
+pub proof fn lemma_bapow_add(s: int, t: int)
+    ensures crate::reduction::reduces_to(bapow(s) + bapow(t), bapow(s + t)),
+    decreases (if s >= 0 { s } else { -s }),
+{
+    use crate::reduction::*;
+    if s == 0 {
+        assert(bapow(s) + bapow(t) =~= bapow(t));
+        assert(bapow(s + t) == bapow(t));
+        lemma_reduces_to_refl(bapow(t));
+    } else if s > 0 {
+        assert(bapow(s) =~= seq![Symbol::Gen(1), Symbol::Gen(0)] + bapow(s - 1));
+        let mid1 = seq![Symbol::Gen(1), Symbol::Gen(0)] + (bapow(s - 1) + bapow(t));
+        let mid2 = seq![Symbol::Gen(1), Symbol::Gen(0)] + bapow(s - 1 + t);
+        assert(bapow(s) + bapow(t) =~= mid1);
+        lemma_bapow_add(s - 1, t);
+        lemma_reduces_to_concat_right(seq![Symbol::Gen(1), Symbol::Gen(0)], bapow(s - 1) + bapow(t), bapow(s - 1 + t));
+        assert(concat(seq![Symbol::Gen(1), Symbol::Gen(0)], bapow(s - 1) + bapow(t)) =~= mid1);
+        assert(concat(seq![Symbol::Gen(1), Symbol::Gen(0)], bapow(s - 1 + t)) =~= mid2);
+        lemma_bapow_prepend_ba(s - 1 + t);
+        assert(bapow(s - 1 + t + 1) == bapow(s + t));
+        lemma_reduces_to_transitive(mid1, mid2, bapow(s + t));
+    } else {
+        assert(bapow(s) =~= seq![Symbol::Inv(0), Symbol::Inv(1)] + bapow(s + 1));
+        let mid1 = seq![Symbol::Inv(0), Symbol::Inv(1)] + (bapow(s + 1) + bapow(t));
+        let mid2 = seq![Symbol::Inv(0), Symbol::Inv(1)] + bapow(s + 1 + t);
+        assert(bapow(s) + bapow(t) =~= mid1);
+        lemma_bapow_add(s + 1, t);
+        lemma_reduces_to_concat_right(seq![Symbol::Inv(0), Symbol::Inv(1)], bapow(s + 1) + bapow(t), bapow(s + 1 + t));
+        assert(concat(seq![Symbol::Inv(0), Symbol::Inv(1)], bapow(s + 1) + bapow(t)) =~= mid1);
+        assert(concat(seq![Symbol::Inv(0), Symbol::Inv(1)], bapow(s + 1 + t)) =~= mid2);
+        lemma_bapow_prepend_bainv(s + 1 + t);
+        assert(bapow(s + 1 + t - 1) == bapow(s + t));
+        lemma_reduces_to_transitive(mid1, mid2, bapow(s + t));
+    }
+}
+
 } // verus!
