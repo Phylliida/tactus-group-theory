@@ -660,4 +660,112 @@ pub proof fn lemma_bapow_add(s: int, t: int)
     }
 }
 
+// reduces_to via a single cancellation.
+proof fn m4_reduces1(w0: Word, i0: int, w1: Word)
+    requires crate::reduction::has_cancellation_at(w0, i0), w1 == crate::reduction::reduce_at(w0, i0),
+    ensures crate::reduction::reduces_to(w0, w1)
+{
+    use crate::reduction::*;
+    assert(reduces_one_step(w0, w1)) by { assert(has_cancellation_at(w0, i0) && w1 == reduce_at(w0, i0)); }
+    assert(reduces_in_steps(w1, w1, 0));
+    assert(reduces_in_steps(w0, w1, 1)) by { assert(reduces_one_step(w0, w1) && reduces_in_steps(w1, w1, 0)); }
+}
+
+// a·a⁻¹ (concrete cancelling pair) reduces to ε.
+proof fn lemma_pair_cancels(x: Symbol, xi: Symbol)
+    requires is_inverse_pair(x, xi),
+    ensures crate::reduction::reduces_to(seq![x, xi], empty_word()),
+{
+    use crate::reduction::*;
+    let p = seq![x, xi];
+    assert(has_cancellation_at(p, 0));
+    assert(reduce_at(p, 0) == empty_word()) by { assert(reduce_at(p, 0) =~= empty_word()); }
+    m4_reduces1(p, 0, empty_word());
+}
+
+// ── K1 (conj_a): a·(ba)^t =_F (ab)^t·a  (pull `a` left through the mixed cycle) ──
+pub proof fn lemma_conj_a(t: int)
+    ensures crate::reduction::freely_equivalent(seq![Symbol::Gen(0)] + bapow(t), abpow(t) + seq![Symbol::Gen(0)]),
+    decreases (if t >= 0 { t } else { -t }),
+{
+    use crate::reduction::*;
+    let a = seq![Symbol::Gen(0)];
+    if t == 0 {
+        assert(a + bapow(0) =~= a);
+        assert(abpow(0) + a =~= a);
+        lemma_freely_equivalent_refl(a);
+    } else if t > 0 {
+        // both sides = [ab] + (inductive body), congruence step
+        assert(a + bapow(t) =~= seq![Symbol::Gen(0), Symbol::Gen(1)] + (a + bapow(t - 1)));
+        assert(abpow(t) + a =~= seq![Symbol::Gen(0), Symbol::Gen(1)] + (abpow(t - 1) + a));
+        lemma_conj_a(t - 1);
+        lemma_fe_concat_left(seq![Symbol::Gen(0), Symbol::Gen(1)], a + bapow(t - 1), abpow(t - 1) + a);
+    } else {
+        // t < 0.  Both sides freely reduce to M = b⁻¹·(ba)^(t+1).
+        let m = seq![Symbol::Inv(1)] + bapow(t + 1);
+        // LHS = a·(ba)^t = [a a⁻¹]·(b⁻¹·(ba)^(t+1)) →* M
+        assert(a + bapow(t) =~= seq![Symbol::Gen(0), Symbol::Inv(0)] + m);
+        lemma_pair_cancels(Symbol::Gen(0), Symbol::Inv(0));
+        lemma_reduces_to_concat_left(seq![Symbol::Gen(0), Symbol::Inv(0)], empty_word(), m);
+        assert(concat(seq![Symbol::Gen(0), Symbol::Inv(0)], m) =~= a + bapow(t));
+        assert(concat(empty_word(), m) =~= m);
+        lemma_fe_from_reduces(a + bapow(t), m);                       // fe(LHS, M)
+        // RHS = (ab)^t·a = [b⁻¹a⁻¹]·((ab)^(t+1)·a);  IH: (ab)^(t+1)·a =_F a·(ba)^(t+1)
+        lemma_conj_a(t + 1);
+        lemma_freely_equivalent_sym(a + bapow(t + 1), abpow(t + 1) + a);
+        lemma_fe_concat_left(seq![Symbol::Inv(1), Symbol::Inv(0)], abpow(t + 1) + a, a + bapow(t + 1));
+        let w = seq![Symbol::Inv(1), Symbol::Inv(0)] + (a + bapow(t + 1));
+        assert(abpow(t) + a =~= seq![Symbol::Inv(1), Symbol::Inv(0)] + (abpow(t + 1) + a));
+        // fe(RHS, W) where W = [b⁻¹a⁻¹]·(a·(ba)^(t+1));  W →* M via a⁻¹a cancel under b⁻¹
+        assert(w =~= seq![Symbol::Inv(1)] + (seq![Symbol::Inv(0), Symbol::Gen(0)] + bapow(t + 1)));
+        lemma_pair_cancels(Symbol::Inv(0), Symbol::Gen(0));
+        lemma_reduces_to_concat_left(seq![Symbol::Inv(0), Symbol::Gen(0)], empty_word(), bapow(t + 1));
+        assert(concat(seq![Symbol::Inv(0), Symbol::Gen(0)], bapow(t + 1)) =~= seq![Symbol::Inv(0), Symbol::Gen(0)] + bapow(t + 1));
+        assert(concat(empty_word(), bapow(t + 1)) =~= bapow(t + 1));
+        lemma_reduces_to_concat_right(seq![Symbol::Inv(1)], seq![Symbol::Inv(0), Symbol::Gen(0)] + bapow(t + 1), bapow(t + 1));
+        assert(concat(seq![Symbol::Inv(1)], seq![Symbol::Inv(0), Symbol::Gen(0)] + bapow(t + 1)) =~= w);
+        assert(concat(seq![Symbol::Inv(1)], bapow(t + 1)) =~= m);
+        lemma_fe_from_reduces(w, m);                                  // fe(W, M)
+        // chain: fe(RHS, W), fe(W, M) ⟹ fe(RHS, M); fe(LHS, M) ⟹ fe(LHS, RHS)
+        lemma_freely_equivalent_trans(abpow(t) + a, w, m);           // fe(RHS, M)
+        lemma_freely_equivalent_sym(abpow(t) + a, m);                // fe(M, RHS)
+        lemma_freely_equivalent_trans(a + bapow(t), m, abpow(t) + a);
+    }
+}
+
+// helper: b⁻¹·(ba)^t =_F a·(ba)^(t-1)  (a single cancellation either direction)
+pub proof fn lemma_binv_bapow(t: int)
+    ensures crate::reduction::freely_equivalent(seq![Symbol::Inv(1)] + bapow(t), seq![Symbol::Gen(0)] + bapow(t - 1)),
+{
+    use crate::reduction::*;
+    if t > 0 {
+        // [b⁻¹]·(ba)^t = [b⁻¹ b]·(a)·(ba)^(t-1)... reduce (b⁻¹,b) → a·(ba)^(t-1)
+        assert(seq![Symbol::Inv(1)] + bapow(t) =~= seq![Symbol::Inv(1), Symbol::Gen(1)] + (seq![Symbol::Gen(0)] + bapow(t - 1)));
+        lemma_pair_cancels(Symbol::Inv(1), Symbol::Gen(1));
+        lemma_reduces_to_concat_left(seq![Symbol::Inv(1), Symbol::Gen(1)], empty_word(), seq![Symbol::Gen(0)] + bapow(t - 1));
+        assert(concat(seq![Symbol::Inv(1), Symbol::Gen(1)], seq![Symbol::Gen(0)] + bapow(t - 1)) =~= seq![Symbol::Inv(1)] + bapow(t));
+        assert(concat(empty_word(), seq![Symbol::Gen(0)] + bapow(t - 1)) =~= seq![Symbol::Gen(0)] + bapow(t - 1));
+        lemma_fe_from_reduces(seq![Symbol::Inv(1)] + bapow(t), seq![Symbol::Gen(0)] + bapow(t - 1));
+    } else {
+        // t ≤ 0: [a]·(ba)^(t-1) = [a a⁻¹]·(b⁻¹)·(ba)^t → reduce → [b⁻¹]·(ba)^t
+        assert(seq![Symbol::Gen(0)] + bapow(t - 1) =~= seq![Symbol::Gen(0), Symbol::Inv(0)] + (seq![Symbol::Inv(1)] + bapow(t)));
+        lemma_pair_cancels(Symbol::Gen(0), Symbol::Inv(0));
+        lemma_reduces_to_concat_left(seq![Symbol::Gen(0), Symbol::Inv(0)], empty_word(), seq![Symbol::Inv(1)] + bapow(t));
+        assert(concat(seq![Symbol::Gen(0), Symbol::Inv(0)], seq![Symbol::Inv(1)] + bapow(t)) =~= seq![Symbol::Gen(0)] + bapow(t - 1));
+        assert(concat(empty_word(), seq![Symbol::Inv(1)] + bapow(t)) =~= seq![Symbol::Inv(1)] + bapow(t));
+        lemma_fe_from_reduces(seq![Symbol::Gen(0)] + bapow(t - 1), seq![Symbol::Inv(1)] + bapow(t));
+        lemma_freely_equivalent_sym(seq![Symbol::Gen(0)] + bapow(t - 1), seq![Symbol::Inv(1)] + bapow(t));
+    }
+}
+
+// ── K2 (conj_binv): b⁻¹·(ba)^t =_F (ab)^(t-1)·a ──
+pub proof fn lemma_conj_binv(t: int)
+    ensures crate::reduction::freely_equivalent(seq![Symbol::Inv(1)] + bapow(t), abpow(t - 1) + seq![Symbol::Gen(0)]),
+{
+    use crate::reduction::*;
+    lemma_binv_bapow(t);                                             // b⁻¹(ba)^t =_F a(ba)^(t-1)
+    lemma_conj_a(t - 1);                                             // a(ba)^(t-1) =_F (ab)^(t-1)a
+    lemma_freely_equivalent_trans(seq![Symbol::Inv(1)] + bapow(t), seq![Symbol::Gen(0)] + bapow(t - 1), abpow(t - 1) + seq![Symbol::Gen(0)]);
+}
+
 } // verus!
