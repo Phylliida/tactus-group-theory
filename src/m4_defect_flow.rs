@@ -978,4 +978,131 @@ pub proof fn lemma_conj_binv(t: int)
     lemma_freely_equivalent_trans(seq![Symbol::Inv(1)] + bapow(t), seq![Symbol::Gen(0)] + bapow(t - 1), abpow(t - 1) + seq![Symbol::Gen(0)]);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// B8 enabler (1): cyclic-exponent extraction — membership in ⟨ab⟩ / ⟨ba⟩ ⟹ a power.
+// Each generator/inverse factor is abpow(±1); collapse the product with K3 (abpow_add).
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+// concat_all of a list of {ab, (ab)⁻¹} factors is freely equivalent to abpow(exponent sum).
+pub proof fn lemma_ab_factors_pow(factors: Seq<Word>)
+    requires crate::benign::factors_from_generators(seq![seq![Symbol::Gen(0), Symbol::Gen(1)]], factors),
+    ensures exists|e: int| crate::reduction::freely_equivalent(crate::benign::concat_all(factors), abpow(e)),
+    decreases factors.len(),
+{
+    use crate::reduction::*;
+    use crate::benign::*;
+    if factors.len() == 0 {
+        lemma_concat_all_empty();
+        assert(concat_all(factors) =~= empty_word() && abpow(0) =~= empty_word());
+        lemma_freely_equivalent_refl(empty_word());
+        assert(freely_equivalent(concat_all(factors), abpow(0)));
+    } else {
+        let f = factors.first();
+        let rest = factors.drop_first();
+        assert(is_generator_or_inverse(seq![seq![Symbol::Gen(0), Symbol::Gen(1)]], f)) by {
+            assert(factors[0] == f);
+        }
+        assert(factors_from_generators(seq![seq![Symbol::Gen(0), Symbol::Gen(1)]], rest)) by {
+            assert forall|k: int| 0 <= k < rest.len() implies is_generator_or_inverse(seq![seq![Symbol::Gen(0), Symbol::Gen(1)]], #[trigger] rest[k]) by {
+                assert(rest[k] == factors[k + 1]);
+            }
+        }
+        lemma_ab_factors_pow(rest);
+        let ep = choose|ep: int| freely_equivalent(concat_all(rest), abpow(ep));
+        assert(abpow(0) =~= empty_word());
+        assert(abpow(1) =~= seq![Symbol::Gen(0), Symbol::Gen(1)] + abpow(0));
+        assert(abpow(1) =~= seq![Symbol::Gen(0), Symbol::Gen(1)]);
+        assert(abpow(-1) =~= seq![Symbol::Inv(1), Symbol::Inv(0)] + abpow(0));
+        assert(abpow(-1) =~= seq![Symbol::Inv(1), Symbol::Inv(0)]);
+        assert(inverse_word(seq![Symbol::Gen(0), Symbol::Gen(1)]) =~= seq![Symbol::Inv(1), Symbol::Inv(0)]) by (compute);
+        let d: int = if f == seq![Symbol::Gen(0), Symbol::Gen(1)] { 1 } else { -1 };
+        assert(f =~= abpow(d));
+        assert(concat_all(factors) =~= f + concat_all(rest));       // head unfold
+        lemma_fe_concat_left(f, concat_all(rest), abpow(ep));        // f+concat_all(rest) =_F f+abpow(ep)
+        lemma_abpow_add(d, ep);                                       // abpow(d)+abpow(ep) →* abpow(d+ep)
+        lemma_fe_from_reduces(abpow(d) + abpow(ep), abpow(d + ep));
+        assert(f + abpow(ep) =~= abpow(d) + abpow(ep));
+        lemma_freely_equivalent_trans(concat_all(factors), f + abpow(ep), abpow(d + ep));
+        assert(freely_equivalent(concat_all(factors), abpow(d + ep)));
+    }
+}
+
+pub proof fn lemma_cyclic_exp_ab(g: Word)
+    requires crate::benign::in_generated_subgroup(crate::higman_operations::free_group(2), seq![seq![Symbol::Gen(0), Symbol::Gen(1)]], g),
+    ensures exists|e: int| crate::reduction::freely_equivalent(g, abpow(e)),
+{
+    use crate::reduction::*;
+    use crate::benign::*;
+    let fg = crate::higman_operations::free_group(2);
+    let gens = seq![seq![Symbol::Gen(0), Symbol::Gen(1)]];
+    let factors = choose|factors: Seq<Word>|
+        factors_from_generators(gens, factors) && equiv_in_presentation(fg, concat_all(factors), g);
+    lemma_ab_factors_pow(factors);
+    let e = choose|e: int| freely_equivalent(concat_all(factors), abpow(e));
+    crate::free_word_problem::lemma_free_group_equiv_freely_equivalent(2, concat_all(factors), g);
+    lemma_freely_equivalent_sym(concat_all(factors), g);
+    lemma_freely_equivalent_trans(g, concat_all(factors), abpow(e));
+}
+
+// concat_all of a list of {ba, (ba)⁻¹} factors is freely equivalent to bapow(exponent sum).
+pub proof fn lemma_ba_factors_pow(factors: Seq<Word>)
+    requires crate::benign::factors_from_generators(seq![seq![Symbol::Gen(1), Symbol::Gen(0)]], factors),
+    ensures exists|e: int| crate::reduction::freely_equivalent(crate::benign::concat_all(factors), bapow(e)),
+    decreases factors.len(),
+{
+    use crate::reduction::*;
+    use crate::benign::*;
+    if factors.len() == 0 {
+        lemma_concat_all_empty();
+        assert(concat_all(factors) =~= empty_word() && bapow(0) =~= empty_word());
+        lemma_freely_equivalent_refl(empty_word());
+        assert(freely_equivalent(concat_all(factors), bapow(0)));
+    } else {
+        let f = factors.first();
+        let rest = factors.drop_first();
+        assert(is_generator_or_inverse(seq![seq![Symbol::Gen(1), Symbol::Gen(0)]], f)) by {
+            assert(factors[0] == f);
+        }
+        assert(factors_from_generators(seq![seq![Symbol::Gen(1), Symbol::Gen(0)]], rest)) by {
+            assert forall|k: int| 0 <= k < rest.len() implies is_generator_or_inverse(seq![seq![Symbol::Gen(1), Symbol::Gen(0)]], #[trigger] rest[k]) by {
+                assert(rest[k] == factors[k + 1]);
+            }
+        }
+        lemma_ba_factors_pow(rest);
+        let ep = choose|ep: int| freely_equivalent(concat_all(rest), bapow(ep));
+        assert(bapow(0) =~= empty_word());
+        assert(bapow(1) =~= seq![Symbol::Gen(1), Symbol::Gen(0)] + bapow(0));
+        assert(bapow(1) =~= seq![Symbol::Gen(1), Symbol::Gen(0)]);
+        assert(bapow(-1) =~= seq![Symbol::Inv(0), Symbol::Inv(1)] + bapow(0));
+        assert(bapow(-1) =~= seq![Symbol::Inv(0), Symbol::Inv(1)]);
+        assert(inverse_word(seq![Symbol::Gen(1), Symbol::Gen(0)]) =~= seq![Symbol::Inv(0), Symbol::Inv(1)]) by (compute);
+        let d: int = if f == seq![Symbol::Gen(1), Symbol::Gen(0)] { 1 } else { -1 };
+        assert(f =~= bapow(d));
+        assert(concat_all(factors) =~= f + concat_all(rest));
+        lemma_fe_concat_left(f, concat_all(rest), bapow(ep));
+        lemma_bapow_add(d, ep);
+        lemma_fe_from_reduces(bapow(d) + bapow(ep), bapow(d + ep));
+        assert(f + bapow(ep) =~= bapow(d) + bapow(ep));
+        lemma_freely_equivalent_trans(concat_all(factors), f + bapow(ep), bapow(d + ep));
+        assert(freely_equivalent(concat_all(factors), bapow(d + ep)));
+    }
+}
+
+pub proof fn lemma_cyclic_exp_ba(g: Word)
+    requires crate::benign::in_generated_subgroup(crate::higman_operations::free_group(2), seq![seq![Symbol::Gen(1), Symbol::Gen(0)]], g),
+    ensures exists|e: int| crate::reduction::freely_equivalent(g, bapow(e)),
+{
+    use crate::reduction::*;
+    use crate::benign::*;
+    let fg = crate::higman_operations::free_group(2);
+    let gens = seq![seq![Symbol::Gen(1), Symbol::Gen(0)]];
+    let factors = choose|factors: Seq<Word>|
+        factors_from_generators(gens, factors) && equiv_in_presentation(fg, concat_all(factors), g);
+    lemma_ba_factors_pow(factors);
+    let e = choose|e: int| freely_equivalent(concat_all(factors), bapow(e));
+    crate::free_word_problem::lemma_free_group_equiv_freely_equivalent(2, concat_all(factors), g);
+    lemma_freely_equivalent_sym(concat_all(factors), g);
+    lemma_freely_equivalent_trans(g, concat_all(factors), bapow(e));
+}
+
 } // verus!
