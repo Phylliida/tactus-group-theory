@@ -164,17 +164,37 @@ So the trigger is specifically **a recursive well-founded proof whose motive car
 
 **Source-level fixes we tried on the recursion — all still HANG (>240s):**
 - `decreases (if e>=0 {e} else {-e})` (the original) → hang.
-- Split into two recursions with **simple** `decreases e` / `decreases -e` → hang. (So it's not the
-  `decreases` form.)
+- Split into two recursions with **simple** `decreases e` / `decreases -e` → hang. (Not the `decreases` form.)
 - **Opaque motive**: `#[verifier::opaque] spec fn qpc(e)=equiv(...)`, recurse with `ensures qpc(e)`,
-  `reveal(qpc)` in the body → **still hangs.** (So `#[verifier::opaque]` on the motive is not honored /
-  not sufficient here, same as `hide` earlier.)
+  `reveal(qpc)` in the body → still hangs.
+- **Opaque Word PARAMS**: `proof fn rec(e, va, vb) requires va==abpow(e), vb==bapow(e) ensures
+  equiv(q·va·q⁻¹, vb)` → still hangs. (The recursive *call* `rec(e-1, abpow(e-1), bapow(e-1))`
+  re-instantiates the different-words equiv, so the opaque motive doesn't remove it.)
 
-**What DOES verify (all in `src/m4_probe.rs` right now):** the full non-recursive restructure suggested by
-an external agent — `lemma_pow_zero/unfold_pos/unfold_neg` (the `==` unfold equations),
-`qconj_step_generic` (generic HNN-conj step over opaque words), and `qpow_step_pos/neg` built from them.
-These are the reusable "peeling" machinery and are worth keeping regardless. Only the ~10-line recursive
-`lemma_qpow_conj` that ties them together is blocked.
+**⭐⭐⭐ SHARPEST characterization (from same-only-in-a-dedicated-module probes, all `timeout`-capped):**
+
+| recursive proof fn, ensures/uses… | result |
+|---|---|
+| `equiv(abpow(e), abpow(e))` — same word | **fast** |
+| recursive result *used* via a same-word `equiv` precondition | **fast** |
+| `equiv(abpow(e)+bapow(e), abpow(e)+bapow(e))` — both fns *present*, same word | **fast** |
+| `equiv(q·abpow(e)·q⁻¹, bapow(e))` — **`abpow` LHS *related to* `bapow` RHS** | **HANG** |
+
+So the trigger is **not** recursion, **not** the motive existential, **not** merely having `abpow`/`bapow`
+present — it is a recursive proof whose equiv motive **relates two *different* symbolic-recursive words**
+(`abpow(e)` on one side, `bapow(e)` on the other). Non-recursively, `qpow_step_pos` proves exactly that
+different-words equiv and is *fast* — it only loops inside a recursion.
+
+**Why no source dodge works:** the theorem's induction hypothesis *is* that different-words equiv
+(`equiv(q·abpow(e-1)·q⁻¹, bapow(e-1))`); the recursion must produce it (recursive call) and consume it
+(the step). It's intrinsic to the statement, so opaque motives/params only relocate it — they can't
+remove it. **This looks like it requires the backend fix** (see §5.1/§5.2): make the Lean translation
+stop unfolding both recursive `spec fn`s when relating them in a recursive `equiv` goal.
+
+**What DOES verify (committed, in `src/m4_qpow.rs`, 8/0, ~54s):** the full non-recursive restructure —
+`lemma_pow_zero/unfold_pos/unfold_neg` (the `==` unfold equations), `qconj_step_generic` (generic
+HNN-conj step over opaque words), `qpow_step_pos/neg`. These are the reusable "peeling" machinery. Only
+the ~10-line recursive `lemma_qpow_conj` (commented out at the bottom of the file) is blocked.
 
 **Where to go from here (this now looks backend-level, and you own the fork):**
 1. **Read the generated Lean for the recursive `lemma_qpow_conj`** (`--emit-lean` / keep temp files) and

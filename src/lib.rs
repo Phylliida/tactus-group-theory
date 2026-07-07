@@ -576,3 +576,4 @@ pub mod m4_defect_flow;
 // m4_qpow: M4 B8 enabler (2) q·(ab)^e·q⁻¹≡(ba)^e — non-recursive peeling machinery VERIFIES; recursive
 // glue lemma_qpow_conj BLOCKED by a tactus Lean-backend cliff (see docs/m4-qpow-cliff-handoff.md).
 pub mod m4_qpow;
+

@@ -3,9 +3,11 @@
 // STATUS: the reusable NON-RECURSIVE machinery below VERIFIES (~40s). The recursive tie-together
 // `lemma_qpow_conj` is BLOCKED by a tactus Lean-backend cliff and is commented out at the bottom.
 // Full diagnosis + minimal repro + what to try: docs/m4-qpow-cliff-handoff.md.
-// One-line summary: a recursive proof fn whose `ensures` is an equiv_in_presentation-over-abpow goal
-// hangs under --lean-backend (regardless of `decreases` form or opaque motive), while every
-// non-recursive ingredient here is fast and `reduces_to`-over-abpow recursion (pw library) is fine.
+// One-line summary: a recursive proof fn whose equiv motive RELATES TWO DIFFERENT symbolic-recursive
+// words (abpow(e) LHS vs bapow(e) RHS) hangs under --lean-backend. Same-word recursion, using a
+// recursive result, and having both fns present are all FAST; only relating the two loops. No source
+// dodge works (decreases form / opaque motive / opaque Word params all hang) because the theorem's
+// induction hypothesis IS that different-words equiv. qpow_step_pos proves it fine non-recursively.
 use vstd::prelude::*;
 use crate::symbol::*;
 use crate::word::*;
