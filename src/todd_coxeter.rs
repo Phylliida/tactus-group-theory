@@ -62,6 +62,11 @@ pub open spec fn coset_table_consistent(t: CosetTable) -> bool {
 
 ///  Trace a word through the coset table starting from a coset.
 ///  Returns None if an undefined entry is hit.
+/// Lean backend: axiom + defining equation (`.eq_def`) — drop_first
+/// recursion's termination fact is out of decreasing_by's reach in
+/// the preamble layout (same as `inverse_word`). Verus verifies
+/// termination Z3-side.
+#[verifier::lean_axiom_eq]
 pub open spec fn trace_word(t: CosetTable, coset: nat, w: Word) -> Option<nat>
     decreases w.len(),
 {

@@ -23,6 +23,12 @@ pub open spec fn apply_hom_symbol(h: HomomorphismData, s: Symbol) -> Word {
 }
 
 ///  Image of a word under the homomorphism.
+///
+/// Lean backend: emitted as axiom + defining equation (`.eq_def`) —
+/// the drop_first recursion's termination fact is a broadcast axiom
+/// Lean's decreasing_by can't reach in the preamble layout (same as
+/// `inverse_word`). Verus verifies termination Z3-side.
+#[verifier::lean_axiom_eq]
 pub open spec fn apply_hom(h: HomomorphismData, w: Word) -> Word
     decreases w.len(),
 {
