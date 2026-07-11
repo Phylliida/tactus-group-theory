@@ -166,6 +166,10 @@ pub open spec fn rt_presentation_view(
 
 ///  Trace a word through the runtime flat table.
 ///  Avoids going through rt_to_spec_table in loop invariants.
+/// Lean backend: axiom + defining equation (`.eq_def`) — drop_first
+/// recursion (same as `inverse_word`). Verus verifies termination
+/// Z3-side.
+#[verifier::lean_axiom_eq]
 pub open spec fn rt_trace_word(rt: RuntimeCosetTable, coset: nat, w: Word) -> Option<nat>
     decreases w.len(),
 {
