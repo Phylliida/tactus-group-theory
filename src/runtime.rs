@@ -42,7 +42,7 @@ pub fn is_inverse_pair_exec(s1: &RuntimeSymbol, s2: &RuntimeSymbol) -> (out: boo
     ensures
         out == is_inverse_pair(runtime_symbol_view(*s1), runtime_symbol_view(*s2)),
 {
-    proof { cases hs1 : s1.deref <;> cases hs2 : s2.deref <;> simp_all [symbol.is_inverse_pair, symbol.inverse_symbol, runtime.runtime_symbol_view] }
+    proof { cases hs1 : s1.deref <;> cases hs2 : s2.deref <;> simp_all [lib.symbol.is_inverse_pair, lib.symbol.inverse_symbol, lib.runtime.runtime_symbol_view] }
     match (s1, s2) {
         (RuntimeSymbol::Gen(i), RuntimeSymbol::Inv(j)) => *i == *j,
         (RuntimeSymbol::Inv(i), RuntimeSymbol::Gen(j)) => *i == *j,
@@ -63,7 +63,7 @@ proof fn lemma_fcf_end(v: Word, i: nat)
     requires i + 1 >= v.len()
     ensures find_cancellation_from(v, i) == v.len()
 by {
-    rw [reduction.find_cancellation_from.eq_def]
+    rw [lib.reduction.find_cancellation_from.eq_def]
     split <;> omega
 }
 
@@ -73,7 +73,7 @@ proof fn lemma_fcf_found(v: Word, i: nat)
         is_inverse_pair(v[i as int], v[i as int + 1]),
     ensures find_cancellation_from(v, i) == i
 by {
-    rw [reduction.find_cancellation_from.eq_def]
+    rw [lib.reduction.find_cancellation_from.eq_def]
     split
     · omega
     · simp_all
@@ -86,7 +86,7 @@ proof fn lemma_fcf_step(v: Word, i: nat)
     ensures
         find_cancellation_from(v, i) == find_cancellation_from(v, i + 1)
 by {
-    rw [reduction.find_cancellation_from.eq_def]
+    rw [lib.reduction.find_cancellation_from.eq_def]
     split
     · omega
     · simp_all
@@ -101,7 +101,7 @@ pub fn find_cancellation_exec(w: &Vec<RuntimeSymbol>) -> (out: usize)
 {
     if w.len() <= 1 {
         assert(find_cancellation_from(runtime_word_view(w@), 0) == w@.len()) by {
-            intros; haveI : alloc.Allocator alloc.Global := ⟨⟩; have hlen := std_specs.vec.axiom_spec_len runtime.RuntimeSymbol alloc.Global w; have hend := runtime.lemma_fcf_end (runtime.runtime_word_view (view.View.view w)) 0 (by simp only [runtime.runtime_word_view]; rw [seq.axiom_seq_new_len]; omega); simp_all [runtime.runtime_word_view, seq.axiom_seq_new_len] <;> omega
+            intros; haveI : lib.alloc.Allocator lib.alloc.Global := ⟨⟩; have hlen := lib.std_specs.vec.axiom_spec_len lib.runtime.RuntimeSymbol lib.alloc.Global w; have hend := lib.runtime.lemma_fcf_end (lib.runtime.runtime_word_view (lib.view.View.view w)) 0 (by simp only [lib.runtime.runtime_word_view]; rw [lib.seq.axiom_seq_new_len]; omega); simp_all [lib.runtime.runtime_word_view, lib.seq.axiom_seq_new_len] <;> omega
         };
         return w.len();
     }
@@ -115,22 +115,22 @@ pub fn find_cancellation_exec(w: &Vec<RuntimeSymbol>) -> (out: usize)
         decreases w.len() - i,
     {
         assert(i + 1 < w@.len()) by {
-            intros; haveI : alloc.Allocator alloc.Global := ⟨⟩; have hlen := std_specs.vec.axiom_spec_len runtime.RuntimeSymbol alloc.Global w; omega
+            intros; haveI : lib.alloc.Allocator lib.alloc.Global := ⟨⟩; have hlen := lib.std_specs.vec.axiom_spec_len lib.runtime.RuntimeSymbol lib.alloc.Global w; omega
         };
         if is_inverse_pair_exec(&w[i], &w[i + 1]) {
             assert(find_cancellation_from(runtime_word_view(w@), i as nat) == i as nat) by {
-                intros; haveI : alloc.Allocator alloc.Global := ⟨⟩; have hlen := std_specs.vec.axiom_spec_len runtime.RuntimeSymbol alloc.Global w; have hfound := runtime.lemma_fcf_found (runtime.runtime_word_view (view.View.view w)) i (by simp only [runtime.runtime_word_view]; rw [seq.axiom_seq_new_len]; omega) (by simp only [runtime.runtime_word_view]; rw [seq.axiom_seq_new_index _ _ _ _ (by first | (simp only [Int.ofNat_eq_natCast]; omega) | omega), seq.axiom_seq_new_index _ _ _ _ (by first | (simp only [Int.ofNat_eq_natCast]; omega) | omega)]; first | assumption | simp_all); first | assumption | omega | (simp_all <;> omega)
+                intros; haveI : lib.alloc.Allocator lib.alloc.Global := ⟨⟩; have hlen := lib.std_specs.vec.axiom_spec_len lib.runtime.RuntimeSymbol lib.alloc.Global w; have hfound := lib.runtime.lemma_fcf_found (lib.runtime.runtime_word_view (lib.view.View.view w)) i (by simp only [lib.runtime.runtime_word_view]; rw [lib.seq.axiom_seq_new_len]; omega) (by simp only [lib.runtime.runtime_word_view]; rw [lib.seq.axiom_seq_new_index _ _ _ _ (by first | (simp only [Int.ofNat_eq_natCast]; omega) | omega), lib.seq.axiom_seq_new_index _ _ _ _ (by first | (simp only [Int.ofNat_eq_natCast]; omega) | omega)]; first | assumption | simp_all); first | assumption | omega | (simp_all <;> omega)
             };
             return i;
         }
         assert(find_cancellation_from(runtime_word_view(w@), i as nat)
             == find_cancellation_from(runtime_word_view(w@), (i + 1) as nat)) by {
-            intros; haveI : alloc.Allocator alloc.Global := ⟨⟩; have hlen := std_specs.vec.axiom_spec_len runtime.RuntimeSymbol alloc.Global w; have hstep := runtime.lemma_fcf_step (runtime.runtime_word_view (view.View.view w)) i (by simp only [runtime.runtime_word_view]; rw [seq.axiom_seq_new_len]; omega) (by simp only [runtime.runtime_word_view]; rw [seq.axiom_seq_new_index _ _ _ _ (by first | (simp only [Int.ofNat_eq_natCast]; omega) | omega), seq.axiom_seq_new_index _ _ _ _ (by first | (simp only [Int.ofNat_eq_natCast]; omega) | omega)]; first | assumption | simp_all); first | assumption | omega | (simp_all <;> omega)
+            intros; haveI : lib.alloc.Allocator lib.alloc.Global := ⟨⟩; have hlen := lib.std_specs.vec.axiom_spec_len lib.runtime.RuntimeSymbol lib.alloc.Global w; have hstep := lib.runtime.lemma_fcf_step (lib.runtime.runtime_word_view (lib.view.View.view w)) i (by simp only [lib.runtime.runtime_word_view]; rw [lib.seq.axiom_seq_new_len]; omega) (by simp only [lib.runtime.runtime_word_view]; rw [lib.seq.axiom_seq_new_index _ _ _ _ (by first | (simp only [Int.ofNat_eq_natCast]; omega) | omega), lib.seq.axiom_seq_new_index _ _ _ _ (by first | (simp only [Int.ofNat_eq_natCast]; omega) | omega)]; first | assumption | simp_all); first | assumption | omega | (simp_all <;> omega)
         };
         i = i + 1;
     }
     assert(find_cancellation_from(runtime_word_view(w@), i as nat) == w@.len()) by {
-        intros; haveI : alloc.Allocator alloc.Global := ⟨⟩; have hlen := std_specs.vec.axiom_spec_len runtime.RuntimeSymbol alloc.Global w; have hend := runtime.lemma_fcf_end (runtime.runtime_word_view (view.View.view w)) i (by simp only [runtime.runtime_word_view]; rw [seq.axiom_seq_new_len]; omega); simp_all [runtime.runtime_word_view, seq.axiom_seq_new_len] <;> omega
+        intros; haveI : lib.alloc.Allocator lib.alloc.Global := ⟨⟩; have hlen := lib.std_specs.vec.axiom_spec_len lib.runtime.RuntimeSymbol lib.alloc.Global w; have hend := lib.runtime.lemma_fcf_end (lib.runtime.runtime_word_view (lib.view.View.view w)) i (by simp only [lib.runtime.runtime_word_view]; rw [lib.seq.axiom_seq_new_len]; omega); simp_all [lib.runtime.runtime_word_view, lib.seq.axiom_seq_new_len] <;> omega
     };
     w.len()
 }
@@ -373,7 +373,7 @@ pub proof fn lemma_inverse_word_element(w: Word, k: int)
 ///  gives a clean postcondition the Lean backend can discharge; the
 ///  parent's per-arm postconditions then close from these + a
 ///  `runtime_symbol_view` unfold).
-#[verifier::tactus_tactic("first | tactus_auto | (intros <;> simp only [homomorphism.apply_hom_symbol, runtime.runtime_hom_view, symbol.Symbol.isGen, symbol.Symbol.Gen_val0] at * <;> rw [seq.axiom_seq_new_index _ _ _ _ (by simp_all)] <;> congr 1)")]
+#[verifier::tactus_tactic("first | tactus_auto | (intros <;> simp only [lib.homomorphism.apply_hom_symbol, lib.runtime.runtime_hom_view, lib.symbol.Symbol.isGen, lib.symbol.Symbol.Gen_val0] at * <;> rw [lib.seq.axiom_seq_new_index _ _ _ _ (by simp_all)] <;> congr 1)")]
 fn apply_hom_gen(h: &RuntimeHomData, i: usize) -> (out: Vec<RuntimeSymbol>)
     requires (i as int) < h.generator_images@.len(),
     ensures runtime_word_view(out@) =~=
@@ -382,7 +382,7 @@ fn apply_hom_gen(h: &RuntimeHomData, i: usize) -> (out: Vec<RuntimeSymbol>)
     copy_word(&h.generator_images[i])
 }
 
-#[verifier::tactus_tactic("first | tactus_auto | (intros <;> simp only [homomorphism.apply_hom_symbol, runtime.runtime_hom_view, symbol.Symbol.isGen, symbol.Symbol.Inv_val0, false_and, if_false, and_true] <;> rw [seq.axiom_seq_new_index _ _ _ _ (by simp_all <;> omega)] <;> congr 1)")]
+#[verifier::tactus_tactic("first | tactus_auto | (intros <;> simp only [lib.homomorphism.apply_hom_symbol, lib.runtime.runtime_hom_view, lib.symbol.Symbol.isGen, lib.symbol.Symbol.Inv_val0, false_and, if_false, and_true] <;> rw [lib.seq.axiom_seq_new_index _ _ _ _ (by simp_all <;> omega)] <;> congr 1)")]
 fn apply_hom_inv(h: &RuntimeHomData, i: usize) -> (out: Vec<RuntimeSymbol>)
     requires (i as int) < h.generator_images@.len(),
     ensures runtime_word_view(out@) =~=
@@ -414,7 +414,7 @@ pub fn apply_hom_symbol_exec(
             let r = apply_hom_gen(h, *i);
             assert(runtime_symbol_view(*s) == Symbol::Gen(*i as nat)) by {
                 intros
-                simp_all (config := { zetaDelta := true }) [runtime.runtime_symbol_view, runtime.RuntimeSymbol.isGen, runtime.RuntimeSymbol.Gen_val0]
+                simp_all (config := { zetaDelta := true }) [lib.runtime.runtime_symbol_view, lib.runtime.RuntimeSymbol.isGen, lib.runtime.RuntimeSymbol.Gen_val0]
             };
             r
         },
@@ -422,7 +422,7 @@ pub fn apply_hom_symbol_exec(
             let r = apply_hom_inv(h, *i);
             assert(runtime_symbol_view(*s) == Symbol::Inv(*i as nat)) by {
                 intros
-                simp_all (config := { zetaDelta := true }) [runtime.runtime_symbol_view, runtime.RuntimeSymbol.isGen, runtime.RuntimeSymbol.Inv_val0]
+                simp_all (config := { zetaDelta := true }) [lib.runtime.runtime_symbol_view, lib.runtime.RuntimeSymbol.isGen, lib.runtime.RuntimeSymbol.Inv_val0]
             };
             r
         },
@@ -461,10 +461,10 @@ fn copy_word(v: &Vec<RuntimeSymbol>) -> (out: Vec<RuntimeSymbol>)
             simp_all
             intro k hk1 hk2
             by_cases hc : k < (j : Int)
-            · rw [seq.axiom_seq_push_index_different _ _ _ _ (by simp_all)]
+            · rw [lib.seq.axiom_seq_push_index_different _ _ _ _ (by simp_all)]
               simp_all
             · have hkj : k = (j : Int) := by omega
-              rw [hkj, seq.axiom_seq_push_index_same _ _ _ _ (by simp_all)]
+              rw [hkj, lib.seq.axiom_seq_push_index_same _ _ _ _ (by simp_all)]
               simp (config := { zetaDelta := true }) only [Int.ofNat_eq_natCast]
         };
         j = j + 1;

@@ -5,7 +5,7 @@
 //! `usize::MAX`, which the Lean backend's `tactus_auto` cannot compile (the
 //! `IntegerTypeBound(UnsignedMax)` deferral). Keeping it OUT of `todd_coxeter.rs` lets the
 //! ghost spec layer (`CosetTable`, `symbol_to_column`, `trace_word`, …) live in the clean
-//! cross-crate export cone (`ceer_lib.rs`) while this showcase stays in the full crate only.
+//! cross-crate export cone (`lib.ceer_lib.rs`) while this showcase stays in the full crate only.
 //! Nothing outside this file references its items.
 //!
 //! NOTE (2026-07-02, "flag decides"): the exec fns below carry Verus-style
@@ -116,7 +116,7 @@ pub fn symbol_to_column_exec(s: &crate::runtime::RuntimeSymbol) -> (out: usize)
     ensures
         out == symbol_to_column(crate::runtime::runtime_symbol_view(*s)) as usize,
 {
-    proof { cases hs : s.deref <;> simp_all [todd_coxeter.symbol_to_column, runtime.runtime_symbol_view] }
+    proof { cases hs : s.deref <;> simp_all [lib.todd_coxeter.symbol_to_column, lib.runtime.runtime_symbol_view] }
     match s {
         crate::runtime::RuntimeSymbol::Gen(i) => 2 * *i,
         crate::runtime::RuntimeSymbol::Inv(i) => 2 * *i + 1,
@@ -398,7 +398,7 @@ pub fn inverse_column_exec(col: usize) -> (out: usize)
     requires col < usize::MAX,
     ensures out == inverse_column(col as nat) as usize,
 {
-    proof { simp_all [todd_coxeter.inverse_column] }
+    proof { simp_all [lib.todd_coxeter.inverse_column] }
     if col % 2 == 0 { col + 1 } else { col - 1 }
 }
 
