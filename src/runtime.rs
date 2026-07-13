@@ -414,7 +414,7 @@ pub fn apply_hom_symbol_exec(
             let r = apply_hom_gen(h, *i);
             assert(runtime_symbol_view(*s) == Symbol::Gen(*i as nat)) by {
                 intros
-                simp_all (config := { zetaDelta := true }) [lib.runtime.runtime_symbol_view, lib.runtime.RuntimeSymbol.isGen, lib.runtime.RuntimeSymbol.Gen_val0]
+                cases hs : s.deref <;> simp_all (config := { zetaDelta := true }) [lib.runtime.runtime_symbol_view, lib.runtime.RuntimeSymbol.isGen, lib.runtime.RuntimeSymbol.Gen_val0]
             };
             r
         },
@@ -422,7 +422,7 @@ pub fn apply_hom_symbol_exec(
             let r = apply_hom_inv(h, *i);
             assert(runtime_symbol_view(*s) == Symbol::Inv(*i as nat)) by {
                 intros
-                simp_all (config := { zetaDelta := true }) [lib.runtime.runtime_symbol_view, lib.runtime.RuntimeSymbol.isGen, lib.runtime.RuntimeSymbol.Inv_val0]
+                cases hs : s.deref <;> simp_all (config := { zetaDelta := true }) [lib.runtime.runtime_symbol_view, lib.runtime.RuntimeSymbol.isGen, lib.runtime.RuntimeSymbol.Inv_val0]
             };
             r
         },
