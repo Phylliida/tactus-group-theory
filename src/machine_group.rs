@@ -8052,14 +8052,14 @@ pub proof fn lemma_x_past_config_inv(pp: int, r: int, s: int)
     lemma_inverse_word_concat(sconfig(r, s), xmP);
     lemma_inverse_signed_power(1, -pp);             //  inv(xmP) =~= xP
     let lia = inverse_word(sconfig(r - pp, s)) + xP;
-    let lib = xP + inverse_word(sconfig(r, s));
+    let lib_w = xP + inverse_word(sconfig(r, s));
     assert(inverse_word(aa) =~= lia);
-    assert(inverse_word(bb) =~= lib);
-    assert(equiv_in_presentation(a, lia, lib));
+    assert(inverse_word(bb) =~= lib_w);
+    assert(equiv_in_presentation(a, lia, lib_w));
     lemma_signed_power_valid(1, pp, 3);
     lemma_inverse_word_valid(sconfig(r - pp, s), 3);
     assert(word_valid(lia, 3)) by { lemma_concat_word_valid(inverse_word(sconfig(r - pp, s)), xP, 3); }
-    lemma_equiv_symmetric(a, lia, lib);
+    lemma_equiv_symmetric(a, lia, lib_w);
 }
 
 //  Inverse-config slide (y):  yᵠ · inv(sconfig(r,s)) ≡ inv(sconfig(r,s−Q)) · yᵠ.
@@ -8088,14 +8088,14 @@ pub proof fn lemma_y_past_config_inv(qq: int, r: int, s: int)
     lemma_inverse_word_concat(sconfig(r, s), ymQ);
     lemma_inverse_signed_power(2, -qq);
     let lia = inverse_word(sconfig(r, s - qq)) + yQ;
-    let lib = yQ + inverse_word(sconfig(r, s));
+    let lib_w = yQ + inverse_word(sconfig(r, s));
     assert(inverse_word(aa) =~= lia);
-    assert(inverse_word(bb) =~= lib);
-    assert(equiv_in_presentation(a, lia, lib));
+    assert(inverse_word(bb) =~= lib_w);
+    assert(equiv_in_presentation(a, lia, lib_w));
     lemma_signed_power_valid(2, qq, 3);
     lemma_inverse_word_valid(sconfig(r, s - qq), 3);
     assert(word_valid(lia, 3)) by { lemma_concat_word_valid(inverse_word(sconfig(r, s - qq)), yQ, 3); }
-    lemma_equiv_symmetric(a, lia, lib);
+    lemma_equiv_symmetric(a, lia, lib_w);
 }
 
 //  xᴾ · yᵠ · inv(sconfig(r,s))  ≡  inv(sconfig(r−P,s−Q)) · xᴾ · yᵠ   (the Inv(0) emit).
