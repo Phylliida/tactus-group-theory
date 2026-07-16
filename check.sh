@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Verify tactus-group-theory under the Lean backend.
+# Verify tactus-group-theory under the Lean backend — the LIVE package-check
+# gate (Lean actually elaborates). The old `--emit-lean` Lean-skipping flag was
+# dropped 2026-07-16: post-M6 a warm verifying run costs about the same as
+# emit-only, so the gate verifies for real on every run.
 #
 # Usage:
 #   ./check.sh                 # verify the whole crate (src/lib.rs)
@@ -23,7 +26,7 @@ if [[ ! -x "$VERUS" ]]; then
   exit 1
 fi
 
-"$VERUS" --lean-backend -V cache --crate-type=lib "$HERE/src/lib.rs" --emit-lean "$@" 2>&1 | tee "$LOG"
+"$VERUS" --lean-backend -V cache --crate-type=lib "$HERE/src/lib.rs" "$@" 2>&1 | tee "$LOG"
 rc="${PIPESTATUS[0]}"
 echo "[check.sh] full output saved to $LOG (exit $rc)" >&2
 exit "$rc"
