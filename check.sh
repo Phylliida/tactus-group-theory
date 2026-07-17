@@ -26,7 +26,29 @@ if [[ ! -x "$VERUS" ]]; then
   exit 1
 fi
 
+# B6: the no-search claim below must cover ONLY the current emission — stale
+# .lean files from older binaries linger in the tree. Delete .lean artifacts
+# (NOT .olean/.verified caches — those are content-keyed and stay valid) so
+# the run regenerates exactly what the current binary emits.
+find "$HERE/target/tactus-lean" -name '*.lean' -delete 2>/dev/null || true
+
 "$VERUS" --lean-backend -V cache --crate-type=lib "$HERE/src/lib.rs" "$@" 2>&1 | tee "$LOG"
 rc="${PIPESTATUS[0]}"
 echo "[check.sh] full output saved to $LOG (exit $rc)" >&2
-exit "$rc"
+[[ "$rc" -ne 0 ]] && exit "$rc"
+
+# B6 no-search gate claim (DESIGN-transparent-automation.md §5): no emitted
+# artifact imports the search module, and no search-ladder tactic is named in
+# tactic position. The derivation-first closer (S2c) means this must hold with
+# ZERO allowed residue — a violation fails the gate.
+#
+# The check covers ONLY the current emission: stale .lean files from older
+# binaries linger in the tree (the gate doesn't clean it), so .lean artifacts
+# are deleted before the run and the current binary regenerates exactly its
+# own output (.olean/.verified caches survive — content-keyed, still valid).
+TOOLS="$(dirname "$(dirname "$(dirname "$VERUS")")")"
+python3 "$TOOLS/tools/check-no-search.py" "$HERE/target/tactus-lean" || {
+  echo "[check.sh] no-search gate claim FAILED — see above" >&2
+  exit 1
+}
+echo "[check.sh] no-search gate claim holds" >&2

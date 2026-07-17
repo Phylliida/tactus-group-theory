@@ -373,7 +373,7 @@ pub proof fn lemma_inverse_word_element(w: Word, k: int)
 ///  gives a clean postcondition the Lean backend can discharge; the
 ///  parent's per-arm postconditions then close from these + a
 ///  `runtime_symbol_view` unfold).
-#[verifier::tactus_tactic("first | tactus_auto | (intros <;> simp only [lib.homomorphism.apply_hom_symbol, lib.runtime.runtime_hom_view, lib.symbol.Symbol.isGen, lib.symbol.Symbol.Gen_val0] at * <;> rw [lib.seq.axiom_seq_new_index _ _ _ _ (by simp_all)] <;> congr 1)")]
+#[verifier::tactus_tactic("first | rfl | decide | (simp_all only [Classical.not_forall, Decidable.not_not, Int.add_emod_left, Int.cast_ofNat_Int, Int.natCast_add, Int.neg_add_emod_self, Int.ofNat_eq_coe, Int.ofNat_zero_le, Int.sub_zero, Int.toNat_natCast_add_one, Int.zero_add, Int.zero_sub, Int.mul_add, Int.add_mul, Int.toNat_zero, Int.toNat_one, Int.add_sub_cancel, Nat.add_le_add_iff_right, Nat.add_left_cancel_iff, Nat.add_zero, Nat.le_add_left, Nat.le_add_right, Nat.le_refl, Nat.not_le, Nat.not_lt, Nat.reduceLeDiff, Nat.sub_le_iff_le_add, Nat.zero_add, Nat.zero_le, Nat.mul_add, Nat.add_mul, Nat.add_sub_cancel, and_imp, and_self, and_true, eq_iff_iff, forall_const, forall_eq, ge_iff_le, gt_iff_lt, iff_true, imp_false, imp_self, implies_true, not_and, not_exists, not_false_eq_true, Classical.not_imp, not_or, not_true_eq_false, true_and] <;> omega) | (intros <;> simp only [lib.homomorphism.apply_hom_symbol, lib.runtime.runtime_hom_view, lib.symbol.Symbol.isGen, lib.symbol.Symbol.Gen_val0] at * <;> rw [lib.seq.axiom_seq_new_index _ _ _ _ (by simp_all)] <;> congr 1)")]
 fn apply_hom_gen(h: &RuntimeHomData, i: usize) -> (out: Vec<RuntimeSymbol>)
     requires (i as int) < h.generator_images@.len(),
     ensures runtime_word_view(out@) =~=
@@ -382,7 +382,7 @@ fn apply_hom_gen(h: &RuntimeHomData, i: usize) -> (out: Vec<RuntimeSymbol>)
     copy_word(&h.generator_images[i])
 }
 
-#[verifier::tactus_tactic("first | tactus_auto | (intros <;> simp only [lib.homomorphism.apply_hom_symbol, lib.runtime.runtime_hom_view, lib.symbol.Symbol.isGen, lib.symbol.Symbol.Inv_val0, false_and, if_false, and_true] <;> rw [lib.seq.axiom_seq_new_index _ _ _ _ (by simp_all <;> omega)] <;> congr 1)")]
+#[verifier::tactus_tactic("first | rfl | decide | (simp_all only [Classical.not_forall, Decidable.not_not, Int.add_emod_left, Int.cast_ofNat_Int, Int.natCast_add, Int.neg_add_emod_self, Int.ofNat_eq_coe, Int.ofNat_zero_le, Int.sub_zero, Int.toNat_natCast_add_one, Int.zero_add, Int.zero_sub, Int.mul_add, Int.add_mul, Int.toNat_zero, Int.toNat_one, Int.add_sub_cancel, Nat.add_le_add_iff_right, Nat.add_left_cancel_iff, Nat.add_zero, Nat.le_add_left, Nat.le_add_right, Nat.le_refl, Nat.not_le, Nat.not_lt, Nat.reduceLeDiff, Nat.sub_le_iff_le_add, Nat.zero_add, Nat.zero_le, Nat.mul_add, Nat.add_mul, Nat.add_sub_cancel, and_imp, and_self, and_true, eq_iff_iff, forall_const, forall_eq, ge_iff_le, gt_iff_lt, iff_true, imp_false, imp_self, implies_true, not_and, not_exists, not_false_eq_true, Classical.not_imp, not_or, not_true_eq_false, true_and] <;> omega) | (intros <;> simp only [lib.homomorphism.apply_hom_symbol, lib.runtime.runtime_hom_view, lib.symbol.Symbol.isGen, lib.symbol.Symbol.Inv_val0, false_and, if_false, and_true] <;> rw [lib.seq.axiom_seq_new_index _ _ _ _ (by simp_all <;> omega)] <;> congr 1)")]
 fn apply_hom_inv(h: &RuntimeHomData, i: usize) -> (out: Vec<RuntimeSymbol>)
     requires (i as int) < h.generator_images@.len(),
     ensures runtime_word_view(out@) =~=
