@@ -109,7 +109,7 @@ pub open spec fn rt_table_get(t: &RuntimeCosetTable, c: usize, col: usize) -> us
 }
 
 ///  Runtime symbol to column.
-#[verifier::tactus_tactic("first | tactus_auto | tactus_usize_bound")]
+#[verifier::tactus_tactic("first | rfl | decide | (simp_all only [Classical.not_forall, Decidable.not_not, Int.add_emod_left, Int.cast_ofNat_Int, Int.natCast_add, Int.neg_add_emod_self, Int.ofNat_eq_coe, Int.ofNat_zero_le, Int.sub_zero, Int.toNat_natCast_add_one, Int.zero_add, Int.zero_sub, Int.mul_add, Int.add_mul, Int.toNat_zero, Int.toNat_one, Int.add_sub_cancel, Nat.add_le_add_iff_right, Nat.add_left_cancel_iff, Nat.add_zero, Nat.le_add_left, Nat.le_add_right, Nat.le_refl, Nat.not_le, Nat.not_lt, Nat.reduceLeDiff, Nat.sub_le_iff_le_add, Nat.zero_add, Nat.zero_le, Nat.mul_add, Nat.add_mul, Nat.add_sub_cancel, and_imp, and_self, and_true, eq_iff_iff, forall_const, forall_eq, ge_iff_le, gt_iff_lt, iff_true, imp_false, imp_self, implies_true, not_and, not_exists, not_false_eq_true, Classical.not_imp, not_or, not_true_eq_false, true_and] <;> omega) | (rcases arch_word_bits_valid with h | h <;> (simp_all only [usize_hi, isize_hi, h]; first | decide | omega))")]
 pub fn symbol_to_column_exec(s: &crate::runtime::RuntimeSymbol) -> (out: usize)
     requires
         symbol_to_column(crate::runtime::runtime_symbol_view(*s)) < usize::MAX,
@@ -393,7 +393,7 @@ pub enum ScanResult {
 }
 
 ///  Compute the inverse column index (exec version).
-#[verifier::tactus_tactic("first | tactus_auto | tactus_usize_bound")]
+#[verifier::tactus_tactic("first | rfl | decide | (simp_all only [Classical.not_forall, Decidable.not_not, Int.add_emod_left, Int.cast_ofNat_Int, Int.natCast_add, Int.neg_add_emod_self, Int.ofNat_eq_coe, Int.ofNat_zero_le, Int.sub_zero, Int.toNat_natCast_add_one, Int.zero_add, Int.zero_sub, Int.mul_add, Int.add_mul, Int.toNat_zero, Int.toNat_one, Int.add_sub_cancel, Nat.add_le_add_iff_right, Nat.add_left_cancel_iff, Nat.add_zero, Nat.le_add_left, Nat.le_add_right, Nat.le_refl, Nat.not_le, Nat.not_lt, Nat.reduceLeDiff, Nat.sub_le_iff_le_add, Nat.zero_add, Nat.zero_le, Nat.mul_add, Nat.add_mul, Nat.add_sub_cancel, and_imp, and_self, and_true, eq_iff_iff, forall_const, forall_eq, ge_iff_le, gt_iff_lt, iff_true, imp_false, imp_self, implies_true, not_and, not_exists, not_false_eq_true, Classical.not_imp, not_or, not_true_eq_false, true_and] <;> omega) | (rcases arch_word_bits_valid with h | h <;> (simp_all only [usize_hi, isize_hi, h]; first | decide | omega))")]
 pub fn inverse_column_exec(col: usize) -> (out: usize)
     requires col < usize::MAX,
     ensures out == inverse_column(col as nat) as usize,
