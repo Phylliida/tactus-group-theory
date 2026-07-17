@@ -391,6 +391,7 @@ fn apply_hom_inv(h: &RuntimeHomData, i: usize) -> (out: Vec<RuntimeSymbol>)
     inverse_word_exec(&h.generator_images[i])
 }
 
+#[verifier::tactus_tactic("first | first | rfl | decide | (tactus_peel <;> (first | rfl | decide | omega)) | (simp_all only [Classical.not_forall, Decidable.not_not, Int.add_emod_left, Int.cast_ofNat_Int, Int.natCast_add, Int.neg_add_emod_self, Int.ofNat_eq_coe, Int.ofNat_zero_le, Int.sub_zero, Int.toNat_natCast_add_one, Int.zero_add, Int.zero_sub, Int.mul_add, Int.add_mul, Int.toNat_zero, Int.toNat_one, Int.add_sub_cancel, Nat.add_le_add_iff_right, Nat.add_left_cancel_iff, Nat.add_zero, Nat.le_add_left, Nat.le_add_right, Nat.le_refl, Nat.not_le, Nat.not_lt, Nat.reduceLeDiff, Nat.sub_le_iff_le_add, Nat.zero_add, Nat.zero_le, Nat.mul_add, Nat.add_mul, Nat.add_sub_cancel, and_imp, and_self, and_true, eq_iff_iff, forall_const, forall_eq, ge_iff_le, gt_iff_lt, iff_true, imp_false, imp_self, implies_true, not_and, not_exists, not_false_eq_true, Classical.not_imp, not_or, not_true_eq_false, true_and] <;> omega) | (intro tmp hg; subst tmp; rw [if_pos hg] at h_req0; exact h_req0) | (intro tmp hg; subst tmp; rw [if_neg hg] at h_req0; exact h_req0)")]
 pub fn apply_hom_symbol_exec(
     h: &RuntimeHomData,
     s: &RuntimeSymbol,
